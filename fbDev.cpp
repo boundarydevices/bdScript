@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.13  2002-12-04 13:56:40  ericn
+ * Revision 1.14  2002-12-07 21:01:06  ericn
+ * -added antialias() method for text rendering
+ *
+ * Revision 1.13  2002/12/04 13:56:40  ericn
  * -changed line() to specify top/left of line instead of center
  *
  * Revision 1.12  2002/12/04 13:12:53  ericn
@@ -503,6 +506,67 @@ void fbDevice_t :: box
    } // something is visible
 }
 
+void fbDevice_t :: antialias
+   ( unsigned char const *bmp,
+     unsigned short       bmpWidth,  // row stride
+     unsigned short       bmpHeight, // num rows in bmp
+     unsigned short       xLeft,     // display coordinates: clip to this rectangle
+     unsigned short       yTop,
+     unsigned short       xRight,
+     unsigned short       yBottom,
+     unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned height = yBottom-yTop+1 ;
+   if( height > bmpHeight )
+      height = bmpHeight ;
+   unsigned width = xRight-xLeft+1 ;
+   if( width > bmpWidth )
+      width = bmpWidth ; 
+
+   unsigned short const fullColor = get16( red, green, blue );
+
+   for( unsigned row = 0 ; row < height ; row++ )
+   {
+      if( yTop < getHeight() )
+      {
+         unsigned char const *alphaCol = bmp + (row*bmpWidth);
+         unsigned short      *screenPix = getRow( yTop++ ) + xLeft ;
+
+         unsigned short screenCol = xLeft ;
+         for( unsigned col = 0 ; col < width ; col++, screenCol++, screenPix++, alphaCol++ )
+         {
+            if( screenCol < getWidth() )
+            {
+               unsigned char const coverage = *alphaCol ;
+               if( 0xFF != coverage )
+               {
+                  if( 0 != coverage )
+                  {
+                     unsigned short const bgColor = *screenPix ;
+                     unsigned char const bgRed   = getRed( bgColor );
+                     unsigned char const bgGreen = getGreen( bgColor );
+                     unsigned char const bgBlue  = getBlue( bgColor );
+
+                     unsigned const alias = coverage + 1 ;
+                     unsigned const notAlias = 256 - alias ;
+                     
+                     unsigned mixRed = ((alias*red)+(notAlias*bgRed))/256 ;
+                     unsigned mixGreen = ((alias*red)+(notAlias*bgGreen))/256 ;
+                     unsigned mixBlue = ((alias*red)+(notAlias*bgBlue))/256 ;
+                     *screenPix = get16( mixRed, mixGreen, mixBlue );
+                  } // not entirely background, need to mix
+               } // not entirely foreground, need to mix
+               else
+                  *screenPix = fullColor ;                     
+            }
+            else
+               break;
+         }
+      }
+      else
+         break;
+   }
+}
 
 
 fbDevice_t :: ~fbDevice_t( void )

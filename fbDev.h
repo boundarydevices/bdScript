@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.8 2002-12-04 13:56:37 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.9 2002-12-07 21:01:19 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.8  2002-12-04 13:56:37  ericn
+ * Revision 1.9  2002-12-07 21:01:19  ericn
+ * -added antialias() method for text rendering
+ *
+ * Revision 1.8  2002/12/04 13:56:37  ericn
  * -changed line() to specify top/left of line instead of center
  *
  * Revision 1.7  2002/12/04 13:12:55  ericn
@@ -95,6 +98,17 @@ public:
              unsigned short x2, unsigned short y2,
              unsigned char penWidth,
              unsigned char red, unsigned char green, unsigned char blue );
+
+   // render anti-aliased alphamap in specified color to display with clipping
+   // always displays top left of source image.
+   void antialias( unsigned char const *bmp,
+                   unsigned short       bmpWidth,  // row stride
+                   unsigned short       bmpHeight, // num rows in bmp
+                   unsigned short       xLeft,     // display coordinates: clip to this rectangle
+                   unsigned short       yTop,
+                   unsigned short       xRight,
+                   unsigned short       yBottom,
+                   unsigned char red, unsigned char green, unsigned char blue );
 
 private:
    fbDevice_t( char const *name );
