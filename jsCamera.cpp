@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCamera.cpp,v $
- * Revision 1.2  2003-04-21 01:25:05  ericn
+ * Revision 1.3  2003-06-04 02:56:32  ericn
+ * -modified to allocate camera even if unplugged
+ *
+ * Revision 1.2  2003/04/21 01:25:05  ericn
  * -modified to use mmap
  *
  * Revision 1.1  2003/04/21 00:25:19  ericn
@@ -548,32 +551,32 @@ static JSBool jsCamera( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
    if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
    {
       JSString *sDevice = JSVAL_TO_STRING( argv[0] );
-      char const *const devicename = JS_GetStringBytes( sDevice );
-      int const fd = open(devicename, O_RDWR);
-      if( fd >= 0 )
+      JSObject *camera = JS_NewObject( cx, &jsCameraClass_, NULL, NULL );
+   
+      if( camera )
       {
-         struct video_capability vidcap ; 
-         struct video_window     vidwin ;
-         struct video_picture    vidpic ; 
-    
-         ioctl( fd, VIDIOCGCAP, &vidcap);
-         ioctl( fd, VIDIOCGWIN, &vidwin);
-         ioctl( fd, VIDIOCGPICT, &vidpic);
-         vidpic.palette = VIDEO_PALETTE_RGB24 ;
-         ioctl( fd, VIDIOCSPICT, &vidpic);
-
-         JSObject *camera = JS_NewObject( cx, &jsCameraClass_, NULL, NULL );
-      
-         if( camera )
+         fbDevice_t &fb = getFB();
+         
+         JS_DefineProperty( cx, camera, "device",
+                            STRING_TO_JSVAL( sDevice ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         char const *const devicename = JS_GetStringBytes( sDevice );
+         int const fd = open(devicename, O_RDWR);
+         if( fd >= 0 )
          {
-            fbDevice_t &fb = getFB();
-            
-            JS_DefineProperty( cx, camera, "device",
-                               STRING_TO_JSVAL( sDevice ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
+            struct video_capability vidcap ; 
+            struct video_window     vidwin ;
+            struct video_picture    vidpic ; 
+       
+            ioctl( fd, VIDIOCGCAP, &vidcap);
+            ioctl( fd, VIDIOCGWIN, &vidwin);
+            ioctl( fd, VIDIOCGPICT, &vidpic);
+            vidpic.palette = VIDEO_PALETTE_RGB24 ;
+            ioctl( fd, VIDIOCSPICT, &vidpic);
+            close( fd );
             JS_DefineProperty( cx, camera, "name",
                                STRING_TO_JSVAL( JS_NewStringCopyZ( cx, vidcap.name ) ),
                                0, 0, 
@@ -646,17 +649,17 @@ static JSBool jsCamera( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
                                JSPROP_ENUMERATE
                                |JSPROP_PERMANENT
                                |JSPROP_READONLY );
-
-            JS_SetPrivate( cx, camera, 0 );
-
-
-            *rval = OBJECT_TO_JSVAL(camera);
          }
+         else
+            JS_ReportError( cx, "Invalid camera device %s", devicename );
 
-         close( fd );
+         JS_SetPrivate( cx, camera, 0 );
+
+         *rval = OBJECT_TO_JSVAL(camera);
       }
       else
-         JS_ReportError( cx, "Invalid camera device %s", devicename );
+         JS_ReportError( cx, "Allocating camera device" );
+
    }
    else
       JS_ReportError( cx, "Usage: Camera( '/dev/video0' )" );
