@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.2  2003-09-22 02:07:35  ericn
+ * Revision 1.3  2003-10-01 01:07:55  ericn
+ * -added udpRxThread for receiving audio
+ *
+ * Revision 1.2  2003/09/22 02:07:35  ericn
  * -modified to keep running with no camera
  *
  * Revision 1.1  2003/09/14 18:08:03  ericn
@@ -417,6 +420,62 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
       perror( "VIDIOCGMBUF" );
 }
 
+struct deviceMsg_t {
+   enum type_e {
+      audio_e = 0
+   };
+
+   enum {
+      MAXSAMPLES = 0x2000
+   };
+   type_e         type_ ;
+   unsigned long  length_ ; // in bytes
+   unsigned short data_[MAXSAMPLES];
+};
+
+
+static void *udpRxThread( void *arg )
+{
+   threadParam_t const &params = *( threadParam_t const *)arg ;
+   int const fdAudio = params.mediaFd_ ;
+   while( 1 )
+   {
+      sockaddr_in fromAddr ;
+      deviceMsg_t msg ;
+      socklen_t   fromSize = sizeof( fromAddr );
+      int numRead = recvfrom( params.udpSock_, 
+                              (char *)&msg, sizeof( msg ), 0,
+                              (struct sockaddr *)&fromAddr, 
+                              &fromSize );
+      if( 0 < numRead )
+      {
+         if( deviceMsg_t :: audio_e == msg.type_ )
+         {
+            unsigned const expected = sizeof( msg )-sizeof( msg.data_ )+msg.length_ ;
+            if( expected == numRead )
+            {
+               int numWritten = write( fdAudio, msg.data_, msg.length_ );
+               if( numWritten == msg.length_ )
+               {
+                  printf( "%lu bytes of audio\n", msg.length_ );
+               }
+               else
+                  fprintf( stderr, "Error %m sending audio output\n" );
+            }
+            else
+               fprintf( stderr, "Weird size : len %lu, expected %lu, read %u\n", msg.length_, expected, numRead );
+         }
+         else
+            printf( "unknown msgtype %d\n", msg.type_ );
+      }
+      else
+      {
+         perror( "recvfrom" );
+         break;
+      }
+   }
+}
+
 static void ctrlcHandler( int signo )
 {
    printf( "<ctrl-c>\n" );
@@ -494,6 +553,12 @@ int main( int argc, char const * const argv[] )
                         int const udpSock = socket( AF_INET, SOCK_DGRAM, 0 );
                         if( 0 <= udpSock )
                         {
+                           sockaddr_in local ;
+                           local.sin_family      = AF_INET ;
+                           local.sin_addr.s_addr = INADDR_ANY ;
+                           local.sin_port        = 0x2020 ;
+                           bind( udpSock, (struct sockaddr *)&local, sizeof( local ) );
+
                            threadParam_t audioParams ; 
                            audioParams.remote_ = remote ;
                            audioParams.mediaFd_ = fdAudio ;
@@ -502,28 +567,62 @@ int main( int argc, char const * const argv[] )
                            int create = pthread_create( &audioHandle, 0, audioThread, &audioParams );
                            if( 0 == create )
                            {
-                              if( 0 <= fdCamera )
+                              threadParam_t audioOutParams = audioParams ;
+                              int fdAudioOut = open( "/dev/dsp", O_WRONLY );
+if( 0 > fdAudioOut )
+{
+   perror( "audioOut" );
+   return 0 ;
+}
+
+if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_SETFMT, &format) ) 
+{
+   perror( "SETFMT output" );
+   return 0 ;
+}
+
+if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_CHANNELS, &channels ) )
+   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
+
+if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_SPEED, &speed ) )
+   fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+
+                              audioOutParams.mediaFd_ = fdAudioOut ;
+                              pthread_t udpHandle ;
+                              create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
+                              if( 0 == create )
                               {
-                                 threadParam_t videoParams ; 
-                                 videoParams.remote_ = remote ;
-                                 videoParams.mediaFd_ = fdCamera ;
-                                 videoParams.udpSock_ = udpSock ;
-   
-                                 pthread_t videoHandle ;
-                                 create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
-                                 if( 0 == create )
+                                 if( 0 <= fdCamera )
                                  {
-                                    printf( "threads created... <ctrl-c> to stop\n" );
-                                    pause();
-                                    printf( "shutting down\n" );
-                                    pthread_cancel( videoHandle );
-                                    void *exitStat ;
-                                    pthread_join( videoHandle, &exitStat );
+                                    threadParam_t videoParams ; 
+                                    videoParams.remote_ = remote ;
+                                    videoParams.mediaFd_ = fdCamera ;
+                                    videoParams.udpSock_ = udpSock ;
+      
+                                    pthread_t videoHandle ;
+                                    create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
+                                    if( 0 == create )
+                                    {
+                                       printf( "threads created... <ctrl-c> to stop\n" );
+                                       pause();
+                                       printf( "shutting down\n" );
+                                       pthread_cancel( videoHandle );
+                                       void *exitStat ;
+                                       pthread_join( videoHandle, &exitStat );
+                                    }
                                  }
+                                 else
+                                 {   
+                                    printf( "no video... sending audio\n" );
+                                    pause();
+                                 }
+                                 pthread_cancel( udpHandle );
+                                 void *exitStat ;
+                                 pthread_join( udpHandle, &exitStat );
                               }
                               else
-                              {   
-                                 printf( "no video... sending audio\n" );
+                              {
+                                 printf( "error %mstarting udp thread\n" );
                                  pause();
                               }
 
