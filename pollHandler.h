@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.1 2003-10-05 19:15:44 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.2 2003-11-02 17:58:05 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-11-02 17:58:05  ericn
+ * -enhanced comment
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -67,7 +70,8 @@ public:
    void setMask( pollHandler_t &handler, short newMask );
 
    //
-   // returns true if at least one handler was notified
+   // returns true if at least one handler was notified, 
+   // false if timed out
    //
    bool poll( int ms );
 
