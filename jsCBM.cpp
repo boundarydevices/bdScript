@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.3  2003-05-10 19:16:43  ericn
+ * Revision 1.4  2003-05-18 21:52:26  ericn
+ * -added print( string ) method
+ *
+ * Revision 1.3  2003/05/10 19:16:43  ericn
  * -added cut command, modified to keep printer fd
  *
  * Revision 1.2  2003/05/10 03:18:54  ericn
@@ -63,7 +66,7 @@ fprintf( stderr, "--> Printing something\n" );
    *rval = JSVAL_FALSE ;
 
    JSObject *rhObj ;
-
+   JSString *sArg ;
    if( ( 1 == argc )
        &&
        JSVAL_IS_OBJECT( argv[0] ) 
@@ -140,7 +143,9 @@ fprintf( stderr, "--> Printing something\n" );
 
                int const numWritten = write( printerFd_, outBuf, nextOut-outBuf );
                printf( "wrote %d bytes\n", numWritten );
-         
+               
+               delete [] outBuf ;
+
                *rval = JSVAL_TRUE ;
             }
             else
@@ -153,8 +158,26 @@ fprintf( stderr, "--> Printing something\n" );
       else
          JS_ReportError( cx, "Error retrieving alphaMap fields" );
    }
+   else if( ( 1 == argc )
+            &&
+            JSVAL_IS_STRING( argv[0] )
+            &&
+            ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) )
+   {
+      if( 0 <= printerFd_ )
+      {
+         int const numWritten = write( printerFd_, 
+                                       JS_GetStringBytes( sArg ), 
+                                       JS_GetStringLength( sArg ) );
+         printf( "wrote %d string bytes\n", numWritten );
+   
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
+   }
    else
-      JS_ReportError( cx, "Usage: printer.print( alphaMap )" );
+      JS_ReportError( cx, "Usage: printer.print( alphaMap|string )" );
    
    return JS_TRUE ;
 }
