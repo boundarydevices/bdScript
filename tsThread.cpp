@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.7  2002-12-23 05:09:35  ericn
+ * Revision 1.8  2003-01-05 01:55:34  ericn
+ * -modified to have touch-screen thread close channel, added close() method
+ *
+ * Revision 1.7  2002/12/23 05:09:35  ericn
  * -modified to use either /dev/input/event0 or /dev/touchscreen/ucb1x00
  *
  * Revision 1.6  2002/12/15 00:00:22  ericn
@@ -49,6 +52,7 @@
 #else
 #define TSDEVICE "/dev/touchscreen/ucb1x00"
 #endif
+static bool volatile shutdown = false ;
 
 static void *tsThread( void *arg )
 {
@@ -62,7 +66,7 @@ static void *tsThread( void *arg )
    unsigned const height = fb.getHeight();
 
    int numRead ;
-   while( 0 <= ( numRead = ts_read( obj->tsDevice_, &sample, 1 ) ) )
+   while( !shutdown && ( 0 <= ( numRead = ts_read( obj->tsDevice_, &sample, 1 ) ) ) )
    {
       if( 1 == numRead )
       {
@@ -95,6 +99,8 @@ static void *tsThread( void *arg )
       } // translated value
    }
    
+   ts_close( obj->tsDevice_ );
+   
    fprintf( stderr, "touch screen thread shutting down due to error %m\n" );
 
    return 0 ;
@@ -122,23 +128,7 @@ touchScreenThread_t :: touchScreenThread_t( void )
 
 touchScreenThread_t :: ~touchScreenThread_t( void )
 {
-   if( isOpen() )
-   {
-//      close( fdDevice_ );
-//      fdDevice_ = -1 ;
-      ts_close( tsDevice_ );
-      tsDevice_ = 0 ;
-   }
-
-   if( isRunning() )
-   {
-      pthread_t thread = (pthread_t)threadHandle_ ;
-      threadHandle_ = -1 ;
-
-      pthread_cancel( thread );
-      void *exitStat ;
-      pthread_join( thread, &exitStat );
-   }
+   close();
 }
 
 void touchScreenThread_t :: onTouch
@@ -157,6 +147,7 @@ void touchScreenThread_t :: onMove
    ( unsigned        x, 
      unsigned        y )
 {
+   printf( "moveTo %u,%u\n", x, y );
 }
 
 bool touchScreenThread_t :: begin( void )
@@ -170,6 +161,20 @@ bool touchScreenThread_t :: begin( void )
    }
    else
       return false ;
+}
+
+void touchScreenThread_t :: close( void )
+{
+   shutdown = true ;
+   if( isRunning() )
+   {
+      pthread_t thread = (pthread_t)threadHandle_ ;
+      threadHandle_ = -1 ;
+
+      pthread_cancel( thread );
+      void *exitStat ;
+      pthread_join( thread, &exitStat );
+   }
 }
 
 #ifdef __MODULETEST__
@@ -187,9 +192,17 @@ int main( void )
       }
       else
          fprintf( stderr, "Error starting thread\n" );
+
+      printf( "shutting down thread\n" );
+
    }
    else
       fprintf( stderr, "Error opening touch device\n" );
+
+   printf( "shutdown complete\n" );
+   
+   sleep( 10 );
+
    return 0 ;
 }
 
