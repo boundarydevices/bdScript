@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.1  2003-08-03 19:27:56  ericn
+ * Revision 1.2  2003-08-04 12:39:01  ericn
+ * -added sound support
+ *
+ * Revision 1.1  2003/08/03 19:27:56  ericn
  * -Initial import
  *
  *
@@ -32,6 +35,8 @@
 #include <linux/timer.h>
 #include "semClasses.h"
 #include "codeQueue.h"
+#include "flash/sound.h"
+#include "audioQueue.h"
 
 extern JSClass jsFlashClass_ ;
 
@@ -84,13 +89,67 @@ getSwf(char *url, int level, void *client_data)
 	printf("GetSwf : %s\n", url);
 }
 
+class flashSoundMixer : public SoundMixer {
+// Class variables
+static  long		 dsp;		// Descriptor for /dev/dsp
+static  char *		 buffer;	// DMA buffer
+static	long		 blockSize;
+static	long		 nbInst;	// Number of instances
+
+	// Sound Device Capabilities
+static	long		 soundRate;	// In hz
+static	long		 stereo;	// True if stereo sound
+static	long		 sampleSize;	// 1 or 2 bytes
+
+public:
+	flashSoundMixer();
+	~flashSoundMixer();
+
+	void		 startSound(Sound *sound);	// Register a sound to be played
+	void		 stopSounds();		// Stop every current sounds in the instance
+};
+
+flashSoundMixer :: flashSoundMixer()
+   : SoundMixer( "" ) // keep it happy
+{
+}
+
+flashSoundMixer :: ~flashSoundMixer()
+{
+}
+
+#include "hexDump.h"
+
+static void flashSoundComplete( void *param )
+{
+   printf( "flashSoundComplete:%p\n", param );
+}
+
+void flashSoundMixer :: startSound(Sound *sound)
+{
+   getAudioQueue().queuePlayback( (unsigned char *)sound->getSamples(), 
+                                  sound->getSampleSize()*sound->getNbSamples(),
+                                  sound,
+                                  flashSoundComplete );
+}
+
+void flashSoundMixer :: stopSounds()
+{
+   unsigned numCancelled ;
+   getAudioQueue().clear( numCancelled );
+}
+
 static void *flashThreadRoutine( void *param )
 {
    flashPrivate_t &priv = *( flashPrivate_t * )param ;
 
    bool completed = false ;
    
-   FlashSoundInit( priv.flashHandle_, "/dev/dsp");
+   FlashMovie *fh = (FlashMovie *)priv.flashHandle_ ;
+
+   fh->sm = new flashSoundMixer();
+
+//   FlashSoundInit( priv.flashHandle_, "/dev/dsp");
    
    fbDevice_t &fb = getFB();
    FlashDisplay display ;
