@@ -28,27 +28,30 @@ dirTest: Makefile dirTest.o
 curlGetMain.o: curlCache.h curlGet.h curlGet.cpp Makefile
 	$(CC) -c -o curlGetMain.o -O2 -DSTANDALONE curlGet.cpp
 
-curlGet: curlGetMain.o curlCache.o dirByATime.o memFile.o Makefile
-	$(CC) -o curlGet curlGetMain.o curlCache.o dirByATime.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
+curlGet: curlGetMain.o curlCache.o relativeURL.o ultoa.o dirByATime.o memFile.o Makefile
+	$(CC) -o curlGet curlGetMain.o curlCache.o relativeURL.o ultoa.o dirByATime.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
 
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -c -o urlTest.o -O2 -DSTANDALONE -I ../zlib urlFile.cpp
 
-urlTest: urlTest.o curlCache.o dirByATime.o
-	$(CC) -o urlTest urlTest.o curlCache.o dirByATime.o $(LIBS) -lstdc++ -lcurl -lz
+urlTest: urlTest.o curlCache.o relativeURL.o ultoa.o dirByATime.o
+	$(CC) -o urlTest urlTest.o curlCache.o relativeURL.o ultoa.o dirByATime.o $(LIBS) -lstdc++ -lcurl -lz
+
+mp3Play: mp3Play.o curlCache.o dirByATime.o relativeURL.o ultoa.o 
+	$(CC) -o mp3Play mp3Play.o curlCache.o dirByATime.o relativeURL.o ultoa.o $(LIBS) -lstdc++ -lcurl -lz -lmad
 
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o dirByATime.o fbDev.o hexDump.o ultoa.o jsText.o jsMP3.o jsURL.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o jsMP3.o jsURL.o dirByATime.o fbDev.o \
+testJS: testJS.o childProcess.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o dirByATime.o fbDev.o hexDump.o ultoa.o jsText.o jsMP3.o jsURL.o relativeURL.o Makefile
+	$(CC) -o testJS testJS.o childProcess.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o jsMP3.o jsURL.o relativeURL.o dirByATime.o fbDev.o \
       hexDump.o ultoa.o \
-      $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lm -lz
+      $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lm -lz
 
 ifneq (,$(findstring arm, $(CC)))
-   all: curlCache curlGet dirTest urlTest testJS
+   all: curlGet dirTest urlTest testJS mp3Play
 else
-   all: curlCache curlGet dirTest urlTest testJS
+   all: curlCache curlGet dirTest urlTest testJS mp3Play
 endif
 
 
