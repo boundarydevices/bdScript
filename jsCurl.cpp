@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.17  2002-12-03 13:36:13  ericn
+ * Revision 1.18  2002-12-15 20:01:52  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.17  2002/12/03 13:36:13  ericn
  * -collapsed code and objects for curl transfers
  *
  * Revision 1.16  2002/12/02 15:19:22  ericn
@@ -122,7 +125,7 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsCurlClass_, NULL, NULL );
 
       if( thisObj )
       {

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.17  2002-12-15 00:07:58  ericn
+ * Revision 1.18  2002-12-15 20:01:25  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.17  2002/12/15 00:07:58  ericn
  * -removed debug msgs
  *
  * Revision 1.16  2002/12/03 13:36:13  ericn
@@ -233,7 +236,7 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsMp3Class_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsMp3Class_, NULL, NULL );
 
       if( thisObj )
       {

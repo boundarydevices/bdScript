@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.24  2002-12-15 00:10:10  ericn
+ * Revision 1.25  2002-12-15 20:01:37  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.24  2002/12/15 00:10:10  ericn
  * -removed debug msgs
  *
  * Revision 1.23  2002/12/15 00:08:46  ericn
@@ -118,6 +121,7 @@
 #include "urlFile.h"
 #include "jsPopen.h"
 #include "jsEnviron.h"
+#include "jsTCP.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -264,6 +268,7 @@ int prMain(int argc, char **argv)
                      initJSButton( cx, glob );
                      initJSPopen( cx, glob );
                      initJSEnv( cx, glob );
+                     initJSTCP( cx, glob );
 
                      getCurlCache();
 

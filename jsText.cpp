@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.11  2002-12-03 13:36:13  ericn
+ * Revision 1.12  2002-12-15 20:01:09  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.11  2002/12/03 13:36:13  ericn
  * -collapsed code and objects for curl transfers
  *
  * Revision 1.10  2002/11/30 16:26:50  ericn
@@ -782,7 +785,7 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsFontClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsFontClass_, NULL, NULL );
 
       if( thisObj )
       {

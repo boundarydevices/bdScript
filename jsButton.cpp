@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.11  2002-12-11 04:04:48  ericn
+ * Revision 1.12  2002-12-15 20:01:44  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.11  2002/12/11 04:04:48  ericn
  * -moved buttonize code from button to fbDev
  *
  * Revision 1.10  2002/12/07 23:19:48  ericn
@@ -316,7 +319,7 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
        && 
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsButtonClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsButtonClass_, NULL, NULL );
 
       if( thisObj )
       {

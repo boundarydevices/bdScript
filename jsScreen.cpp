@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.9  2002-12-11 04:04:48  ericn
+ * Revision 1.10  2002-12-15 20:01:16  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.9  2002/12/11 04:04:48  ericn
  * -moved buttonize code from button to fbDev
  *
  * Revision 1.8  2002/12/06 02:23:07  ericn
@@ -453,7 +456,7 @@ static JSPropertySpec screenProperties_[] = {
 //
 static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   obj = js_NewObject( cx, &jsScreenClass_, NULL, NULL );
+   obj = JS_NewObject( cx, &jsScreenClass_, NULL, NULL );
 
    if( obj )
    {

@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.1  2002-11-02 18:39:42  ericn
+ * Revision 1.2  2002-12-15 20:01:57  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.1  2002/11/02 18:39:42  ericn
  * -Initial import
  *
  *
@@ -185,7 +188,7 @@ static JSBool alphaMap( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsAlphaMapClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsAlphaMapClass_, NULL, NULL );
 
       if( thisObj )
       {

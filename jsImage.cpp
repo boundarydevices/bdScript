@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.20  2002-12-03 13:36:13  ericn
+ * Revision 1.21  2002-12-15 20:01:30  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.20  2002/12/03 13:36:13  ericn
  * -collapsed code and objects for curl transfers
  *
  * Revision 1.19  2002/11/30 16:26:00  ericn
@@ -262,7 +265,7 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
        && 
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsImageClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsImageClass_, NULL, NULL );
 
       if( thisObj )
       {

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.7  2002-12-14 23:59:58  ericn
+ * Revision 1.8  2002-12-15 20:01:04  ericn
+ * -modified to use JS_NewObject instead of js_NewObject
+ *
+ * Revision 1.7  2002/12/14 23:59:58  ericn
  * -removed redundant touch code
  *
  * Revision 1.6  2002/11/30 23:45:49  ericn
@@ -266,7 +269,7 @@ static JSBool touch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
        && 
        ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
    {
-      JSObject *thisObj = js_NewObject( cx, &jsTouchClass_, NULL, NULL );
+      JSObject *thisObj = JS_NewObject( cx, &jsTouchClass_, NULL, NULL );
 
       if( thisObj )
       {
