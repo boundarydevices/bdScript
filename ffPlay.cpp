@@ -512,17 +512,22 @@ static void *outThread( void *param )
                      }
                      else 
                      {
+/*
                         if( ai.fragments > ai.fragstotal / 2 )
                            queue.displayFrames_ = PIC_MASK_CODING_TYPE_I ; // skip most
                         else
                            queue.displayFrames_ = PIC_MASK_CODING_TYPE_I | PIC_MASK_CODING_TYPE_P ; // skip B
+*/                           
+//                        if( ai.fragments > ai.fragstotal / 2 )
+//                           queue.displayFrames_ = PIC_MASK_CODING_TYPE_I | PIC_MASK_CODING_TYPE_P ; // skip B
+                        queue.displayFrames_ = PIC_MASK_CODING_TYPE_I | PIC_MASK_CODING_TYPE_P ; // skip B
                         break;
                      }
                   }
                   else
                   {
                      printf( "stall\n" );
-                     queue.displayFrames_ = PIC_MASK_CODING_TYPE_I ; // skip most
+//                     queue.displayFrames_ = PIC_MASK_CODING_TYPE_I ; // skip most
                      if( queue.wait() )
                         first = true ;
                      break;
@@ -640,6 +645,9 @@ printf( "pre-read %lu.%lu seconds\n", elapsed/1000000, elapsed % 1000000 );
    }
 }
 
+static unsigned char  assEnd[4096];
+static unsigned short assEndLength = 0 ;
+
 void main( int argc, char const * const argv[] )
 {
    yuv2rgb_c_init();
@@ -755,7 +763,21 @@ void main( int argc, char const * const argv[] )
                                  nextA->when_ = pkt.pts ;
                                  if( flags & ( 1<<CODEC_TYPE_AUDIO ) )
                                  {
-                                    mad_stream_buffer( &stream, pkt.data, pkt.size );
+                                    if( 0 != assEndLength )
+                                    {
+                                       mad_stream_buffer( &stream, assEnd, assEndLength );
+                                       if( sizeof( assEnd ) > pkt.size + assEndLength )
+                                       {
+                                          memcpy( assEnd+assEndLength, pkt.data, pkt.size );
+                                          assEndLength += pkt.size ;
+                                          mad_stream_buffer( &stream, assEnd, assEndLength );
+                                       }
+                                       else
+                                          fprintf( stderr, "packet too big %lu/%lu\n", assEndLength, pkt.size );
+                                       assEndLength = 0 ;
+                                    }
+                                    else
+                                       mad_stream_buffer( &stream, pkt.data, pkt.size );
                                     if( !haveMadHeader )
                                     {
                                        haveMadHeader = ( -1 != mad_header_decode( &header, &stream ) );
@@ -843,7 +865,19 @@ void main( int argc, char const * const argv[] )
                                              if( MAD_RECOVERABLE( stream.error ) )
                                                 ;
                                              else 
+                                             {
+                                                if( MAD_ERROR_BUFLEN != stream.error )
+                                                   fprintf( stderr, "Error %d decoding audio frame\n", stream.error );
+                                                else if( 0 != stream.next_frame )
+                                                {
+                                                   assEndLength = stream.bufend-stream.next_frame ;
+                                                   memcpy( assEnd, stream.next_frame, assEndLength );
+//                                                   fprintf( stderr, "tail frame %p/%p/%lu, %lu\n", stream.next_frame, stream.main_data, stream.md_len, stream.bufend-stream.next_frame );
+                                                }
+                                                else
+                                                   assEndLength = 0 ;
                                                 break;
+                                             }
                                           }
                                        } while( 1 );
                                     }
@@ -900,6 +934,9 @@ void main( int argc, char const * const argv[] )
                                              else if( PIC_FLAG_CODING_TYPE_I - 1 == picType )
                                                 skippedP = false ;
    
+                                             if( skip )
+                                                ++numSkipped ;
+
                                              mpeg2_skip( mpeg2dec, skip );
                                              break;
                                           }
@@ -944,8 +981,7 @@ void main( int argc, char const * const argv[] )
                                                 }
                                                 else
                                                 {
-                                                   ++numSkipped ;
-                                                } // skipping frame
+                                                } // not a valid picture
                                              }
                                              break;
                                           }
