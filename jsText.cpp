@@ -9,7 +9,13 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.12  2002-12-15 20:01:09  ericn
+ * Revision 1.13  2003-01-03 16:57:00  ericn
+ * -removed jsText function
+ *
+ * Revision 1.13  2003/01/03 16:56:41  ericn
+ * -removed jsText function
+ *
+ * Revision 1.12  2002/12/15 20:01:09  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.11  2002/12/03 13:36:13  ericn
@@ -173,240 +179,6 @@ printf( "colors == fg %u/%u/%u, bg %u/%u/%u\n",
          }
       }
    } // sanity check
-}
-
-static JSType const jsTextParamTypes[] = {
-   JSTYPE_STRING,    // 0 .ttf font data
-   JSTYPE_NUMBER,    // 1 point size
-   JSTYPE_NUMBER,    // 2 x position
-   JSTYPE_NUMBER,    // 3 y position (baseline)
-   JSTYPE_STRING,    // 4 string to render
-   JSTYPE_NUMBER,    // 5 fg color (0xFFFFFFFF to invert)
-   JSTYPE_NUMBER     // 6 fg color (0xFFFFFFFF for transparent)
-};
-
-static unsigned char const jsTextRequired = 5 ;
-static unsigned char const jsTextMaxParams = sizeof( jsTextParamTypes ) / sizeof( jsTextParamTypes[0] );
-
-static JSBool
-jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   if( ( jsTextRequired  <= argc ) 
-       &&
-       ( jsTextMaxParams >= argc ) )
-   {
-      int penX = 0 ;
-      int penY = 0 ;
-      int fontHeight = 0 ;
-      bool okay = true ;
-      for( int arg = 0 ; okay && ( arg < argc ) ; arg++ )
-      {
-         JSType const paramType = JS_TypeOfValue( cx, argv[arg] );
-         if( paramType != jsTextParamTypes[arg] )
-         {
-            printf( "Invalid type for arg %d\n", arg );
-            okay = false ;
-         }
-      } // check type of each parameter
-      
-      if( okay )
-      {
-         FT_Library library ;
-         int error = FT_Init_FreeType( &library );
-         if( 0 != error )
-         {
-            fprintf( stderr, "Error %d initializing freeType library\n", error );
-            exit( 3 );
-         }
-
-//         initFreeType();
-
-         JSString *fontString = JS_ValueToString( cx, argv[0] );
-         if( fontString )
-         {
-            FT_Face face;      /* handle to face object */
-
-            error = FT_New_Memory_Face( library, 
-                                        (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
-                                        JS_GetStringLength(fontString),    /* size in bytes        */
-                                        0,                          /* face_index           */
-                                        &face );
-            if( 0 == error )
-            {
-               int const pointSize = JSVAL_TO_INT( argv[1] );
-               if( 0 < pointSize )
-               {
-                  if( face->face_flags & FT_FACE_FLAG_SCALABLE )
-                     error = FT_Set_Char_Size( face, 0, pointSize*64, 80, 80 );
-                  else
-                     error = 0 ;
-                  if( 0 == error )
-                  {
-                     penX = JSVAL_TO_INT( argv[2] );
-                     penY = JSVAL_TO_INT( argv[3] );
-                     
-                     unsigned long fg = 0xFFFFFF ;
-                     unsigned long bg = 0 ;
-                     if( argc > 5 )
-                     {
-                        fg = (unsigned long)JSVAL_TO_INT( argv[5] );
-                        if( 6 < argc )
-                           bg = (unsigned long)JSVAL_TO_INT( argv[6] );
-                     }
-                     
-                     fontHeight = FT_MulFix( face->height, face->size->metrics.y_scale ) / 64 ;
-
-                     JSString *textString = JS_ValueToString( cx, argv[4] );
-
-                     if( textString )
-                     {
-                        fbDevice_t &fb = getFB();
-
-                        FT_UInt prevGlyph = 0 ; // used for kerning
-                        FT_Bool useKerning = FT_HAS_KERNING( face );
-
-                        jschar const *sText = JS_GetStringChars( textString );
-                        while( jschar const c = *sText++ )
-                        {
-                           // three things can happen here:
-                           //    1. we can load the char index and glyph, at which 
-                           //       point we can ask about kerning.
-                           //    2. we can't load the char index, but can render directly,
-                           //       which means we can't kern
-                           //    3. everything failed
-                           //
-
-                           bool haveGlyph = false ;
-                           int  kern = 0 ;
-
-                           FT_UInt glIndex = FT_Get_Char_Index( face, c );
-                           if( 0 < glIndex )
-                           {
-//                              printf( "glyph index for <%c> == %u\n", c, glIndex );
-                              error = FT_Load_Glyph( face, glIndex, FT_LOAD_DEFAULT );
-                              if( 0 == error )
-                              {
-                                 if( face->glyph->format != ft_glyph_format_bitmap )
-                                 {
-//                                    printf( "rendering...\n" );
-                                    error = FT_Render_Glyph( face->glyph, ft_render_mode_normal );
-                                    if( 0 == error )
-                                    {
-                                       haveGlyph = true ;
-                                       if( useKerning && ( 0 != prevGlyph ) )
-                                       {
-                                          FT_Vector  delta;
-                                          FT_Get_Kerning( face, prevGlyph, glIndex, ft_kerning_default, &delta );
-                                          kern = delta.x / 64 ;
-//                                          printf( "kerning => %d\n", kern );
-                                       }
-                                    }
-                                    else
-                                       fprintf( stderr, "Error %d rendering glyph\n", error );
-                                 }
-                                 else
-                                 {
-                                    fprintf( stderr, "Bitmap rendered directly\n" );
-                                    haveGlyph = true ;
-                                 }
-                              }
-                              else
-                              {
-                                 fprintf( stderr, "Error %d loading glyph\n", error );
-                              }
-                           }
-                           else
-                           {
-//                              printf( "try to load char directly\n" );
-                              haveGlyph = ( 0 == FT_Load_Char( face, c, FT_LOAD_RENDER ) );
-                           }
-
-                           if( haveGlyph )
-                           {
-                              // 
-                              // Whew! A lot of stuff was done to get here, but now
-                              // we have a bitmap (face->glyph->bitmap) (actually a 
-                              // byte-map with the image data in 1/255ths
-                              //
-/*
-                              printf( "   rows  %d\n", face->glyph->bitmap.rows );
-                              printf( "   width %d\n", face->glyph->bitmap.width );
-                              printf( "   pitch %d\n", face->glyph->bitmap.pitch );
-                              printf( "  #grays %d\n", face->glyph->bitmap.num_grays );
-                              printf( "   pixMode %d\n", face->glyph->bitmap.pixel_mode );
-                              printf( "   palMode %d\n", face->glyph->bitmap.palette_mode );
-                              
-                              printf( "displaying at %d, %d\n",
-                                      penX + face->glyph->bitmap_left, 
-                                      penY + face->glyph->bitmap_top );
-*/
-
-                              render( fb, face->glyph->bitmap, 
-                                      penX + face->glyph->bitmap_left, 
-                                      penY - face->glyph->bitmap_top,
-                                      fg, bg );
-
-                              penX += ( face->glyph->advance.x / 64 );
-                              penY += ( face->glyph->advance.y / 64 );
-
-//                              printf( "new position %d, %d\n", penX, penY );
-                           }
-                           else
-                           {
-                              fprintf( stderr, "Undefined char <0x%02x>\n", (unsigned char)(c) );
-                           }
-                           
-                           prevGlyph = glIndex ;
-
-                        }
-                     }
-                     else
-                        fprintf( stderr, "Error extracting text string\n" );
-                  }
-                  else
-                     fprintf( stderr, "Error %d setting point size\n", error );
-               }
-               else
-                  fprintf( stderr, "Invalid point size %d\n", pointSize );
-
-               FT_Done_Face( face );
-            }
-            else
-               fprintf( stderr, "Error %d loading face\n", error );
-         }
-         else
-            fprintf( stderr, "Error retrieving font data string\n" );
-         
-         error = FT_Done_FreeType( library );
-         if( 0 != error )
-         {
-            fprintf( stderr, "Error %d initializing freeType library\n", error );
-            exit( 3 );
-         }
-      }
-
-      *rval = JSVAL_FALSE ;
-
-      JSObject *returnObject = JS_NewObject( cx, 0, 0, obj );
-      if( returnObject )
-      {
-         if( JS_DefineProperty( cx, returnObject, "x", INT_TO_JSVAL(penX), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE )
-             &&
-             JS_DefineProperty( cx, returnObject, "y", INT_TO_JSVAL(penY), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE )
-             &&
-             JS_DefineProperty( cx, returnObject, "height", INT_TO_JSVAL(fontHeight), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-         {
-            *rval = OBJECT_TO_JSVAL(returnObject);
-         }
-      }
-         
-      return JS_TRUE ;
-   
-   } // have required # of params
-   else
-      printf( "Invalid parameter count\n" );
-
-   return JS_FALSE ;
 }
 
 static char const * const faceFlagNames_[] = {
@@ -810,12 +582,6 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
 
 }
 
-static JSFunctionSpec text_functions[] = {
-    {"jsText",           jsText,        1 },
-    {0}
-};
-
-
 bool initJSText( JSContext *cx, JSObject *glob )
 {
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsFontClass_,
@@ -825,7 +591,7 @@ bool initJSText( JSContext *cx, JSObject *glob )
                                   0, 0 );
    if( rval )
    {
-      return JS_DefineFunctions( cx, glob, text_functions);
+      return true ;
    }
    
    return false ;
