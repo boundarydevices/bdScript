@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.61  2003-09-10 04:56:30  ericn
+ * Revision 1.62  2003-11-22 21:02:37  ericn
+ * -made code queue a pollHandler_t
+ *
+ * Revision 1.61  2003/09/10 04:56:30  ericn
  * -Added UDP support
  *
  * Revision 1.60  2003/09/09 03:58:34  ericn
@@ -321,15 +324,18 @@ jsMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 // returns true if execution should continue
-static bool mainLoop( JSContext *cx )
+static bool mainLoop( pollHandlerSet_t &polls,
+                      JSContext        *cx )
 {
-   if( !pollCodeQueue( cx, 5000, 1 ) )
+   if( !polls.poll( 5000 ) )
    {
       mutexLock_t lock( execMutex_ );
       JS_GC( cx );
    }
    return !( gotoCalled_ || execCalled_ || exitRequested_ );
 }
+
+pollHandlerSet_t pollHandlers_ ;
 
 static JSBool
 jsWaitFor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
@@ -341,7 +347,7 @@ jsWaitFor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
        && 
        ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, argv[1] ) ) )
    {
-      while( mainLoop( cx ) )
+      while( mainLoop( pollHandlers_, cx ) )
       {
          jsval functionReturn ;
          JSFunction *function = JS_ValueToFunction( cx, argv[1] );
@@ -446,7 +452,7 @@ int prMain(int argc, char **argv)
                      initJSTimer( cx, glob );
                      initJSScreen( cx, glob );
                      initJSText( cx, glob );
-                     initializeCodeQueue( cx, glob );
+                     initializeCodeQueue( pollHandlers_, cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
                      initJSJPEG( cx, glob );
@@ -538,7 +544,7 @@ int prMain(int argc, char **argv)
                            {
                               unsigned numEvents = 0 ;
 
-                              while( mainLoop( cx ) )
+                              while( mainLoop( pollHandlers_, cx ) )
                                  ;
 //                                 printf( "in main loop\n" );
                            }

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.16  2003-11-22 20:20:41  ericn
+ * Revision 1.17  2003-11-22 21:02:37  ericn
+ * -made code queue a pollHandler_t
+ *
+ * Revision 1.16  2003/11/22 20:20:41  ericn
  * -use pipe for code queue
  *
  * Revision 1.15  2003/09/05 13:04:44  ericn
@@ -327,42 +330,6 @@ void codeFilter_t :: unlink( void )
       fprintf( stderr, "Error locking filter mutex\n" );
 }
 
-//
-// returns true and a string full of bytecode if
-// successful, false on timeout
-//
-bool pollCodeQueue( JSContext *cx,
-                    unsigned   milliseconds,
-                    unsigned   iterations )
-{
-   context_ = cx ;
-
-   for( unsigned i = 0 ; i < iterations ; i++ )
-   {
-      callbackAndData_t cbd ;
-      pollfd filedes ;
-      filedes.fd = codeListRead_ ;
-      filedes.events = POLLIN ;
-      if( 0 < poll( &filedes, 1, milliseconds ) )
-      {
-         int const numRead = read( codeListRead_, &cbd, sizeof( cbd ) );
-         if( ( sizeof(cbd) == numRead ) && ( 0 != cbd.callback_ ) )
-         {
-            cbd.callback_( cbd.cbData_ );
-   
-            if( gotoCalled_ || execCalled_ || exitRequested_ )
-               break;
-         }
-         else
-            return ( sizeof(cbd) != numRead) ; // timed out
-      }
-      else
-         return false ;
-   }
-
-   return true ; // not timed out
-}
-
 void abortCodeQueue( void )
 {
    int const fds[2] = {
@@ -374,9 +341,33 @@ void abortCodeQueue( void )
 }
 
 
+class codeQueueHandler_t : public pollHandler_t {
+public:
+   codeQueueHandler_t( int readFd, pollHandlerSet_t &set )
+      : pollHandler_t( readFd, set )
+   {
+      setMask( POLLIN );
+   }
+
+   //
+   // These routines should return true if the handler
+   // still wants callbacks on the same events.
+   //
+   virtual void onDataAvail( void );     // POLLIN
+};
+
+void codeQueueHandler_t::onDataAvail( void )
+{
+   callbackAndData_t cbd ;
+   int const numRead = read( fd_, &cbd, sizeof( cbd ) );
+   if( ( sizeof(cbd) == numRead ) && ( 0 != cbd.callback_ ) )
+      cbd.callback_( cbd.cbData_ );
+}
+
 void initializeCodeQueue
-   ( JSContext *cx,
-     JSObject  *glob )
+   ( pollHandlerSet_t &pollSet,
+     JSContext        *cx,
+     JSObject         *glob )
 {
    int fds[2];
    if( 0 == pipe( fds ) )
@@ -385,6 +376,8 @@ void initializeCodeQueue
       codeListWrite_ = fds[1];
       context_ = cx ;
       global_  = glob ;
+      codeQueueHandler_t *const handler = new codeQueueHandler_t( codeListRead_, pollSet );
+      pollSet.add( *handler );
    }
    else
    {

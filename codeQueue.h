@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.10 2003-09-05 13:04:32 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.11 2003-11-22 21:02:37 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.10  2003-09-05 13:04:32  ericn
+ * Revision 1.11  2003-11-22 21:02:37  ericn
+ * -made code queue a pollHandler_t
+ *
+ * Revision 1.10  2003/09/05 13:04:32  ericn
  * -made pollCodeQueue() return bool (not timed out)
  *
  * Revision 1.9  2003/07/06 01:21:37  ericn
@@ -56,6 +59,7 @@
 #include <string>
 #include "js/jsapi.h"
 #include "dlList.h"
+#include "pollHandler.h"
 
 //
 // returns true if queued successfully, 
@@ -133,16 +137,6 @@ private:
 };
 
 
-//
-// returns when idle for specified time in milliseconds,
-// when 'iterations' fragments of code have been executed,
-// or upon a 'gotoURL' call
-//
-// returns true if not timed out
-//
-bool pollCodeQueue( JSContext *cx,
-                    unsigned   milliseconds,
-                    unsigned   iterations );
 
 //
 // called to terminate the normal read cycle of the code 
@@ -154,8 +148,9 @@ void abortCodeQueue( void );
 // This should be called after the initial script is 
 // evaluated to establish a run-time context
 //
-void initializeCodeQueue( JSContext *cx,
-                          JSObject  *glob );
+void initializeCodeQueue( pollHandlerSet_t &pollSet,
+                          JSContext        *cx,
+                          JSObject         *glob );
 
 #endif
 
