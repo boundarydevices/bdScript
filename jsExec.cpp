@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.28  2003-01-05 01:51:45  ericn
+ * Revision 1.29  2003-01-06 04:30:53  ericn
+ * -added exception handling
+ *
+ * Revision 1.28  2003/01/05 01:51:45  ericn
  * -stack dump exception handler
  *
  * Revision 1.27  2002/12/27 23:30:23  ericn
@@ -378,7 +381,10 @@ void handler(int sig)
    fprintf( stderr, "got signal, stack == %p (id %x)\n", &sig, me );
    fprintf( stderr, "sighandler at %p\n", handler );
 
-   hexDumper_t dumpStack( &sig, 512 );
+   unsigned long addr = (unsigned long)&sig ;
+   unsigned long page = addr & ~0xFFF ; // 4K
+   unsigned long size = page+0x1000-addr ;
+   hexDumper_t dumpStack( &sig, size ); // just dump this page
    while( dumpStack.nextLine() )
       fprintf( stderr, "%s\n", dumpStack.getLine() );
 
@@ -400,7 +406,7 @@ int main( int argc, char *argv[] )
    // Set up the signal handler
    sigaction(SIGSEGV, &sa, NULL);
 
-   printf( "main thread %p (id %x)\n", &argc, pthread_self() );
+   printf( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
    
    int result = PR_Initialize( prMain, argc, argv, 0 );
    if( gotoCalled_ )
