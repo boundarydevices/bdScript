@@ -2,6 +2,8 @@
 #include "SRle.h"
 #include "SImageDataRLE.h"
 
+extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
+extern "C" unsigned long uShiftRight(ULONGLONG* m_nextBitsBuffer,int shift);
 
 //#undef ZeroMemory
 //#define ZeroMemory(dest,count)  ZeroMem(count,dest)
@@ -576,13 +578,14 @@ ImageData* SRle::Decode()
 		DWORD* p = colMap+1;
 		while (*p) p+=2;
 		p--;		//0,0 (last) entry of column map
-		DWORD rowCnt = (((DWORD)(pBlue-pS->m_yCbCrSamples[0]))/width);
+		DWORD rem;
+		DWORD rowCnt = uDivRem(((DWORD)(pBlue-pS->m_yCbCrSamples[0])),width,&rem);
 		ExpandCols(pS->m_yCbCrSamples[0],width,compressedWidth,rowCnt,p);
 
-		rowCnt = (((DWORD)(pGreen-pS->m_yCbCrSamples[1]))/width);
+		rowCnt = uDivRem(((DWORD)(pGreen-pS->m_yCbCrSamples[1])),width,&rem);
 		ExpandCols(pS->m_yCbCrSamples[1],width,compressedWidth,rowCnt,p);
 
-		rowCnt = (((DWORD)(pRed-pS->m_yCbCrSamples[2]))/width);
+		rowCnt = uDivRem(((DWORD)(pRed-pS->m_yCbCrSamples[2])),width,&rem);
 		ExpandCols(pS->m_yCbCrSamples[2],width,compressedWidth,rowCnt,p);
 		delete[] rowMap;
 		delete[] colMap;
@@ -632,19 +635,24 @@ int SRle::readWord()
 	return i;
 }
 
-
+static inline int Get3Bytes(BYTE* p)
+{
+	return *p | (*(p+1) << 8) | (*(p+2) << 16);
+}
 
 int SRle::GetHuffColor()
 {
 	BYTE* p = (BYTE*)&m_nextBitsBuffer;
 	while (m_bitsOverDword<0)
 	{
-		*((DWORD*)(p+1)) = *((DWORD*)p);
-		*p = readByte();	//new byte is least significant
+		DWORD d = *((DWORD*)p);
+		*(p+4) = (BYTE)(d>>24);
+		*((DWORD*)p) = (d<<8) | readByte();	//new byte is least significant
 		m_bitsOverDword+=8;
 	}
 #ifdef NOASM
-	DWORD huffWord=(DWORD)(m_nextBitsBuffer>>m_bitsOverDword);
+//	DWORD huffWord=(DWORD)(m_nextBitsBuffer>>m_bitsOverDword);
+	DWORD huffWord= uShiftRight(&m_nextBitsBuffer,m_bitsOverDword);
 #else
 	DWORD huffWord;
 	BYTE shift = (BYTE)m_bitsOverDword;
@@ -668,7 +676,7 @@ int SRle::GetHuffColor()
 	m_bitsOverDword -= len;
 	int index = diff + m_huffIndex[i];
 	index += (index<<1);//3 bytes per entry
-	index = (*((DWORD*)((m_pColorTbl)+index))) & 0x00ffffff;
+	index = Get3Bytes(m_pColorTbl+index);
 	if (diff<m_huffSpecial[i])
 	{
 //0                           - color follows immediately
@@ -697,12 +705,14 @@ DWORD SRle::GetUnsignedBits(BYTE bitcnt)
 		BYTE* p = (BYTE*)&m_nextBitsBuffer;
 		while (m_bitsOverDword<0)
 		{
-			*((DWORD*)(p+1)) = *((DWORD*)p);
-			*p = readByte();	//new byte is least significant
+			DWORD d = *((DWORD*)p);
+			*(p+4) = (BYTE)(d>>24);
+			*((DWORD*)p) = (d<<8) | readByte();	//new byte is least significant
 			m_bitsOverDword+=8;
 		}
 #ifdef NOASM
-		data = (DWORD)(m_nextBitsBuffer>>m_bitsOverDword);
+//		data = (DWORD)(m_nextBitsBuffer>>m_bitsOverDword);
+		data = uShiftRight(&m_nextBitsBuffer,m_bitsOverDword);
 #else
 		BYTE shift = (BYTE)m_bitsOverDword;
 		__asm

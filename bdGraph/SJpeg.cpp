@@ -1,6 +1,7 @@
 #include "ICommon.h"
 #include "SImageDataJpeg.h"
 #include "SJpeg.h"
+extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 
 #include "coefficients.h"
 #undef ZeroMemory
@@ -129,10 +130,11 @@ void SJpeg::GetMCURow(StartOfScan* sos)
 			}
 			else
 			{
+				DWORD rem;
 				compHortMCUs= sof_hortMCUs;
 				compDataCnt = compHSampling;				//parameters for 1 componet of MCU Row.
-				lastCompDataCnt = ((((sof_samplesPerLine*compHSampling+sof_maxHFactor-1)/sof_maxHFactor)+7)>>3)- ((compHortMCUs-1)*compHSampling);
-				compLinesLeft = ((((sof_numberOfLines*compVSampling+sof_maxVFactor-1)/sof_maxVFactor)+7)>>3)- ((sos->curRowNum)*compVSampling);
+				lastCompDataCnt = ((uDivRem(sof_samplesPerLine*compHSampling+sof_maxHFactor-1,sof_maxHFactor,&rem)+7)>>3)- ((compHortMCUs-1)*compHSampling);
+				compLinesLeft = ((uDivRem(sof_numberOfLines*compVSampling+sof_maxVFactor-1,sof_maxVFactor,&rem)+7)>>3)- ((sos->curRowNum)*compVSampling);
 				if ((compLinesLeft>compVSampling)||(compLinesLeft<=0)) compLinesLeft = compVSampling;
 				skipOtherComponents=(sof_dataUnitCnt-compHSampling)<<7;
 				dctComponentAdvance=compHSampling<<7; 
@@ -683,7 +685,8 @@ void SJpeg::Decode()
 					j++;
 					i--;
 				}
-				sof_hortMCUs = (((sof_samplesPerLine+7)>>3) + sof_maxHFactor-1)/sof_maxHFactor;
+				DWORD rem;
+				sof_hortMCUs = uDivRem(((sof_samplesPerLine+7)>>3) + sof_maxHFactor-1,sof_maxHFactor,&rem);
 				sof_mcuRowByteCnt = ((sof_hortMCUs*sof_dataUnitCnt)<<7)+4;
 				break;
 			}

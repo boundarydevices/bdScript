@@ -16,7 +16,9 @@
 #include "SImagePosition.h"
 #include "SImagePositionBottom.h"
 
-
+extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
+//return (1<<32)/value and remainder
+extern "C" unsigned long uReciprocal(unsigned long value,unsigned long * rem);
 //#define _LCD
 /////////////////////////////////////////////////////////////////////////////
 
@@ -24,8 +26,13 @@ DWORD Scale::GetMult(DWORD val,DWORD cDiv)
 {
 	DWORD result;
 #ifdef NOASM
+#if 0
 	result = val/cDiv;
 	DWORD rem = val%cDiv;
+#else
+	DWORD rem;
+	result = uDivRem(val,cDiv,&rem);
+#endif
 	rem += rem;
 	if (rem>cDiv) {result++;}
 #else
@@ -60,9 +67,14 @@ DWORD Scale::GetReciprocal(DWORD yDiv)
 	if (yDiv>1)
 	{
 #ifdef NOASM
+#if 0
 		ULONGLONG u = static_cast<ULONGLONG>(1)<<32;
 		result = static_cast<DWORD>(u/yDiv);
 		DWORD rem = static_cast<DWORD>(u % yDiv);
+#else
+		DWORD rem;
+		result = uReciprocal(yDiv,&rem);
+#endif
 		rem += rem;
 		if (rem>yDiv) result++;
 #else
@@ -113,11 +125,12 @@ BYTE* Scale::GetDibBits(DWORD drawWidth,const DWORD drawHeight,
 	if (!picHeight) picHeight = height;
 	SRFact rf;
 	m_imageData->Reset(&rf,0);
-	int rem = picLeft % rf.hMax;
+	DWORD rem;
+	uDivRem(picLeft,rf.hMax,&rem);
 	picLeft -= rem;
 	picWidth +=rem;
 
-	rem = picTop % rf.vMax;
+	uDivRem(picTop,rf.vMax,&rem);
 	picTop -= rem;
 	picHeight +=rem;
 

@@ -1,5 +1,6 @@
 #include "ICommon.h"
 #include "SImagePosition.h"
+extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 
 
 SImagePosition::SImagePosition(ImageData* imageData) : m_cRef(1)
@@ -60,8 +61,9 @@ void SImagePosition::SetPosition(const BYTE* sRowPos,DWORD sRowsLeft,DWORD sRepe
 
 void SImagePosition::Advance(DWORD picLeft,DWORD picTop)
 {
-	picLeft /= m_f.hMax;
-	picTop /= m_f.vMax;
+	DWORD rem;
+	picLeft = uDivRem(picLeft,m_f.hMax,&rem);
+	picTop = uDivRem(picTop,m_f.vMax,&rem);
 	AdvanceRows(picTop*m_f.vFact);
 	AdvanceWithinRow(picLeft*m_f.hFact);
 }

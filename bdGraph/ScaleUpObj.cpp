@@ -5,6 +5,7 @@
 #include "ScaleHortObj.h"
 #include "ScaleVertObj.h"
 #include "ScaleUpObj.h"
+extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 
 //upcode		! is starting point for edges
 //1		1 -> 1  !next
@@ -61,9 +62,9 @@ DWORD gcm(DWORD a, DWORD b)
 	//find greatest common multiple
 	while (TRUE)
 	{
-		b %= a;
+		uDivRem(b,a,&b);
 		if (b==0)return a;
-		a %= b;
+		uDivRem(a,b,&a);
 		if (a==0)return b;
 	}
 }
@@ -72,19 +73,20 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 		DWORD outLeft,DWORD outTop,DWORD outWidth)
 {
 	DWORD gf;
+	DWORD rem;
 	const SRFact* pRF = pSample->GetSRFact();
 
 	DWORD hScaleFrom = picWidth*pRF->hFact;
 	DWORD hScaleTo = drawWidth*pRF->hMax;
 	gf = gcm(hScaleFrom,hScaleTo);
-	hScaleFrom /= gf;
-	hScaleTo /= gf;
+	hScaleFrom = uDivRem(hScaleFrom,gf,&rem);
+	hScaleTo = uDivRem(hScaleTo,gf,&rem);
 
 	DWORD vScaleFrom = picHeight*pRF->vFact;
 	DWORD vScaleTo = drawHeight*pRF->vMax;
 	gf = gcm(vScaleFrom,vScaleTo);
-	vScaleFrom /= gf;
-	vScaleTo /= gf;
+	vScaleFrom = uDivRem(vScaleFrom,gf,&rem);
+	vScaleTo = uDivRem(vScaleTo,gf,&rem);
 
 	int hUpCode = UpCode(hScaleFrom,hScaleTo);
 	int vUpCode = UpCode(vScaleFrom,vScaleTo);
@@ -110,8 +112,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 				int t = (vScaleFrom<<1)*outTop -vInitWeight;
 				if (t>0)
 				{
-					DWORD n = ((DWORD)t)/(vScaleTo<<1);
-					t -= (vScaleTo<<1)*n;
+					DWORD n = uDivRem((DWORD)t,(vScaleTo<<1),(DWORD*)&t);
 					pSample->AdvanceRows(n);
 				}
 				vInitWeight = -t;
@@ -119,8 +120,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 			else
 			{
 				vInitWeight = vScaleFrom*outTop;
-				DWORD n = ((DWORD)vInitWeight)/vScaleTo;
-				vInitWeight -= vScaleTo*n;
+				DWORD n = uDivRem((DWORD)vInitWeight,vScaleTo,(DWORD*)&vInitWeight);
 				pSample->AdvanceRows(n);
 				if (vInitWeight==0)
 				{
@@ -137,8 +137,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 				DWORD n =0;
 				if (t>0)
 				{
-					n = ((DWORD)t)/(hScaleTo<<1);
-					t -= (hScaleTo<<1)*n;
+					n = uDivRem((DWORD)t,(hScaleTo<<1),(DWORD*)&t);
 					pSample->AdvanceWithinRow(n);
 				}
 
@@ -146,8 +145,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 				DWORD m=1;
 				if (tt>0)
 				{
-					m = ((DWORD)tt)/(hScaleTo<<1);
-					tt -= (hScaleTo<<1)*m;
+					m = uDivRem((DWORD)tt,(hScaleTo<<1),(DWORD*)&tt);
 					if (m<picWidth) m++;
 				}
 				hInitWeight = -t;
@@ -156,8 +154,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 			else
 			{
 				hInitWeight = hScaleFrom*outLeft;
-				DWORD n = ((DWORD)hInitWeight)/hScaleTo;
-				hInitWeight -= hScaleTo*n;
+				DWORD n = uDivRem((DWORD)hInitWeight,hScaleTo,(DWORD*)&hInitWeight);
 				pSample->AdvanceWithinRow(n);
 				if (hInitWeight==0)
 				{
@@ -166,8 +163,7 @@ BOOL ScaleUpObj::Init(ImagePosition* pSample,DWORD picWidth,DWORD picHeight,DWOR
 				hInitWeight-=hScaleTo;
 
 				DWORD t = hScaleFrom*(outLeft+outWidth);
-				DWORD m = t/hScaleTo;
-				t -= hScaleTo*m;
+				DWORD m = uDivRem(t,hScaleTo,&t);
 				if (t!=0)
 				{
 					m++;
