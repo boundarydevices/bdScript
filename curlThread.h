@@ -1,5 +1,5 @@
 #ifndef __CURLTHREAD_H__
-#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.2 2002-11-02 04:12:20 ericn Exp $"
+#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.3 2002-11-03 17:03:04 ericn Exp $"
 
 /*
  * curlThread.h
@@ -98,7 +98,10 @@
  * Change History : 
  *
  * $Log: curlThread.h,v $
- * Revision 1.2  2002-11-02 04:12:20  ericn
+ * Revision 1.3  2002-11-03 17:03:04  ericn
+ * -added opaque parameter
+ *
+ * Revision 1.2  2002/11/02 04:12:20  ericn
  * -fixed commentary
  *
  * Revision 1.1  2002/10/31 02:13:08  ericn
@@ -133,6 +136,8 @@ struct jsCurlRequest_t {
                                     //    optionally urlParams[] array property
    JSContext           *cx_ ;       // context in which to run
    mutex_t             *mutex_ ;    // mutex to grant access to context
+
+   void                *callerData_ ; // used to pass app-specific info to callback
 
    //
    // one of these called when transfer terminates. 
