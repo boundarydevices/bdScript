@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-10-27 17:48:57  ericn
+ * -removed debug code
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -48,7 +51,6 @@ static void *interval( void *arg )
       }
       else
       {
-         printf( "interval timer cancelled %d\n", result );
          break;
       }
    } while( 1 );
@@ -155,12 +157,10 @@ jsCancelTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
       int result = pthread_cancel( thread );
       if( 0 == result )
       {
-         printf( "timer cancelled\n" );
          void *exitStat ;
          result = pthread_join( thread, &exitStat );
          if( 0 == result )
          {
-            printf( "timer thread complete, status %ld\n", (int)exitStat );
             *rval = JSVAL_TRUE ;
             return JS_TRUE ;
          }
