@@ -18,9 +18,9 @@ ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
-   LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
-   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2 -I$(BUILDDIR)/$(LINUX_V)/include
-   LIB = $(INSTALL_LIB)/libCurlCache.a
+   LIBS=-L./ -L../install/arm-linux/lib
+   IFLAGS=-I../install/arm-linux/include/nspr -I../install/arm-linux/include/freetype2 -I../linux-2.4.19/include
+   LIB = ../install/arm-linux/lib/libCurlCache.a
 else
 #   CC=g++
    AR=ar
@@ -30,10 +30,14 @@ else
    LIB = ./libCurlCache.a
 endif
 
-TSINPUTFLAG= $(TSINPUTAPI:y=1)
+ifneq (y,TSINPUTAPI)
+   TSINPUTFLAG=0
+else
+   TSINPUTFLAG=1
+endif
 
 %.o : %.cpp Makefile
-	$(CC) -D_REENTRANT=1 -DTSINPUTAPI='$(TSINPUTFLAG)' -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
@@ -131,10 +135,10 @@ shared-headers = ddtoul.h dirByATime.h hexDump.h  \
    ultoa.h ultodd.h urlFile.h
 
 install-headers:
-	cp -f -v $(shared-headers) $(INSTALL_ROOT)/include
+	cp -f -v $(shared-headers) ../install/arm-linux/include
 
 install-bin:
-	cp -f -v jsExec $(INSTALL_ROOT)/bin
+	cp -f -v jsExec ../install/arm-linux/bin
 
 install: install-bin install-headers
 
