@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.1  2002-09-29 17:36:23  ericn
+ * Revision 1.2  2002-10-06 14:54:10  ericn
+ * -added Finalize, removed debug statements
+ *
+ * Revision 1.1  2002/09/29 17:36:23  ericn
  * -Initial import
  *
  *
@@ -38,12 +41,9 @@ extern JSClass jsCurlClass_ ;
 static JSBool
 jsCurl_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
-printf( "getting property for jsCurl object\n" );
    if( JSVAL_IS_INT(id) )
    {
       jsint slot = JSVAL_TO_INT(id);
-
-printf( "slot == %d\n", slot );
 
       JS_LOCK_OBJ(cx, obj);
       jsdouble lastIndex;
@@ -96,8 +96,6 @@ printf( "slot == %d\n", slot );
       JS_UNLOCK_OBJ(cx, obj);
    
    }
-   else
-      printf( "id not a slot\n" );
 
    return JS_TRUE;
 }
@@ -117,11 +115,24 @@ printf( "setting property for jsCurl object\n" );
    return JS_TRUE ;
 }
 
+static void
+jsCurl_finalize(JSContext *cx, JSObject *obj)
+{
+   urlFile_t *fURL = (urlFile_t *)JS_GetInstancePrivate( cx, obj, &jsCurlClass_, NULL);
+
+	if( fURL )
+   {
+      printf( "finalizing object %p/%p\n", obj, fURL );
+      delete fURL ;
+      JS_SetPrivate( cx, obj, 0 );
+	}
+}
+
 JSClass jsCurlClass_ = {
   "curlFile",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  jsCurl_getProperty,  jsCurl_setProperty,
-   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsCurl_finalize,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
@@ -138,22 +149,20 @@ static JSPropertySpec curlFileProperties_[] = {
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "constructing curlFile\n" );
    if( (argc == 1) && ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
    {
-printf( "in curlFile constructor\n" );
       if( JSVAL_IS_STRING( argv[0] ) )
       {
-printf( "param is string\n" );
          obj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
 
          if( obj )
          {
             char const *url = JS_GetStringBytes( js_ValueToString( cx, argv[0]) );
-printf( "param<%s>\n", url );
+
             urlFile_t *fURL = new urlFile_t( (char const *)url );
             if( fURL )
             {
+// printf( "new file %s/%p/%p\n", url, obj, fURL );
                if( JS_SetPrivate( cx, obj, fURL ) )
                {
                   *rval = OBJECT_TO_JSVAL(obj);
