@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.13  2002-10-27 17:38:40  ericn
+ * Revision 1.14  2002-10-31 02:03:17  ericn
+ * -added curl thread startup/shutdown
+ *
+ * Revision 1.13  2002/10/27 17:38:40  ericn
  * -added hyperlink and process calls
  *
  * Revision 1.12  2002/10/26 14:13:54  ericn
@@ -71,6 +74,8 @@
 #include "childProcess.h"
 #include "jsProc.h"
 #include "jsHyperlink.h"
+#include "jsGlobals.h"
+#include "curlThread.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -197,6 +202,8 @@ int main(int argc, char **argv)
       return 1;
    }
  
+   execContext_ = cx ;
+
    // create the global object here
    JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
  
@@ -220,6 +227,7 @@ int main(int argc, char **argv)
                initJSProc( cx, glob );
                initJSHyperlink( cx, glob );
                startChildMonitor();
+               startCurlThreads();
 
                curlCache_t &cache = getCurlCache();
 
@@ -263,6 +271,7 @@ int main(int argc, char **argv)
                      fprintf( stderr, "Error opening url %s\n", url );
                }
 
+               stopCurlThreads();
                stopChildMonitor();  // stop trapping SIGCHLD signal
             
             }
