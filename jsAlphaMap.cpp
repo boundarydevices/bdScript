@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.7  2004-05-08 15:03:42  ericn
+ * Revision 1.8  2004-06-27 14:50:31  ericn
+ * -stub for game/suite controller
+ *
+ * Revision 1.7  2004/05/08 15:03:42  ericn
  * -removed debug statement
  *
  * Revision 1.6  2004/05/05 03:19:50  ericn
@@ -67,9 +70,14 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 
       if( 3 == argc )
       {
+#ifdef CONFIG_BD2003
          imageMem = fb.getRow(0);
          imageWidth = fb.getWidth();
          imageHeight = fb.getHeight();
+#else
+         JS_ReportError( cx, "draw alphaMap onto screen" );
+         return JS_TRUE ;
+#endif
       }
       else
       {
