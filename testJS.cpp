@@ -8,8 +8,11 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.1  2002-09-28 16:50:46  ericn
- * Initial revision
+ * Revision 1.2  2002-09-28 17:04:16  ericn
+ * -changed #include references
+ *
+ * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
+ * -Initial import
  *
  *
  * Copyright Ticketmaster Technologies, Inc. 2002
@@ -21,8 +24,8 @@
 #include <string.h>
 
 /* include the JS engine API header */
-#include "mozilla/js/src/jsstddef.h"
-#include "mozilla/js/src/jsapi.h"
+#include "js/jsstddef.h"
+#include "js/jsapi.h"
 
 #include "urlFile.h"
 
