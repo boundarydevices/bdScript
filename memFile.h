@@ -1,5 +1,5 @@
 #ifndef __MEMFILE_H__
-#define __MEMFILE_H__ "$Id: memFile.h,v 1.1 2002-10-07 04:38:17 ericn Exp $"
+#define __MEMFILE_H__ "$Id: memFile.h,v 1.2 2002-10-09 01:08:46 ericn Exp $"
 
 /*
  * memFile.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: memFile.h,v $
- * Revision 1.1  2002-10-07 04:38:17  ericn
+ * Revision 1.2  2002-10-09 01:08:46  ericn
+ * -added inline keyword
+ *
+ * Revision 1.1  2002/10/07 04:38:17  ericn
  * -Initial import
  *
  *
@@ -23,15 +26,16 @@
 class memFile_t {
 public:
    memFile_t( char const *path );
+   memFile_t( memFile_t const & );
    ~memFile_t( void );
 
-   bool worked( void ) const { return 0 <= fd_ ; }
+   inline bool worked( void ) const { return 0 <= fd_ ; }
    
    // call if !worked
    char const *getError( void ) const ;
 
-   void const *getData( void ) const { return data_ ; }
-   unsigned long getLength( void ) const { return length_ ; }
+   inline void const *getData( void ) const { return data_ ; }
+   inline unsigned long getLength( void ) const { return length_ ; }
 
 private:
    int           fd_ ;
