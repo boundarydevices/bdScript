@@ -7,6 +7,7 @@ HARDWARE_TYPE=-DCONFIG_BD2003
 
 OBJS = \
        barcodePoll.o \
+       baudRate.o \
        box.o \
        ccActiveURL.o \
        ccDiskCache.o \
@@ -47,6 +48,7 @@ OBJS = \
        jsPopen.o \
        jsProcess.o \
        jsScreen.o \
+       jsSerial.o \
        jsSniffWLAN.o \
        jsTCP.o \
        jsTTY.o \
@@ -67,6 +69,7 @@ OBJS = \
        popen.o \
        relativeURL.o \
        semClasses.o \
+       serialPoll.o \
        sniffWLAN.o \
        tcpPoll.o \
        ttyPoll.o \
@@ -325,6 +328,10 @@ udpPoll: udpPoll.cpp $(LIB)
 
 barcodePoll: barcodePoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o barcodePoll -DSTANDALONE=1 -Xlinker -Map -Xlinker barcodePoll.map barcodePoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread
+	$(STRIP) $@
+
+serialPoll: serialPoll.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o serialPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker serialPoll.map serialPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 touchPoll: touchPoll.cpp $(LIB)
