@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.7  2002-11-21 23:03:00  tkisky
+ * Revision 1.8  2002-11-22 10:58:55  tkisky
+ * -Don't mess up display settings
+ *
+ * Revision 1.7  2002/11/21 23:03:00  tkisky
  * -Make it easy to turn off/change reordering
  *
  * Revision 1.6  2002/11/21 14:03:21  ericn
@@ -166,7 +169,7 @@ fbDevice_t :: fbDevice_t( char const *name )
       int err = ioctl( fd_, FBIOGET_FSCREENINFO, &fixed_info);
       if( 0 == err )
       {
-/*
+#if 0
          printf( "id %s\n", fixed_info.id );
          printf( "smem_start %lu\n", fixed_info.smem_start );
          printf( "smem_len   %lu\n", fixed_info.smem_len );
@@ -180,50 +183,50 @@ fbDevice_t :: fbDevice_t( char const *name )
          printf( "mmio_start %lu\n", fixed_info.mmio_start );
          printf( "mmio_len   %lu\n", fixed_info.mmio_len );
          printf( "accel      %lu\n", fixed_info.accel );
-*/
+#endif
          struct fb_var_screeninfo variable_info;
 
 	      err = ioctl( fd_, FBIOGET_VSCREENINFO, &variable_info );
          if( 0 == err )
          {
-/*
-            printf( "xres              = %lu\n", variable_info.xres );			//  visible resolution		
+#if 0
+            printf( "xres              = %lu\n", variable_info.xres );			//  visible resolution
             printf( "yres              = %lu\n", variable_info.yres );
-            printf( "xres_virtual      = %lu\n", variable_info.xres_virtual );		//  virtual resolution		
+            printf( "xres_virtual      = %lu\n", variable_info.xres_virtual );		//  virtual resolution
             printf( "yres_virtual      = %lu\n", variable_info.yres_virtual );
-            printf( "xoffset           = %lu\n", variable_info.xoffset );			//  offset from virtual to visible 
-            printf( "yoffset           = %lu\n", variable_info.yoffset );			//  resolution			
-            printf( "bits_per_pixel    = %lu\n", variable_info.bits_per_pixel );		//  guess what			
-            printf( "grayscale         = %lu\n", variable_info.grayscale );		//  != 0 Graylevels instead of colors 
-   
-            printf( "red               = offs %lu, len %lu, msbr %lu\n", 
+            printf( "xoffset           = %lu\n", variable_info.xoffset );			//  offset from virtual to visible
+            printf( "yoffset           = %lu\n", variable_info.yoffset );			//  resolution
+            printf( "bits_per_pixel    = %lu\n", variable_info.bits_per_pixel );		//  guess what
+            printf( "grayscale         = %lu\n", variable_info.grayscale );		//  != 0 Graylevels instead of colors
+
+            printf( "red               = offs %lu, len %lu, msbr %lu\n",
                     variable_info.red.offset,
                     variable_info.red.length,
                     variable_info.red.msb_right );
-            printf( "green             = offs %lu, len %lu, msbr %lu\n", 
+            printf( "green             = offs %lu, len %lu, msbr %lu\n",
                     variable_info.green.offset,
                     variable_info.green.length,
                     variable_info.green.msb_right );
-            printf( "blue              = offs %lu, len %lu, msbr %lu\n", 
+            printf( "blue              = offs %lu, len %lu, msbr %lu\n",
                     variable_info.blue.offset,
                     variable_info.blue.length,
                     variable_info.blue.msb_right );
-   
-            printf( "nonstd            = %lu\n", variable_info.nonstd );			//  != 0 Non standard pixel format 
-            printf( "activate          = %lu\n", variable_info.activate );			//  see FB_ACTIVATE_*		
-            printf( "height            = %lu\n", variable_info.height );			//  height of picture in mm    
-            printf( "width             = %lu\n", variable_info.width );			//  width of picture in mm     
-            printf( "accel_flags       = %lu\n", variable_info.accel_flags );		//  acceleration flags (hints)	
-            printf( "pixclock          = %lu\n", variable_info.pixclock );			//  pixel clock in ps (pico seconds) 
-            printf( "left_margin       = %lu\n", variable_info.left_margin );		//  time from sync to picture	
-            printf( "right_margin      = %lu\n", variable_info.right_margin );		//  time from picture to sync	
-            printf( "upper_margin      = %lu\n", variable_info.upper_margin );		//  time from sync to picture	
+
+            printf( "nonstd            = %lu\n", variable_info.nonstd );			//  != 0 Non standard pixel format
+            printf( "activate          = %lu\n", variable_info.activate );			//  see FB_ACTIVATE_*
+            printf( "height            = %lu\n", variable_info.height );			//  height of picture in mm
+            printf( "width             = %lu\n", variable_info.width );			//  width of picture in mm
+            printf( "accel_flags       = %lu\n", variable_info.accel_flags );		//  acceleration flags (hints)
+            printf( "pixclock          = %lu\n", variable_info.pixclock );			//  pixel clock in ps (pico seconds)
+            printf( "left_margin       = %lu\n", variable_info.left_margin );		//  time from sync to picture
+            printf( "right_margin      = %lu\n", variable_info.right_margin );		//  time from picture to sync
+            printf( "upper_margin      = %lu\n", variable_info.upper_margin );		//  time from sync to picture
             printf( "lower_margin      = %lu\n", variable_info.lower_margin );
-            printf( "hsync_len         = %lu\n", variable_info.hsync_len );		//  length of horizontal sync	
-            printf( "vsync_len         = %lu\n", variable_info.vsync_len );		//  length of vertical sync	
-            printf( "sync              = %lu\n", variable_info.sync );			//  see FB_SYNC_*		
-            printf( "vmode             = %lu\n", variable_info.vmode );			//  see FB_VMODE_*		
-*/
+            printf( "hsync_len         = %lu\n", variable_info.hsync_len );		//  length of horizontal sync
+            printf( "vsync_len         = %lu\n", variable_info.vsync_len );		//  length of vertical sync
+            printf( "sync              = %lu\n", variable_info.sync );			//  see FB_SYNC_*
+            printf( "vmode             = %lu\n", variable_info.vmode );			//  see FB_VMODE_*
+#endif
             if( ( 16 != variable_info.bits_per_pixel )
                 ||
                 ( 1 != variable_info.left_margin )
@@ -248,9 +251,8 @@ fbDevice_t :: fbDevice_t( char const *name )
                variable_info.blue.offset     = 0 ;
                variable_info.blue.length     = 5 ;
                variable_info.blue.msb_right  = 0 ;
-               err = ioctl( fd_, FBIOPUT_VSCREENINFO, &variable_info );
-               if( err )
-                  perror( "FBIOPUT_VSCREENINFO" );
+//             err = ioctl( fd_, FBIOPUT_VSCREENINFO, &variable_info );
+//             if( err )  perror( "FBIOPUT_VSCREENINFO" );
             } // set to 16-bit
 
             if( 0 == err )
