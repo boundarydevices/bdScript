@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.5  2003-08-02 15:20:39  ericn
+ * Revision 1.6  2003-08-02 19:29:36  ericn
+ * -modified to allow width, height, and output sampleRate and numChannels
+ *
+ * Revision 1.5  2003/08/02 15:20:39  ericn
  * -memory leak fix
  *
  * Revision 1.4  2003/08/01 14:31:28  ericn
@@ -42,6 +45,7 @@
 #include "hexDump.h"
 #include "mpDemux.h"
 #include "mpegDecode.h"
+#include "madDecode.h"
 #include <zlib.h>
 #include "ccActiveURL.h"
 
@@ -62,7 +66,9 @@ jsMPEGPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          
          unsigned xPos = 0 ;
          unsigned yPos = 0 ;
-   
+         unsigned width =  0 ;
+         unsigned height = 0 ;
+
          JSObject *rhObj ;
          if( ( 1 <= argc )
              &&
@@ -100,9 +106,24 @@ jsMPEGPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             {
                yPos = JSVAL_TO_INT( val );
             } // have y position
+            
+            if( JS_GetProperty( cx, rhObj, "width", &val ) 
+                &&
+                JSVAL_IS_INT( val ) )
+            {
+               width = JSVAL_TO_INT( val );
+            } // have width
+            
+            if( JS_GetProperty( cx, rhObj, "height", &val ) 
+                &&
+                JSVAL_IS_INT( val ) )
+            {
+               height = JSVAL_TO_INT( val );
+            } // have height
+            
          } // have right-hand object
    
-         if( getAudioQueue().queueMPEG( obj, (unsigned char const *)data, length, onComplete, onCancel, xPos, yPos ) )
+         if( getAudioQueue().queueMPEG( obj, (unsigned char const *)data, length, onComplete, onCancel, xPos, yPos, width, height ) )
          {
    //         JS_ReportError( cx, "queued MPEG for playback" );
          }
@@ -130,7 +151,6 @@ jsMPEGRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
       if( 0 != handle )
       {
          JS_SetPrivate( cx, obj, 0 );
-         printf( "deallocate handle %lu\n", handle );
          getCurlCache().closeHandle( handle );
          JS_DefineProperty( cx,
                             obj,
@@ -163,7 +183,9 @@ enum jsMpeg_tinyid {
    MPEGFILE_STREAMCOUNT,
    MPEGFILE_NUMFRAMES,
    MPEGFILE_WIDTH,
-   MPEGFILE_HEIGHT
+   MPEGFILE_HEIGHT,
+   MPEGFILE_SAMPLERATE,
+   MPEGFILE_NUMCHANNELS
 };
 
 static void jsMPEGFinalize(JSContext *cx, JSObject *obj);
@@ -184,6 +206,8 @@ static JSPropertySpec mpegFileProperties_[] = {
   {"numFrames",      MPEGFILE_NUMFRAMES,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"width",          MPEGFILE_WIDTH,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"height",         MPEGFILE_HEIGHT,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"sampleRate",     MPEGFILE_SAMPLERATE,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"numChannels",    MPEGFILE_NUMCHANNELS, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -194,9 +218,6 @@ static char const * const numFrameIndeces[] = {
 
 static void mpegOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-
-printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
-
    mpegDemux_t demux( data, size );
    mpegDemux_t::bulkInfo_t const *bi = demux.getFrames();
 
@@ -220,7 +241,8 @@ printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
                          |JSPROP_READONLY );
       
       unsigned width = 0, height = 0 ;
-      
+      unsigned sampleRate = 0 ;
+      unsigned numChannels = 0 ;
       JSObject *const numFramesObj = JS_NewObject( req.cx_, 0, 0, 0 );
       if( numFramesObj )
       {
@@ -257,9 +279,20 @@ printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
                      }
                   }
                } // keep passin frames til we have video size               
-               printf( "width %u, height %u\n", width, height );
             } // video stream
-
+            else if( mpegDemux_t::audioFrame_e == sAndF.sInfo_.type )
+            {
+               madDecoder_t mp3Decode ;
+               for( unsigned i = 0 ; ( !mp3Decode.haveHeader() ) && ( i < sAndF.numFrames_ ); i++ )
+               {
+                  mpegDemux_t::frame_t const &frame = sAndF.frames_[i];
+                  mp3Decode.feed( frame.data_, frame.length_ );
+                  while( mp3Decode.getData() )
+                     ;
+               }
+               sampleRate  = mp3Decode.sampleRate();
+               numChannels = mp3Decode.numChannels();
+            }
             
             JS_DefineProperty( req.cx_, numFramesObj, numFrameIndeces[sAndF.sInfo_.type], 
                                INT_TO_JSVAL( sAndF.numFrames_ ),
@@ -289,7 +322,22 @@ printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      printf( "cc handle %lu\n", req.handle_ );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "sampleRate",
+                         INT_TO_JSVAL( sampleRate ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "numChannels",
+                         INT_TO_JSVAL( numChannels ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
       getCurlCache().addRef( req.handle_ );
       JS_SetPrivate( req.cx_, req.lhObj_, (void *)req.handle_ );
       
@@ -310,7 +358,6 @@ static void jsMPEGFinalize(JSContext *cx, JSObject *obj)
       if( 0 != handle )
       {
          JS_SetPrivate( cx, obj, 0 );
-         printf( "deallocate handle %lu\n", handle );
          getCurlCache().closeHandle( handle );
       }
    }
