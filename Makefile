@@ -220,6 +220,10 @@ md5: md5.cpp $(LIB)
 	$(CC) $(IFLAGS) -o md5 -DSTANDALONE=1 -Xlinker -Map -Xlinker md5.map md5.cpp $(LIBS) -lcrypto -lCurlCache
 	$(STRIP) $@
 
+avSendTo: avSendTo.cpp $(LIB)
+	$(CC) $(IFLAGS) -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
 
 .PHONY: install-libs install-headers
