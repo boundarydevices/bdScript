@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: pollHandler.cpp,v $
- * Revision 1.2  2003-11-24 19:42:05  ericn
+ * Revision 1.3  2004-02-08 10:34:55  ericn
+ * -added pollClient_t
+ *
+ * Revision 1.2  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -43,6 +46,21 @@ pollHandler_t :: ~pollHandler_t( void )
 {
    parent_.removeMe( *this );
 }
+
+pollClient_t :: ~pollClient_t( void )
+{
+}
+
+unsigned short pollClient_t :: getMask( void )
+{
+   debugPrint( "pollClient_t::getMask()" );
+   return 0 ;
+}
+
+void pollClient_t :: onDataAvail( pollHandler_t & ){ debugPrint( "pollClient_t::onDataAvail" ); }
+void pollClient_t :: onWriteSpace( pollHandler_t & ){ debugPrint( "pollClient_t::onWriteSpace" ); }
+void pollClient_t :: onError( pollHandler_t & ){ debugPrint( "pollClient_t::onError" ); }
+void pollClient_t :: onHUP( pollHandler_t & ){ debugPrint( "pollClient_t::onHUP" ); }
 
 
 void pollHandler_t :: setMask( short events )
