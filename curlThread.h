@@ -1,5 +1,5 @@
 #ifndef __CURLTHREAD_H__
-#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.5 2002-11-07 02:14:58 ericn Exp $"
+#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.6 2002-11-26 23:26:08 ericn Exp $"
 
 /*
  * curlThread.h
@@ -98,7 +98,10 @@
  * Change History : 
  *
  * $Log: curlThread.h,v $
- * Revision 1.5  2002-11-07 02:14:58  ericn
+ * Revision 1.6  2002-11-26 23:26:08  ericn
+ * -typedef'd callbacks
+ *
+ * Revision 1.5  2002/11/07 02:14:58  ericn
  * -updated comments
  *
  * Revision 1.4  2002/11/03 17:55:41  ericn
@@ -132,6 +135,8 @@
 
 
 struct jsCurlRequest_t {
+   typedef void (*callback_t)( jsCurlRequest_t &, curlFile_t const &f );
+
    //
    // all of these fields must be filled in by the caller of queueCurlRequest
    //
@@ -145,8 +150,8 @@ struct jsCurlRequest_t {
    //
    // one of these called when transfer terminates. 
    //
-   void (*onComplete)( jsCurlRequest_t &, curlFile_t const &f );
-   void (*onError)( jsCurlRequest_t &, curlFile_t const &f );
+   callback_t onComplete ;
+   callback_t onError ;
 };
 
 //
