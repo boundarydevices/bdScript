@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.3  2003-07-28 13:36:08  ericn
+ * Revision 1.4  2004-05-23 21:25:21  ericn
+ * -updated to work with either new or old mpeg2dec library
+ *
+ * Revision 1.3  2003/07/28 13:36:08  ericn
  * -removed debug statements
  *
  * Revision 1.2  2003/07/20 18:35:38  ericn
@@ -28,9 +31,19 @@ extern "C" {
 #include <stdlib.h>
 #include <inttypes.h>
 #include <time.h>
+#include "config.h"
 #include <mpeg2dec/mpeg2.h>
-#include "mpeg2dec/video_out.h"
-#include "mpeg2dec/convert.h"
+
+#ifdef LIBMPEG2_OLD 
+   #include "mpeg2dec/video_out.h"
+   #include "mpeg2dec/convert.h"
+   #define mpeg2_sequence_t sequence_t
+   #define mpeg2convert_rgb16 convert_rgb16
+#else
+   #include "mpeg2dec/video_out.h"
+   #include "mpeg2dec/mpeg2convert.h"
+#endif
+
 };
 #include <stdio.h>
 
@@ -106,7 +119,7 @@ bool mpegDecoder_t :: getPicture
       {
          case STATE_SEQUENCE:
          {
-            sequence_t const &seq = *INFOPTR->sequence ;
+            mpeg2_sequence_t const &seq = *INFOPTR->sequence ;
             if( !haveVideoHeader_ )
             {
                haveVideoHeader_ = true ;
@@ -114,7 +127,7 @@ bool mpegDecoder_t :: getPicture
                mpegHeight_ = seq.height ;
             }
 
-            mpeg2_convert( DECODER, convert_rgb16, NULL );
+            mpeg2_convert( DECODER, mpeg2convert_rgb16, NULL );
             mpeg2_custom_fbuf (DECODER, 0);
 /*
             printf( "w: %u, h:%u\n", seq.width, seq.height );
