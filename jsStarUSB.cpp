@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.5  2004-12-05 00:56:11  tkisky
+ * Revision 1.6  2005-03-06 07:37:49  tkisky
+ * -work around for older star printer software
+ *
+ * Revision 1.5  2004/12/05 00:56:11  tkisky
  * -minor
  *
  * Revision 1.4  2004/11/16 07:37:22  tkisky
@@ -206,7 +209,7 @@ void starPoll_t :: fire( void )
          if( 0 < numRead ) {
             char change=0;
             statusWaitTicks = 0;
-            if (asb_valid) {
+            if (asb_valid || ((numRead >= 9) && ((inBuf[0] & 0x13) && ((inBuf[0] & 0x91)!=10))) ) {
                if ( ( numRead != prevLen_ ) || ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) ) {
                   for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
                   printf( "\n" );
@@ -255,15 +258,19 @@ void starPoll_t :: fire( void )
       } // data available
 	  else {
          if (statusWaitTicks==0) {
-            static const char strAsbInvalid[] = {0x1b,0x1e,0x61,0x30};
-            static const char strAsbValid[] = {0x1b,0x1e,0x61,0x31};
+            static const char strAsbInvalid[] = {0x1b,0x1e,0x61,0x0};
+            static const char strAsbValid[] = {0x1b,0x1e,0x61,0x1};
             static const char strEotEnq[] = {0x04, 0x05};
+            static const char strAsbStatus[] = {0x1b,0x06,0x01};	//esc ack soh
             const char * p = NULL;
             int len = 0;
             if (asbInitialized==0) {
                if (asb_valid) {p = strAsbValid; len = sizeof(strAsbValid); }
-               else {p = strAsbInvalid; len = sizeof(strAsbInvalid);}
-            } else if (asb_valid==0) { p = strEotEnq; len = sizeof(strEotEnq); }
+               else {p = strAsbInvalid; len = sizeof(strAsbInvalid); }
+            } else {
+               if (asb_valid==0) { p = strEotEnq; len = sizeof(strEotEnq); }
+               else { p = strAsbStatus; len = sizeof(strAsbStatus); }
+            }
             if (p) {
                int const numWritten = usb_bulk_write( udev_, outep,(char*)p,len, 1000 );
                if (numWritten==4) asbInitialized = 1;
