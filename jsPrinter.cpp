@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsPrinter.cpp,v $
- * Revision 1.2  2004-05-08 16:33:46  ericn
+ * Revision 1.3  2004-05-12 03:42:26  ericn
+ * -added read() method
+ *
+ * Revision 1.2  2004/05/08 16:33:46  ericn
  * -removed debug msg
  *
  * Revision 1.1  2004/05/05 03:20:32  ericn
@@ -191,11 +194,39 @@ fprintf( stderr, "---> closing printer:fd %d\n", *pfd );
    return JS_TRUE ;
 }
 
+static JSBool
+jsPrinterRead( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsPrinterClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      struct pollfd ufds;
+      ufds.fd = *pfd;
+      ufds.events = POLLIN;
+      ufds.revents = 0;
+      if( 0 != poll( &ufds, 1, 0 ) )
+      {
+         char inBuf[256];
+         int numRead = read( *pfd, inBuf, sizeof( inBuf ) );
+         if( 0 <= numRead )
+         {
+            JSString *sOut = JS_NewStringCopyN( cx, inBuf, numRead );
+            *rval = STRING_TO_JSVAL( sOut );
+         }
+         else
+            perror( "printerRead" );
+      } // data present
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
 
 static JSFunctionSpec printer_methods[] = {
    { "print",        jsPrinterPrint,      0,0,0 },
    { "close",        jsPrinterClose,      0,0,0 },
    { "flush",        jsPrinterFlush,      0,0,0 },
+   { "read",         jsPrinterRead,       0,0,0 },
    { 0 }
 };
 
@@ -227,7 +258,7 @@ static JSBool jsPrinter( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
          int *pfd = (int *)JS_malloc( cx, sizeof(*pfd) );
          *pfd = -1 ;
          JS_SetPrivate( cx, prObj, pfd );
-         int const fd = open( JS_GetStringBytes( sDevice ), O_WRONLY );
+         int const fd = open( JS_GetStringBytes( sDevice ), O_RDWR );
          if( 0 <= fd )
          {
             fcntl( fd, F_SETFD, FD_CLOEXEC );
