@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: relativeURL.cpp,v $
- * Revision 1.3  2002-11-29 18:37:28  ericn
+ * Revision 1.4  2002-11-30 05:28:37  ericn
+ * -removed debug msg
+ *
+ * Revision 1.3  2002/11/29 18:37:28  ericn
  * -moved URL parsing to parsedURL
  *
  * Revision 1.2  2002/11/11 04:29:00  ericn
@@ -80,7 +83,6 @@ bool absoluteURL( std::string const &relative,   //
 bool isRelativeURL( std::string const &url )
 {
    parsedURL_t parsed( url );
-//   printURL( parsed );
    return parsed.isRelative();
 }
 
