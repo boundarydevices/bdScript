@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.1 2002-11-29 16:45:27 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.2 2002-11-29 18:37:43 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.1  2002-11-29 16:45:27  ericn
+ * Revision 1.2  2002-11-29 18:37:43  ericn
+ * -added file:// support
+ *
+ * Revision 1.1  2002/11/29 16:45:27  ericn
  * -Initial import
  *
  *
@@ -103,6 +106,8 @@ private:
       void const    *data_ ;
       unsigned long  length_ ;
       unsigned long  useCount_ ;
+      bool           isFile_ ;
+      int            fd_ ;
    };
 
    enum state_e {

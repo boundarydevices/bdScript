@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.1  2002-11-29 16:45:27  ericn
+ * Revision 1.2  2002-11-29 18:37:47  ericn
+ * -added file:// support
+ *
+ * Revision 1.1  2002/11/29 16:45:27  ericn
  * -Initial import
  *
  *
@@ -19,8 +22,13 @@
 #include "ccActiveURL.h"
 #include "ccDiskCache.h"
 #include "ccWorker.h"
-
+#include "parsedURL.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <assert.h>
+#include <errno.h>
 
 static curlCache_t *cache_ = 0 ;
 
@@ -36,29 +44,82 @@ void curlCache_t :: get
    {
       item = newItem( hash, request_t::get_, url );
 
-      ccDiskCache_t &diskCache = getDiskCache();
-      if( diskCache.find( url.c_str(), item->diskInfo_.sequence_ ) )
+      parsedURL_t parsed( url );
+      if( 0 != parsed.getProtocol().compare( "file" ) )
       {
-         item->state_ = open_ ;
-         diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
-         item->diskInfo_.useCount_ = 1 ;
-         callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
-
-         if( 0 == --item->diskInfo_.useCount_ )
-            removeItem( item );  // done, remove item from active list
-      } // found in cache... finished
+         ccDiskCache_t &diskCache = getDiskCache();
+         if( diskCache.find( url.c_str(), item->diskInfo_.sequence_ ) )
+         {
+            item->state_ = open_ ;
+            diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
+            item->diskInfo_.useCount_ = 1 ;
+            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
+   
+            item->diskInfo_.useCount_-- ;
+            if( 0 == item->diskInfo_.useCount_ )
+               removeItem( item );  // done, remove item from active list
+         } // found in cache... finished
+         else
+         {
+            request_t *const req = newRequest( *item, opaque, request_t::get_, callbacks );
+   
+            curlTransferRequest_t workReq ;
+            workReq.opaque_   = item ;
+            workReq.url_      = url ;
+            workReq.postHead_ = 0 ;
+            workReq.cancel_   = &item->cancel_ ;
+   
+            getCurlRequestQueue().push( workReq );
+         } // not found in cache... get it
+      }
       else
       {
-         request_t *const req = newRequest( *item, opaque, request_t::get_, callbacks );
+         std::string errMsg ;
 
-         curlTransferRequest_t workReq ;
-         workReq.opaque_   = item ;
-         workReq.url_      = url ;
-         workReq.postHead_ = 0 ;
-         workReq.cancel_   = &item->cancel_ ;
-
-         getCurlRequestQueue().push( workReq );
-      } // not found in cache... get it
+         item->diskInfo_.fd_ = open( parsed.getPath().c_str(), O_RDONLY );
+         if( 0 <= item->diskInfo_.fd_ )
+         {
+            off_t const fileSize = lseek( item->diskInfo_.fd_, 0, SEEK_END );
+            lseek( item->diskInfo_.fd_, 0, SEEK_SET );
+            void *mem = mmap( 0, fileSize, PROT_READ, MAP_PRIVATE, item->diskInfo_.fd_, 0 );
+            if( MAP_FAILED != mem )
+            {
+               item->diskInfo_.isFile_ = true ;
+               item->diskInfo_.data_   = mem ;
+               item->diskInfo_.length_ = fileSize ;
+            }
+            else
+            {
+               errMsg = "map:" ;
+               errMsg += parsed.getPath();
+               errMsg += strerror( errno );
+               close( item->diskInfo_.fd_ );
+               item->diskInfo_.fd_ = - 1 ;
+            }
+         }
+         else
+         {
+            errMsg = parsed.getPath();
+            errMsg += ':' ;
+            errMsg += strerror( errno );
+         }
+            
+         if( 0 == errMsg.size() )
+         {
+            item->state_ = open_ ;
+            item->diskInfo_.useCount_ = 1 ;
+            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
+   
+            item->diskInfo_.useCount_-- ;
+            if( 0 == item->diskInfo_.useCount_ )
+               removeItem( item );  // done, remove item from active list
+         }
+         else
+         {
+            callbacks.onFailure_( opaque, errMsg );
+            removeItem( item );
+         }
+      }
    } // initial state
    else if( pendingCancel_ == item->state_ )
    {
@@ -95,30 +156,15 @@ void curlCache_t :: post
    if( 0 == item )
    {
       item = newItem( hash, request_t::post_, url );
+      request_t *const req = newRequest( *item, opaque, request_t::post_, callbacks );
 
-      ccDiskCache_t &diskCache = getDiskCache();
-      if( diskCache.find( url.c_str(), item->diskInfo_.sequence_ ) )
-      {
-         item->state_ = open_ ;
-         diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
-         item->diskInfo_.useCount_ = 1 ;
-         callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
+      curlTransferRequest_t workReq ;
+      workReq.opaque_   = item ;
+      workReq.url_      = url ;
+      workReq.postHead_ = postHead ;
+      workReq.cancel_   = &item->cancel_ ;
 
-         if( 0 == --item->diskInfo_.useCount_ )
-            removeItem( item );  // done, remove item from active list
-      } // found in cache... finished
-      else
-      {
-         request_t *const req = newRequest( *item, opaque, request_t::post_, callbacks );
-
-         curlTransferRequest_t workReq ;
-         workReq.opaque_   = item ;
-         workReq.url_      = url ;
-         workReq.postHead_ = postHead ;
-         workReq.cancel_   = &item->cancel_ ;
-
-         getCurlRequestQueue().push( workReq );
-      } // not found in cache... get it
+      getCurlRequestQueue().push( workReq );
    } // initial state
    else if( pendingCancel_ == item->state_ )
    {
@@ -418,7 +464,7 @@ curlCache_t :: item_t *curlCache_t :: newItem
    INIT_LIST_HEAD( &newItem->requests_ );
    memset( &newItem->diskInfo_, 0, sizeof( newItem->diskInfo_ ) );
    list_add_tail( &newItem->chainHash_, &hash_[hash] );
-   
+
    return newItem ;
 }
 
@@ -429,12 +475,28 @@ void curlCache_t :: removeItem( item_t *item )
        ||
        ( open_ == item->state_ ) )
    {
-      ccDiskCache_t &diskCache = getDiskCache();
-      diskCache.notInUse( item->diskInfo_.sequence_ );
-      if( ( pendingDelete_ == item->state_ )
-          ||
-          ( item->deleteOnClose_ ) )
-         diskCache.deleteFromCache( item->url_.c_str() );
+      if( !item->diskInfo_.isFile_ )
+      {
+         ccDiskCache_t &diskCache = getDiskCache();
+         diskCache.notInUse( item->diskInfo_.sequence_ );
+         if( ( pendingDelete_ == item->state_ )
+             ||
+             ( item->deleteOnClose_ ) )
+            diskCache.deleteFromCache( item->url_.c_str() );
+      }
+      else
+      {
+         int result = munmap( (void *)item->diskInfo_.data_, item->diskInfo_.length_ );
+         if( 0 != result )
+            fprintf( stderr, "Error unmapping file:// object\n" );
+         result = close( item->diskInfo_.fd_ );
+         if( 0 != result )
+            fprintf( stderr, "Error closing file:// object\n" );
+
+         item->diskInfo_.data_ = 0 ;
+         item->diskInfo_.length_ = 0 ;
+         item->diskInfo_.fd_ = -1 ;
+      }
    }
 
    list_del( &item->chainHash_ );
@@ -520,7 +582,7 @@ void curlCacheComplete( void         *opaque,
                         unsigned long numRead )
 {
    printf( "complete, %lu bytes\n", numRead );
-   fwrite( data, 1, numRead, stdout );
+//   fwrite( data, 1, numRead, stdout );
 }
 
 void curlCacheFailure( void              *opaque,
