@@ -1,5 +1,5 @@
 #ifndef __ROLLINGMEDIAN_H__
-#define __ROLLINGMEDIAN_H__ "$Id: rollingMedian.h,v 1.1 2004-11-26 15:30:04 ericn Exp $"
+#define __ROLLINGMEDIAN_H__ "$Id: rollingMedian.h,v 1.2 2004-12-03 04:42:46 ericn Exp $"
 
 /*
  * rollingMedian.h
@@ -22,7 +22,10 @@
  * Change History : 
  *
  * $Log: rollingMedian.h,v $
- * Revision 1.1  2004-11-26 15:30:04  ericn
+ * Revision 1.2  2004-12-03 04:42:46  ericn
+ * -added dump method
+ *
+ * Revision 1.1  2004/11/26 15:30:04  ericn
  * -Initial import
  *
  *
@@ -44,6 +47,7 @@ public:
    // reset to initial value (use when stream stops)
    void reset( void );
 
+   void dump( void ) const ;
 private:
    unsigned               N_ ;
    unsigned               mid_ ;
