@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.3  2002-10-31 02:08:10  ericn
+ * Revision 1.4  2002-11-02 18:36:54  ericn
+ * -added getPixel, setPixel, getRect
+ *
+ * Revision 1.3  2002/10/31 02:08:10  ericn
  * -made screen object, got rid of bare clearScreen method
  *
  * Revision 1.2  2002/10/20 16:30:49  ericn
@@ -29,6 +32,7 @@
 #include "js/jscntxt.h"
 #include "js/jsapi.h"
 #include "js/jslock.h"
+#include "jsImage.h"
 
 static JSBool
 jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -53,6 +57,167 @@ jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    } // clear to specified color
          
    *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSBool
+jsGetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      unsigned x = JSVAL_TO_INT( argv[0] );
+      unsigned y = JSVAL_TO_INT( argv[1] );
+      fbDevice_t &fb = getFB();
+      
+      if( ( x < fb.getWidth() ) && ( y < fb.getHeight() ) )
+      {
+         unsigned short const rgb16 = fb.getPixel( x, y );
+         unsigned red   = fb.getRed( rgb16 );
+         unsigned green = fb.getGreen( rgb16 );
+         unsigned blue  = fb.getBlue( rgb16 );
+         unsigned rgb = ( red << 16 ) | ( green << 8 ) | blue ;
+         *rval = INT_TO_JSVAL( rgb );
+      }
+      else
+         JS_ReportError( cx, "Invalid screen position" );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.getPixel( x, y );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   
+   if( ( 3 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] ) )
+   {
+      unsigned x = JSVAL_TO_INT( argv[0] );
+      unsigned y = JSVAL_TO_INT( argv[1] );
+      unsigned rgb = JSVAL_TO_INT( argv[2] );
+
+      fbDevice_t &fb = getFB();
+      
+      if( ( x < fb.getWidth() ) && ( y < fb.getHeight() ) )
+      {
+         unsigned char red   = rgb >> 16 ;
+         unsigned char green = ( rgb >> 8 ) & 0xFF ;
+         unsigned char blue  = rgb & 0xFF ;
+
+         fb.getPixel( x, y ) = fb.get16( red, green, blue );
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "Invalid screen position" );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.getPixel( x, y );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsGetRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 4 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      JSObject *rImage = JS_NewObject( cx, &jsImageClass_, 0, 0 );
+      if( rImage )
+      {
+         int width = JSVAL_TO_INT( argv[2] );
+         int height = JSVAL_TO_INT( argv[3] );
+         if( ( 0 < width ) && ( 0 < height ) )
+         {
+            *rval = OBJECT_TO_JSVAL( rImage );
+            JS_DefineProperty( cx, rImage, "width",
+                               argv[2],
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, rImage, "height", 
+                               argv[3],
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            unsigned const pixBytes = width*height*sizeof(unsigned short);
+            unsigned short * const pixels = (unsigned short *)JS_malloc( cx, pixBytes );
+            if( pixels )
+            {
+               int const startX = JSVAL_TO_INT( argv[0] );
+               int const startY = JSVAL_TO_INT( argv[1] );
+
+               fbDevice_t &fb = getFB();
+
+               for( unsigned y = 0 ; y < height ; y++ )
+               {
+                  if( startY + y < fb.getHeight() )
+                  {
+                     for( unsigned x = 0 ; x < width ; x++ )
+                     {
+                        if( startX + x < fb.getWidth() )
+                        {
+                           pixels[(y*width)+x] = fb.getPixel( startX + x, startY + y );
+                        }
+                        else
+                           pixels[(y*width)+x] = 0 ;
+                     }
+                  }
+                  else
+                     memset( pixels+(y*width), 0, width*sizeof(pixels[0]));
+               }
+               JSString *sPix = JS_NewString( cx, (char *)pixels, pixBytes );
+               if( sPix )
+               {
+                  JS_DefineProperty( cx, rImage, "pixBuf", 
+                                     STRING_TO_JSVAL( sPix ),
+                                     0, 0, 
+                                     JSPROP_ENUMERATE
+                                     |JSPROP_PERMANENT
+                                     |JSPROP_READONLY );
+               }
+               else
+               {
+                  JS_ReportError( cx, "Error allocating pixStr" );
+                  JS_free( cx, pixels );
+               }
+            }
+            else
+               JS_ReportError( cx, "Error allocating pixBuf" );
+         }
+         else
+            JS_ReportError( cx, "Invalid width or height" );
+      }
+      else
+         JS_ReportError( cx, "Error allocating image rect" );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.getRect( x, y, width, height );" );
+
    return JS_TRUE ;
 }
 
@@ -112,6 +277,9 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 
 static JSFunctionSpec screen_methods[] = {
    { "clear",        jsClearScreen,      0,0,0 },
+   { "getPixel",     jsGetPixel,         0,0,0 },
+   { "setPixel",     jsSetPixel,         0,0,0 },
+   { "getRect",      jsGetRect,          0,0,0 },
    { 0 }
 };
 
