@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.19  2003-02-01 18:14:30  ericn
+ * Revision 1.20  2003-02-02 13:46:17  ericn
+ * -added recordBuffer support
+ *
+ * Revision 1.19  2003/02/01 18:14:30  ericn
  * -added wave file playback support
  *
  * Revision 1.18  2002/12/15 20:01:25  ericn
@@ -526,6 +529,333 @@ static JSBool waveFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 }
 
 static JSBool
+jsRecordPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   jsval                dataVal ;
+   JSString            *dataStr ;
+   unsigned char const *data ;
+   if( JS_GetProperty( cx, obj, "data", &dataVal ) 
+       &&
+       JSVAL_IS_STRING( dataVal ) 
+       &&
+       ( 0 != ( dataStr = JSVAL_TO_STRING( dataVal ) ) ) 
+       &&
+       ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
+   {
+      unsigned const length = JS_GetStringLength( dataStr );
+
+      jsval onComplete = JSVAL_VOID ;
+      jsval onCancel   = JSVAL_VOID ;
+      
+      JSObject *rhObj ;
+      if( ( 1 <= argc )
+          &&
+          JSVAL_IS_OBJECT( argv[0] ) 
+          &&
+          ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
+      {
+         jsval     val ;
+         JSString *sHandler ;
+         
+         if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
+             &&
+             JSVAL_IS_STRING( val ) )
+         {
+            onComplete = val ;
+         } // have onComplete handler
+         
+         if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
+             &&
+             JSVAL_IS_STRING( val ) )
+         {
+            onCancel = val ;
+         } // have onComplete handler
+      } // have right-hand object
+
+      audioQueue_t::waveHeader_t const &header = *(audioQueue_t::waveHeader_t const *)data ;
+      if( getAudioQueue().queuePlayback( obj, header, onComplete, onCancel ) )
+      {
+//         JS_ReportError( cx, "queued record buffer for playback" );
+      }
+      else
+      {
+         JS_ReportError( cx, "Error queueing record buffer for playback" );
+      }
+   }
+   else
+      JS_ReportError( cx, "Invalid record data" );
+
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSBool
+jsRecord( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) 
+       &&
+       JSVAL_IS_OBJECT( argv[0] ) )
+   {
+      jsval val ;
+      if( !JS_GetProperty( cx, obj, "isRecording", &val ) 
+          ||
+          !JSVAL_IS_BOOLEAN( val ) 
+          ||
+          !JSVAL_TO_BOOLEAN( val ) )
+      {
+         if( JS_GetProperty( cx, obj, "data", &val ) )
+         {
+            int      sampleRate ;
+            unsigned maxSamples ;
+            JSString *dataStr = 0 ;
+            if( !JSVAL_IS_STRING( val ) )
+            {
+               jsdouble maxDuration ;
+               if( !JS_GetProperty( cx, obj, "maxSeconds", &val ) 
+                   ||
+                   !JSVAL_IS_NUMBER( val ) 
+                   ||
+                   !JS_ValueToNumber( cx, val, &maxDuration ) ) 
+               {
+                  maxDuration = 5.0 ;
+               }
+               
+               if( !JS_GetProperty( cx, obj, "sampleRate", &val ) 
+                   ||
+                   !JSVAL_IS_INT( val ) 
+                   ||
+                   ( 0 == ( sampleRate = JSVAL_TO_INT( val ) ) ) ) 
+               {
+                  sampleRate = 11025 ;
+               }
+         
+               maxSamples = (unsigned)( maxDuration*sampleRate );
+               unsigned const bufSize = sizeof( audioQueue_t::waveHeader_t ) + maxSamples*sizeof(short);
+               void *buf = JS_malloc( cx, bufSize );
+               if( buf )
+               {
+                  dataStr = JS_NewString( cx, (char *)buf, bufSize );
+                  if( dataStr )
+                  {
+                     JS_DefineProperty( cx, 
+                                        obj, 
+                                        "data",
+                                        STRING_TO_JSVAL( dataStr ),
+                                        0, 0, 
+                                        JSPROP_ENUMERATE
+                                        |JSPROP_PERMANENT
+                                        |JSPROP_READONLY );
+                     JS_DefineProperty( cx, 
+                                        obj, 
+                                        "maxSamples",
+                                        INT_TO_JSVAL( maxSamples ),
+                                        0, 0, 
+                                        JSPROP_ENUMERATE
+                                        |JSPROP_PERMANENT
+                                        |JSPROP_READONLY );
+                  }
+                  else
+                     JS_ReportError( cx, "rooting dataStr" );
+               }
+            } // need to allocate data buffer
+            else
+            {
+               dataStr = JSVAL_TO_STRING( val );
+               JS_GetProperty( cx, obj, "sampleRate", &val );
+               sampleRate = JSVAL_TO_INT( val );
+               JS_GetProperty( cx, obj, "maxSamples", &val );
+               maxSamples = JSVAL_TO_INT( val );
+            }
+   
+            if( dataStr )
+            {
+               JSObject *rhObj = JSVAL_TO_OBJECT( argv[0] );
+               jsval onComplete = JSVAL_VOID ;
+               jsval onCancel   = JSVAL_VOID ;
+               if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
+                   &&
+                   JSVAL_IS_STRING( val ) )
+               {
+                  onComplete = val ;
+               } // have onComplete handler
+               
+               if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
+                   &&
+                   JSVAL_IS_STRING( val ) )
+               {
+                  onCancel = val ;
+               } // have onComplete handler
+   
+               char *buf = JS_GetStringBytes( dataStr );
+               audioQueue_t::waveHeader_t &header = *( audioQueue_t::waveHeader_t * )buf ;
+               header.numChannels_ = 1 ;
+               header.sampleRate_  = sampleRate ;
+               header.numSamples_  = maxSamples ;
+               if( getAudioQueue().queueRecord( obj, header, onComplete, onCancel ) )
+               {
+                  JS_DefineProperty( cx, 
+                                     obj, 
+                                     "isRecording",
+                                     JSVAL_TRUE,
+                                     0, 0, 
+                                     JSPROP_ENUMERATE
+                                     |JSPROP_PERMANENT
+                                     |JSPROP_READONLY );
+      printf( "record request queued\n" );
+                  *rval = JSVAL_TRUE ;
+               }
+               else
+                  JS_ReportError( cx, "queueing record buffer" );
+            }
+         }
+         else
+            JS_ReportError( cx, "no record data" );
+      }
+      else
+         JS_ReportError( cx, "already recording" );
+   }
+   else
+      JS_ReportError( cx, "Usage: recordBuffer.record( { onComplete:\"code\", onCancel:\"code\" } );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsRecordStop( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( getAudioQueue().stopRecording() )
+      *rval = JSVAL_TRUE ;
+   else
+      *rval = JSVAL_FALSE ;
+
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec recordBufferMethods_[] = {
+    {"record",       jsRecord,               0 },
+    {"playback",     jsRecordPlay,           0 },
+    {"stop",         jsRecordStop,           0 },
+    {0}
+};
+
+enum jsRecordFile_tinyid {
+   RECORDBUFFER_DATA, 
+   RECORDBUFFER_SAMPLERATE,
+   RECORDBUFFER_MAXDURATION,
+   RECORDBUFFER_MAXSAMPLES,
+   RECORDBUFFER_SECSRECORDED,
+   RECORDBUFFER_ISRECORDING,
+};
+
+extern JSClass jsRecordBufferClass_ ;
+
+JSClass jsRecordBufferClass_ = {
+  "recordBuffer",
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSPropertySpec recordBufferProperties_[] = {
+   {"data",           RECORDBUFFER_DATA,         JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {"sampleRate",     RECORDBUFFER_SAMPLERATE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {"maxSeconds",     RECORDBUFFER_MAXDURATION,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {"maxSamples",     RECORDBUFFER_SAMPLERATE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {"secsRecorded",   RECORDBUFFER_SECSRECORDED, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {"isRecording",    RECORDBUFFER_ISRECORDING,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+   {0,0,0}
+};
+
+static JSBool recordBuffer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( ( 1 == argc ) 
+       &&
+       JSVAL_IS_OBJECT( argv[0] ) )
+   {
+      JSObject *thisObj = JS_NewObject( cx, &jsRecordBufferClass_, NULL, NULL );
+
+      if( thisObj )
+      {
+         *rval = OBJECT_TO_JSVAL( thisObj ); // root
+
+         JSObject *rhObj ;
+         if( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) )
+         {
+            jsval     val ;
+            JSString *sHandler ;
+            double    maxSeconds ;
+            
+            if( JS_GetProperty( cx, rhObj, "maxSeconds", &val ) 
+                &&
+                JSVAL_IS_NUMBER( val ) )
+            {
+               JS_ValueToNumber( cx, val, &maxSeconds );
+            }
+            else
+               maxSeconds = 5.0 ;
+
+            JS_DefineProperty( cx, 
+                               thisObj, 
+                               "maxSeconds",
+                               DOUBLE_TO_JSVAL( JS_NewDouble( cx, maxSeconds ) ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            int sampleRate ;
+            if( JS_GetProperty( cx, rhObj, "sampleRate", &val ) 
+                &&
+                JSVAL_IS_INT( val ) )
+            {
+               sampleRate = JSVAL_TO_INT( val );
+            }
+            else
+               sampleRate = 11025 ;
+
+            JS_DefineProperty( cx, 
+                               thisObj, 
+                               "sampleRate",
+                               INT_TO_JSVAL( sampleRate ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+
+            JS_DefineProperty( cx, 
+                               thisObj, 
+                               "secsRecorded",
+                               DOUBLE_TO_JSVAL( JS_NewDouble( cx, 0.0 ) ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+
+            JS_DefineProperty( cx, 
+                               thisObj, 
+                               "data",
+                               JSVAL_NULL,
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            return JS_TRUE ;
+         }
+         else
+            JS_ReportError( cx, "Error reading right-hand object" );
+      }
+      else
+         JS_ReportError( cx, "Error allocating recordBuffer" );
+   }
+   else
+      JS_ReportError( cx, "Usage: new recordBuffer( {sampleRate:x, maxSeconds:seconds} );" );
+
+   return JS_FALSE ;
+
+}
+
+static JSBool
 jsMP3Cancel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    unsigned numCancelled ;
@@ -561,7 +891,15 @@ bool initJSMP3( JSContext *cx, JSObject *glob )
                            0, 0 );
       if( rval )
       {
-         return JS_DefineFunctions( cx, glob, _functions);
+         rval = JS_InitClass( cx, glob, NULL, &jsRecordBufferClass_,
+                              recordBuffer, 1,
+                              recordBufferProperties_, 
+                              recordBufferMethods_,
+                              0, 0 );
+         if( rval )
+         {
+            return JS_DefineFunctions( cx, glob, _functions);
+         }
       }
    }
    return false ;

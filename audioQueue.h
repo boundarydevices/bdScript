@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.5 2003-02-01 18:15:27 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.6 2003-02-02 13:46:17 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.5  2003-02-01 18:15:27  ericn
+ * Revision 1.6  2003-02-02 13:46:17  ericn
+ * -added recordBuffer support
+ *
+ * Revision 1.5  2003/02/01 18:15:27  ericn
  * -preliminary wave file and record support
  *
  * Revision 1.4  2002/12/01 03:13:54  ericn
@@ -107,6 +110,11 @@ public:
    bool clear( unsigned &numCancelled );
 
    //
+   //
+   //
+   bool stopRecording( void );
+
+   //
    // shutdown audio output thread
    //
    static void shutdown( void );
@@ -136,6 +144,9 @@ private:
    bool volatile shutdown_ ;
    int           readFd_ ;
    int           writeFd_ ;
+   unsigned      numReadFrags_ ;
+   unsigned      readFragSize_ ;
+   unsigned      maxReadBytes_ ;
 };
 
 #endif

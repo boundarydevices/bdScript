@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.16  2003-02-01 18:15:29  ericn
+ * Revision 1.17  2003-02-02 13:46:17  ericn
+ * -added recordBuffer support
+ *
+ * Revision 1.16  2003/02/01 18:15:29  ericn
  * -preliminary wave file and record support
  *
  * Revision 1.15  2003/01/12 03:04:26  ericn
@@ -90,9 +93,52 @@ int getDspFd( void )
    return getAudioQueue().readFd_ ;
 }
 
-static void audioHandlerCallback( void *cbParam )
+static void normalize( short int *samples,
+                       unsigned   numSamples )
+{
+   signed short min = 0x7fff ;
+   signed short max = 0x8000 ;
+   signed short *next = samples ;
+   for( unsigned i = 0 ; i < numSamples ; i++ )
+   {
+      signed short s = *next++ ;
+      if( s > max )
+         max = s ;
+      if( s < min )
+         min = s ;
+   }
+   min = 0-min ;
+   max = max > min ? max : min ;
+   
+   //
+   // fixed point 16:16
+   //
+   unsigned long const ratio = ( 0x70000000UL / max );
+   next = samples ;
+   for( unsigned i = 0 ; i < numSamples ; i++ )
+   {
+      signed long x16 = ratio * *next ;
+      signed short s = (signed short)( x16 >> 16 );
+      *next++ = s ;
+   }
+}
+
+static void audioCallback( void *cbParam )
 {
    audioQueue_t::item_t *item = (audioQueue_t::item_t *)cbParam ;
+
+   if( audioQueue_t::wavRecord_ == item->type_ )
+   {
+      JS_DefineProperty( execContext_, 
+                         item->obj_, 
+                         "isRecording",
+                         JSVAL_FALSE,
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+   }
+
    jsval handler = item->isComplete_ ? item->onComplete_ : item->onCancel_ ;
 
    if( JSVAL_VOID != handler )
@@ -266,7 +312,6 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
             }
             else if( audioQueue_t::wavPlay_ == item->type_ )
             {
-               printf( "playback stuff here\n" );
                _playing = true ;
 
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
@@ -345,18 +390,19 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
                }
 
-               unsigned short *nextSample = header.samples_ ;
+               unsigned char *nextSample = (unsigned char *)header.samples_ ;
                unsigned long bytesLeft = header.numSamples_ * sizeof( header.samples_[0] );
+               unsigned const maxRead = queue->readFragSize_ ;
                while( !( _cancel || queue->shutdown_ ) 
                       && 
                       ( 0 < bytesLeft ) )
                {
-                  // read max of 1/2 second at a time
-                  int const readSize = ( bytesLeft > header.sampleRate_ ) ? header.sampleRate_ : bytesLeft ;
-                  int numRead = read( queue->readFd_, nextSample, bytesLeft );
+                  int const readSize = ( bytesLeft > maxRead ) ? maxRead : bytesLeft ;
+                  int numRead = read( queue->readFd_, nextSample, readSize );
                   if( 0 < numRead )
                   {
                      bytesLeft -= numRead ;
+                     nextSample += numRead ;
                   }
                   else
                   {
@@ -365,9 +411,11 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                   }
                }
 
-               header.numSamples_ = ( header.numSamples_ - bytesLeft ) / sizeof( header.samples_[0] );
+               header.numSamples_ = ( header.numSamples_*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
                header.numChannels_ = 1 ;
 
+               normalize( (short *)header.samples_, header.numSamples_ );
+               _recording = false ;
             }
             else
                fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
@@ -377,8 +425,6 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                if( _cancel )
                {
                   _cancel = false ;
-                  queueCallback( audioHandlerCallback, item );
-
                   if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_RESET, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                }
@@ -389,8 +435,8 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                   if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_SYNC, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                   item->isComplete_ = true ;
-                  queueCallback( audioHandlerCallback, item );
                }
+               queueCallback( audioCallback, item );
             }
          }
       }
@@ -415,24 +461,41 @@ audioQueue_t :: audioQueue_t( void )
    audioQueue_ = this ;
    pthread_t tHandle ;
    
-   int recordLevel = 100 ;
-   if( 0 == ioctl( readFd_, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-      printf( "record level is now %d\n", recordLevel );
-   else
-      perror( "set record level" );
-
-   int const create = pthread_create( &tHandle, 0, audioThread, this );
-   if( 0 == create )
+   if( ( 0 <= readFd_ ) && ( 0 <= writeFd_ ) )
    {
-      struct sched_param tsParam ;
-      tsParam.__sched_priority = 90 ;
-      pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
-      threadHandle_ = (void *)tHandle ;
-printf( "readFd == %d\n"
-        "queue->writeFd_ == %d\n", readFd_, writeFd_ );
+      audio_buf_info bufInfo ;
+      int biResult = ioctl( readFd_, SNDCTL_DSP_GETISPACE, &bufInfo );
+      if( 0 == biResult )
+      {
+         numReadFrags_ = bufInfo.fragstotal ;
+         readFragSize_ = bufInfo.fragsize ;
+         maxReadBytes_ = (numReadFrags_*readFragSize_);
+      }
+      else
+      {
+         perror( "getISpace" );
+         numReadFrags_ = 16 ;
+         readFragSize_ = 8192 ;
+         maxReadBytes_ = numReadFrags_ * readFragSize_ ;
+      }
+
+      int recordLevel = 100 ;
+      if( 0 != ioctl( readFd_, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+         perror( "set record level" );
+      
+      int const create = pthread_create( &tHandle, 0, audioThread, this );
+      if( 0 == create )
+      {
+         struct sched_param tsParam ;
+         tsParam.__sched_priority = 90 ;
+         pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
+         threadHandle_ = (void *)tHandle ;
+      }
+      else
+         fprintf( stderr, "Error %m creating curl-reader thread\n" );
    }
    else
-      fprintf( stderr, "Error %m creating curl-reader thread\n" );
+      perror( "/dev/dsp" );
 }
 
 audioQueue_t :: ~audioQueue_t( void )
@@ -480,6 +543,26 @@ bool audioQueue_t :: queuePlayback
    return queue_.push( item );
 }
 
+bool audioQueue_t :: queueRecord
+   ( JSObject            *obj,
+     waveHeader_t        &data,
+     jsval                onComplete,
+     jsval                onCancel )
+{
+   item_t *item = new item_t ;
+   item->type_       = wavRecord_ ;
+   item->obj_        = obj ;
+   item->data_       = (unsigned char const *)&data ;
+   item->length_     = 0 ;
+   item->onComplete_ = onComplete ;
+   item->onCancel_   = onCancel ;
+   item->isComplete_ = false ;
+   JS_AddRoot( execContext_, &item->obj_ );
+   JS_AddRoot( execContext_, &item->onComplete_ );
+   JS_AddRoot( execContext_, &item->onCancel_ );
+   return queue_.push( item );
+}
+
 bool audioQueue_t :: clear( unsigned &numCancelled )
 {
    numCancelled = 0 ;
@@ -495,7 +578,7 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       while( queue_.pull( item, 0 ) )
       {
          item->isComplete_ = false ;
-         queueCallback( audioHandlerCallback, item );
+         queueCallback( audioCallback, item );
          ++numCancelled ;
       }
    
@@ -513,6 +596,20 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
    ioctl( writeFd_, SNDCTL_DSP_SYNC, 0 );
 
    return true ;
+}
+
+bool audioQueue_t :: stopRecording( void )
+{
+   //
+   // tell player to cancel at next frame
+   //
+   if( _recording )
+   {
+      _cancel = true ;
+      return true ;
+   }
+   else
+      return false ;
 }
 
 void audioQueue_t :: shutdown( void )
