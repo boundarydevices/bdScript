@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.3 2003-11-24 19:42:05 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.4 2003-11-28 14:08:34 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.3  2003-11-24 19:42:05  ericn
+ * Revision 1.4  2003-11-28 14:08:34  ericn
+ * -added getter method isDeleted()
+ *
+ * Revision 1.3  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.2  2003/11/02 17:58:05  ericn
@@ -80,6 +83,8 @@ public:
 
    unsigned numHandlers( void ) const { return numHandlers_ ; }
    pollHandler_t *operator[]( unsigned idx ) const { return handlers_[idx]; }
+   
+   bool isDeleted( unsigned idx ) const { return deleted_[idx]; }
 
 protected:
    bool              inPollLoop_ ;
