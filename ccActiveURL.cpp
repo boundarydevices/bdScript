@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.4  2002-11-30 16:31:40  ericn
+ * Revision 1.5  2002-12-02 15:32:25  ericn
+ * -named mutex, removed double-removeItem(), added lock back to openHandle()
+ *
+ * Revision 1.4  2002/11/30 16:31:40  ericn
  * -changed work request url to char array from string
  *
  * Revision 1.3  2002/11/30 05:23:40  ericn
@@ -59,11 +62,7 @@ void curlCache_t :: get
             item->state_ = open_ ;
             diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
             item->diskInfo_.useCount_ = 1 ;
-            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
-   
-            item->diskInfo_.useCount_-- ;
-            if( 0 == item->diskInfo_.useCount_ )
-               removeItem( item );  // done, remove item from active list
+            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
          } // found in cache... finished
          else
          {
@@ -114,11 +113,7 @@ void curlCache_t :: get
          {
             item->state_ = open_ ;
             item->diskInfo_.useCount_ = 1 ;
-            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
-   
-            item->diskInfo_.useCount_-- ;
-            if( 0 == item->diskInfo_.useCount_ )
-               removeItem( item );  // done, remove item from active list
+            callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
          }
          else
          {
@@ -140,10 +135,7 @@ void curlCache_t :: get
       if( 0 < item->diskInfo_.useCount_ ) // or why still in cache?
       {
          item->diskInfo_.useCount_++ ;
-         callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
-   
-         if( 0 == --item->diskInfo_.useCount_ )
-            removeItem( item );  // done, remove item from active list
+         callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
       }
       else
          fprintf( stderr, "Weird use count %lu, state %d, url %s\n", item->diskInfo_.useCount_, item->state_, item->url_.c_str() );
@@ -180,10 +172,7 @@ void curlCache_t :: post
    {
       assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
       item->diskInfo_.useCount_++ ;
-      callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_ );
-
-      if( 0 == --item->diskInfo_.useCount_ )
-         removeItem( item );  // done, remove item from active list
+      callbacks.onComplete_( opaque, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
    } // open or pending delete, treat as immediate success
 }
 
@@ -193,7 +182,7 @@ void curlCache_t :: openHandle
      unsigned long     &length,        // output
      unsigned long     &identifier )   // output : used to close file
 {
-//   mutexLock_t lock( mutex_ );
+   mutexLock_t lock( mutex_ );
    item_t *item = findItem( hashURL( url ), url );
    assert( item && ( ( open_ == item->state_ ) || ( pendingDelete_ == item->state_ ) ) );
       
@@ -282,17 +271,11 @@ void curlCache_t :: transferComplete
          while( nextReq != head )
          {
             request_t *req = (request_t *)nextReq ;
-
             ++item->diskInfo_.useCount_ ;
             req->callbacks_.onComplete_( req->opaque_, item->diskInfo_.data_, item->diskInfo_.length_ );
-            --item->diskInfo_.useCount_ ;
-
             nextReq = req->chain_.next ;
             removeRequest( *req );
          }
-
-         if( 0 == item->diskInfo_.useCount_ )
-            removeItem( item );  // done, remove item from active list
       }
       else
       {
@@ -304,13 +287,11 @@ void curlCache_t :: transferComplete
          while( nextReq != head )
          {
             request_t *req = (request_t *)nextReq ;
-
             req->callbacks_.onFailure_( req->opaque_, errorMsg );
-
             nextReq = req->chain_.next ;
             removeRequest( *req );
          }
-         
+
          removeItem( item );  // done, remove item from active list
       }
    }
@@ -421,6 +402,7 @@ void curlCache_t :: transferProgress
 }
 
 curlCache_t :: curlCache_t( void )
+   : mutex_( "curlCacheMutex" )
 {
    for( unsigned i = 0 ; i < numHashBuckets_ ; i++ )
       INIT_LIST_HEAD( &hash_[i] );
