@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.1  2004-06-28 02:57:34  ericn
+ * Revision 1.2  2004-07-04 21:31:27  ericn
+ * -added status and bitmap support
+ *
+ * Revision 1.1  2004/06/28 02:57:34  ericn
  * -Initial import
  *
  *
@@ -22,6 +25,13 @@
 #include <stdio.h>
 #include "dither.h"
 #include <assert.h>
+#include "jsImage.h"
+#include "jsAlphaMap.h"
+#include "jsBitmap.h"
+#include <string.h>
+#include "hexDump.h"
+#include "jsGlobals.h"
+#include "codeQueue.h"
 
 #define STAR_VENDOR_ID         0x0519
 #define VENDORCLASS_PRODUCT_ID 0x0002
@@ -34,10 +44,17 @@ public:
    virtual ~starPoll_t( void );
    
    virtual void fire( void );
+   void print( JSContext  *cx, 
+               void const *data, 
+               unsigned    len );
+
+   void setHandler( jsval method, JSObject *obj );
 
    char                   prevData_[512];
    unsigned               prevLen_ ;
    struct usb_dev_handle *udev_ ;
+   jsval                  statusHandler_ ;
+   JSObject              *statusObj_ ;
 };
 
 static int const inep  = 130; // find_ep(dev, config, interface, altsetting, USB_ENDPOINT_IN, USB_ENDPOINT_TYPE_BULK);
@@ -48,8 +65,13 @@ starPoll_t :: starPoll_t( void )
    : pollTimer_t()
    , udev_( 0 )
    , prevLen_( 0 )
+   , statusHandler_( JSVAL_VOID )
+   , statusObj_( 0 )
 {
 //   usb_debug = 2 ;
+   JS_AddRoot( execContext_, &statusHandler_ );
+   JS_AddRoot( execContext_, &statusObj_ );
+
    usb_init();
 
    usb_find_busses();
@@ -89,6 +111,52 @@ starPoll_t :: starPoll_t( void )
    }
 }
 
+void starPoll_t :: print( JSContext *cx, void const *data, unsigned len )
+{
+   unsigned    outBytes = len ;
+   char const *nextOut = (char const *)data ;
+
+   while( ( 0 < outBytes ) && ( 0 != udev_ ) )
+   {
+      unsigned toWrite = (4096 < outBytes) ? 4096 : outBytes ;
+      
+      int const numWritten = usb_bulk_write( udev_, outep, 
+                                             (char *)nextOut, toWrite, 1000 );
+      if( toWrite == numWritten )
+      {
+         outBytes -= numWritten ;
+         nextOut  += numWritten ;
+      }
+      else if( 0 > numWritten )
+      {
+         JS_ReportError( cx, "Error writing to printer" );
+         usb_close( udev_ );
+         udev_ = 0 ;
+      }
+      else
+      {
+         JS_ReportError( cx, "printer stall: %u of %u\n", numWritten, toWrite );
+         if( 0 <= usb_clear_halt( udev_, outep ) )
+         {
+            outBytes -= numWritten ;
+            nextOut  += numWritten ;
+         }
+         else
+         {
+            JS_ReportError( cx, "Error resetting printer" );
+            usb_close( udev_ );
+            udev_ = 0 ;
+         }
+      }
+   }
+}
+
+void starPoll_t :: setHandler( jsval method, JSObject *obj )
+{
+   statusHandler_ = method ;
+   statusObj_     = obj ;
+}
+
 starPoll_t :: ~starPoll_t( void )
 {
    if( udev_ )
@@ -96,6 +164,8 @@ starPoll_t :: ~starPoll_t( void )
       usb_close( udev_ );
       udev_ = 0 ;
    }
+   JS_RemoveRoot( execContext_, &statusHandler_ );
+   JS_RemoveRoot( execContext_, &statusObj_ );
 }
    
 void starPoll_t :: fire( void )
@@ -119,6 +189,12 @@ void starPoll_t :: fire( void )
                printf( "\n" );
                memcpy( prevData_, inBuf, numRead );
                prevLen_ = numRead ;
+
+               if( JSVAL_VOID != statusHandler_ )
+               {
+                  JSObject *scope = statusObj_ ;
+                  executeCode( statusObj_, statusHandler_, "starUSB:onStatusChange", 0, 0 );
+               }
             }
          }
          else
@@ -146,15 +222,120 @@ static JSBool jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
    return JS_TRUE ;
 }
 
+static JSClass jsStarStatusClass_ = {
+   "starStatus",                
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+
 static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
+   starPoll_t *const star = (starPoll_t *)JS_GetInstancePrivate( cx, obj, &jsStarUSBClass_, NULL );
+   if( ( 0 != star ) && ( 0 != star->udev_ ) )
+   {
+      struct status {
+          // parsed
+          bool offline;
+          bool coveropen;
+          bool paperempty;
+          bool papernearempty;
+          bool draweropen;
+          bool stackerfull;
+          bool etbavailable;
+          unsigned char etbcounter;
+          bool paperInPresenter;
+      };
+
+      if( 9 <= star->prevLen_ )
+      {
+         status st ;
+         st.offline        = (star->prevData_[2] & 0x08)!=0;
+         st.coveropen      = (star->prevData_[2] & 0x20)!=0;
+         st.paperempty     = (star->prevData_[5] & 0x08)!=0;
+         st.papernearempty = (star->prevData_[5] & 0x04)!=0;
+         st.draweropen     = (star->prevData_[2] & 0x04)!=0;
+         st.stackerfull    = (star->prevData_[6] & 0x02)!=0;
+         
+         st.etbavailable = 1;
+         st.etbcounter = (((star->prevData_[7] & 0x40) >> 2) |
+                          ((star->prevData_[7] & 0x20) >> 2) |
+                          ((star->prevData_[7] & 0x08) >> 1) |
+                          ((star->prevData_[7] & 0x04) >> 1) |
+                          ((star->prevData_[7] & 0x02) >> 1));
+         st.paperInPresenter = (0 != (star->prevData_[8] & 0x0e));
+
+         JSObject *statObj = JS_NewObject( cx, &jsStarStatusClass_, 0, obj );
+         *rval = OBJECT_TO_JSVAL(statObj); // root
+
+         JS_DefineProperty( cx, statObj, "paperInPresenter", 
+                            st.paperInPresenter ? JSVAL_TRUE : JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, statObj, "paperNearEmpty", 
+                            st.papernearempty ? JSVAL_TRUE : JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, statObj, "paperOut", 
+                            st.paperempty ? JSVAL_TRUE : JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, statObj, "counter", 
+                            INT_TO_JSVAL(st.etbcounter),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         int errors = 0 ;
+         JS_DefineProperty( cx, statObj, "errors", 
+                            INT_TO_JSVAL(errors),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+      }
+      else
+         JS_ReportError( cx, "No printer status available" );
+   }
+   else
+      JS_ReportError( cx, "printer closed!" );
    return JS_TRUE ;
 }
 
 static JSBool jsOnStatusChange( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
+   JSObject *handlerObj = obj ;
+   if( ( ( 1 == argc ) || ( 2 == argc ) )
+       &&
+       ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, argv[0] ) ) 
+       &&
+       ( ( 1 == argc )
+         ||
+         ( ( JSTYPE_OBJECT == JS_TypeOfValue( cx, argv[1] ) )
+           &&
+           ( 0 != ( handlerObj = JSVAL_TO_OBJECT( argv[1] ) ) ) ) ) )
+   {
+      starPoll_t *const star = (starPoll_t *)JS_GetInstancePrivate( cx, obj, &jsStarUSBClass_, NULL );
+      if( ( 0 != star ) && ( 0 != star->udev_ ) )
+      {
+         star->setHandler( argv[0], handlerObj );
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "printer closed!" );
+   }
+   else
+      JS_ReportError( cx, "Usage: starUSB.onStatusChange( method [, object] );" );
    return JS_TRUE ;
 }
 
@@ -225,7 +406,9 @@ jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
        &&
        JSVAL_IS_OBJECT( argv[0] ) 
        &&
-       ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
+       ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) )
+       &&
+       JS_InstanceOf( cx, rhObj, &jsImageClass_, NULL ) )
    {
       jsval     vPixMap ;
       jsval     vWidth ;
@@ -269,6 +452,12 @@ long long const start = tickMs();
 long long const dEnd = tickMs();
 printf( "toBits..." ); fflush( stdout );
 */
+            //
+            // each row of output is either:
+            //    skipLine command
+            // or
+            //    'b' m n bits...        where n * 256 + m is the number of bytes worth of bits
+            //
             for( unsigned y = 0 ; y < bmHeight ; y++ )
             {
                unsigned char * const startOfLine = nextOut ;
@@ -304,7 +493,6 @@ printf( "toBits..." ); fflush( stdout );
 
                if( lastDot == startOfLine )
                {
-
                   memcpy( startOfLine, skipLine, sizeof( skipLine )-1 );
                   nextOut = startOfLine + sizeof( skipLine ) - 1 ;
                } // blank line
@@ -370,7 +558,7 @@ static JSFunctionSpec methods_[] = {
    { 0 }
 };
 
-static JSClass jsStarUSBClass_ = {
+JSClass jsStarUSBClass_ = {
   "starUSB",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
@@ -381,6 +569,156 @@ static JSClass jsStarUSBClass_ = {
 static JSPropertySpec properties_[] = {
   {0,0,0}
 };
+
+static void printBitmap( starPoll_t &dev,
+                         JSContext  *cx, 
+                         JSObject   *bmpObj )
+{
+   jsval     vPixMap ;
+   jsval     vWidth ;
+   jsval     vHeight ;
+   JSString *sPixMap ;
+
+   if( JS_GetProperty( cx, bmpObj, "pixBuf", &vPixMap )
+       &&
+       JSVAL_IS_STRING( vPixMap )
+       &&
+       ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
+       &&
+       JS_GetProperty( cx, bmpObj, "width", &vWidth )
+       &&
+       JSVAL_IS_INT( vWidth )
+       &&
+       JS_GetProperty( cx, bmpObj, "height", &vHeight )
+       &&
+       JSVAL_IS_INT( vHeight ) )
+   {
+      unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+      unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
+
+      char outBuf[4096];
+      char *nextOut = outBuf ;
+      memcpy( nextOut, initPrinter, sizeof( initPrinter )-1 );
+      nextOut += sizeof( initPrinter )-1 ;
+
+      memcpy( nextOut, initRaster, sizeof( initRaster )-1 );
+      nextOut += sizeof( initRaster )-1 ;
+      
+      int hSpecLen = sprintf( nextOut, "%s%d", setPageHeight, bmHeight ) + 1 ;
+      nextOut += hSpecLen ;
+      
+      memcpy( nextOut, letterQuality, sizeof( letterQuality )-1 );
+      nextOut += sizeof( letterQuality )-1 ;
+
+// printf( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );   
+
+      unsigned const bytesIn = (bmWidth+7)/8 ;
+      unsigned const inBytesPerRow = ((bmWidth+31)/32)*4 ;
+      unsigned const maxBytesPerRow = 3 + bytesIn ;
+      
+// printf( "BYTES %u x %u, %u\n", bytesIn, inBytesPerRow, maxBytesPerRow );   
+      //
+      // flush buffer to device when (if) we get to this point
+      //
+      char *const lastStartOfLine = outBuf+sizeof(outBuf)-maxBytesPerRow ;
+      JSString *const sPixMap = JSVAL_TO_STRING( vPixMap );
+      char const *nextIn = JS_GetStringBytes( sPixMap );
+
+      //
+      // print data goes here.
+      // each output line is either:
+      //    skipLine
+      // or 
+      //    'b' m n bits...        where n * 256 + m is the number of bytes worth of bits
+      //
+      unsigned char const n = bytesIn/256 ;
+      unsigned char const m = bytesIn&255 ;
+
+      unsigned totalOut = 0 ;
+/*
+      hexDumper_t dumpIn( nextIn, inBytesPerRow );
+      while( dumpIn.nextLine() )
+         printf( "%s\n", dumpIn.getLine() );
+*/
+
+      unsigned const inPad = inBytesPerRow-bytesIn ;
+      char *prevSkip = 0 ;
+
+      for( unsigned y = 0 ; y < bmHeight ; y++ )
+      {
+         char *const startOfLine = nextOut ;
+         *nextOut++ = 'b' ;
+         *nextOut++ = (char)m ;
+         *nextOut++ = (char)n ;
+
+         // copy next line from input
+         char *lastSet = startOfLine ;
+         for( unsigned byte = 0 ; byte < bytesIn ; byte++ )
+         {
+            char const in = *nextIn++ ;
+            if( in )
+               lastSet = nextOut ;
+            *nextOut++ = in ;
+         }
+
+         nextIn += inPad ;
+         if( lastSet == startOfLine )
+         {
+            if( 0 == prevSkip )
+               prevSkip = startOfLine ;
+
+            nextOut = startOfLine ;
+            memcpy( nextOut, skipLine, sizeof( skipLine )-1 );
+            nextOut += sizeof( skipLine )-1 ;
+         }
+         else if( ++lastSet < nextOut )
+         {
+            if( prevSkip )
+            {
+               unsigned skipBytes  = (startOfLine - prevSkip);
+               unsigned numSkipped = skipBytes/(sizeof(skipLine)-1) ;
+               prevSkip = 0 ;
+            } // could optimize this
+            unsigned const lineBytes = lastSet - startOfLine - 3 ;
+            startOfLine[1] = (char)(lineBytes & 255);
+            startOfLine[2] = (char)(lineBytes / 256);
+            nextOut = lastSet + 1 ;
+         }
+//         memset( nextOut, '\x0', bytesIn );
+//         memset( nextOut, '\xff', bytesIn );
+/*
+         memcpy( nextOut, nextIn, bytesIn );
+         nextOut += bytesIn ;
+         nextIn  += inBytesPerRow ;
+*/
+         if( nextOut >= lastStartOfLine )
+         {
+// printf( "print: %p..%p\n", outBuf, nextOut );            
+            dev.print( cx, outBuf, nextOut-outBuf );
+            totalOut += nextOut-outBuf ;
+            nextOut = outBuf ;
+         }
+      }
+
+// printf( "done sending data to printer\n" );   
+
+      memcpy( nextOut, formFeed, sizeof( formFeed )-1 );
+      nextOut += sizeof( formFeed )-1 ;
+
+      memcpy( nextOut, exitRaster, sizeof( exitRaster )-1 );
+      nextOut += sizeof( exitRaster )-1 ;
+
+      dev.print( cx, outBuf, nextOut-outBuf );
+      totalOut += nextOut-outBuf ;
+
+      assert( nextOut <= outBuf+sizeof(outBuf) );
+
+printf( "%lu total bytes sent to printer\n", totalOut );
+// printf( "done sending to printer\n" );   
+   }
+   else
+      JS_ReportError( cx, "Invalid bitmap\n" );
+}
 
 static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -397,15 +735,29 @@ static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
           &&
           ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
       {
-         if( JS_CallFunctionName( cx, obj, "imageToString", argc, argv, rval )
-             &&
-             JSVAL_IS_STRING( *rval )
-             &&
-             ( 0 != ( sArg = JSVAL_TO_STRING( *rval ) ) ) )
+         if( JS_InstanceOf( cx, rhObj, &jsAlphaMapClass_, NULL ) )
          {
+            JS_ReportError( cx, "Can't (yet) convert from alphamap" );
+         }
+         else if( JS_InstanceOf( cx, rhObj, &jsImageClass_, NULL ) )
+         {
+            if( JS_CallFunctionName( cx, obj, "imageToString", argc, argv, rval )
+                &&
+                JSVAL_IS_STRING( *rval )
+                &&
+                ( 0 != ( sArg = JSVAL_TO_STRING( *rval ) ) ) )
+            {
+               star->print( cx, JS_GetStringBytes( sArg ), JS_GetStringLength( sArg ) );
+            }
+            else
+               JS_ReportError( cx, "converting image to string\n" );
+         }
+         else if( JS_InstanceOf( cx, rhObj, &jsBitmapClass_, NULL ) )
+         {
+            printBitmap( *star, cx, rhObj );
          }
          else
-            JS_ReportError( cx, "converting image to string\n" );
+            JS_ReportError( cx, "Unknown conversion" );
       }
       else if( ( 1 == argc )
                &&
@@ -413,50 +765,12 @@ static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
                &&
                ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) )
       {
+         star->print( cx, JS_GetStringBytes( sArg ), JS_GetStringLength( sArg ) );
       }
       else
       {
          JS_ReportError( cx, "Usage: printer.print( alphaMap|string )" );
          sArg = 0 ; // just in case
-      }
-
-      if( 0 != sArg )
-      {
-         unsigned    outBytes = JS_GetStringLength( sArg );
-         char const *nextOut = JS_GetStringBytes( sArg );
-         while( ( 0 < outBytes ) && ( 0 != star->udev_ ) )
-         {
-            unsigned toWrite = (4096 < outBytes) ? 4096 : outBytes ;
-            
-            int const numWritten = usb_bulk_write( star->udev_, outep, 
-                                                   (char *)nextOut, toWrite, 1000 );
-            if( toWrite == numWritten )
-            {
-               outBytes -= numWritten ;
-               nextOut  += numWritten ;
-            }
-            else if( 0 > numWritten )
-            {
-               JS_ReportError( cx, "Error writing to printer" );
-               usb_close( star->udev_ );
-               star->udev_ = 0 ;
-            }
-            else
-            {
-               JS_ReportError( cx, "printer stall: %u of %u\n", numWritten, toWrite );
-               if( 0 <= usb_clear_halt( star->udev_, outep ) )
-               {
-                  outBytes -= numWritten ;
-                  nextOut  += numWritten ;
-               }
-               else
-               {
-                  JS_ReportError( cx, "Error resetting printer" );
-                  usb_close( star->udev_ );
-                  star->udev_ = 0 ;
-               }
-            }
-         }
       }
    }
    else
@@ -476,7 +790,7 @@ static void jsStarUSBFinalize(JSContext *cx, JSObject *obj)
 }
 
 //
-// constructor for the screen object
+// constructor for the starUSB object
 //
 static JSBool jsStarUSB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
