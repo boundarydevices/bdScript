@@ -848,7 +848,7 @@ void main( int argc, char const * const argv[] )
 printf( "video frame period == %llu\n", period );
 if( 0 != period )
 ptsAdjustFrame = outQueue.ptsDenominator_ / ((27000000/period) * outQueue.ptsNumerator_);
-printf( "num %lld/denom %lld\n", outQueue.ptsNumerator_, outQueue.ptsDenominator_ );
+printf( "num %ld/denom %ld\n", outQueue.ptsNumerator_, outQueue.ptsDenominator_ );
 printf( "frame adjust = %llu\n", ptsAdjustFrame );
 
                                           break;
