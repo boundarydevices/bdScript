@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.9  2002-11-07 02:14:34  ericn
+ * Revision 1.10  2002-11-07 14:51:07  ericn
+ * -removed debug msg
+ *
+ * Revision 1.9  2002/11/07 02:14:34  ericn
  * -removed bare functions
  *
  * Revision 1.8  2002/11/05 15:16:07  ericn
@@ -102,7 +105,7 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       
       if( getAudioQueue().insert( obj, data, length, onComplete, onCancel ) )
       {
-         JS_ReportError( cx, "queued MP3 for playback" );
+//         JS_ReportError( cx, "queued MP3 for playback" );
       }
       else
       {
