@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.3  2002-11-22 14:58:16  ericn
+ * Revision 1.4  2003-03-23 22:53:12  ericn
+ * -force fast integer DCT (doesn't help much)
+ *
+ * Revision 1.3  2002/11/22 14:58:16  ericn
  * -fixed off-by-one bug, added stand-alone test
  *
  * Revision 1.2  2002/11/15 14:39:52  ericn
@@ -125,6 +128,7 @@ bool imageJPEG( void const    *inData,     // input
 
    jpeg_read_header(&cinfo, TRUE);
    cinfo.out_color_space = JCS_RGB ;
+   cinfo.dct_method = JDCT_IFAST;   
    
    //
    // per documentation, sample array should be allocated before
