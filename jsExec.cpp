@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.62  2003-11-22 21:02:37  ericn
+ * Revision 1.63  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.62  2003/11/22 21:02:37  ericn
  * -made code queue a pollHandler_t
  *
  * Revision 1.61  2003/09/10 04:56:30  ericn
@@ -327,7 +330,8 @@ jsMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static bool mainLoop( pollHandlerSet_t &polls,
                       JSContext        *cx )
 {
-   if( !polls.poll( 5000 ) )
+   static unsigned iterations = 0 ;
+   if( !polls.poll( 5000 ) || ( 15 == ( iterations++ & 15 ) ) )
    {
       mutexLock_t lock( execMutex_ );
       JS_GC( cx );
@@ -486,9 +490,7 @@ int prMain(int argc, char **argv)
 
                      getCurlCache();
 
-                     touchScreenThread_t *tsThread ;
-                     if( !initJSTouch( tsThread, cx, glob ) )
-                        tsThread = 0 ;
+                     initJSTouch( cx, glob );
 
                      //
                      // start up audio output 
@@ -562,9 +564,6 @@ int prMain(int argc, char **argv)
                      shutdownCurlWorkers();
                      shutdownCCDiskCache();
                      audioQueue_t::shutdown();
-
-                     if( tsThread )
-                        delete tsThread ;
                   }
                   else
                      fprintf( stderr, "Error defining Javascript shell functions\n" );
@@ -623,6 +622,7 @@ void handler(int sig)
 
    if (btSize > 0)
    {
+      backtrace_symbols_fd( btArray, btSize, 1 );
       char** btSymbols = backtrace_symbols( btArray, btSize );
       if( btSymbols )
       {

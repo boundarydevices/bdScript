@@ -1,5 +1,5 @@
 #ifndef __JSTOUCH_H__
-#define __JSTOUCH_H__ "$Id: jsTouch.h,v 1.1 2002-11-03 15:39:36 ericn Exp $"
+#define __JSTOUCH_H__ "$Id: jsTouch.h,v 1.2 2003-11-24 19:42:05 ericn Exp $"
 
 /*
  * jsTouch.h
@@ -7,18 +7,25 @@
  * This header file declares the Javascript Touch
  * Screen initialization routine.
  *
- * Internally, the touch-screen routines are:
+ * The touch-screen api includes three global functions:
  *
  *    onTouch( "code to execute" );
  *    onRelease( "code to execute" );
+ *    onMove( "code to execute" );
  *
- *    getTouchX();
- *    getTouchY();
- * 
+ * and a 'touchScreen' object, which has the following
+ * methods:
+ *
+ *    getX()      - returns x-position of the last touch
+ *    getY()      - returns y-position of the last touch
+ *
  * Change History : 
  *
  * $Log: jsTouch.h,v $
- * Revision 1.1  2002-11-03 15:39:36  ericn
+ * Revision 1.2  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.1  2002/11/03 15:39:36  ericn
  * -Initial import
  *
  *
@@ -28,17 +35,7 @@
 
 #include "js/jsapi.h"
 
-#ifndef __TSTHREAD_H__
-#include "tsThread.h"
-#endif
-
-//
-// returns a pointer to the touch-screen thread.
-// 
-// delete'ing it will shut the thread down.
-//
-bool initJSTouch( touchScreenThread_t *&thread,
-                  JSContext            *cx, 
+bool initJSTouch( JSContext            *cx, 
                   JSObject             *glob );
 
 

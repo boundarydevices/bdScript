@@ -6,9 +6,9 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o jsJPEG.o \
        jsAlphaMap.o jsBarcode.o jsButton.o jsCamera.o jsCurl.o jsGlobals.o \
        jsHyperlink.o jsImage.o jsMP3.o jsScreen.o jsShell.o \
-       jsText.o jsTimer.o jsTouch.o jsTransitions.o jsURL.o jsVolume.o \
+       jsText.o jsTimer.o jsNewTouch.o jsTransitions.o jsURL.o jsVolume.o \
        jsGpio.o madDecode.o madHeaders.o memFile.o parsedURL.o \
-       relativeURL.o tsThread.o ultoa.o \
+       relativeURL.o ultoa.o \
        ultodd.o box.o urlFile.o zOrder.o \
        cbmImage.o ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
        popen.o jsPopen.o jsCBM.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
@@ -16,7 +16,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        jsMPEG.o jsFlash.o jsSniffWLAN.o sniffWLAN.o jsMonWLAN.o monitorWLAN.o \
        ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o \
        pollHandler.o barcodePoll.o touchPoll.o gpioPoll.o image.o imgFile.o \
-       flashThread.o
+       flashThread.o parsedFlash.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: pollHandler.cpp,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -20,6 +23,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "debugPrint.h"
+
 pollHandler_t :: pollHandler_t
    ( int               fd,
      pollHandlerSet_t &set )
@@ -29,14 +34,14 @@ pollHandler_t :: pollHandler_t
 {
 }
    
-void pollHandler_t :: onDataAvail( void ){ printf( "pollHandler\n" ); }     // POLLIN
-void pollHandler_t :: onWriteSpace( void ){ printf( "pollHandler\n" ); }    // POLLOUT
-void pollHandler_t :: onError( void ){ printf( "pollHandler\n" ); }         // POLLERR
-void pollHandler_t :: onHUP( void ){ printf( "pollHandler\n" ); }           // POLLHUP
+void pollHandler_t :: onDataAvail( void ){ debugPrint( "pollHandler\n" ); }     // POLLIN
+void pollHandler_t :: onWriteSpace( void ){ debugPrint( "pollHandler\n" ); }    // POLLOUT
+void pollHandler_t :: onError( void ){ debugPrint( "pollHandler\n" ); }         // POLLERR
+void pollHandler_t :: onHUP( void ){ debugPrint( "pollHandler\n" ); }           // POLLHUP
 
 pollHandler_t :: ~pollHandler_t( void )
 {
-   parent_.remove( *this );
+   parent_.removeMe( *this );
 }
 
 
@@ -48,7 +53,8 @@ void pollHandler_t :: setMask( short events )
 
 
 pollHandlerSet_t :: pollHandlerSet_t( void )
-   : numHandlers_( 0 )
+   : inPollLoop_( 0 )
+   , numHandlers_( 0 )
 {
    memset( handlers_, 0, sizeof( handlers_ ) );
    memset( fds_, 0, sizeof( fds_ ) );
@@ -71,27 +77,44 @@ void pollHandlerSet_t :: add( pollHandler_t &handler )
       handlers_[numHandlers_]   = &handler ;
       fds_[numHandlers_].events = handler.getMask();
       fds_[numHandlers_].fd     = handler.getFd();
+      deleted_[numHandlers_]    = false ;
       ++numHandlers_ ;
    }
+   else
+      fprintf( stderr, "!!!!!!!!!!! max poll handlers exceeded !!!!!!!!!!!\n" );
 }
 
-void pollHandlerSet_t :: remove( pollHandler_t &handler )
+void pollHandlerSet_t :: removeMe( pollHandler_t &handler )
 {
-   for( unsigned i = 0 ; i < numHandlers_ ; i++ )
+   if( !inPollLoop_ )
    {
-      if( handlers_[i] == &handler )
+      for( unsigned i = 0 ; i < numHandlers_ ; i++ )
       {
-         if( i < numHandlers_-1 )
+         if( handlers_[i] == &handler )
          {
-            unsigned numToShift = numHandlers_-i-1 ;
-            memcpy( handlers_+i, handlers_+i+1, numToShift*sizeof(handlers_[0]) );
-            memcpy( fds_+i, fds_+i+1, numToShift*sizeof(fds_[0]) );
-         } // shift everything down
-
-         --numHandlers_ ;
-         break ;
-      }
-   } // make sure it's not already in the list
+            if( i < numHandlers_-1 )
+            {
+               unsigned numToShift = numHandlers_-i-1 ;
+               memcpy( handlers_+i, handlers_+i+1, numToShift*sizeof(handlers_[0]) );
+               memcpy( fds_+i, fds_+i+1, numToShift*sizeof(fds_[0]) );
+            } // shift everything down
+   
+            --numHandlers_ ;
+            break ;
+         }
+      } // find in the list
+   }
+   else
+   {
+      for( unsigned i = 0 ; i < numHandlers_ ; i++ )
+      {
+         if( handlers_[i] == &handler )
+         {
+            deleted_[i] = true ;
+            break ;
+         }
+      } // find in the list
+   } // in poll loop, defer removal
 }
 
 //
@@ -99,21 +122,21 @@ void pollHandlerSet_t :: remove( pollHandler_t &handler )
 //
 bool pollHandlerSet_t :: poll( int ms )
 {
-/*
-printf( "polling %u handles\n", numHandlers_ );
+debugPrint( "polling %u handles\n", numHandlers_ );
 for( unsigned h = 0 ; h < numHandlers_ ; h++ )
 {
-   printf( "[%u].fd_ = %d, .mask_ = %x\n", h, fds_[h].fd, fds_[h].events );
+   debugPrint( "[%u].fd_ = %d, .mask_ = %x\n", h, fds_[h].fd, fds_[h].events );
 }
-*/
+
    int const numReady = ::poll( fds_, numHandlers_, ms );
    if( 0 < numReady )
    {
+      inPollLoop_ = true ;
       for( unsigned i = 0 ; i < numHandlers_ ; i++ )
       {
          pollfd &fd = fds_[i];
          short const signals = fd.events & fd.revents ;
-// printf( "[%u].fd_ = %d, .mask_ = %x, .events = %x, signals = %x\n", i, fds_[i].fd, fds_[i].events, fds_[i].revents, signals );
+debugPrint( "[%u].fd_ = %d, .mask_ = %x, .events = %x, signals = %x\n", i, fds_[i].fd, fds_[i].events, fds_[i].revents, signals );
          if( signals )
          {
             pollHandler_t *handler = handlers_[i];
@@ -131,8 +154,30 @@ for( unsigned h = 0 ; h < numHandlers_ ; h++ )
                handler->onHUP();
          }
       }
+      inPollLoop_ = false ;
+      
+      //
+      // check for deferred deletes
+      //
+      unsigned numDeleted = 0 ;
+      for( unsigned i = 0 ; i < numHandlers_ ; i++ )
+      {
+         if( deleted_[i] )
+         {
+            if( i < numHandlers_-1 )
+            {
+               unsigned numToShift = numHandlers_-i-1 ;
+               memcpy( handlers_+i, handlers_+i+1, numToShift*sizeof(handlers_[0]) );
+               memcpy( fds_+i, fds_+i+1, numToShift*sizeof(fds_[0]) );
+            } // shift everything down
+   
+            ++numDeleted ;
+         }
+      } // check for deleted items
+      numHandlers_ -= numDeleted ;
    }
 
+debugPrint( "done polling %u handles\n", numHandlers_ );
    return 0 != numReady ;
 }
 
@@ -160,10 +205,10 @@ public:
               pollHandlerSet_t &set )
       : pollHandler_t( fd, set ){}
    
-   virtual void onDataAvail( void ){ printf( "POLLIN\n" ); setMask( getMask() & ~POLLIN ); }    // POLLIN
-   virtual void onWriteSpace( void ){ printf( "POLLOUT\n" ); setMask( getMask() & ~POLLOUT ); } // POLLOUT
-   virtual void onError( void ){ printf( "POLLERR\n" ); setMask( getMask() & ~POLLERR ); }      // POLLERR
-   virtual void onHUP( void ){ printf( "POLLHUP\n" ); setMask( getMask() & ~POLLHUP ); }        // POLLHUP
+   virtual void onDataAvail( void ){ debugPrint( "POLLIN\n" ); setMask( getMask() & ~POLLIN ); }    // POLLIN
+   virtual void onWriteSpace( void ){ debugPrint( "POLLOUT\n" ); setMask( getMask() & ~POLLOUT ); } // POLLOUT
+   virtual void onError( void ){ debugPrint( "POLLERR\n" ); setMask( getMask() & ~POLLERR ); }      // POLLERR
+   virtual void onHUP( void ){ debugPrint( "POLLHUP\n" ); setMask( getMask() & ~POLLHUP ); }        // POLLHUP
    
 };
 
@@ -177,7 +222,7 @@ int main( int argc, char const *const argv[] )
          int fd = open( argv[arg], O_RDONLY );
          if( 0 <= fd )
          {
-            printf( "opened %s: fd %d\n", argv[arg], fd );
+            debugPrint( "opened %s: fd %d\n", argv[arg], fd );
             int doit = 1 ;
             int iRes = ioctl( fd, O_NONBLOCK, &doit );
             if( 0 != iRes )
@@ -196,7 +241,7 @@ int main( int argc, char const *const argv[] )
          while( 1 )
          {
             handlers.poll( -1 );
-            printf( "poll %d\n", ++iterations );
+            debugPrint( "poll %d\n", ++iterations );
          }
       }
       else

@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.2 2003-11-02 17:58:05 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.3 2003-11-24 19:42:05 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.2  2003-11-02 17:58:05  ericn
+ * Revision 1.3  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.2  2003/11/02 17:58:05  ericn
  * -enhanced comment
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -65,7 +68,7 @@ public:
    ~pollHandlerSet_t( void );
 
    void add( pollHandler_t &handler );
-   void remove( pollHandler_t &handler );
+   void removeMe( pollHandler_t &handler );
 
    void setMask( pollHandler_t &handler, short newMask );
 
@@ -79,9 +82,11 @@ public:
    pollHandler_t *operator[]( unsigned idx ) const { return handlers_[idx]; }
 
 protected:
+   bool              inPollLoop_ ;
    unsigned          numHandlers_ ;
    pollHandler_t    *handlers_[maxHandlers_];
    pollfd            fds_[maxHandlers_];
+   bool              deleted_[maxHandlers_];
 };
 
 #endif

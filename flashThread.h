@@ -1,5 +1,5 @@
 #ifndef __FLASHTHREAD_H__
-#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.2 2003-11-22 19:51:24 ericn Exp $"
+#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.3 2003-11-24 19:42:05 ericn Exp $"
 
 /*
  * flashThread.h
@@ -31,7 +31,10 @@
  * Change History : 
  *
  * $Log: flashThread.h,v $
- * Revision 1.2  2003-11-22 19:51:24  ericn
+ * Revision 1.3  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.2  2003/11/22 19:51:24  ericn
  * -fixed sound support (pause,stop)
  *
  * Revision 1.1  2003/11/22 18:30:04  ericn
@@ -44,7 +47,6 @@
 
 
 #include <pthread.h>
-#include "flash/flash.h"
 #include "flash/flash.h"
 #include "flash/swf.h"
 #include "flash/movie.h"

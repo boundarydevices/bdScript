@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.11 2003-03-12 02:57:14 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.12 2003-11-24 19:42:05 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.11  2003-03-12 02:57:14  ericn
+ * Revision 1.12  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.11  2003/03/12 02:57:14  ericn
  * -added blend() method
  *
  * Revision 1.10  2002/12/11 04:04:48  ericn
@@ -133,6 +136,7 @@ public:
                    unsigned char red, unsigned char green, unsigned char blue );
 
 private:
+   fbDevice_t( fbDevice_t const &rhs ); // no copies
    fbDevice_t( char const *name );
    ~fbDevice_t( void );
    int            fd_ ;

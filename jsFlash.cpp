@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.4  2003-11-15 17:45:03  ericn
+ * Revision 1.5  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.4  2003/11/15 17:45:03  ericn
  * -modified to allow re-use
  *
  * Revision 1.3  2003/08/06 13:23:56  ericn
@@ -32,340 +35,153 @@
 #include "js/jscntxt.h"
 #include "jsCurl.h"
 #include "macros.h"
-#include "flash/flash.h"
-#include "flash/swf.h"
-#include "flash/movie.h"
 #include "ccActiveURL.h"
 #include "fbDev.h"
 #include <pthread.h>
 #include <linux/timer.h>
 #include "semClasses.h"
 #include "codeQueue.h"
-#include "flash/sound.h"
+#include "flashThread.h"
+#include "parsedFlash.h"
 #include "audioQueue.h"
+#include "jsGlobals.h"
 
 extern JSClass jsFlashClass_ ;
 
-class flashPrivate_t {
+class flashPollHandler_t : public pollHandler_t {
 public:
+   flashPollHandler_t( JSContext        *cx,
+                       JSObject         *scope,
+                       int               fd, 
+                       pollHandlerSet_t &set )
+      : pollHandler_t( fd, set )
+      , scope_( scope )
+      , scopeVal_( OBJECT_TO_JSVAL( scope ) )
+      , onComplete_( JSVAL_VOID )
+      , onCancel_( JSVAL_VOID )
+   {
+      JS_AddRoot( cx, &scopeVal_ );
+      JS_AddRoot( cx, &onComplete_ );
+      JS_AddRoot( cx, &onCancel_ );
+   }
+
+   ~flashPollHandler_t( void )
+   {
+      JS_RemoveRoot( execContext_, &scopeVal_ );
+      JS_RemoveRoot( execContext_, &onComplete_ );
+      JS_RemoveRoot( execContext_, &onCancel_ );
+   }
+
+   virtual void onDataAvail( void );     // POLLIN
+
+   JSObject   *scope_ ;
+   jsval       scopeVal_ ;
+   jsval       onComplete_ ;
+   jsval       onCancel_ ;
+};
+
+
+void flashPollHandler_t :: onDataAvail( void )
+{
+   flashThread_t :: event_e event ;
+   if( sizeof( event ) == read( getFd(), &event, sizeof( event ) ) )
+   {
+      if( flashThread_t::complete_e == event )
+      {
+         if( JSVAL_VOID != onComplete_ )
+            queueUnrootedSource( scope_, onComplete_, "onFlashComplete" );
+      }
+      else if( flashThread_t::cancel_e == event )
+      {
+         if( JSVAL_VOID != onCancel_ )
+            queueUnrootedSource( scope_, onCancel_, "onFlashCancel" );
+      }
+      else
+         JS_ReportError( execContext_, "Invalid flashThread event:%u\n", event );
+   }
+}
+
+
+struct flashPrivate_t {
    flashPrivate_t( JSContext    *cx,
                    JSObject     *obj,
                    unsigned long cacheHandle,
-                   FlashHandle   flashHandle );
+                   void const   *data,
+                   unsigned long bytes,
+                   unsigned      x,
+                   unsigned      y,
+                   unsigned      w,
+                   unsigned      h,
+                   unsigned      bgColor );
    ~flashPrivate_t( void );
 
-   inline bool isRunning( void ){ return (pthread_t)-1 != threadHandle_ ; }
-   void stop( bool runHandlers_ );
-   bool start( jsval onComplete,
-               jsval onCancel,
-               unsigned xPos,
-               unsigned yPos,
-               unsigned width,
-               unsigned height,
-               unsigned bgColor );
+   bool worked( void ) const { return flashData_.worked() && thread_->isAlive(); }
+   inline void start( void ){ if( thread_ ) thread_->start(); }
+   inline void stop( void ){ if( thread_ ) thread_->stop(); }
+   inline void pause( void ){ if( thread_ ) thread_->pause(); }
 
-   JSContext    *cx_ ;
-   JSObject     *obj_ ;
-   unsigned long cacheHandle_ ;
-   FlashHandle   flashHandle_ ;
-   pthread_t     threadHandle_ ;
-   mutex_t       dieMutex_ ;
-   condition_t   dieCondition_ ;
-   jsval         onComplete_ ;
-   jsval         onCancel_ ;
-   unsigned      xPos_ ;
-   unsigned      yPos_ ;
-   unsigned      width_ ;
-   unsigned      height_ ;
-   unsigned      bgColor_ ;
-   bool volatile cancelled_ ;
-   unsigned volatile numSoundsPlaying_ ;
+   FlashInfo const &getFlashInfo( void ) const { return flashData_.flashInfo(); }
+   flashPollHandler_t *getPollHandler( void ){ return pollHandler_ ; }
+
 private:
-   flashPrivate_t( flashPrivate_t const & );
+   JSContext *const    cx_ ;
+   JSObject  *const    obj_ ;
+   unsigned long const cacheHandle_ ;
+   parsedFlash_t       flashData_ ;
+   unsigned      const x_ ;
+   unsigned      const y_ ;
+   unsigned      const w_ ;
+   unsigned      const h_ ;
+   unsigned      const bgColor_ ;
+   flashThread_t      *thread_ ;
+   flashPollHandler_t *pollHandler_ ;
 };
 
-static void
-getUrl(char *url, char *target, void *client_data)
-{
-	printf("GetURL : %s\n", url);
-}
-
-static void
-getSwf(char *url, int level, void *client_data)
-{
-	printf("GetSwf : %s\n", url);
-}
-
-class flashSoundMixer : public SoundMixer {
-public:
-	flashSoundMixer( flashPrivate_t &parent );
-	~flashSoundMixer();
-
-	void		 startSound(Sound *sound);	// Register a sound to be played
-	void		 stopSounds();		// Stop every current sounds in the instance
-        flashPrivate_t  &parent_ ;
-};
-
-flashSoundMixer :: flashSoundMixer( flashPrivate_t &parent )
-   : SoundMixer( "" ), // keep it happy
-     parent_( parent )
-{
-}
-
-flashSoundMixer :: ~flashSoundMixer()
-{
-}
-
-#include "hexDump.h"
-
-static void flashSoundComplete( void *param )
-{
-   printf( "flashSoundComplete:%p\n", param );
-}
-
-void flashSoundMixer :: startSound(Sound *sound)
-{
-   getAudioQueue().queuePlayback( (unsigned char *)sound->getSamples(), 
-                                  sound->getSampleSize()*sound->getNbSamples(),
-                                  sound,
-                                  flashSoundComplete );
-   mutexLock_t lock( parent_.dieMutex_ );
-   ++parent_.numSoundsPlaying_ ;
-}
-
-void flashSoundMixer :: stopSounds()
-{
-   unsigned numCancelled ;
-   getAudioQueue().clear( numCancelled );
-   mutexLock_t lock( parent_.dieMutex_ );
-   --parent_.numSoundsPlaying_ ;
-}
-
-static void *flashThreadRoutine( void *param )
-{
-   flashPrivate_t &priv = *( flashPrivate_t * )param ;
-
-   bool completed = false ;
-   
-   FlashMovie *fh = (FlashMovie *)priv.flashHandle_ ;
-
-   fh->sm = new flashSoundMixer( priv );
-
-//   FlashSoundInit( priv.flashHandle_, "/dev/dsp");
-   
-   fbDevice_t &fb = getFB();
-   FlashDisplay display ;
-
-   display.width  = ( 0 == priv.width_ ) ? fb.getWidth() : priv.width_ ;
-   if( display.width > fb.getWidth() )
-      display.width = fb.getWidth();
-
-   display.height = ( 0 == priv.height_ ) ? fb.getHeight() : priv.height_ ;
-   if( display.height > fb.getHeight() )
-      display.height = fb.getHeight();
-
-   unsigned short * const pixels = new unsigned short [ display.width*display.height ];
-   display.pixels = pixels ;
-   display.bpl    = display.width*sizeof(pixels[0]);
-   unsigned const videoBytes = display.width*display.height*sizeof(pixels[0]);
-   unsigned short const bg = fb.get16( ( priv.bgColor_ >> 16 ),
-                                       ( priv.bgColor_ >> 8 ) & 0xFF,
-                                       ( priv.bgColor_ & 0xFF ) );
-   // set top row
-   for( unsigned i = 0 ; i < display.width ; i++ )
-      pixels[i] = bg ;
-   // set remaining rows 
-   for( unsigned i = 1 ; i < display.height ; i++ )
-      memcpy( pixels+(i*display.width), pixels, display.bpl );
-   unsigned short * const fbMem = (unsigned short *)fb.getMem() + priv.xPos_ + ( priv.yPos_ * fb.getWidth() );
-   unsigned const fbStride = fb.getWidth()*sizeof(pixels[0]);
-
-   display.depth  = sizeof( pixels[0]);
-   display.bpp    = sizeof( pixels[0]);
-   display.flash_refresh = 0 ;
-   display.clip_x = 0 ;
-   display.clip_y = 0 ;
-   display.clip_width = display.width ;
-   display.clip_height = display.height ;
-
-   FlashGraphicInit( priv.flashHandle_, &display );
-
-   FlashSetGetUrlMethod( priv.flashHandle_, getUrl, 0);
-   FlashSetGetSwfMethod( priv.flashHandle_, getSwf, 0);
-
-   do {
-      mutexLock_t lock( priv.dieMutex_ );
-      if( lock.worked() )
-      {
-         if( priv.dieCondition_.wait( lock, 100 ) )
-         {
-            break;
-         }
-         else
-         {
-             struct timeval wd ;
-             long wakeUp = FlashExec( priv.flashHandle_, FLASH_WAKEUP, 0, &wd);
-
-             if( display.flash_refresh )
-             {
-                char *pixMem = (char *)fbMem ;
-                char *flashMem = (char *)display.pixels ;
-                for( unsigned i = 0 ; i < display.height ; i++, pixMem += fbStride, flashMem += display.bpl )
-                {
-                   memcpy( pixMem, flashMem, display.bpl );
-                }
-             }
-
-             if( wakeUp )
-             {
-                struct timeval now ;
-                gettimeofday(&now,0);
-
-                if( wd.tv_sec >= now.tv_sec )
-                {
-                   struct timespec delay ;
-                   delay.tv_sec = wd.tv_sec - now.tv_sec ;
-                   if( wd.tv_usec < now.tv_usec )
-                   {
-                      if( 0 < delay.tv_sec )
-                      {
-                         --delay.tv_sec ;
-                         delay.tv_nsec = ( 1000000 + wd.tv_usec - now.tv_usec ) * 1000 ;
-                      }
-                      else
-                      {
-                         delay.tv_nsec = delay.tv_nsec = 0 ;
-                      } // too late
-                   } // borrow
-                   else
-                      delay.tv_nsec = ( wd.tv_usec - now.tv_usec ) * 1000 ;
-                   
-                   if( delay.tv_sec || delay.tv_nsec )
-                   {
-                      struct timespec remaining ;
-//                      nanosleep( &delay, &remaining );
-                   }
-                } // not WAY too late
-             }
-             else
-                completed = true ;
-         }
-      }
-      else
-      {
-         fprintf( stderr, "flashLockErr\n" ); fflush( stderr );
-         break;
-      }
-   } while( !( completed || priv.cancelled_ ) );
-
-   if( 0 != priv.numSoundsPlaying_ )
-   {
-      unsigned numCancelled;
-      getAudioQueue().clear( numCancelled );
-      priv.numSoundsPlaying_ = 0 ;
-   }
-
-   jsval const handler = completed ? priv.onComplete_ : priv.onCancel_ ;
-   if( JSVAL_VOID != handler )
-   {
-      if( !queueSource( priv.obj_, handler, "flashHandler" ) )
-      {
-         fprintf( stderr, "Error calling flashMovie.handler()\n" ); fflush( stderr );
-      }
-   }
-   else
-   {
-   }
-
-   delete [] pixels ;
-}
-
-flashPrivate_t::flashPrivate_t
+flashPrivate_t :: flashPrivate_t
    ( JSContext    *cx,
      JSObject     *obj,
      unsigned long cacheHandle,
-     FlashHandle   flashHandle )
-   : cx_( cx ),
-     obj_( obj ),
-     cacheHandle_( cacheHandle ), 
-     flashHandle_( flashHandle ), 
-     threadHandle_( (pthread_t)-1 ),
-     dieMutex_(),
-     dieCondition_(),
-     onComplete_( JSVAL_VOID ),
-     onCancel_( JSVAL_VOID ),
-     xPos_( 0 ),
-     yPos_( 0 ),
-     width_( 0 ),
-     height_( 0 ),
-     bgColor_( 0 ),
-     cancelled_( false ),
-     numSoundsPlaying_( 0 )
+     void const   *data,
+     unsigned long bytes,
+     unsigned      x,
+     unsigned      y,
+     unsigned      w,
+     unsigned      h,
+     unsigned      bgColor )
+   : cx_( cx )
+   , obj_( obj )
+   , cacheHandle_( cacheHandle )
+   , flashData_( data, bytes )
+   , x_( x )
+   , y_( y )
+   , w_( w )
+   , h_( h )
+   , bgColor_( bgColor )
+   , thread_( 0 )
+   , pollHandler_( 0 )
 {
-   getCurlCache().addRef( cacheHandle_ );
-   JS_AddRoot( cx, &onComplete_ );
-   JS_AddRoot( cx, &onCancel_ );
-}
-
-flashPrivate_t::~flashPrivate_t( void )
-{
-   if( isRunning() )
-      stop( false );
-   JS_RemoveRoot( cx_, &onComplete_ );
-   JS_RemoveRoot( cx_, &onCancel_ );
-   getCurlCache().closeHandle( cacheHandle_ );
-   if( 0 != flashHandle_ )
-      FlashClose( flashHandle_ );
-}
-
-void flashPrivate_t::stop( bool runHandlers )
-{ 
-   if( isRunning() )
+   if( flashData_.worked() )
    {
-      cancelled_ = true ;
-
+      thread_ = new flashThread_t( flashData_, x_, y_, w_, h_, bgColor_, false );
+      if( ( 0 != thread_ ) && thread_->isAlive() )
       {
-         mutexLock_t lock( dieMutex_ );
-         if( !lock.worked() ){ fprintf( stderr, "error locking mutex!\n" ); fflush( stderr ); }
-         if( !runHandlers )
-         {
-            onComplete_ = JSVAL_VOID ;
-            onCancel_   = JSVAL_VOID ;
-         }
-
-         dieCondition_.signal(); 
+         pollHandler_ = new flashPollHandler_t( cx, obj, thread_->eventReadFd(), pollHandlers_ );
+         pollHandler_->setMask( POLLIN );
+         pollHandlers_.add( *pollHandler_ );
       }
-      void *exitStat ; 
-      pthread_join( threadHandle_, &exitStat ); 
-      threadHandle_ = (pthread_t)-1 ; 
    }
 }
 
-bool flashPrivate_t::start
-   ( jsval onComplete,
-     jsval onCancel,
-     unsigned xPos,
-     unsigned yPos,
-     unsigned width,
-     unsigned height,
-     unsigned bgColor )
+flashPrivate_t :: ~flashPrivate_t( void )
 {
-   onComplete_ = onComplete ;
-   onCancel_ = onCancel ;
-   xPos_ = xPos ;
-   yPos_ = yPos ;
-   width_ = width ;
-   height_ = height ;
-   bgColor_ = bgColor ;
+   if( pollHandler_ )
+      delete pollHandler_ ;
 
-   if( !isRunning() )
+   if( thread_ )
    {
-      cancelled_ = false ;
-      int create = pthread_create( &threadHandle_, 0, flashThreadRoutine, this );
-      return 0 == create ;
+      delete thread_ ;
+      thread_ = 0 ;
    }
-   else
-      return false ;
 }
 
 static JSBool
@@ -373,21 +189,15 @@ jsFlashPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 {
    *rval = JSVAL_FALSE ;
 
-   flashPrivate_t * const privData = (flashPrivate_t *)JS_GetInstancePrivate( cx, obj, &jsFlashClass_, NULL );
+   flashPrivate_t * const priv = (flashPrivate_t *)JS_GetInstancePrivate( cx, obj, &jsFlashClass_, NULL );
    
-   if( 0 != privData )
+   if( ( 0 != priv ) && priv->worked() )
    {
-      if( !privData->isRunning() )
+      flashPollHandler_t *const handler = priv->getPollHandler();
+      if( handler )
       {
-         jsval onComplete = JSVAL_VOID ;
-         jsval onCancel = JSVAL_VOID ;
-         
-         unsigned xPos = 0 ;
-         unsigned yPos = 0 ;
-         unsigned width =  0 ;
-         unsigned height = 0 ;
-         unsigned bgColor = 0 ;
-
+         handler->onComplete_ = JSVAL_VOID ;
+         handler->onCancel_ = JSVAL_VOID ;
          JSObject *rhObj ;
          if( ( 1 <= argc )
              &&
@@ -402,78 +212,21 @@ jsFlashPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
                 &&
                 JSVAL_IS_STRING( val ) )
             {
-               onComplete = val ;
+               handler->onComplete_ = val ;
             } // have onComplete handler
             
             if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
                 &&
                 JSVAL_IS_STRING( val ) )
             {
-               onCancel = val ;
+               handler->onCancel_ = val ;
             } // have onComplete handler
-            
-            if( JS_GetProperty( cx, rhObj, "x", &val ) 
-                &&
-                JSVAL_IS_INT( val ) )
-            {
-               xPos = JSVAL_TO_INT( val );
-            } // have x position
-            
-            if( JS_GetProperty( cx, rhObj, "y", &val ) 
-                &&
-                JSVAL_IS_INT( val ) )
-            {
-               yPos = JSVAL_TO_INT( val );
-            } // have y position
-            
-            if( JS_GetProperty( cx, rhObj, "width", &val ) 
-                &&
-                JSVAL_IS_INT( val ) )
-            {
-               width = JSVAL_TO_INT( val );
-            } // have width
-            
-            if( JS_GetProperty( cx, rhObj, "height", &val ) 
-                &&
-                JSVAL_IS_INT( val ) )
-            {
-               height = JSVAL_TO_INT( val );
-            } // have height
-
-            if( JS_GetProperty( cx, rhObj, "bgColor", &val ) 
-                &&
-                JSVAL_IS_INT( val ) )
-            {
-               bgColor = JSVAL_TO_INT( val );
-            } // have bgColor
-            
+   
          } // have right-hand object
+      }
 
-FlashMovie *fh = (FlashMovie *)privData->flashHandle_ ;
-if( fh )
-{
-   CInputScript *scr = fh->main ;
-   if( scr )
-   {
-      Program *prog = scr->program ;
-      if( prog )
-      {
-prog->rewindMovie();
-prog->continueMovie();
-      }
-      else
-         printf( "jsFlash.play() no program\n" );
-   }
-   else
-      printf( "jsFlash.play() no script\n" );
-}
-else
-   printf( "jsFlash.play() no movie\n" );
-         if( privData->start( onComplete, onCancel, xPos, yPos, width, height, bgColor ) )
-            *rval = JSVAL_TRUE ;
-      }
-      else
-         JS_ReportError( cx, "movie is already playing" );
+      priv->start();
+      *rval = JSVAL_TRUE ;
    }
    else
       JS_ReportError( cx, "flash movie unloaded\n" );
@@ -486,17 +239,12 @@ jsFlashStop( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 {
    flashPrivate_t * const privData = (flashPrivate_t *)JS_GetInstancePrivate( cx, obj, &jsFlashClass_, NULL );
    
-   if( 0 != privData )
+   if( ( 0 != privData ) && privData->worked() )
    {
-      if( privData->isRunning() )
-      {
-         privData->stop( true );
-      }
-      else
-         JS_ReportError( cx, "movie is already stopped" );
+      privData->stop();
    }
    else
-      JS_ReportError( cx, "flash movie unloaded\n" );
+      JS_ReportError( cx, "movie is already stopped" );
 
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
@@ -520,6 +268,7 @@ jsFlashRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
+printf( "releasing flash\n" );
          privData->~flashPrivate_t();
 
          JS_free( cx, privData );
@@ -580,64 +329,67 @@ static char const * const cObjectTypes[] = {
 
 static void flashMovieOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   FlashHandle flashHandle = FlashNew();
-   if( 0 != flashHandle )
+   void * const privMem = JS_malloc( req.cx_, sizeof( flashPrivate_t ) );
+   fbDevice_t &fb = getFB();
+   unsigned x = 0, y = 0, width = fb.getWidth(), height = fb.getHeight(), bgColor = 0 ;
+   jsval val ;
+   if( JS_GetProperty( req.cx_, req.lhObj_, "x", &val ) && JSVAL_IS_INT( val ) )
+      x = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "y", &val ) && JSVAL_IS_INT( val ) )
+      y = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "width", &val ) && JSVAL_IS_INT( val ) )
+      width = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "height", &val ) && JSVAL_IS_INT( val ) )
+      height = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "bgColor", &val ) && JSVAL_IS_INT( val ) )
+      bgColor = JSVAL_TO_INT( val );
+         
+   flashPrivate_t * const privData = new (privMem)flashPrivate_t( req.cx_, 
+                                                                  req.lhObj_, 
+                                                                  req.handle_, 
+                                                                  data, 
+                                                                  size,
+                                                                  x, y, width, height, bgColor ); // placement new
+   JS_SetPrivate( req.cx_, req.lhObj_, privData );
+
+   if( privData->worked() )
    {
-      int status ;
-
-      // Load level 0 movie
-      do {
-         status = FlashParse(flashHandle, 0, (char *)data, size );
-      } while( status & FLASH_PARSE_NEED_DATA );
-      
-      if( FLASH_PARSE_START & status )
-      {
-         struct FlashInfo fi;
-         FlashGetInfo( flashHandle, &fi );
-
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "numFrames",
-                            INT_TO_JSVAL( fi.frameCount ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "frameRate",
-                            INT_TO_JSVAL( fi.frameRate ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "width",
-                            INT_TO_JSVAL( fi.frameWidth ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "height",
-                            INT_TO_JSVAL( fi.frameHeight ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-      }
-      else
-         JS_ReportError( req.cx_, "parsing flash file\n" );
-
+      FlashInfo const &fi = privData->getFlashInfo();
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "numFrames",
+                         INT_TO_JSVAL( fi.frameCount ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "frameRate",
+                         INT_TO_JSVAL( fi.frameRate ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "flashWidth",
+                         INT_TO_JSVAL( fi.frameWidth ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "flashHeight",
+                         INT_TO_JSVAL( fi.frameHeight ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
    }
    else
-      JS_ReportError( req.cx_, "allocating flash handle\n" );
-
-   void * const privMem = JS_malloc( req.cx_, sizeof( flashPrivate_t ) );
-   flashPrivate_t * const privData = new (privMem)flashPrivate_t( req.cx_, req.lhObj_, req.handle_, flashHandle ); // placement new
-   JS_SetPrivate( req.cx_, req.lhObj_, privData );
+      JS_ReportError( req.cx_, "parsing flash file\n" );
 }
 
 
@@ -649,6 +401,7 @@ static void jsFlashFinalize(JSContext *cx, JSObject *obj)
       if( 0 != privData )
       {
          JS_SetPrivate( cx, obj, 0 );
+printf( "destroying flashPrivate_t\n" );
          privData->~flashPrivate_t();
          JS_free( cx, privData );
       }
@@ -667,6 +420,65 @@ static JSBool flashMovie( JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
          JS_SetPrivate( cx, thisObj, 0 );
+         JSObject *rhObj = JSVAL_TO_OBJECT( argv[0] );
+
+         fbDevice_t &fb = getFB();
+         unsigned xPos = 0, 
+                  yPos = 0, 
+                  width = fb.getWidth(), 
+                  height = fb.getHeight(), 
+                  bgColor = 0 ;
+
+         jsval val ;
+         if( JS_GetProperty( cx, rhObj, "x", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            xPos = JSVAL_TO_INT( val );
+         } // have x position
+         else
+            xPos = 0 ;
+         JS_DefineProperty( cx, thisObj, "x", INT_TO_JSVAL( xPos ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+         
+         if( JS_GetProperty( cx, rhObj, "y", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            yPos = JSVAL_TO_INT( val );
+         } // have y position
+         else
+            yPos = 0 ;
+         JS_DefineProperty( cx, thisObj, "y", INT_TO_JSVAL( yPos ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+         
+         if( JS_GetProperty( cx, rhObj, "width", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            width = JSVAL_TO_INT( val );
+         } // have width
+         else
+            width = fb.getWidth();
+         JS_DefineProperty( cx, thisObj, "width", INT_TO_JSVAL( width ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "height", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            height = JSVAL_TO_INT( val );
+         } // have height
+         else
+            height = fb.getHeight();
+         JS_DefineProperty( cx, thisObj, "height", INT_TO_JSVAL( height ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "bgColor", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            bgColor = JSVAL_TO_INT( val );
+         } // have bgColor
+         else
+            bgColor = 0 ; // black
+         JS_DefineProperty( cx, thisObj, "bgColor", INT_TO_JSVAL( bgColor ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
 
          if( queueCurlRequest( thisObj, argv[0], cx, flashMovieOnComplete ) )
          {

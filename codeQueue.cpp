@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.17  2003-11-22 21:02:37  ericn
+ * Revision 1.18  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.17  2003/11/22 21:02:37  ericn
  * -made code queue a pollHandler_t
  *
  * Revision 1.16  2003/11/22 20:20:41  ericn
@@ -70,6 +73,7 @@
 #include <linux/stddef.h>
 #include <unistd.h>
 #include <poll.h>
+#include <fcntl.h>
 
 #define MAXARGS 8
 
@@ -361,7 +365,10 @@ void codeQueueHandler_t::onDataAvail( void )
    callbackAndData_t cbd ;
    int const numRead = read( fd_, &cbd, sizeof( cbd ) );
    if( ( sizeof(cbd) == numRead ) && ( 0 != cbd.callback_ ) )
+   {
+      mutexLock_t lock( execMutex_ );
       cbd.callback_( cbd.cbData_ );
+   }
 }
 
 void initializeCodeQueue
@@ -372,7 +379,10 @@ void initializeCodeQueue
    int fds[2];
    if( 0 == pipe( fds ) )
    {
+      fcntl(fds[0], F_SETFL, FD_CLOEXEC);
+      fcntl(fds[1], F_SETFL, FD_CLOEXEC);
       codeListRead_  = fds[0];
+      fcntl(codeListRead_, F_SETFL, O_NONBLOCK);
       codeListWrite_ = fds[1];
       context_ = cx ;
       global_  = glob ;

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.2  2003-11-24 19:09:13  ericn
+ * Revision 1.3  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.2  2003/11/24 19:09:13  ericn
  * -added deglitch
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -72,10 +75,12 @@ void touchPoll_t :: onRelease( timeval const &tv )
    printf( "touch screen release\n" );
 }
 
+static bool wasDown = false ;
+
 void touchPoll_t :: onDataAvail( void )
 {
-   ts_event prevEvent ;
    ts_event event ;
+   ts_event nextEvent ;
    unsigned count = 0 ;
    int numRead ;
 
@@ -85,20 +90,20 @@ void touchPoll_t :: onDataAvail( void )
    int prevX = prevX_ ;
    int prevY = prevY_ ;
 
-   while( sizeof( event ) == ( numRead = read( fd_, &event, sizeof( event ) ) ) )
+   while( sizeof( nextEvent ) == ( numRead = read( fd_, &nextEvent, sizeof( nextEvent ) ) ) )
    {
       if( 0 < count )
       {
-         prevX = prevEvent.x ;
-         prevY = prevEvent.y ;
+         prevX = event.x ;
+         prevY = event.y ;
       }
-      prevEvent = event ;
+      event = nextEvent ;
       count++ ;
    }
    
    if( 0 < count )
    {
-      if( 0 < prevEvent.pressure )
+      if( 0 < event.pressure )
       {
          int minX, maxX ;
          if( 0 != xRange_ )
@@ -132,28 +137,37 @@ void touchPoll_t :: onDataAvail( void )
             maxY = 0x7fffffff ;
          }
 
-         if( ( prevEvent.x >= minX ) && ( prevEvent.x <= maxX )
+         if( ( event.x >= minX ) && ( event.x <= maxX )
              &&
-             ( prevEvent.y >= minY ) && ( prevEvent.y <= maxY ) )
+             ( event.y >= minY ) && ( event.y <= maxY ) )
          {
-            onTouch( prevEvent.x, prevEvent.y, prevEvent.pressure, prevEvent.stamp );
+            onTouch( event.x, event.y, event.pressure, event.stamp );
          }
          else
          {
-//            printf( "x: range[%d,%d], value %d\n", minX, maxX, prevEvent.x );
-//            printf( "y: range[%d,%d], value %d\n", minY, maxY, prevEvent.y );
+//            printf( "x: range[%d,%d], value %d\n", minX, maxX, event.x );
+//            printf( "y: range[%d,%d], value %d\n", minY, maxY, event.y );
 //            printf( "e" ); 
 //            fflush( stdout );
          } // eat wild one
          
-         xMotion_ = prevEvent.x - prevX_ ;
-         yMotion_ = prevEvent.y - prevY_ ;
-         prevX_ = prevEvent.x ;
-         prevY_ = prevEvent.y ;
+         xMotion_ = event.x - prevX_ ;
+         yMotion_ = event.y - prevY_ ;
+         prevX_ = event.x ;
+         prevY_ = event.y ;
+         if( !wasDown )
+         {
+printf( "first touch at %u:%u\n", event.x, event.y );
+            wasDown = true ;
+         }
       }
       else
       {
-         onRelease( prevEvent.stamp );
+printf( "release at %u/%u\n", prevX_, prevY_ );
+         xMotion_ = yMotion_ = 0 ;
+         prevX_ = prevY_ = 0 ;
+         onRelease( event.stamp );
+         wasDown = false ;
       }
    }
 }

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.2  2003-11-22 19:51:27  ericn
+ * Revision 1.3  2003-11-24 19:42:05  ericn
+ * -polling touch screen
+ *
+ * Revision 1.2  2003/11/22 19:51:27  ericn
  * -fixed sound support (pause,stop)
  *
  * Revision 1.1  2003/11/22 18:30:08  ericn
@@ -24,6 +27,7 @@
 #include <poll.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include "js/jsapi.h"
 #include "audioQueue.h"
 #include "flash/sound.h"
@@ -116,11 +120,15 @@ flashThread_t :: flashThread_t
    int fdCtrl[2];
    if( 0 == pipe( fdCtrl ) )
    {
+      fcntl( fdCtrl[0], F_SETFD, FD_CLOEXEC );
+      fcntl( fdCtrl[1], F_SETFD, FD_CLOEXEC );
       fdReadCtrl_ = fdCtrl[0];
       fdWriteCtrl_ = fdCtrl[1];
       int fdEvents[2];
       if( 0 == pipe( fdEvents ) )
       {
+         fcntl( fdEvents[0], F_SETFD, FD_CLOEXEC );
+         fcntl( fdEvents[1], F_SETFD, FD_CLOEXEC );
          fdReadEvents_ = fdEvents[0];
          fdWriteEvents_ = fdEvents[1];
          
@@ -156,7 +164,7 @@ flashThread_t :: flashThread_t
          display_.clip_width = display_.width ;
          display_.clip_height = display_.height ;
       
-         printf( "   bpl %u\n"
+/*         printf( "   bpl %u\n"
                  "   width %u\n"
                  "   height %u\n"
                  "   depth %u\n"
@@ -176,6 +184,7 @@ flashThread_t :: flashThread_t
                  display_.clip_y,
                  display_.clip_width, 
                  display_.clip_height );
+*/                 
          FlashGraphicInit( hFlash, &display_ );
       
          FlashSetGetUrlMethod( hFlash, getUrl, 0);
@@ -198,8 +207,10 @@ flashThread_t :: flashThread_t
 flashThread_t :: ~flashThread_t( void )
 {
 printf( "closing\n" );
+   if( 0 <= fdReadCtrl_ ) { close( fdReadCtrl_ );  fdReadCtrl_ = -1 ; }
    if( 0 <= fdWriteCtrl_ ) { close( fdWriteCtrl_ );  fdWriteCtrl_ = -1 ; }
    if( 0 <= fdReadEvents_ ){ close( fdReadEvents_ ); fdReadEvents_ = -1 ; }
+   if( 0 <= fdWriteEvents_ ){ close( fdWriteEvents_ ); fdWriteEvents_ = -1 ; }
 
    if( isAlive() )
    {
@@ -314,6 +325,8 @@ void *flashThread( void *param )
                   prog->pauseMovie();
                   prog->rewindMovie();
                   running = false ;
+                  flashThread_t::event_e const endEvent = flashThread_t::cancel_e ;
+                  write( tObj.fdWriteEvents_, &endEvent, sizeof( endEvent ) );
                   break;
                }
                case flashThread_t::rewind_e :
@@ -326,7 +339,7 @@ void *flashThread( void *param )
          else 
          {
             if( 0 != numRead ) // !broken pipe
-               fprintf( stderr, "flashReadCtrl:%u:%m", numRead );
+               fprintf( stderr, "flashReadCtrl:%u:%m\n", numRead );
 
             break;
          }
@@ -371,6 +384,8 @@ void *flashThread( void *param )
    } while( 1 );
    
    printf( "flashThread shutdown\n" );
+   close( tObj.fdWriteEvents_ ); tObj.fdWriteEvents_ = -1 ;
+   close( tObj.fdReadCtrl_ );    tObj.fdReadCtrl_ = -1 ;
 }
 
 
