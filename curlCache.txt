@@ -35,7 +35,7 @@ pulls requests and posts status values.
 
    Main application entry points
    -----------------------------
-   get/put
+   get/post
          details of request
             url
             post parameters
@@ -44,17 +44,17 @@ pulls requests and posts status values.
          oncomplete callback  - ref counted file ptr handed off here
          oncancel callback
          onfailure callback
-         ondelete callback (used if no cache specified and file exists in cache)
 
    cancelLoad  - cancel a pending transfer
       all instances or just this request?
-      oncancel callback
 
    deleteFile
       details of request
          url
          post params
-      ondelete callback
+
+   openFile
+      add a reference to a file (retrieving ptr/length)
 
    worker thread entry points
    --------------------------
@@ -122,8 +122,8 @@ Data structure notes
 
          A set of application entries for each pending request. Pending
          here means the time between an initiating application call to
-         the curl cache (get,put,delete) and the corresponding final completion 
-         callback (oncomplete,onfailure,ondelete,oncancel). Note that 
+         the curl cache (get,post) and the corresponding final completion 
+         callback (oncomplete,onfailure,oncancel). Note that 
          cancel is not an initiating call, since it requires an active
          entry, and does not generate an extra completion callback. Instead,
          it alters (if not too late) the completion callback to 'oncancel' 
@@ -153,8 +153,6 @@ Use/case analysis
          file size
          bytes read      
       call oncomplete
-
-
 
 Data structure linkages:
 
@@ -195,7 +193,7 @@ Actually, I'll also put the file open/mmap calls into the disk cache to mask the
 fact that there's header information in the cache'd files.
 
 
-                        In-depth data structure descriptions:
+                        Detailed data structure descriptions:
                         -------------------------------------
 
 Disk Cache
@@ -236,4 +234,180 @@ routine.
 All of this allows the module to be developed and tested outside of the greater curl cache 
 structure.
 
+
+Active Entity Cache
+-------------------
+In general, active entity cache entries serve as glue between the curl worker
+threads, the disk cache, and the application request list. 
+
+Each object in the active entity cache corresponds to a single URL.
+
+More specifically, each entry in the active entity cache connects one or more
+application requests or file handles to either the curl worker module or the 
+disk cache. 
+
+The data structure consists of 
+   
+   1. a doubly-linked list of application requests, and 
+   
+   2. information for either 
+   
+   a.)   a worker request URL, [post params], cancel flag
+   b.)   the disk cache
+            pointer and length of data
+            non-zero reference count
+
+Location of an entity from a URL is performed by a hash table lookup and
+linear search. Note that a couple of things (file handles, get/post identifiers)
+use pointers to active entity cache entries, so we need to firmly plant 
+these in memory (no STL here!).
+
+Application Request List
+------------------------
+The application request list is a set of unfulfilled requests from the application. 
+
+The data is kept as a doubly-linked list of objects, pointed to from the application
+entity cache (URL).
+
+Each request contains a type (get,post) and a set of zero or more callbacks:
+   onprogress callback
+   onfilesize callback
+   oncomplete callback
+   oncancel callback
+   onfailure callback
+
+Note that get and post calls return references (pointers) to their requests for use
+in 'cancel' and 'delete' calls.
+
+
+Application File Handles
+------------------------
+File handles are returned to an application as pointers into the active entity cache.
+The active entity cache contains a reference count so that it knows the total number
+outstanding, and can tell when it's okay to invalidate the entry (and possibly delete)
+the file.
+
+
+                        State and Transition logic
+                        --------------------------
+
+Because of the large number of combinations and events involved in the lifetime of an
+active curl entity, I'm going to try and describe the behavior as a state machine.
+
+States:
+   Initial        - invalid object, no request URL
+   Retrieving     - while URL in worker queue or worker is transferring
+   Pending Cancel - same as Retrieving, but trying to cancel all requests
+                    on this URL
+   Open           - while one or more application fragments have the 
+                    URL content open (and mmapped)
+   Pending Delete - same as Open, but with command to delete from cache
+                    when last handle is closed
+
+
+Events: 
+   Events marked with 'a' are app-generated, 'w' are worker generated
+   Initiating events are marked with 'I'.
+   
+I  a - Get request
+I  a - Post request
+   a - Open request
+   a - Cancel request
+   a - Cancel all request
+   a - Delete request
+   a - Close file handle
+   w - Transfer progress
+   w = Have file size
+   w - Transfer completed
+   w - Transfer failed
+   w - Transfer cancelled
+
+Actions: Rather than exhaustively list the 55 event/state combinations, I'll describe 
+the actions by event since that's the primary thing we have coming in, and some
+events do the same thing for entities in multiple states.
+
+   Get/Post requests
+      Get requests in the initial state first check the cache (depending on app flag)
+         and jump right to the 'open' state if the URL is found.
+      Post requests always act like 'no cache' gets
+
+      If the entity state is 'initial', the request is queued to a worker thread
+      and a transition is made to the 'retrieving' state.
+
+      If the entity is in the 'pending cancel' or 'pending delete' state, the 
+      request is fulfilled immediately as 'cancelled'.
+
+      If the entity state is 'Open', it remains 'Open', and the request is fulfilled
+      as 'Completed'.
+
+   Cancel requests
+      If a matching, unfulfilled request is found, it is cancelled (with call-backs) and
+      removed from the 'unfulfilled' request list. If all unfulfilled requests for the
+      URL have been cancelled, an attempt is made to notify the worker thread of this
+      and the state is set to 'Pending Cancel'.
+
+      The only way that the request could have been unfulfilled is if the state of the
+      entity was 'retrieving' or 'pending cancel'. Initial, Open or Pending Delete 
+      states can't have unfulfilled requests.
+
+      'Cancel' is not an initiating app event, so it never adds a request to the 
+      application request list.
+
+   Open requests
+      This should only occur when the file is in the 'open' state, generally during an
+      'onComplete' callback.
+      
+      If so, this routine adds a reference and returns a pointer, length, and URL reference
+      (for later use during a 'close file handle' event).
+
+      If called at other times, this event generates an error return value
+
+   Cancel all requests
+      Same as 'Cancel' request, except that all matching, unfulfilled requests for the URL
+      are processed.
+
+   Delete request
+      If the state is:              The code:
+      ----------------              ---------
+      Initial                       removes the requested file from cache and fulfills the request
+      Retrieving/pending cancel     acts like 'cancel all'
+      Open                          sets the state to 'pending delete' 
+      Pending delete                no-op (already pending delete)
+
+   Close file handle request
+      This event should only occur in the open or pending delete states.
+      It is not an initiating event, so it completes immediately.
+
+      It decrements the use count and removes the reference to the disk cache.
+
+      If the reference count is now zero. If the state is 'pending delete', 
+      it tells the disk cache to delete the file
+
+   Transfer completed event
+      This event should only occur during the 'pending cancel' or 'retrieving'
+      states.
+
+      If 'pending cancel', this event is treated as a 'transfer cancelled event'
+      as described below.
+      
+      If 'retrieving', this routine saves the file to the disk cache and fulfills
+      any pending (get/post) requests. Fulfilling each request increments the use
+      count (and causes an mmap in the disk cache). If this URL was 'posted', the 
+      state is changed to 'pending delete', otherwise the state is changed to 'Open'.
+
+   Transfer cancelled event
+      (Should only occur in state 'Pending Cancel')
+      This routine fulfills all get or post requests with status 'cancelled'. 
+
+      The state of the URL returns to 'Initial'.
+
+   Transfer failed event
+
+      If the state is 'pending cancel', this is treated exactly as a 'transfer cancelled'
+      event.
+
+      Otherwise (state=Retrieving), all pending get or post requests are fulfilled with
+      status 'failed'.
+      
+      The state returns to 'Initial'.
 
