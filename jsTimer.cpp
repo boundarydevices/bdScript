@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.7  2003-01-05 01:58:15  ericn
+ * Revision 1.8  2003-06-16 12:54:59  ericn
+ * -modified to clean up timer threads
+ *
+ * Revision 1.7  2003/01/05 01:58:15  ericn
  * -added identification of threads
  *
  * Revision 1.6  2002/12/15 00:00:44  ericn
@@ -126,6 +129,7 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       int create = pthread_create( &thread, 0, interval, param );
       if( 0 == create )
       {
+         pthread_detach( thread );
          *rval = INT_TO_JSVAL( thread );
          return JS_TRUE ;
       }
@@ -160,6 +164,8 @@ jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       int create = pthread_create( &thread, 0, oneShot, param );
       if( 0 == create )
       {
+         pthread_detach( thread );
+
          *rval = INT_TO_JSVAL( thread );
          return JS_TRUE ;
       }
