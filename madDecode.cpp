@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.2  2003-07-20 15:42:32  ericn
+ * Revision 1.3  2003-07-27 15:14:28  ericn
+ * -modified to keep track of unread samples
+ *
+ * Revision 1.2  2003/07/20 15:42:32  ericn
  * -separated feed from read
  *
  * Revision 1.1  2002/11/24 19:08:58  ericn
@@ -28,14 +31,13 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
-madDecoder_t :: madDecoder_t( unsigned maxSamples )
+madDecoder_t :: madDecoder_t( void )
    : haveHeader_( false ),
      numChannels_( 0 ),
      sampleRate_( 0 ),
      assEndLength_( 0 ),
-     samples_( 0 ),
-     maxSamples_( maxSamples ),
-     numSamples_( 0 )
+     numSamples_( 0 ),
+     sampleStart_( 0 )
 {
    mad_stream_init(&mp3Stream_);
 }
@@ -43,8 +45,6 @@ madDecoder_t :: madDecoder_t( unsigned maxSamples )
 madDecoder_t :: ~madDecoder_t( void )
 {
    mad_stream_finish(&mp3Stream_);
-   if( samples_ )
-      delete [] samples_ ;
 }
 
 //
@@ -61,14 +61,16 @@ void madDecoder_t :: feed( void const *inData, unsigned long inBytes )
          mad_stream_buffer( &mp3Stream_, assEnd_, assEndLength_ );
       }
       else
+      {
          fprintf( stderr, "packet too big %lu/%lu\n", assEndLength_, inBytes );
+      }
       assEndLength_ = 0 ;
    }
    else
       mad_stream_buffer( &mp3Stream_, (unsigned char const *)inData, inBytes );
 }
    
-bool madDecoder_t :: getData( unsigned short const *&outData, unsigned &numSamples )
+bool madDecoder_t :: getData( void )
 {
    if( !haveHeader_ )
    {
@@ -80,10 +82,17 @@ bool madDecoder_t :: getData( unsigned short const *&outData, unsigned &numSampl
          haveHeader_ = true ;
          mad_frame_init(&mp3Frame_);
          mad_synth_init(&mp3Synth_);
+printf( "-> decode channels %u, sample rate %u\n", numChannels_, sampleRate_ );
       }
       else
+      {
+         assEndLength_ = mp3Stream_.bufend-mp3Stream_.buffer ;
+         memcpy( assEnd_, mp3Stream_.buffer, assEndLength_ );
          return false ;
+      }
    }
+
+   numSamples_ = 0 ;
 
    if( haveHeader_ )
    {
@@ -94,40 +103,12 @@ bool madDecoder_t :: getData( unsigned short const *&outData, unsigned &numSampl
             sampleRate_ = mp3Frame_.header.samplerate ;
             mad_synth_frame( &mp3Synth_, &mp3Frame_ );
 
-            if( 0 == samples_ )
-               samples_ = new unsigned short [maxSamples_];
-            
-            if( samples_ )
+            numSamples_ = mp3Synth_.pcm.length ;
+            if( 0 < numSamples_ )
             {
-               unsigned short *nextOut = samples_ + numSamples_ ;
-               if( 1 == numChannels_ )
-               {
-                  mad_fixed_t const *left = mp3Synth_.pcm.samples[0];
-
-                  for( unsigned i = 0 ; i < mp3Synth_.pcm.length ; i++ )
-                  {
-                     assert( numSamples_ < maxSamples_ );
-                     unsigned short const sample = scale( *left++ );
-                     *nextOut++ = sample ;
-                     *nextOut++ = sample ;
-                     numSamples_ += 2 ;
-                  }
-               } // mono
-               else
-               {
-                  mad_fixed_t const *left  = mp3Synth_.pcm.samples[0];
-                  mad_fixed_t const *right = mp3Synth_.pcm.samples[1];
-
-                  for( unsigned i = 0 ; i < mp3Synth_.pcm.length ; i++ )
-                  {
-                     assert( numSamples_ < maxSamples_ );
-                     *nextOut++ = scale( *left++ );
-                     *nextOut++ = scale( *right++ );
-                     numSamples_ += 2 ;
-                  }
-               } // stereo
+               sampleStart_ = 0 ;
+               break;
             }
-            break;
          } // mp3Frame_ decoded
          else
          {
@@ -140,8 +121,10 @@ bool madDecoder_t :: getData( unsigned short const *&outData, unsigned &numSampl
                else if( 0 != mp3Stream_.next_frame )
                {
                   assEndLength_ = mp3Stream_.bufend-mp3Stream_.next_frame ;
-                  memcpy( assEnd_, mp3Stream_.next_frame, assEndLength_ );
-//                                                   fprintf( stderr, "tail mp3Frame_ %p/%p/%lu, %lu\n", mp3Stream_.next_frame, mp3Stream_.main_data, mp3Stream_.md_len, mp3Stream_.bufend-mp3Stream_.next_frame );
+                  if( 0 < assEndLength_ )
+                  {
+                     memcpy( assEnd_, mp3Stream_.next_frame, assEndLength_ );
+                  }
                }
                else
                   assEndLength_ = 0 ;
@@ -151,10 +134,58 @@ bool madDecoder_t :: getData( unsigned short const *&outData, unsigned &numSampl
       } while( 1 );
    }
 
-   outData = samples_ ;
-   numSamples = numSamples_ ;
-   numSamples_ = 0 ;
-   return ( 0 < numSamples );
+   if( 0 == numSamples_ )
+   {
+      return false ;
+   }
+   else
+      return true ;
 }
 
+bool madDecoder_t :: readSamples( unsigned short samples[],
+                                  unsigned       maxSamples,
+                                  unsigned      &numRead )
+{
+   
+   numRead = 0 ;
 
+   unsigned short *nextOut = samples ;
+
+   if( 1 == numChannels_ )
+   {
+      if( maxSamples > numSamples_ )
+         maxSamples = numSamples_ ;
+
+      mad_fixed_t const *left = mp3Synth_.pcm.samples[0] + sampleStart_ ;
+
+      for( unsigned i = 0 ; i < maxSamples ; i++ )
+         *nextOut++ = scale( *left++ );
+      
+      numSamples_  -= maxSamples ;
+      sampleStart_ += maxSamples ;
+   
+   } // mono
+   else
+   {
+      maxSamples /= 2 ;
+
+      if( maxSamples > numSamples_ )
+         maxSamples = numSamples_ ;
+
+      mad_fixed_t const *left  = mp3Synth_.pcm.samples[0] + sampleStart_ ;
+      mad_fixed_t const *right = mp3Synth_.pcm.samples[1] + sampleStart_ ;
+
+      for( unsigned i = 0 ; i < maxSamples ; i++ )
+      {
+         *nextOut++ = scale( *left++ );
+         *nextOut++ = scale( *right++ );
+      }
+
+      numSamples_  -= maxSamples ;
+      sampleStart_ += maxSamples ;
+
+   } // stereo
+
+   numRead = nextOut - samples ;
+   return 0 != numRead ;
+}
