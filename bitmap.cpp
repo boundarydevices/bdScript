@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: bitmap.cpp,v $
- * Revision 1.1  2004-07-04 21:35:14  ericn
+ * Revision 1.2  2004-07-25 22:34:56  ericn
+ * -added source offset param to bltFrom
+ *
+ * Revision 1.1  2004/07/04 21:35:14  ericn
  * -Initial import
  *
  *
@@ -158,11 +161,12 @@ void bitmap_t::bltFrom
    ( unsigned char       *bitStart,
      unsigned             startOffs,
      unsigned char const *src,
-     unsigned             count )
+     unsigned             count,
+     unsigned             srcOffs )
 {
    unsigned char *nextOut = bitStart+(startOffs/8);
    unsigned char outMask = 0x80 >> (startOffs&7);
-   unsigned char inMask  = 0x80 ;
+   unsigned char inMask  = 0x80 >> (srcOffs&7);
    unsigned char inChar  = *src++ ;
    unsigned char outChar = *nextOut ; // preload
 

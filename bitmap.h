@@ -1,5 +1,5 @@
 #ifndef __BITMAP_H__
-#define __BITMAP_H__ "$Id: bitmap.h,v 1.1 2004-07-04 21:35:14 ericn Exp $"
+#define __BITMAP_H__ "$Id: bitmap.h,v 1.2 2004-07-25 22:34:45 ericn Exp $"
 
 /*
  * bitmap.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: bitmap.h,v $
- * Revision 1.1  2004-07-04 21:35:14  ericn
+ * Revision 1.2  2004-07-25 22:34:45  ericn
+ * -added source offset param to bltFrom
+ *
+ * Revision 1.1  2004/07/04 21:35:14  ericn
  * -Initial import
  *
  *
@@ -55,12 +58,13 @@ public:
                           unsigned       count );
    //
    // copy bits to specified offset
-   // input bits are copied from high bit
+   // bits are numbered from high bit
    //
    static void bltFrom( unsigned char       *bitStart,
                         unsigned             startOffs,
                         unsigned char const *src,
-                        unsigned             count );
+                        unsigned             count,
+                        unsigned             srcOffs = 0 );
 
 private:
    unsigned char *const bits_ ;
