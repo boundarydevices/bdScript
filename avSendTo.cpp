@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.3  2003-10-01 01:07:55  ericn
+ * Revision 1.4  2003-10-01 05:04:24  ericn
+ * -modified to remove echo
+ *
+ * Revision 1.3  2003/10/01 01:07:55  ericn
  * -added udpRxThread for receiving audio
  *
  * Revision 1.2  2003/09/22 02:07:35  ericn
@@ -254,6 +257,7 @@ typedef struct threadParam_t {
 };
 
 unsigned volatile audioBytesOut = 0 ;
+bool volatile     playingSomething = false ;
 
 static void *audioThread( void *arg )
 {
@@ -263,11 +267,6 @@ static void *audioThread( void *arg )
    audio_buf_info inf ;
    if( 0 == ioctl( fdAudio, SNDCTL_DSP_GETISPACE, &inf) ) 
    {
-printf( "inf.bytes = %u\n", inf.bytes );
-printf( "inf.fragments = %u\n", inf.fragments );
-printf( "inf.fragsize = %u\n", inf.fragsize );
-printf( "inf.fragstotal = %u\n", inf.fragstotal );
-
       unsigned char *const audioInBuf = new unsigned char[inf.fragsize+sizeof( udpHeader_t)];
       udpHeader_t &header = *( udpHeader_t * )audioInBuf ;
       unsigned char *const readBuf = audioInBuf+sizeof( udpHeader_t );
@@ -276,6 +275,8 @@ printf( "inf.fragstotal = %u\n", inf.fragstotal );
          int numRead = read( fdAudio, audioInBuf, inf.fragsize );
          if( inf.fragsize == numRead )
          {
+            if( playingSomething )
+               memset( audioInBuf, 0, inf.fragsize );
             header.length_ = numRead ;
             header.type_   = header.audio ;
             int numSent = sendto( params.udpSock_, audioInBuf, sizeof(udpHeader_t)+numRead, 0, 
@@ -284,6 +285,20 @@ printf( "inf.fragstotal = %u\n", inf.fragstotal );
             {
                audioBytesOut += numRead ;
 //               printf( "audio %u, %u\n", numRead, audioBytesOut );
+               if( playingSomething )
+               {
+                  audio_buf_info ai ;
+                  if( 0 == ioctl( fdAudio, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                  {
+                     if( ai.fragments == ai.fragstotal )
+                        playingSomething = false ;
+                  }
+                  else
+                  {
+                     perror( "SNDCTL_DSP_GETOSPACE" );
+                     break;
+                  }
+               }
             }
             else
             {
@@ -454,6 +469,7 @@ static void *udpRxThread( void *arg )
             unsigned const expected = sizeof( msg )-sizeof( msg.data_ )+msg.length_ ;
             if( expected == numRead )
             {
+               playingSomething = true ;
                int numWritten = write( fdAudio, msg.data_, msg.length_ );
                if( numWritten == msg.length_ )
                {
@@ -519,7 +535,7 @@ int main( int argc, char const * const argv[] )
          else
             fprintf( stderr, "Error opening mixer\n" );
 
-         int fdAudio = open( "/dev/dsp", O_RDONLY );
+         int fdAudio = open( "/dev/dsp", O_RDWR );
          if( 0 <= fdAudio )
          {
             printf( "opened /dev/dsp\n" );
@@ -568,26 +584,7 @@ int main( int argc, char const * const argv[] )
                            if( 0 == create )
                            {
                               threadParam_t audioOutParams = audioParams ;
-                              int fdAudioOut = open( "/dev/dsp", O_WRONLY );
-if( 0 > fdAudioOut )
-{
-   perror( "audioOut" );
-   return 0 ;
-}
-
-if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_SETFMT, &format) ) 
-{
-   perror( "SETFMT output" );
-   return 0 ;
-}
-
-if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_CHANNELS, &channels ) )
-   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
-
-if( 0 != ioctl( fdAudioOut, SNDCTL_DSP_SPEED, &speed ) )
-   fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
-
-                              audioOutParams.mediaFd_ = fdAudioOut ;
+                              audioOutParams.mediaFd_ = fdAudio ;
                               pthread_t udpHandle ;
                               create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
                               if( 0 == create )
