@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.28  2003-08-04 12:37:51  ericn
+ * Revision 1.29  2003-08-06 13:24:14  ericn
+ * -fixed audio playback for flash
+ *
+ * Revision 1.28  2003/08/04 12:37:51  ericn
  * -added raw MP3 (for flash)
  *
  * Revision 1.27  2003/08/02 19:30:03  ericn
@@ -582,7 +585,6 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
-printf( "MP3 playback here: callback %p\n", item->callback_ );
                _playing = true ;
                
                audio_buf_info ai ;
@@ -716,6 +718,8 @@ printf( "MP3 playback here: callback %p\n", item->callback_ );
                   if( samples )
                      delete [] samples ;
 
+                  _playing = false ;
+                  
                   if( !queue->shutdown_ )
                   {
                      if( _cancel )
