@@ -133,7 +133,7 @@ ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 tsTest: tsTest.cpp
 	$(CC) $(IFLAGS) -o tsTest tsTest.cpp $(LIBS) -lts
 
-all: curlGet dirTest urlTest jsExec ftRender tsTest tsThread madHeaders
+all: curlGet dirTest urlTest jsExec ftRender tsTest tsThread madHeaders bc
 
 .PHONY: install-libs install-headers
 
@@ -152,4 +152,4 @@ install-bin:
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a *.map curlGet dirTest urlTest jsExec testJS ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a *.map bc curlGet dirTest urlTest jsExec testJS ftRender tsTest tsThread madHeaders $(LIB)
