@@ -21,6 +21,7 @@
 #include "codeQueue.h"
 #include "jsGlobals.h"
 #include "linux/pxa-gpio.h"
+#include <fcntl.h>
 
 static int fdAmber =0;
 static int fdRed =0;
@@ -51,8 +52,9 @@ static JSBool jsSetGpio( int &fd, char* device,JSContext *cx, JSObject *obj, uin
 	 memcpy(&buffer[5],device,strlen(device)+1);
          fd = open(buffer, O_WRONLY );
       }
-      if ( (fd > 0) && (write( fd, &ledState, 1) >= 0) )
+      if ( (fd >= 0) && (write( fd, &ledState, 1) >= 0) )
       {
+         fcntl( fd, F_SETFD, FD_CLOEXEC );
          *rval = JSVAL_TRUE;
       }
       else
@@ -104,6 +106,7 @@ static void* FeedbackThread( void *arg )
             close( pfds[i].fd );
          return 0 ;
       }
+      fcntl( pfds[i].fd, F_SETFD, FD_CLOEXEC );
    }
    
    while( 1 )
@@ -200,6 +203,7 @@ static JSBool jsGetDebounce( JSContext *cx, JSObject *obj, uintN argc, jsval *ar
    int const fd = open( "/dev/Feedback", O_RDONLY);
    if( 0 <= fd )
    {
+      fcntl( fd, F_SETFD, FD_CLOEXEC );
       int result = 0 ;
       if( 0 == ioctl( fd, ioctlVal, &result ) )
       {
@@ -223,6 +227,7 @@ static JSBool jsSetDebounce( JSContext *cx, JSObject *obj, uintN argc, jsval *ar
       int const fd = open( "/dev/Feedback", O_RDONLY);
       if( 0 <= fd )
       {
+         fcntl( fd, F_SETFD, FD_CLOEXEC );
          int ms = JSVAL_TO_INT(argv[0]);
          if( 0 == ioctl( fd, ioctlVal, &ms ) )
          {
