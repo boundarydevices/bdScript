@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.24  2003-05-18 10:18:23  tkisky
+ * Revision 1.25  2003-06-26 08:03:34  tkisky
+ * -add rotate90 function
+ *
+ * Revision 1.24  2003/05/18 10:18:23  tkisky
  * -add scaling function
  *
  * Revision 1.23  2003/04/26 15:42:57  ericn
@@ -568,11 +571,72 @@ jsImageScale( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    return JS_TRUE ;
 }
 
+JSBool
+jsImageRotate90( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if (argc) {
+      JS_ReportError( cx, "Usage: img.rotate90();" );
+   }
+   else
+   {
+      jsval widthVal, heightVal, dataVal ;
+      if( JS_GetProperty( cx, obj, "width", &widthVal )
+          &&
+          JS_GetProperty( cx, obj, "height", &heightVal )
+          &&
+          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal ) )
+      {
+         int const width  = JSVAL_TO_INT( widthVal );
+         int const height = JSVAL_TO_INT( heightVal );
+         JSString *pixStr = JSVAL_TO_STRING( dataVal );
+         unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+         if( JS_GetStringLength( pixStr ) == pixBytes )
+         {
+            JSObject *returnObj = JS_NewObject( cx, &jsImageClass_, 0, 0 );
+            if( returnObj )
+            {
+               *rval = OBJECT_TO_JSVAL( returnObj ); // root
+
+               void *const pixMem = JS_malloc( cx, pixBytes );
+               if (pixMem)
+               {
+                  Scale16::rotate90( (unsigned short *)pixMem, pixMap, width,height);
+
+                  JSString *sScaleMap = JS_NewString( cx, (char *)pixMem, pixBytes );
+                  if( sScaleMap )
+                  {
+                     JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sScaleMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                     JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(height), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                     JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(width), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                  }
+                  else
+                     JS_ReportError( cx, "Error building Scale map string" );
+               }
+               else
+                  JS_ReportError( cx, "Error allocating Scale map string" );
+            }
+            else
+               JS_ReportError( cx, "allocating array" );
+         }
+         else
+            JS_ReportError( cx, "Invalid width or height" );
+      }
+      else
+         JS_ReportError( cx, "Invalid image" );
+   }
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec imageMethods_[] = {
     {"draw",         jsImageDraw,           3 },
     {"dissolve",     jsImageDissolve,       3 },
     {"dither",       jsImageDither,         3 },
     {"scale",        jsImageScale,          6,0,0 },
+    {"rotate90",     jsImageRotate90,       0,0,0 },
     {0}
 };
 

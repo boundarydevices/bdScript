@@ -23,6 +23,8 @@ public:
 		unsigned short const *img, int imgWidth, int imgHeight,
 		int picLeft, int picTop, int picWidth,int picHeight);
 
+	static void rotate90(unsigned short *dest, unsigned short const *src,
+		int srcWidth, int srcHeight);
 };
 
 //extern "C" void scale16(unsigned short *dest, int destWidth, int destHeight,

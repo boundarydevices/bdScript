@@ -95,6 +95,24 @@ void Scale16::scale(unsigned short *dest, int destWidth, int destHeight,
 		else pImageData->Release();
 	}
 }
+#define destWidth srcHeight
+#define destHeight srcWidth
+void Scale16::rotate90(unsigned short *dest, unsigned short const *src, int srcWidth, int srcHeight)
+{
+	unsigned short * dest1 = dest + (destWidth - 1);
+	while (dest1 >=dest)
+	{
+		unsigned short * dest2 = dest1;
+		int i = destHeight;
+		while (i)
+		{
+			*dest2 = *src++;
+			dest2 += destWidth;
+			i--;
+		}
+		dest1--;
+	}	
+}
 
 /*
 extern "C" void scale16(unsigned short *dest, int destWidth, int destHeight,
