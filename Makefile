@@ -31,6 +31,7 @@ OBJS = \
        imgPNG.o \
        jsAlphaMap.o \
        jsBarcode.o \
+       jsBCWidths.o \
        jsBitmap.o \
        jsCurl.o \
        jsDir.o \
