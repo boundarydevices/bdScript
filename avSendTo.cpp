@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.12  2003-10-20 03:49:27  ericn
+ * Revision 1.13  2003-10-31 13:32:54  ericn
+ * -inverted guard shack pin, added barcode type and terminator
+ *
+ * Revision 1.12  2003/10/20 03:49:27  ericn
  * -set params for output audio fd
  *
  * Revision 1.11  2003/10/19 17:02:56  ericn
@@ -576,22 +579,94 @@ class udpBarcode_t : public barcodePoll_t {
 public:
    udpBarcode_t( pollHandlerSet_t  &set,
                  int                udpSock,
-                 sockaddr_in const &remote )
-      : barcodePoll_t( set )
-      , udpSock_( udpSock )
-      , remote_( remote ){}
+                 sockaddr_in const &remote );
 
    virtual void onBarcode( void );
 
+   enum scannerType_e {
+      sick_e,
+      keyence_e,
+      other_e
+   };
+
 private:
-   int         udpSock_ ;
-   sockaddr_in remote_ ;
+   int            udpSock_ ;
+   sockaddr_in    remote_ ;
+   scannerType_e  scannerType_ ;
 };
+
+static int strTableLookup( char const * const strTable[],
+                           unsigned           nelements,
+                           char const        *target )
+{
+   for( unsigned i = 0 ; i < nelements ; i++ )
+   {
+      if( 0 == strcasecmp( strTable[i], target ) )
+         return i ;
+   }
+
+   return -1 ;
+}
+
+udpBarcode_t :: udpBarcode_t
+   ( pollHandlerSet_t  &set,
+     int                udpSock,
+     sockaddr_in const &remote )
+   : barcodePoll_t( set )
+   , udpSock_( udpSock )
+   , remote_( remote )
+{
+   static char const *const scannerTypes[] = {
+      "sick", "keyence", "other"
+   };
+
+   int type = -1 ;
+
+   FILE *fScannerType = fopen( "/js/scannerType", "rb" );
+   if( fScannerType )
+   {
+      char inBuf[256];
+      int numRead = fread( inBuf, 1, sizeof( inBuf )-1, fScannerType );
+      if( 0 < numRead )
+      {
+         inBuf[numRead] = '\0' ;
+         type = strTableLookup( scannerTypes, 3, inBuf );
+      }
+      fclose( fScannerType );
+   }
+   
+   char const scannerTerminators[] = {
+      '\x03', '\r', '\0'
+   };
+   if( 0 > type )
+   {
+      printf( "undefined scanner type... defaulting to sick\n" );
+      scannerType_ = sick_e ;  // default to sick
+   }
+   else
+      scannerType_ = (scannerType_e)type ;
+
+   terminator_ = scannerTerminators[type];
+
+}
 
 void udpBarcode_t :: onBarcode( void )
 {
-   unsigned const len = strlen( getBarcode() );
+   unsigned len = strlen( getBarcode() );
    printf( "barcode <%s>, len %u\n", getBarcode(), len );
+   if( sick_e == scannerType_ )
+   {
+      printf( "Sick scanner\n" );
+      if( '\x03' == barcode_[--len] ) 
+      {
+         printf( "Have terminator\n" );
+         barcode_[--len] = '\0' ; // trim symbology
+      }
+      else
+         printf( "No terminator\n" );
+   }
+   else
+      printf( "Not sick scanner\n" );
 
    char data[sizeof(udpHeader_t)+sizeof(barcode_)];
    udpHeader_t &header = *(udpHeader_t *)data ;
@@ -743,13 +818,15 @@ public:
               sockaddr_in const  &remote,
               unsigned char       mask,
               uiState_t          &ui,
-              uiState_t::input_e  uiBit )
+              uiState_t::input_e  uiBit,
+              bool                inverted )
       : gpioPoll_t( set, devName )
       , udpSock_( udpSock )
       , remote_( remote )
       , mask_( mask )
       , ui_( ui )
       , uiBit_( uiBit )
+      , inverted_( inverted )
    {
    }
 
@@ -764,6 +841,7 @@ private:
    unsigned char const mask_ ;
    uiState_t          &ui_ ;
    uiState_t::input_e  uiBit_ ;
+   bool const          inverted_ ;
 };
 
 
@@ -783,7 +861,10 @@ void udpGPIO_t :: sendPinState( void )
 
 void udpGPIO_t :: onHigh( void )
 {
-   gpioPins_.pinState_ |= mask_ ;
+   if( !inverted_ )
+      gpioPins_.pinState_ |= mask_ ;
+   else
+      gpioPins_.pinState_ &= ~mask_ ;
    sendPinState();
    ui_.setState( uiBit_, true );
 }
@@ -791,7 +872,11 @@ void udpGPIO_t :: onHigh( void )
 
 void udpGPIO_t :: onLow( void )
 {
-   gpioPins_.pinState_ &= ~mask_ ;
+   if( !inverted_ )
+      gpioPins_.pinState_ &= ~mask_ ;
+   else
+      gpioPins_.pinState_ |= mask_ ;
+
    sendPinState();
    ui_.setState( uiBit_, false );
 }
@@ -863,7 +948,7 @@ void udpRxPoll_t :: onMsg( deviceMsg_t const &msg )
       int numWritten = write( fdAudio_, msg.data_, msg.length_ );
       if( numWritten == msg.length_ )
       {
-         printf( "%lu bytes of audio\n", msg.length_ );
+//         printf( "%lu bytes of audio\n", msg.length_ );
       }
       else
          fprintf( stderr, "Error %m sending audio output\n" );
@@ -938,12 +1023,13 @@ void udpRxPoll_t :: onDataAvail( void )
 struct pinData_t {
    char const     *name_ ;
    unsigned short  mask_ ;
+   bool            inverted_ ;
 };
 
 static pinData_t const pins_[] = {
-   { "/dev/Feedback",  gpioPins_t::gateOpen_e },
-   { "/dev/Feedback2", gpioPins_t::carDetect_e },
-   { "/dev/Feedback3", gpioPins_t::guardShack_e },
+   { "/dev/Feedback",  gpioPins_t::gateOpen_e, false },
+   { "/dev/Feedback2", gpioPins_t::carDetect_e, false },
+   { "/dev/Feedback3", gpioPins_t::guardShack_e, true },
 };
 
 static uiState_t::input_e const pinUI_[] = {
@@ -977,7 +1063,7 @@ static void *pollThread( void *arg )
          for( unsigned p = 0 ; p < pinCount_ ; p++ )
          {
             char const *devName = pins_[p].name_ ;
-            pollPins[p] = new udpGPIO_t( handlers, devName, params.udpSock_, params.remote_, pins_[p].mask_, uiState, pinUI_[p] );
+            pollPins[p] = new udpGPIO_t( handlers, devName, params.udpSock_, params.remote_, pins_[p].mask_, uiState, pinUI_[p], pins_[p].inverted_ );
             if( pollPins[p]->isOpen() )
                printf( "opened %s: fd %d, mask %x\n", devName, pollPins[p]->getFd(), pollPins[p]->getMask() );
          }
