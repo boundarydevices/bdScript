@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.14  2002-11-30 18:52:57  ericn
+ * Revision 1.15  2002-11-30 23:45:27  ericn
+ * -removed debug msg
+ *
+ * Revision 1.14  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.13  2002/11/30 16:29:07  ericn
@@ -488,7 +491,6 @@ bool queueCurlRequest
          }
 
          request.isComplete_ = false ;
-printf( "retrieving %s\n", absolute.c_str() );
 
          if( 0 == postHead )
          {
