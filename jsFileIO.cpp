@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
- * Revision 1.5  2004-04-20 15:30:20  ericn
+ * Revision 1.6  2004-04-23 04:23:27  ericn
+ * -removed comment blocks
+ *
+ * Revision 1.5  2004/04/20 15:30:20  ericn
  * -implemented onLineIn, onCharIn callbacks
  *
  * Revision 1.4  2004/04/20 15:18:10  ericn
@@ -461,16 +464,12 @@ void filePollHandler_t :: onDataAvail( void )
          numRead_ = 0 ;
          dataBuf_[numRead_] = '\0' ;
       } // have charIn handler
-/*
-*/   
    }
    else
    {
       perror( "FIONREAD" );
       setMask( 0 );
    }
-/*
-*/   
 }
 
 void filePollHandler_t :: onLineIn( void )
