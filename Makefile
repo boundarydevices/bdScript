@@ -219,4 +219,8 @@ install-bin:
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a *.map bc curlGet dirTest urlTest jsExec testJS ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a *.map *.lst *.sym bc curlGet dirTest urlTest \
+         jsExec testJS ftRender tsTest tsThread madHeaders backtrace \
+         cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
+         mpeg2mp3 \
+         $(LIB)
