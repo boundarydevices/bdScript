@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.15  2002-12-26 19:26:59  ericn
+ * Revision 1.16  2003-01-31 13:30:05  ericn
+ * -modified to allow empty buttons
+ *
+ * Revision 1.15  2002/12/26 19:26:59  ericn
  * -added onMoveOff support
  *
  * Revision 1.14  2002/12/26 19:04:26  ericn
@@ -565,8 +568,6 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   else
                      JS_ReportError( cx, "missing font data" );
                } // get font fields
-               else
-                  JS_ReportError( cx, "Must have either img or font" );
                
                getZMap().addBox( *box );
             }
