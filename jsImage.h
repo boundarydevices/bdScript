@@ -1,5 +1,5 @@
 #ifndef __JSIMAGE_H__
-#define __JSIMAGE_H__ "$Id: jsImage.h,v 1.3 2002-11-02 18:37:23 ericn Exp $"
+#define __JSIMAGE_H__ "$Id: jsImage.h,v 1.4 2002-11-22 15:08:01 ericn Exp $"
 
 /*
  * jsImage.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: jsImage.h,v $
- * Revision 1.3  2002-11-02 18:37:23  ericn
+ * Revision 1.4  2002-11-22 15:08:01  ericn
+ * -made jsImageDraw public
+ *
+ * Revision 1.3  2002/11/02 18:37:23  ericn
  * -made jsImageClass_ externally visible
  *
  * Revision 1.2  2002/10/15 05:00:00  ericn
@@ -31,6 +34,11 @@
 #include "js/jsapi.h"
 
 extern JSClass jsImageClass_ ;
+
+//
+// image.draw( x, y )
+//
+JSBool jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval );
 
 bool initJSImage( JSContext *cx, JSObject *glob );
 

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.13  2002-11-20 00:39:02  ericn
+ * Revision 1.14  2002-11-22 15:08:03  ericn
+ * -made jsImageDraw public
+ *
+ * Revision 1.13  2002/11/20 00:39:02  ericn
  * -fixed memory leak
  *
  * Revision 1.12  2002/11/11 04:28:55  ericn
@@ -63,7 +66,7 @@
 #include "curlThread.h"
 #include "jsGlobals.h"
 
-static JSBool
+JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    //
