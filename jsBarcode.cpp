@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.11  2003-07-03 13:59:21  ericn
+ * Revision 1.12  2003-12-27 15:09:29  ericn
+ * -keep and use prototype
+ *
+ * Revision 1.11  2003/07/03 13:59:21  ericn
  * -modified to close bc handle on exec
  *
  * Revision 1.10  2003/06/10 23:54:08  ericn
@@ -59,6 +62,7 @@
 #include <errno.h>
 #include "js/jscntxt.h"
 
+static JSObject *bcReaderProto = NULL ;
 
 struct bcrParams_t {
    jsval     object_ ;
@@ -284,14 +288,14 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
        &&
        ( 0 != ( sDevice = JSVAL_TO_STRING( argv[0] ) ) ) )
    {
-      obj = JS_NewObject( cx, &jsBarcodeReaderClass_, NULL, NULL );
+      JSObject *reader = JS_NewObject( cx, &jsBarcodeReaderClass_, bcReaderProto, obj );
    
-      if( obj )
+      if( reader )
       {
-         *rval = OBJECT_TO_JSVAL(obj); // root
-         JS_SetPrivate( cx, obj, 0 );
+         *rval = OBJECT_TO_JSVAL(reader); // root
+         JS_SetPrivate( cx, reader, 0 );
 
-         JS_DefineProperty( cx, obj, "deviceName", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+         JS_DefineProperty( cx, reader, "deviceName", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
 
          char terminator = '\0' ;
 
@@ -300,7 +304,7 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
             JSString *sTerminator = JSVAL_TO_STRING( argv[1] );
             if( sTerminator && ( 1 == JS_GetStringLength( sTerminator ) ) )
             {
-               JS_DefineProperty( cx, obj, "terminator", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, reader, "terminator", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                terminator = *JS_GetStringBytes( sTerminator );
             }
             else
@@ -315,7 +319,7 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
             bcrParams_t *params = new bcrParams_t ;
 
             params->object_       = *rval ;
-            params->scope_        = obj ;
+            params->scope_        = reader ;
             params->fd_           = fd ;
             params->terminator_   = terminator ;
             params->outputDelay_  = 0 ;
@@ -324,7 +328,7 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
             int const create = pthread_create( &params->threadHandle_, 0, barcodeThread, params );
             if( 0 == create )
             {
-               JS_SetPrivate( cx, obj, params );
+               JS_SetPrivate( cx, reader, params );
             }
             else
             {
@@ -832,22 +836,24 @@ static JSPropertySpec bcReaderProperties_[] = {
 
 bool initJSBarcode( JSContext *cx, JSObject *glob )
 {
-   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsBarcodeReaderClass_,
-                                  jsBarcodeReader, 1,
-                                  bcReaderProperties_, 
-                                  barcodeReader_methods,
-                                  0, 0 );
-   if( rval )
+   bcReaderProto = JS_InitClass( cx, glob, NULL, &jsBarcodeReaderClass_,
+                                 jsBarcodeReader, 1,
+                                 bcReaderProperties_, 
+                                 barcodeReader_methods,
+                                 0, 0 );
+   if( bcReaderProto )
    {
+      JS_AddRoot( cx, &bcReaderProto );
+
       JSObject *symTable = JS_NewArrayObject( cx, 0, NULL );
 
       // root it
-      if( JS_DefineProperty( cx, rval, "symbologyNames", OBJECT_TO_JSVAL( symTable ),
+      if( JS_DefineProperty( cx, bcReaderProto, "symbologyNames", OBJECT_TO_JSVAL( symTable ),
                              NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
       {
          for( unsigned i = BCR_NOSYM ; i < BCR_NUMSYMBOLOGIES ; i++ )
          {
-            if( !JS_DefinePropertyWithTinyId( cx, rval, bcrSymNames_[i], i, INT_TO_JSVAL( i ), 
+            if( !JS_DefinePropertyWithTinyId( cx, bcReaderProto, bcrSymNames_[i], i, INT_TO_JSVAL( i ), 
                                               NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
             {
                JS_ReportError( cx, "Defining barcodeReader.%s", bcrSymNames_[i] );
