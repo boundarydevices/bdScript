@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.11  2002-12-01 03:13:52  ericn
+ * Revision 1.12  2002-12-02 15:14:35  ericn
+ * -modified to use pull instead of twiddlin' internals of queue
+ *
+ * Revision 1.11  2002/12/01 03:13:52  ericn
  * -modified to root objects through audio queue
  *
  * Revision 1.10  2002/11/30 18:52:57  ericn
@@ -336,11 +339,9 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       // Javascript code), so there's no need to lock
       // execMutex_.
       //
-      mutexLock_t lock( queue_.mutex_ );
-      while( !queue_.list_.empty() )
+      item_t *item ;
+      while( queue_.pull( item, 0 ) )
       {
-         item_t *item = queue_.list_.front();
-         queue_.list_.pop_front();
          item->isComplete_ = false ;
          queueCallback( audioHandlerCallback, item );
          ++numCancelled ;
