@@ -22,3 +22,4 @@ config.mk
 config.h
 mpegDecode testYUV *.prestrip
 mpegDecodeMain
+udpEcho udpSendTo httpPoll dnsPoll pwd rollingMedian
