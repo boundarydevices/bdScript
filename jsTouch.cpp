@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.20  2004-11-16 15:48:59  ericn
+ * Revision 1.21  2004-11-26 15:33:51  ericn
+ * -remove range from touch calibration
+ *
+ * Revision 1.20  2004/11/16 15:48:59  ericn
  * -matrix based calibration
  *
  * Revision 1.19  2004/11/16 04:06:51  ericn
@@ -163,22 +166,12 @@ void jsTouchPoll_t :: setCooked( char const *data )
 {
    double a[6];
    unsigned swap ;
-   unsigned rangeI, rangeJ ;
-   if( 8 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf,%u,%u", a, a+1, a+2, a+3, a+4, a+5, &rangeI, &rangeJ ) )
+   if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf,%u,%u", a, a+1, a+2, a+3, a+4, a+5 ) )
    {
       raw_ = false ;
 
       for( unsigned i = 0 ; i < 6 ; i++ )
          coef_[i] = (long)floor( 65536*a[i] );
-      touchPoll_t::setRange( rangeI, rangeJ );
-/*
-      swapXY_  = ( 0 != swap );
-      scaleX_  = scaleX ;
-      scaleY_  = scaleY ;
-      originX_ = originX ;
-      originY_ = originY ;
-      touchPoll_t::setRange( rangeX, rangeY );
-*/         
    }
    else
       fprintf( stderr, "Invalid calibration settings\n" );
