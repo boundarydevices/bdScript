@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.4  2003-03-23 22:53:12  ericn
+ * Revision 1.5  2004-11-16 07:32:43  tkisky
+ * -add choice to use my JPEG library, not active because dither looks weird with it
+ *
+ * Revision 1.4  2003/03/23 22:53:12  ericn
  * -force fast integer DCT (doesn't help much)
  *
  * Revision 1.3  2002/11/22 14:58:16  ericn
@@ -29,12 +32,14 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include "fbDev.h"
 
+#define USE_LIBJPEG
+#ifdef USE_LIBJPEG
 extern "C" {
 #include <jpeglib.h>
 };
 
-#include "fbDev.h"
 
 //
 // used differently than pngData_t.
@@ -98,7 +103,7 @@ bool imageJPEG( void const    *inData,     // input
                 unsigned short &height )   // output
 {
    pixData = 0 ; width = height = 0 ;
-   
+
    JOCTET const *jpegData = (JOCTET *)inData ;
    unsigned const jpegLength = inSize ;
    
@@ -136,7 +141,7 @@ bool imageJPEG( void const    *inData,     // input
    // we need to call calc_output_dimensions().
    //
    jpeg_calc_output_dimensions(&cinfo);
-   
+
    int row_stride = cinfo.output_width * cinfo.output_components;
 
    JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)( (j_common_ptr)&cinfo,
@@ -153,11 +158,11 @@ bool imageJPEG( void const    *inData,     // input
       unsigned numRead = jpeg_read_scanlines( &cinfo, buffer, 1);
       unsigned char const *nextOut = buffer[0];
 
-      for( unsigned column = 0; column < cinfo.output_width; ++column ) 
+      for( unsigned column = 0; column < cinfo.output_width; ++column )
       {
          unsigned char red, green, blue ;
-         if( cinfo.output_components == 1 ) 
-         {   
+         if( cinfo.output_components == 1 )
+         {
             red = green = blue = *nextOut++ ;
          }
          else
@@ -166,7 +171,7 @@ bool imageJPEG( void const    *inData,     // input
             green = *nextOut++ ;
             blue  = *nextOut++ ;
          }
-         
+
          unsigned short const color = fb.get16( red, green, blue );
          pixMap[row*cinfo.output_width+column] = color ;
       }
@@ -183,6 +188,26 @@ bool imageJPEG( void const    *inData,     // input
    return true ;
 }
 
+
+
+#else
+#include "bdGraph/ResourceView.h"
+bool imageJPEG( void const    *inData,     // input
+                unsigned long  inSize,     // input
+                void const    *&pixData,   // output
+                unsigned short &width,     // output
+                unsigned short &height )   // output
+{
+	unsigned short* pixMap=NULL;
+	int	picWidth=0;
+	int picHeight=0;
+	ResourceView::GetData16((const unsigned char *)inData,(unsigned)inSize,&pixMap,&picWidth,&picHeight,fbDevice_t::ConvertRgb24LineTo16);
+	pixData = pixMap;
+	width   = picWidth;
+	height  = picHeight;
+	return true;
+}
+#endif
 
 #ifdef __STANDALONE__
 
