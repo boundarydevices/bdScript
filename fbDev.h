@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.14 2004-05-05 03:18:59 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.15 2004-05-08 14:23:02 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.14  2004-05-05 03:18:59  ericn
+ * Revision 1.15  2004-05-08 14:23:02  ericn
+ * -added drawing primitives to image object
+ *
+ * Revision 1.14  2004/05/05 03:18:59  ericn
  * -add render and antialias into image
  *
  * Revision 1.13  2004/03/17 04:56:19  ericn
@@ -124,19 +127,29 @@ public:
    // draw a filled rectangle
    void rect( unsigned short x1, unsigned short y1,
               unsigned short x2, unsigned short y2,
-              unsigned char red, unsigned char green, unsigned char blue );
+              unsigned char red, unsigned char green, unsigned char blue,
+              unsigned short *imageMem = 0 ,
+              unsigned short  imageWidth = 0,
+              unsigned short  imageHeight = 0 );
    
    // draw a line of specified thickness, points specify top or left of line
    void line( unsigned short x1, unsigned short y1, // only vertical and horizonta supported (for now)
               unsigned short x2, unsigned short y2,
               unsigned char penWidth,
-              unsigned char red, unsigned char green, unsigned char blue );
+              unsigned char red, unsigned char green, unsigned char blue,
+              unsigned short *imageMem = 0 ,
+              unsigned short  imageWidth = 0,
+              unsigned short  imageHeight = 0 );
    
    // outlined box (4 connecting lines), points specify outside of box
    void box( unsigned short x1, unsigned short y1,
              unsigned short x2, unsigned short y2,
              unsigned char penWidth,
-             unsigned char red, unsigned char green, unsigned char blue );
+             unsigned char red, unsigned char green, unsigned char blue,
+             unsigned short *imageMem = 0 ,
+             unsigned short  imageWidth = 0,
+             unsigned short  imageHeight = 0 );
+
 
    // render anti-aliased alphamap in specified color to display with clipping
    // always displays top left of source image.

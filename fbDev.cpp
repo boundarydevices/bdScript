@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.22  2004-05-05 03:19:01  ericn
+ * Revision 1.23  2004-05-08 14:23:02  ericn
+ * -added drawing primitives to image object
+ *
+ * Revision 1.22  2004/05/05 03:19:01  ericn
  * -add render and antialias into image
  *
  * Revision 1.21  2004/03/17 04:56:19  ericn
@@ -801,43 +804,68 @@ void fbDevice_t :: render
 void fbDevice_t :: rect
    ( unsigned short x1, unsigned short y1,
      unsigned short x2, unsigned short y2,
-     unsigned char red, unsigned char green, unsigned char blue )
+     unsigned char red, unsigned char green, unsigned char blue,
+     unsigned short *imageMem,
+     unsigned short  imageWidth,
+     unsigned short  imageHeight )
 {
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )
       swap( y1, y2 );
-   
-   if( ( x1 < getWidth() ) && ( y1 < getHeight() ) )
+   if( 0 == imageMem )
+      imageMem = (unsigned short*)getMem();
+   if( 0 == imageWidth )
+      imageWidth = getWidth();
+   if( 0 == imageHeight )
+      imageHeight = getHeight();
+
+   if( ( x1 < imageWidth ) && ( y1 < imageHeight ) )
    {
-      if( x2 >= getWidth() )
-         x2 = getWidth() - 1 ;
+      if( x2 >= imageWidth )
+         x2 = imageWidth - 1 ;
       unsigned short const w = x2 - x1 + 1 ;
 
-      if( y2 >= getHeight() )
-         y2 = getHeight() - 1 ;
+      if( y2 >= imageHeight )
+         y2 = imageHeight - 1 ;
 
       unsigned short const rgb = get16( red, green, blue );
 #ifdef CONFIG_BD2003
-      unsigned short *row = getRow( y1 ) + x1 ;
-      unsigned short *endRow = row + ( y2 - y1 ) * getWidth();
+      unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
+      unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
       while( row <= endRow )
       {
          unsigned short *next = row ;
          unsigned short * const endLine = next + w ;
          while( next < endLine )
             *next++ = rgb ;
-         row += getWidth();
+         row += imageWidth ;
       }
-#else 
-      for( unsigned y = y1 ; y <= y2 ; y++ )
+#else
+      if( imageMem == (unsigned short*)getMem() )
       {
-         for( unsigned x = x1 ; x <= x2 ; x++ )
+         for( unsigned y = y1 ; y <= y2 ; y++ )
          {
-            setPixel( x, y, rgb );
+            for( unsigned x = x1 ; x <= x2 ; x++ )
+            {
+               setPixel( x, y, rgb );
+            }
+         }
+         refresh();
+      }
+      else
+      {
+         unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
+         unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
+         while( row <= endRow )
+         {
+            unsigned short *next = row ;
+            unsigned short * const endLine = next + w ;
+            while( next < endLine )
+               *next++ = rgb ;
+            row += imageWidth ;
          }
       }
-      refresh();
 #endif
    } // something is visible
 }
@@ -846,20 +874,29 @@ void fbDevice_t :: line
    ( unsigned short x1, unsigned short y1,
      unsigned short x2, unsigned short y2,
      unsigned char penWidth,
-     unsigned char red, unsigned char green, unsigned char blue )
+     unsigned char red, unsigned char green, unsigned char blue,
+     unsigned short *imageMem,
+     unsigned short  imageWidth,
+     unsigned short  imageHeight )
 {
    if( 0 < penWidth )
    {
+      if( 0 == imageMem )
+         imageMem = (unsigned short*)getMem();
+      if( 0 == imageWidth )
+         imageWidth = getWidth();
+      if( 0 == imageHeight )
+         imageHeight = getHeight();
       unsigned short const rgb = get16( red, green, blue );
       if( y1 == y2 )
       {
-         if( y1 < getHeight()  )
-            rect( x1, y1, x2, y1+penWidth-1, red, green, blue );
+         if( y1 < imageHeight  )
+            rect( x1, y1, x2, y1+penWidth-1, red, green, blue, imageMem, imageWidth, imageHeight );
       } // horizontal
       else if( x1 == x2 )
       {
-         if( x1 < getWidth() )
-            rect( x1, y1, x1+penWidth-1, y2, red, green, blue );
+         if( x1 < imageWidth )
+            rect( x1, y1, x1+penWidth-1, y2, red, green, blue, imageMem, imageWidth, imageHeight );
       } // vertical
       else
          fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
@@ -871,7 +908,10 @@ void fbDevice_t :: box
    ( unsigned short x1, unsigned short y1,
      unsigned short x2, unsigned short y2,
      unsigned char penWidth,
-     unsigned char red, unsigned char green, unsigned char blue )
+     unsigned char red, unsigned char green, unsigned char blue,
+     unsigned short *imageMem,
+     unsigned short  imageWidth,
+     unsigned short  imageHeight )
 {
    unsigned short const rgb = get16( red, green, blue );
 
@@ -880,19 +920,26 @@ void fbDevice_t :: box
    if( y1 > y2 )
       swap( y1, y2 );
 
-   if( ( y1 < getHeight() )
+   if( 0 == imageMem )
+      imageMem = (unsigned short*)getMem();
+   if( 0 == imageWidth )
+      imageWidth = getWidth();
+   if( 0 == imageHeight )
+      imageHeight = getHeight();
+
+   if( ( y1 < imageHeight )
        &&
-       ( x1 < getWidth() ) )
+       ( x1 < imageWidth ) )
    {
       // draw vertical lines
-      line( x1, y1, x1, y2, penWidth, red, green, blue );
+      line( x1, y1, x1, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
       x2 = x2 - penWidth + 1 ;
-      line( x2, y1, x2, y2, penWidth, red, green, blue );
+      line( x2, y1, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
 
       // horizontal lines
-      line( x1, y1, x2, y1, penWidth, red, green, blue );
+      line( x1, y1, x2, y1, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
       y2 = y2 - penWidth + 1 ;
-      line( x1, y2, x2, y2, penWidth, red, green, blue );
+      line( x1, y2, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
    } // something is visible
 }
 
