@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.52  2003-08-23 02:50:26  ericn
+ * Revision 1.53  2003-08-24 17:30:31  ericn
+ * -added child process control (sort of)
+ *
+ * Revision 1.52  2003/08/23 02:50:26  ericn
  * -added Javascript ping support
  *
  * Revision 1.51  2003/08/20 02:54:02  ericn
@@ -219,6 +222,7 @@
 #include "jsSniffWLAN.h"
 #include "jsMonWLAN.h"
 #include "jsPing.h"
+#include "jsProcess.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -362,6 +366,7 @@ int prMain(int argc, char **argv)
                      initSniffWLAN( cx, glob );
                      initMonitorWLAN( cx, glob );
                      initPing( cx, glob );
+                     initJSProcess( cx, glob );
 
                      getCurlCache();
 
