@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.1  2004-02-01 09:53:18  ericn
+ * Revision 1.2  2004-02-03 06:11:12  ericn
+ * -allow empty strings
+ *
+ * Revision 1.1  2004/02/01 09:53:18  ericn
  * -Initial import
  *
  *
@@ -239,7 +242,7 @@ bool varIter_t::next
       } // data char
    }
 
-   if( ( 0 < nameLen ) && ( 0 < dataLen ) )
+   if( ( 0 < nameLen ) && ( done == state ) )
    {
       return true ;
    }
