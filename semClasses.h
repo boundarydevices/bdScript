@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.1 2002-10-27 17:42:08 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.2 2002-10-31 02:04:42 ericn Exp $"
 
 /*
  * semaphore.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-10-31 02:04:42  ericn
+ * -modified to compile on ARM
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -57,7 +60,7 @@ public:
    //
    condition_t( void ){ pthread_cond_init( &handle_, 0 ); }
    ~condition_t( void ){ pthread_cond_destroy( &handle_ ); }
-    
+
    //
    // wait-side routines. 
    //
@@ -105,7 +108,10 @@ inline bool condition_t :: wait
       now.tv_sec  += now.tv_usec / 1000000 ;
       now.tv_usec  = now.tv_usec % 1000000 ;
    }
-   timespec then ; TIMEVAL_TO_TIMESPEC( &now, &then );
+   timespec then ; 
+   
+   then.tv_sec  = now.tv_sec ;
+   then.tv_nsec = now.tv_usec*1000 ;
    
    if( 0 == pthread_cond_timedwait( &handle_, &lock.handle_, &then ) )
    {
