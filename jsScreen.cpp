@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.2  2002-10-20 16:30:49  ericn
+ * Revision 1.3  2002-10-31 02:08:10  ericn
+ * -made screen object, got rid of bare clearScreen method
+ *
+ * Revision 1.2  2002/10/20 16:30:49  ericn
  * -modified to allow clear to specified color
  *
  * Revision 1.1  2002/10/18 01:18:25  ericn
@@ -22,6 +25,10 @@
 #include "jsScreen.h"
 #include "fbDev.h"
 #include <string.h>
+#include "js/jsstddef.h"
+#include "js/jscntxt.h"
+#include "js/jsapi.h"
+#include "js/jslock.h"
 
 static JSBool
 jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -49,14 +56,77 @@ jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    return JS_TRUE ;
 }
 
-static JSFunctionSpec image_functions[] = {
-    {"clearScreen",      jsClearScreen, 1 },
-    {0}
+enum jsScreen_tinyId {
+   SCREEN_WIDTH, 
+   SCREEN_HEIGHT, 
+   SCREEN_PIXBUF,
+};
+
+extern JSClass jsScreenClass_ ;
+
+JSClass jsScreenClass_ = {
+  "Screen",
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSPropertySpec screenProperties_[] = {
+  {"width",         SCREEN_WIDTH,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"height",        SCREEN_HEIGHT,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {0,0,0}
 };
 
 
+//
+// constructor for the screen object
+//
+static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   obj = js_NewObject( cx, &jsScreenClass_, NULL, NULL );
+
+   if( obj )
+   {
+      fbDevice_t &fb = getFB();
+      
+      JS_DefineProperty( cx, obj, "width",
+                         INT_TO_JSVAL( fb.getWidth() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( cx, obj, "height", 
+                         INT_TO_JSVAL( fb.getHeight() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      *rval = OBJECT_TO_JSVAL(obj);
+   }
+   else
+      *rval = JSVAL_FALSE ;
+   
+   return JS_TRUE;
+}
+
+static JSFunctionSpec screen_methods[] = {
+   { "clear",        jsClearScreen,      0,0,0 },
+   { 0 }
+};
+
 bool initJSScreen( JSContext *cx, JSObject *glob )
 {
-   return JS_DefineFunctions( cx, glob, image_functions);
+   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsScreenClass_,
+                                  jsScreen, 1,
+                                  screenProperties_, 
+                                  screen_methods,
+                                  0, 0 );
+   if( rval )
+   {
+      return true ;
+   }
+   else
+      return false ;
 }
 
