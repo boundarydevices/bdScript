@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.65  2003-11-30 16:45:53  ericn
+ * Revision 1.66  2003-12-27 18:38:31  ericn
+ * -added pollTimer reference
+ *
+ * Revision 1.65  2003/11/30 16:45:53  ericn
  * -kernel and JFFS2 upgrade support
  *
  * Revision 1.64  2003/11/28 14:11:18  ericn
@@ -263,6 +266,7 @@
 #include "md5.h"
 #include "jsUDP.h"
 #include "jsKernel.h"
+#include "pollTimer.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -483,6 +487,7 @@ int prMain(int argc, char **argv)
                {
                   if( JS_DefineFunctions( cx, glob, shell_functions) )
                   {
+                     getTimerPoll( pollHandlers_ );
                      initJSTimer( cx, glob );
                      initJSScreen( cx, glob );
                      initJSText( cx, glob );
