@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: cbmImage.cpp,v $
- * Revision 1.2  2003-06-26 08:01:33  tkisky
+ * Revision 1.3  2003-06-26 08:44:46  tkisky
+ * -whoops, length fix
+ *
+ * Revision 1.2  2003/06/26 08:01:33  tkisky
  * -fix last segment bugs
  *
  * Revision 1.1  2003/05/26 22:08:19  ericn
@@ -60,7 +63,7 @@ cbmImage_t :: cbmImage_t( unsigned short widthPix,
      rowsLastSegment_( (((actualHeight_-1) % rowsPerSegment_)+1+7)&~7 ),
      numSegments_( (actualHeight_+rowsPerSegment_-1)/rowsPerSegment_ ),
      bytesPerSegment_( (rowsPerSegment_*actualWidth_/8) + headerLen + trailerLen ),
-     length_( bytesPerSegment_*numSegments_ ),
+     length_( bytesPerSegment_*numSegments_ -  ((rowsPerSegment_ - rowsLastSegment_) /8)*actualWidth_),
      data_( new unsigned char[ length_ ] )
 {
    memset( data_, 0, length_ );
