@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUDP.cpp,v $
- * Revision 1.1  2003-09-10 04:56:30  ericn
+ * Revision 1.2  2003-11-04 00:41:24  tkisky
+ * -htons
+ *
+ * Revision 1.1  2003/09/10 04:56:30  ericn
  * -Added UDP support
  *
  *
@@ -80,11 +83,11 @@ static JSBool jsUDPSendTo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
    if( 0 != udpSocket )
    {
       if( ( 3 == argc )
-          && 
-          JSVAL_IS_STRING( argv[0] ) 
-          && 
-          JSVAL_IS_INT( argv[1] ) 
-          && 
+          &&
+          JSVAL_IS_STRING( argv[0] )
+          &&
+          JSVAL_IS_INT( argv[1] )
+          &&
           JSVAL_IS_STRING( argv[2] ) )
       {
          int const targetIP = inet_addr( JS_GetStringBytes( JSVAL_TO_STRING( argv[0] ) ) );
@@ -94,7 +97,7 @@ static JSBool jsUDPSendTo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
             sockaddr_in remote ;
             remote.sin_family      = AF_INET ;
             remote.sin_addr.s_addr = targetIP ;
-            remote.sin_port        = targetPort ;
+            remote.sin_port        = htons(targetPort) ;
             JSString *const sData = JSVAL_TO_STRING( argv[2] );
             char const     *data = JS_GetStringBytes( sData );
             unsigned const  dataLen = JS_GetStringLength( sData );
@@ -146,7 +149,7 @@ static void *recvThread( void *arg )
             mutexLock_t lock( execMutex_ );
             udpSocket.msg_ = STRING_TO_JSVAL( JS_NewStringCopyN( execContext_, rxBuf, numRx ) );
             udpSocket.senderIp_ = STRING_TO_JSVAL( JS_NewStringCopyZ( execContext_, inet_ntoa( from.sin_addr ) ) );
-            udpSocket.senderPort_ = INT_TO_JSVAL( from.sin_port );
+            udpSocket.senderPort_ = INT_TO_JSVAL( ntohs(from.sin_port) );
             jsval args[3] = {
                udpSocket.msg_,
                udpSocket.senderIp_,
@@ -166,11 +169,11 @@ static JSBool jsUDP( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 {
    *rval = JSVAL_FALSE ;
    if( ( 1 == argc )
-       && 
+       &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
       JSObject *thisObj = JS_NewObject( cx, &jsUDPClass_, NULL, NULL );
-   
+
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
@@ -190,7 +193,7 @@ static JSBool jsUDP( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
             sockInfo->senderIp_   = JSVAL_VOID ;
             sockInfo->senderPort_ = JSVAL_VOID ;
             sockInfo->cx_         = cx ;
-   
+
             JSObject *rhObj = JSVAL_TO_OBJECT( argv[0] );
             if( rhObj )
             {
@@ -201,9 +204,9 @@ static JSBool jsUDP( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                {
                   sockInfo->port_ = JSVAL_TO_INT( jsv );
                   sockaddr_in myAddress ;
-         
+
                   memset( &myAddress, 0, sizeof( myAddress ) );
-            
+
                   myAddress.sin_family      = AF_INET;
                   myAddress.sin_addr.s_addr = 0 ; // local
                   myAddress.sin_port        = htons( sockInfo->port_ );

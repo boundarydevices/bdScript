@@ -29,7 +29,7 @@ int main( int argc, char const * const argv[] )
                sockaddr_in local ;
                local.sin_family = AF_INET ;
                local.sin_addr.s_addr = INADDR_ANY ;
-               local.sin_port   = localPort ;
+               local.sin_port   = htons(localPort) ;
                if( 0 == bind( sFd, (struct sockaddr *) &local, sizeof( local ) ) )
                {
                   char * const rxBuf = new char [ RXSIZE ];

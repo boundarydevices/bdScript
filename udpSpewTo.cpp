@@ -30,7 +30,7 @@ int main( int argc, char const * const argv[] )
                sockaddr_in remote ;
                remote.sin_family = AF_INET ;
                remote.sin_addr   = targetIP ;
-               remote.sin_port   = targetPort ;
+               remote.sin_port   = htons(targetPort) ;
 
                unsigned char * const sendBuf = new unsigned char [ SENDSIZE ];
                char cNext = '0' ;

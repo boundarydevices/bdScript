@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.16  2003-11-02 17:59:06  ericn
+ * Revision 1.17  2003-11-04 00:40:12  tkisky
+ * -htons
+ *
+ * Revision 1.16  2003/11/02 17:59:06  ericn
  * -added symbol scanner support
  *
  * Revision 1.15  2003/10/31 13:57:57  ericn
@@ -1161,7 +1164,7 @@ int main( int argc, char const * const argv[] )
          sockaddr_in remote ;
          remote.sin_family      = AF_INET ;
          remote.sin_addr.s_addr = targetIP ;
-         remote.sin_port        = targetPort ;
+         remote.sin_port        = htons(targetPort) ;
 
          int mixerFd = open( "/dev/mixer", O_RDWR );
          if( 0 <= mixerFd )
@@ -1171,7 +1174,7 @@ int main( int argc, char const * const argv[] )
                printf( "record boost is now %d\n", recordLevel );
             else
                perror( "set boost" );
-            
+
             recordLevel = 0x6464 ;
             if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_IGAIN ), &recordLevel ) )
                printf( "igain was %d\n", recordLevel );
@@ -1247,10 +1250,10 @@ int main( int argc, char const * const argv[] )
                            sockaddr_in local ;
                            local.sin_family      = AF_INET ;
                            local.sin_addr.s_addr = INADDR_ANY ;
-                           local.sin_port        = 0x2020 ;
+                           local.sin_port        = htons(0x2020) ;
                            bind( udpSock, (struct sockaddr *)&local, sizeof( local ) );
 
-                           threadParam_t audioParams ; 
+                           threadParam_t audioParams ;
                            audioParams.remote_ = remote ;
                            audioParams.mediaFd_ = fdAudio ;
                            audioParams.udpSock_ = udpSock ;
