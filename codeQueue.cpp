@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.6  2002-12-01 03:14:42  ericn
+ * Revision 1.7  2002-12-01 14:58:51  ericn
+ * -changed queue to only deal with callbacks
+ *
+ * Revision 1.6  2002/12/01 03:14:42  ericn
  * -added executeCode() method for handlers
  *
  * Revision 1.5  2002/12/01 02:42:08  ericn
@@ -46,38 +49,11 @@ struct callbackAndData_t {
    void      *cbData_ ;
 };
 
-struct callbackOrScript_t {
-   bool isCallback_ ;
-   union {
-      callbackAndData_t cb_ ;
-      scriptAndScope_t  ss_ ;
-   } u_ ;
-};
-
-typedef mtQueue_t<callbackOrScript_t> codeList_t ;
+typedef mtQueue_t<callbackAndData_t> codeList_t ;
 
 static JSContext  *context_ = 0 ;
 static JSObject   *global_ = 0 ;
 static codeList_t  codeList_ ;
-
-bool queueSource( JSObject   *scope,
-                  jsval       sourceCode,
-                  char const *sourceFile )
-{
-   callbackOrScript_t cbs ;
-   cbs.isCallback_    = false ;
-   cbs.u_.ss_.script_ = sourceCode ;
-   cbs.u_.ss_.scope_  = scope ;
-   cbs.u_.ss_.source_ = sourceFile ;
-
-   bool const worked = codeList_.push( cbs );
-   if( worked )
-      return true ;
-   else
-      fprintf( stderr, "Error queueing code\n" );
-
-   return false ;
-}
 
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
@@ -107,7 +83,7 @@ void executeCode( JSObject   *scope,
       JS_ReportError( context_, "reading script from %s", sourceFile );
 }
 
-static void runAndUnlock( void *scriptAndScope )
+static void runUnrootAndFree( void *scriptAndScope )
 {
    scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
    executeCode( ss->scope_, ss->script_, ss->source_ );
@@ -116,15 +92,22 @@ static void runAndUnlock( void *scriptAndScope )
    delete ss ;
 }
 
+static void runAndFree( void *scriptAndScope )
+{
+   scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
+   executeCode( ss->scope_, ss->script_, ss->source_ );
+
+   delete ss ;
+}
+
 bool queueCallback( callback_t callback,
                     void      *cbData )
 {
-   callbackOrScript_t cbs ;
-   cbs.isCallback_      = true ;
-   cbs.u_.cb_.callback_ = callback ;
-   cbs.u_.cb_.cbData_   = cbData ;
+   callbackAndData_t cbd ;
+   cbd.callback_ = callback ;
+   cbd.cbData_   = cbData ;
 
-   bool const worked = codeList_.push( cbs );
+   bool const worked = codeList_.push( cbd );
    if( worked )
    {
       return true ;
@@ -146,8 +129,22 @@ bool queueUnrootedSource( JSObject   *scope,
    newSS->source_ = sourceFile ;
 
    JS_AddRoot( context_, &newSS->script_ );
-   return queueCallback( runAndUnlock, newSS );
+   return queueCallback( runUnrootAndFree, newSS );
 }
+
+
+bool queueSource( JSObject   *scope,
+                  jsval       sourceCode,
+                  char const *sourceFile )
+{
+   scriptAndScope_t *newSS = new scriptAndScope_t ;
+   newSS->script_ = sourceCode ;
+   newSS->scope_  = scope ;
+   newSS->source_ = sourceFile ;
+
+   return queueCallback( runAndFree, newSS );
+}
+
 
 //
 // returns true and a string full of bytecode if
@@ -161,44 +158,14 @@ void pollCodeQueue( JSContext *cx,
 
    for( unsigned i = 0 ; i < iterations ; i++ )
    {
-      callbackOrScript_t cbs ;
+      callbackAndData_t cbd ;
       bool const result = ( 0xFFFFFFFF == milliseconds )
-                          ? codeList_.pull( cbs )
-                          : codeList_.pull( cbs, milliseconds );
+                          ? codeList_.pull( cbd )
+                          : codeList_.pull( cbd, milliseconds );
       if( result )
       {
-         if( cbs.isCallback_ )
-         {
-            cbs.u_.cb_.callback_( cbs.u_.cb_.cbData_ );
-         }
-         else
-         {
-            mutexLock_t lock( execMutex_ );
-
-            JSString *sVal ;
-            if( JSVAL_IS_STRING( cbs.u_.ss_.script_ ) 
-                &&
-                ( 0 != ( sVal = JSVAL_TO_STRING( cbs.u_.ss_.script_ ) ) ) )
-            {
-               JSScript *scr = JS_CompileScript( cx, cbs.u_.ss_.scope_, 
-                                                 JS_GetStringBytes( sVal ), 
-                                                 JS_GetStringLength( sVal ), 
-                                                 cbs.u_.ss_.source_, 1 );
-               if( scr )
-               {
-                  jsval rval; 
-                  JSBool const exec = JS_ExecuteScript( cx, cbs.u_.ss_.scope_, scr, &rval );
-                  JS_DestroyScript( cx, scr );
-                  if( !exec )
-                     fprintf( stderr, "error executing code\n" );
-               }
-               else
-                  fprintf( stderr, "Compiling %s code", cbs.u_.ss_.script_ );
-            }
-            else
-               fprintf( stderr, "Invalid script ptr\n" );
-         }
-
+         cbd.callback_( cbd.cbData_ );
+         
          if( gotoCalled_ )
             break;
       }
