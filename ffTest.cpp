@@ -174,6 +174,7 @@ int main( int argc, char const * const argv[] )
                {
                   case mpegDemux_t::videoFrame_e :
                   {
+long long const start = tickMs();
                      mpegDecoder_t videoDecode ;
                      fbDevice_t    &fb = getFB();
                      videoQueue_t  *vidQueue = 0 ;
@@ -192,8 +193,8 @@ int main( int argc, char const * const argv[] )
                         mpegDecoder_t::picType_e type ;
                         while( videoDecode.getPicture( picture, type, videoDecode.ptAll_e ) )
                         {
-static char const picTypes_[] = { 'I', 'P', 'B', 'D' };
-printf( "%c", picTypes_[type] ); fflush( stdout );
+//static char const picTypes_[] = { 'I', 'P', 'B', 'D' };
+//printf( "%c", picTypes_[type] ); fflush( stdout );
                            if( 0 == vidQueue )
                            {
                               firstPTS = lastPTS ;
@@ -255,9 +256,11 @@ printf( "%c", picTypes_[type] ); fflush( stdout );
                               fprintf( stderr, "video allocation error\n" );
                         }
                      }
-                     printf( "-- %u frames discarded\n", vidQueue->discards_ );
-                     printf( "first video PTS %llu\n", firstPTS );
-                     printf( "last video PTS %llu\n", lastPTS );
+long long const end = tickMs();
+                     unsigned long long msElapsed = end-start ;
+                     printf( "%llu.%03llu seconds elapsed\n", msElapsed / 1000, msElapsed % 1000 );
+                     msElapsed = lastPTS-firstPTS ;
+                     printf( "%llu.%03llu seconds of video\n", msElapsed / 1000, msElapsed % 1000 );
                      break;
                   }
    
