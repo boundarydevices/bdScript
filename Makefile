@@ -65,10 +65,10 @@ testJS: testJS.o $(LIB)
 	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	$(STRIP) testJS
 
-testEvents: testEvents.o $(LIB)
-	$(CC) -o testEvents testEvents.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
-	arm-linux-nm testEvents >testEvents.map
-	$(STRIP) testEvents
+jsExec: jsExec.o $(LIB)
+	$(CC) -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	arm-linux-nm jsExec >jsExec.map
+	$(STRIP) jsExec
 
 ftRender.o: ftObjs.h ftObjs.cpp Makefile
 	$(CC) -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
@@ -94,7 +94,7 @@ madHeaders: madHeadersMain.o Makefile $(LIB)
 	arm-linux-nm madHeaders >madHeaders.map
 	$(STRIP) madHeaders
 
-all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
+all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
 .PHONY: install-libs install-headers
 
@@ -108,9 +108,9 @@ install-headers:
 	cp -f -v $(shared-headers) $(INSTALL_ROOT)/include
 
 install-bin:
-	cp -f -v testEvents $(INSTALL_ROOT)/bin
+	cp -f -v jsExec $(INSTALL_ROOT)/bin
 
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
