@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.45  2003-07-06 01:22:15  ericn
+ * Revision 1.46  2003-07-20 15:41:46  ericn
+ * -removed debug msg
+ *
+ * Revision 1.45  2003/07/06 01:22:15  ericn
  * -added exit() support
  *
  * Revision 1.44  2003/07/03 14:08:00  ericn
@@ -385,7 +388,6 @@ int prMain(int argc, char **argv)
                                  }
                                  else 
                                  {
-printf( "exit not requested\n" );
                                     mutexLock_t lock( execMutex_ );
                                     JS_GC( cx );
                                  }
