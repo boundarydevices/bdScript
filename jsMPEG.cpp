@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.7  2003-08-03 14:41:49  ericn
+ * Revision 1.8  2004-10-30 19:37:14  ericn
+ * -accept all picture types
+ *
+ * Revision 1.7  2003/08/03 14:41:49  ericn
  * -fixed return value from release() call
  *
  * Revision 1.6  2003/08/02 19:29:36  ericn
@@ -273,7 +276,7 @@ static void mpegOnComplete( jsCurlRequest_t &req, void const *data, unsigned lon
                   void const *picture ;
                   mpegDecoder_t::picType_e type ;
 // if( 10 < i ){ printf( "getPicture %u\n", i ); fflush( stdout ); sleep( 1 ); }
-                  while( decoder.getPicture( picture, type, 0 ) )
+                  while( decoder.getPicture( picture, type ) )
                   {
                      if( decoder.haveHeader() )
                      {
