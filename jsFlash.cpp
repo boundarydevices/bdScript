@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.5  2003-11-24 19:42:05  ericn
+ * Revision 1.6  2003-11-28 14:57:41  ericn
+ * -fixed shutdown dependencies by controlling parsedFlash_t lifetime, use prototype for construction
+ *
+ * Revision 1.5  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.4  2003/11/15 17:45:03  ericn
@@ -45,8 +48,11 @@
 #include "parsedFlash.h"
 #include "audioQueue.h"
 #include "jsGlobals.h"
+#include "debugPrint.h"
 
 extern JSClass jsFlashClass_ ;
+static JSObject *glob_ = 0 ;
+static jsval     flashProto_ = JSVAL_VOID ;
 
 class flashPollHandler_t : public pollHandler_t {
 public:
@@ -115,19 +121,20 @@ struct flashPrivate_t {
                    unsigned      bgColor );
    ~flashPrivate_t( void );
 
-   bool worked( void ) const { return flashData_.worked() && thread_->isAlive(); }
+   bool worked( void ) const { return flashData_->worked() && thread_->isAlive(); }
    inline void start( void ){ if( thread_ ) thread_->start(); }
    inline void stop( void ){ if( thread_ ) thread_->stop(); }
    inline void pause( void ){ if( thread_ ) thread_->pause(); }
 
-   FlashInfo const &getFlashInfo( void ) const { return flashData_.flashInfo(); }
+   FlashInfo const &getFlashInfo( void ) const { return flashData_->flashInfo(); }
    flashPollHandler_t *getPollHandler( void ){ return pollHandler_ ; }
 
 private:
+   flashPrivate_t( flashPrivate_t const & ); // no copies
    JSContext *const    cx_ ;
    JSObject  *const    obj_ ;
    unsigned long const cacheHandle_ ;
-   parsedFlash_t       flashData_ ;
+   parsedFlash_t      *flashData_ ;
    unsigned      const x_ ;
    unsigned      const y_ ;
    unsigned      const w_ ;
@@ -151,7 +158,7 @@ flashPrivate_t :: flashPrivate_t
    : cx_( cx )
    , obj_( obj )
    , cacheHandle_( cacheHandle )
-   , flashData_( data, bytes )
+   , flashData_( new parsedFlash_t( data, bytes ) )
    , x_( x )
    , y_( y )
    , w_( w )
@@ -160,9 +167,9 @@ flashPrivate_t :: flashPrivate_t
    , thread_( 0 )
    , pollHandler_( 0 )
 {
-   if( flashData_.worked() )
+   if( flashData_->worked() )
    {
-      thread_ = new flashThread_t( flashData_, x_, y_, w_, h_, bgColor_, false );
+      thread_ = new flashThread_t( *flashData_, x_, y_, w_, h_, bgColor_, false );
       if( ( 0 != thread_ ) && thread_->isAlive() )
       {
          pollHandler_ = new flashPollHandler_t( cx, obj, thread_->eventReadFd(), pollHandlers_ );
@@ -170,18 +177,22 @@ flashPrivate_t :: flashPrivate_t
          pollHandlers_.add( *pollHandler_ );
       }
    }
+   getCurlCache().addRef( cacheHandle_ );
 }
 
 flashPrivate_t :: ~flashPrivate_t( void )
 {
-   if( pollHandler_ )
-      delete pollHandler_ ;
-
    if( thread_ )
    {
       delete thread_ ;
       thread_ = 0 ;
    }
+
+   if( pollHandler_ )
+      delete pollHandler_ ;
+
+   delete flashData_ ;
+   getCurlCache().closeHandle( cacheHandle_ );
 }
 
 static JSBool
@@ -190,7 +201,6 @@ jsFlashPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    *rval = JSVAL_FALSE ;
 
    flashPrivate_t * const priv = (flashPrivate_t *)JS_GetInstancePrivate( cx, obj, &jsFlashClass_, NULL );
-   
    if( ( 0 != priv ) && priv->worked() )
    {
       flashPollHandler_t *const handler = priv->getPollHandler();
@@ -205,8 +215,7 @@ jsFlashPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
              &&
              ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
          {
-            jsval     val ;
-            JSString *sHandler ;
+            jsval val ;
             
             if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
                 &&
@@ -253,6 +262,7 @@ jsFlashStop( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 static JSBool
 jsFlashRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   *rval = JSVAL_FALSE ;
    if( obj )
    {
       flashPrivate_t * const privData = (flashPrivate_t *)JS_GetInstancePrivate( cx, obj, &jsFlashClass_, NULL );
@@ -268,12 +278,12 @@ jsFlashRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
-printf( "releasing flash\n" );
-         privData->~flashPrivate_t();
+         delete privData ;
+         *rval = JSVAL_TRUE ;
 
-         JS_free( cx, privData );
       }
    }
+   
    return JS_TRUE ;
 }
 
@@ -329,7 +339,6 @@ static char const * const cObjectTypes[] = {
 
 static void flashMovieOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   void * const privMem = JS_malloc( req.cx_, sizeof( flashPrivate_t ) );
    fbDevice_t &fb = getFB();
    unsigned x = 0, y = 0, width = fb.getWidth(), height = fb.getHeight(), bgColor = 0 ;
    jsval val ;
@@ -344,12 +353,12 @@ static void flashMovieOnComplete( jsCurlRequest_t &req, void const *data, unsign
    if( JS_GetProperty( req.cx_, req.lhObj_, "bgColor", &val ) && JSVAL_IS_INT( val ) )
       bgColor = JSVAL_TO_INT( val );
          
-   flashPrivate_t * const privData = new (privMem)flashPrivate_t( req.cx_, 
-                                                                  req.lhObj_, 
-                                                                  req.handle_, 
-                                                                  data, 
-                                                                  size,
-                                                                  x, y, width, height, bgColor ); // placement new
+   flashPrivate_t * const privData = new flashPrivate_t( req.cx_, 
+                                                         req.lhObj_, 
+                                                         req.handle_, 
+                                                         data, 
+                                                         size,
+                                                         x, y, width, height, bgColor ); // placement new
    JS_SetPrivate( req.cx_, req.lhObj_, privData );
 
    if( privData->worked() )
@@ -401,21 +410,19 @@ static void jsFlashFinalize(JSContext *cx, JSObject *obj)
       if( 0 != privData )
       {
          JS_SetPrivate( cx, obj, 0 );
-printf( "destroying flashPrivate_t\n" );
-         privData->~flashPrivate_t();
-         JS_free( cx, privData );
+         delete privData ;
       }
    }
 }
 
 static JSBool flashMovie( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   *rval = JSVAL_FALSE ;
    if( ( 1 == argc ) 
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = JS_NewObject( cx, &jsFlashClass_, NULL, NULL );
-
+      JSObject *thisObj = JS_NewObject( cx, &jsFlashClass_, JSVAL_TO_OBJECT(flashProto_), obj );
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
@@ -501,11 +508,20 @@ static JSBool flashMovie( JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 
 bool initJSFlash( JSContext *cx, JSObject *glob )
 {
+   JS_AddRoot( cx, &flashProto_ );
+
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsFlashClass_,
                                   flashMovie, 1,
                                   flashMovieProperties_, 
                                   flashMovieMethods_,
                                   0, 0 );
+   if( rval )
+   {
+      flashProto_ = OBJECT_TO_JSVAL( rval );
+   }
+   else
+      JS_ReportError( cx, "initializing flashMovie class\n" );
+   glob_ = glob ;
    return ( 0 != rval );
 }
 
