@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.32  2003-02-27 03:51:09  ericn
+ * Revision 1.33  2003-03-04 14:45:18  ericn
+ * -added jsFileIO module
+ *
+ * Revision 1.32  2003/02/27 03:51:09  ericn
  * -added exec routine
  *
  * Revision 1.31  2003/01/31 13:29:43  ericn
@@ -147,6 +150,7 @@
 #include "jsTTY.h"
 #include "jsUse.h"
 #include "jsURL.h"
+#include "jsFileIO.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -279,6 +283,7 @@ int prMain(int argc, char **argv)
                      initJSTTY( cx, glob );
                      initJSUse( cx, glob );
                      initJSURL( cx, glob );
+                     initJSFileIO( cx, glob );
 
                      getCurlCache();
 
