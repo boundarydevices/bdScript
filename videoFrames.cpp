@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: videoFrames.cpp,v $
- * Revision 1.1  2003-07-27 15:19:12  ericn
+ * Revision 1.2  2004-10-30 18:48:52  ericn
+ * -use decoder's stride() method
+ *
+ * Revision 1.1  2003/07/27 15:19:12  ericn
  * -Initial import
  *
  *
@@ -79,7 +82,7 @@ bool videoFrames_t :: preload( void )
          entry->type_    = type ;
          unsigned char *dest = entry->data_ ;
          unsigned char const *src = (unsigned char *)picture ;
-         unsigned const imgStride = decoder_.width()*2 ;
+         unsigned const imgStride = decoder_.stride();
          for( unsigned i = 0 ; i < queue_->height_ ; i++, dest += queue_->rowStride_, src += imgStride )
          {
             memcpy( dest, src, queue_->rowStride_ );
