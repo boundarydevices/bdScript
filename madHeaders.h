@@ -1,5 +1,5 @@
 #ifndef __MADHEADERS_H__
-#define __MADHEADERS_H__ "$Id: madHeaders.h,v 1.2 2002-11-05 15:14:01 ericn Exp $"
+#define __MADHEADERS_H__ "$Id: madHeaders.h,v 1.3 2002-11-24 19:06:55 ericn Exp $"
 
 /*
  * madHeaders.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: madHeaders.h,v $
- * Revision 1.2  2002-11-05 15:14:01  ericn
+ * Revision 1.3  2002-11-24 19:06:55  ericn
+ * -modified to use milliseconds, not seconds for output length
+ *
+ * Revision 1.2  2002/11/05 15:14:01  ericn
  * -changed name of method
  *
  * Revision 1.1  2002/11/05 05:42:15  ericn
@@ -38,13 +41,14 @@ public:
 
    mp3FrameSet_t const &frames( void ) const { return frames_ ; }
 
-   unsigned long lengthSeconds( void ) const { return numSeconds_ ; }
+   unsigned long lengthSeconds( void ) const { return lengthMilliseconds() / 1000 ; }
+   unsigned long lengthMilliseconds( void ) const { return numMilliseconds_ ; }
    unsigned long playbackRate( void ) const { return playbackRate_ ; }
    unsigned long numChannels( void ) const { return numChannels_ ; }
 
    bool          worked_ ;
    mp3FrameSet_t frames_ ;
-   unsigned long numSeconds_ ;
+   unsigned long numMilliseconds_ ;
    unsigned long playbackRate_ ;
    unsigned long numChannels_ ;
 };

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.4  2002-11-14 13:12:44  ericn
+ * Revision 1.5  2002-11-24 19:06:58  ericn
+ * -modified to use milliseconds, not seconds for output length
+ *
+ * Revision 1.4  2002/11/14 13:12:44  ericn
  * -modified to allow sounds < 1 second
  *
  * Revision 1.3  2002/11/07 02:13:55  ericn
@@ -46,7 +49,7 @@ madHeaders_t :: madHeaders_t
      unsigned long length )
    : worked_( false ),
      frames_(),
-     numSeconds_(0),
+     numMilliseconds_(0),
      playbackRate_(0),
      numChannels_(0)
 {
@@ -139,7 +142,21 @@ madHeaders_t :: madHeaders_t
              ( 0 < stats.channels );
    if( worked_ )
    {
-      numSeconds_   = stats.length.seconds ;
+      numMilliseconds_ = ( stats.length.seconds * 1000 );
+      //
+      // fractional part of mad_timer is in units of 1/MAD_TIMER_RESOLUTION
+      // but we want milliseconds.
+      //
+      //    fraction/MAD_TIMER_RESOLUTION = x/1000
+      //    x = 1000*fraction/MAD_TIMER_RESOLUTION
+      //
+      // but 1000*fraction may over-run a long int, so we'll
+      // divide both fraction and MAD_TIMER_RESOLUTION by 1024 
+      // first.
+      //
+      //    x = 1000*((fraction/1024)/(MAD_TIMER_RESOLUTION/1024))
+      //
+      numMilliseconds_ += (1000 * (stats.length.fraction/1024)) / (MAD_TIMER_RESOLUTION/1024);
       playbackRate_ = stats.freq ;
       numChannels_  = stats.channels ;
    }
