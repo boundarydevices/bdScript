@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: popen.cpp,v $
- * Revision 1.1  2002-12-09 15:21:11  ericn
+ * Revision 1.2  2002-12-10 04:10:02  ericn
+ * -fixed problems with timeout
+ *
+ * Revision 1.1  2002/12/09 15:21:11  ericn
  * -added module popen
  *
  *
@@ -99,11 +102,15 @@ bool popen_t :: getLine
             }
             else if( 0 != ( POLLERR & rdPoll.events ) )
             {
+               close( fd );
                break;
             }
          }
          else
+         {
+            close( fd );
             break;
+         }
       }
 
       pclose( fIn_ );
