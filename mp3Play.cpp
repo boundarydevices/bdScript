@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.1  2002-10-25 02:55:01  ericn
+ * Revision 1.2  2002-10-25 03:08:30  ericn
+ * -removed debug statements
+ *
+ * Revision 1.1  2002/10/25 02:55:01  ericn
  * -initial import
  *
  *
@@ -118,7 +121,6 @@ enum mad_flow output(void *data,
       if( pcm->channels != requestedChannels_ )
       {
          numChannels_ = requestedChannels_ = pcm->channels ;
-         printf( "changing #channels to %d\n", requestedChannels_ );
          if( 0 != ioctl( dspFd_, SNDCTL_DSP_CHANNELS, &numChannels_ ) )
          {
             fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%d:%m\n" );
@@ -126,7 +128,7 @@ enum mad_flow output(void *data,
          }
          if( requestedChannels_ != numChannels_ )
          {
-            printf( "%d channels not allowed, using %d\n", requestedChannels_, numChannels_ );
+            fprintf( stderr, "%d channels not allowed, using %d\n", requestedChannels_, numChannels_ );
             return MAD_FLOW_BREAK ;
          }
       }
@@ -134,9 +136,7 @@ enum mad_flow output(void *data,
       if( pcm->samplerate != sampleRate_ )
       {
          sampleRate_ = pcm->samplerate ;
-         if( 0 == ioctl( dspFd_, SNDCTL_DSP_SPEED, &sampleRate_ ) )
-            printf( "new sampling rate %d\n", sampleRate_ );
-         else
+         if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &sampleRate_ ) )
          {
             fprintf( stderr, "Error setting sampling rate to %d\n", sampleRate_ );
             return MAD_FLOW_BREAK ;
@@ -262,7 +262,6 @@ int main( int argc, char *argv[] )
                {
                   if( 0 == ioctl( dspFd_, SNDCTL_DSP_SPEED, &speed ) )
                   {
-   //                  printf( "initialized at %u samples/sec\n", speed );
                      break;
                   }
                   else
@@ -280,12 +279,6 @@ int main( int argc, char *argv[] )
                      audio_buf_info info ;
                      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &info ) )
                      {   
-/*
-                        printf( "frags %d\n"
-                                "fragsTotal %d\n"
-                                "fragSize %d\n"
-                                "bytes %d\n", info.fragments, info.fragstotal, info.fragsize, info.bytes );
-*/                                
                         fragSize = info.fragsize ;
                      }
                      else
@@ -294,10 +287,8 @@ int main( int argc, char *argv[] )
                         fprintf( stderr, "Error %m getting outBuffer stats\n" );
                      }
 
-//                     printf( "playing %lu bytes of audio\n", f.getSize() );
                      outBuffer = new unsigned short [ fragSize ];
                      spaceLeft = fragSize ;
-// printf( "spaceLeft %u\n", spaceLeft );
                      nice( -10 );
                      decode( (unsigned char *)f.getData(), f.getSize() );
                      

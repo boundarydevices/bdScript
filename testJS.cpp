@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.9  2002-10-25 02:20:05  ericn
+ * Revision 1.10  2002-10-25 03:07:16  ericn
+ * -removed debug statements
+ *
+ * Revision 1.9  2002/10/25 02:20:05  ericn
  * -added child process initialization calls
  *
  * Revision 1.8  2002/10/24 13:16:21  ericn
@@ -165,23 +168,26 @@ int main(int argc, char **argv)
    // initialize the JS run time, and return result in rt
    JSRuntime * const rt = JS_NewRuntime(2L * 1024L * 1024L);
  
-   printf( "allocated runtime\n" );
    // if rt does not have a value, end the program here
    if (!rt)
-     return 1;
+   {
+      fprintf( stderr, "Error initializing Javascript runtime\n" );
+      return 1;
+   }
  
    // create a context and associate it with the JS run time
    JSContext * const cx = JS_NewContext(rt, 8192);
  
-   printf( "allocated context\n" );
    // if cx does not have a value, end the program here
-   if (cx == NULL)
-     return 1;
+   if(cx == NULL)
+   {
+      fprintf( stderr, "Error initializing Javascript context\n" );
+      return 1;
+   }
  
    // create the global object here
    JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
  
-   printf( "created glob\n" );
    if( 0 != glob )
    {
       // initialize the built-in JS objects and the global object
@@ -202,58 +208,56 @@ int main(int argc, char **argv)
                initJSMP3( cx, glob );
                startChildMonitor();
 
-               printf( "initialized jsCurl and jsImage\n" );
-
                curlCache_t &cache = getCurlCache();
 
                for( int arg = 1 ; arg < argc ; arg++ )
                {
                   char const *url = argv[arg];
-                  printf( "evaluating %s\n", url );
+//                  printf( "evaluating %s\n", url );
                   curlFile_t f( cache.get( url, false ) );
                   if( f.isOpen() )
                   {
                      pushURL( f.getEffectiveURL() );
 
-                     printf( "opened url\n" );
+//                     printf( "opened url\n" );
                      
                      JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), url, 1 );
                      if( script )
                      {
-                        printf( "compiled script\n" );
+//                        printf( "compiled script\n" );
                         jsval rval; 
                         JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
                         if( exec )
                         {
-                           printf( "executed\n" );
+//                           printf( "executed\n" );
                         }
                         else
-                           printf( "exec error\n" );
+                           fprintf( stderr, "exec error %s\n", f.getEffectiveURL() );
                         JS_DestroyScript( cx, script );
                      }
                      else
-                        printf( "Error compiling script\n" );
+                        fprintf( stderr, "Error compiling script %s\n", f.getEffectiveURL() );
                      
                      popURL();
                   }
                   else
-                     printf( "Error opening url %s\n", url );
+                     fprintf( stderr, "Error opening url %s\n", url );
                }
 
                stopChildMonitor();  // stop trapping SIGCHLD signal
             
             }
             else
-               printf( "Error defining shell functions\n" );
+               fprintf( stderr, "Error defining Javascript shell functions\n" );
          }
          else
-            printf( "Error defining shell functions\n" );
+            fprintf( stderr, "Error defining Javascript shell functions\n" );
       }
       else
-         printf( "Error creating builtins\n" );
+         fprintf( stderr, "Error creating Javascript builtins\n" );
    }
    else
-      fprintf( stderr, "Error allocating global\n" );
+      fprintf( stderr, "Error allocating Javascript global\n" );
 
    JS_DestroyContext( cx );
 
