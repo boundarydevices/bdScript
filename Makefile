@@ -12,7 +12,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        ultodd.o box.o urlFile.o zOrder.o \
        cbmImage.o ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
        popen.o jsPopen.o jsCBM.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
-       jsFileIO.o jsExit.o mpegDecode.o mpDemux.o
+       jsFileIO.o jsExit.o mpegDecode.o mpDemux.o videoQueue.o videoFrames.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
@@ -178,12 +178,12 @@ ffPlay: ffPlay.cpp $(LIB)
 	$(STRIP) $@
 
 ffTest: ffTest.cpp $(LIB)
-	$(CC) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache -lavformat -lavcodec -lmpeg2 -lvo -lmad -lm -lz -lpthread -lmpeg2 -lCurlCache -lstdc++ -lvo 
+	$(CC) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache -lmpeg2 -lvo -lmad -lm -lz -lpthread -lmpeg2 -lCurlCache -lstdc++ -lvo 
 	$(NM) --demangle $@ | sort >$@.sym
 #	$(STRIP) $@
 
 mpDemux: mpDemux.cpp $(LIB)
-	$(CC) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lmpeg2 
+	$(CC) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lmpeg2
 	$(STRIP) $@
 
 mpeg2mp3: mpeg2mp3.cpp $(LIB)
