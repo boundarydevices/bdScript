@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.7  2002-10-25 02:53:33  ericn
+ * Revision 1.8  2002-10-25 04:51:20  ericn
+ * -modified to use only 1.5MB for cache
+ *
+ * Revision 1.7  2002/10/25 02:53:33  ericn
  * -moved non-Javascript URL stuff to relativeURL.cpp
  *
  * Revision 1.6  2002/10/24 13:18:25  ericn
@@ -665,7 +668,7 @@ static curlCache_t *cache_ = 0 ;
 curlCache_t &getCurlCache( void )
 {
    if( 0 == cache_ )
-      cache_ = new curlCache_t( "/tmp/curl", 8*(1<<20), 5 );
+      cache_ = new curlCache_t( "/tmp/curl", (1<<20)+(1<<19), 5 );
 
    return *cache_ ;
 }
