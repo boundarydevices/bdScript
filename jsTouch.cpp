@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.13  2003-01-05 01:56:57  ericn
+ * Revision 1.14  2003-01-06 04:29:18  ericn
+ * -made callbacks return bool (false if system shutting down)
+ *
+ * Revision 1.13  2003/01/05 01:56:57  ericn
  * -moved AddRoot calls
  *
  * Revision 1.12  2002/12/26 19:41:14  ericn
@@ -73,11 +76,11 @@ public:
    virtual ~jsTouchScreenThread_t( void ){ printf( "closing ts thread\n" ); close(); }
 
    // these are called directly by the touch screen thread
-   virtual void onTouch( unsigned        x, 
+   virtual bool onTouch( unsigned        x, 
                          unsigned        y );
-   virtual void onRelease( void );
+   virtual bool onRelease( void );
    
-   virtual void onMove( unsigned        x, 
+   virtual bool onMove( unsigned        x, 
                         unsigned        y );
 
    enum {
@@ -270,7 +273,7 @@ static void doOnRelease( void *data )
    thread_->flags_ &= ~thread_->queuedRelease_ ;
 }
 
-void jsTouchScreenThread_t :: onTouch
+bool jsTouchScreenThread_t :: onTouch
    ( unsigned x, 
      unsigned y )
 {
@@ -281,23 +284,27 @@ void jsTouchScreenThread_t :: onTouch
       lastY_ = y ;
    
       flags_ |= queuedTouch_ ;
-      queueCallback( doOnTouch, this );
+      return queueCallback( doOnTouch, this );
    }
+   else
+      return true ;
 }
 
 
-void jsTouchScreenThread_t :: onRelease( void )
+bool jsTouchScreenThread_t :: onRelease( void )
 {
    mutexLock_t lock( mutex_ );
    if( 0 == ( flags_ & queuedRelease_ ) )
    {
       flags_ |= queuedRelease_ ;
-      queueCallback( doOnRelease, this );
+      return queueCallback( doOnRelease, this );
    }
+   else
+      return true ;
 }
 
 
-void jsTouchScreenThread_t :: onMove
+bool jsTouchScreenThread_t :: onMove
    ( unsigned x, 
      unsigned y )
 {
@@ -308,8 +315,10 @@ void jsTouchScreenThread_t :: onMove
       lastY_ = y ;
    
       flags_ |= queuedTouch_ ;
-      queueCallback( doOnMove, this );
+      return queueCallback( doOnMove, this );
    }
+   else
+      return true ;
 }
 
 static JSFunctionSpec touch_functions[] = {

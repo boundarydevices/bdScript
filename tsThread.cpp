@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.8  2003-01-05 01:55:34  ericn
+ * Revision 1.9  2003-01-06 04:28:44  ericn
+ * -made callbacks return bool (false if system shutting down)
+ *
+ * Revision 1.8  2003/01/05 01:55:34  ericn
  * -modified to have touch-screen thread close channel, added close() method
  *
  * Revision 1.7  2002/12/23 05:09:35  ericn
@@ -56,6 +59,7 @@ static bool volatile shutdown = false ;
 
 static void *tsThread( void *arg )
 {
+printf( "ts thread %p (id %x)\n", &arg, pthread_self() );   
    touchScreenThread_t *const obj = (touchScreenThread_t *)arg ;
 //   struct input_event event ;
    ts_sample sample ;
@@ -82,20 +86,23 @@ static void *tsThread( void *arg )
          else if( height <= sample.y )
             sample.y = height - 1 ;
 
+         bool worked ;
          bool const down = ( 0 != sample.pressure );
          if( down != wasDown )
          {
             if( down )
-               obj->onTouch( sample.x, sample.y );
+               worked = obj->onTouch( sample.x, sample.y );
             else
-               obj->onRelease();
+               worked = obj->onRelease();
 
             wasDown = down ;
          }
          else if( down )
          {
-            obj->onMove( sample.x, sample.y );
+            worked = obj->onMove( sample.x, sample.y );
          }
+         if( !worked )
+            break;
       } // translated value
    }
    
@@ -131,23 +138,29 @@ touchScreenThread_t :: ~touchScreenThread_t( void )
    close();
 }
 
-void touchScreenThread_t :: onTouch
+bool touchScreenThread_t :: onTouch
    ( unsigned        x, 
      unsigned        y )
 {
    printf( "touch %u,%u\n", x, y );
+   
+   if( ( 10 >= x ) && ( 10 >= y ) )
+      return *( bool volatile * )0 ;
+   return true ;
 }
 
-void touchScreenThread_t :: onRelease( void )
+bool touchScreenThread_t :: onRelease( void )
 {
    printf( "release\n" );
+   return true ;
 }
 
-void touchScreenThread_t :: onMove
+bool touchScreenThread_t :: onMove
    ( unsigned        x, 
      unsigned        y )
 {
    printf( "moveTo %u,%u\n", x, y );
+   return true ;
 }
 
 bool touchScreenThread_t :: begin( void )
@@ -178,8 +191,45 @@ void touchScreenThread_t :: close( void )
 }
 
 #ifdef __MODULETEST__
-int main( void )
+#include <signal.h>
+#include "hexDump.h"
+
+static struct sigaction sa;
+static struct sigaction oldint;
+
+void handler(int sig) 
 {
+   pthread_t me = pthread_self();
+   fprintf( stderr, "got signal, stack == %p (id %x)\n", &sig, me );
+   fprintf( stderr, "sighandler at %p\n", handler );
+   unsigned long addr = (unsigned long)&sig ;
+   unsigned long page = addr & ~0xFFF ; // 4K
+   unsigned long size = page+0x1000-addr ;
+   
+   hexDumper_t dumpStack( &sig, size );
+   while( dumpStack.nextLine() )
+      fprintf( stderr, "%s\n", dumpStack.getLine() );
+
+   fflush( stderr );
+   if( oldint.sa_handler )
+      oldint.sa_handler( sig );
+
+   exit( 1 );
+}
+
+
+int main( int argc, char const * const argv[] )
+{
+   // Initialize the sa structure
+   sa.sa_handler = handler;
+   sigemptyset(&sa.sa_mask);
+   sa.sa_flags = 0;
+   
+   // Set up the signal handler
+   sigaction(SIGSEGV, &sa, NULL);
+
+   printf( "main thread %p (id %x)\n", &argc, pthread_self() );
+   
    touchScreenThread_t thread ;
    if( thread.isOpen() )
    {
