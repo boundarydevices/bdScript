@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.9 2002-12-03 13:36:13 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.10 2003-11-28 14:09:54 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.9  2002-12-03 13:36:13  ericn
+ * Revision 1.10  2003-11-28 14:09:54  ericn
+ * -lock lhObj_ via jsval
+ *
+ * Revision 1.9  2002/12/03 13:36:13  ericn
  * -collapsed code and objects for curl transfers
  *
  * Revision 1.8  2002/12/02 15:09:23  ericn
@@ -165,6 +168,7 @@ struct jsCurlRequest_t {
    // all of these fields must be filled in by the caller of queueCurlRequest
    //
    JSObject            *lhObj_ ;    // generally used for the destination object
+   jsval                lhVal_ ;
    JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
    bool                 async_ ;
    bool                 isComplete_ ;

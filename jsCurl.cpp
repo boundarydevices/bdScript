@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.20  2003-03-23 01:10:03  ericn
+ * Revision 1.21  2003-11-28 14:09:56  ericn
+ * -lock lhObj_ via jsval
+ *
+ * Revision 1.20  2003/03/23 01:10:03  ericn
  * -added file upload from string variable
  *
  * Revision 1.19  2003/01/06 04:30:00  ericn
@@ -388,6 +391,7 @@ jsCurlRequest_t :: jsCurlRequest_t
      bool         async,
      onComplete_t onComplete )
    : lhObj_( lhObj ),
+     lhVal_( OBJECT_TO_JSVAL( lhObj ) ),
      cx_( cx ),
      async_( async ),
      isComplete_( false ),
@@ -401,12 +405,12 @@ jsCurlRequest_t :: jsCurlRequest_t
      callingThread_( pthread_self() ),
      onComplete_( onComplete )
 {
-   JS_AddRoot( cx, &lhObj_ );
+   JS_AddRoot( cx, &lhVal_ );
 }
 
 jsCurlRequest_t :: ~jsCurlRequest_t( void )
 {
-   JS_RemoveRoot( cx_, &lhObj_ );
+   JS_RemoveRoot( cx_, &lhVal_ );
    memset( this, 0, sizeof( this ) );
 }
 
