@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.51  2003-08-20 02:54:02  ericn
+ * Revision 1.52  2003-08-23 02:50:26  ericn
+ * -added Javascript ping support
+ *
+ * Revision 1.51  2003/08/20 02:54:02  ericn
  * -added module jsMonWLAN
  *
  * Revision 1.50  2003/08/12 01:20:27  ericn
@@ -215,6 +218,7 @@
 #include "jsFlash.h"
 #include "jsSniffWLAN.h"
 #include "jsMonWLAN.h"
+#include "jsPing.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -357,6 +361,7 @@ int prMain(int argc, char **argv)
                      initJSFlash( cx, glob );
                      initSniffWLAN( cx, glob );
                      initMonitorWLAN( cx, glob );
+                     initPing( cx, glob );
 
                      getCurlCache();
 
