@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.72  2004-03-27 20:22:48  ericn
+ * Revision 1.73  2004-04-18 16:11:21  ericn
+ * -allow flashVar on BD2004
+ *
+ * Revision 1.72  2004/03/27 20:22:48  ericn
  * -added jsSerial
  *
  * Revision 1.71  2004/03/17 04:56:19  ericn
@@ -282,6 +285,7 @@
 #include "jsBitmap.h"
 #include "fbDev.h"
 #include "jsSerial.h"
+#include "jsFlashVar.h"
 
 #ifdef CONFIG_BD2003
 #include "audioQueue.h"
@@ -291,7 +295,6 @@
 #include "jsMP3.h"
 #include "jsMPEG.h"
 #include "jsFlash.h"
-#include "jsFlashVar.h"
 #endif 
 
 static JSBool
@@ -544,6 +547,7 @@ int prMain(int argc, char **argv)
                   initJSUDP( cx, glob );
                   initJSKernel( cx, glob );
                   initJSSerial( cx, glob );
+                  initJSFlashVar( cx, glob );
 #ifdef CONFIG_BD2003
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
@@ -552,7 +556,6 @@ int prMain(int argc, char **argv)
                   initJSCBM( cx, glob );
                   initJSMPEG( cx, glob );
                   initJSFlash( cx, glob );
-                  initJSFlashVar( cx, glob );
                   initJSTouch( cx, glob );
                   //
                   // start up audio output 

@@ -2,8 +2,8 @@
 # Makefile for curlCache library and utility programs
 #
 
-#HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
-HARDWARE_TYPE=-DCONFIG_BD2003
+HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
+#HARDWARE_TYPE=-DCONFIG_BD2003
 
 OBJS = \
        barcodePoll.o \
@@ -79,18 +79,18 @@ OBJS = \
        ultoa.o \
        ultodd.o \
        urlFile.o \
+       flashVar.o \
+       jsFlashVar.o \
 
 ifneq ($(HARDWARE_TYPE),-DCONFIG_PXA_GAME_CONTROLLER)
 
 OBJS += \
        audioQueue.o \
        cbmImage.o \
-       flashVar.o \
        jsButton.o \
        jsCBM.o \
        jsCamera.o \
        jsFlash.o \
-       jsFlashVar.o \
        jsMP3.o \
        jsMPEG.o \
        jsVolume.o \
