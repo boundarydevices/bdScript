@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sniffWLAN.cpp,v $
- * Revision 1.2  2003-08-13 00:49:04  ericn
+ * Revision 1.3  2003-09-07 22:51:17  ericn
+ * -modified to allow empty SSID
+ *
+ * Revision 1.2  2003/08/13 00:49:04  ericn
  * -fixed cancellation process
  *
  * Revision 1.1  2003/08/12 01:20:38  ericn
@@ -417,7 +420,7 @@ void sniffWLAN_t :: sniff( unsigned channel, unsigned seconds )
                      varBits+=tagLen;
                   }
 
-                  if( ( 0 != ssid[0] ) && ( channel == frameChannel ) )
+                  if( channel == frameChannel )
                   {
                      ap_t *ap = firstAP_ ;
                      while( ap )
