@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.1 2002-10-15 05:01:47 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.2 2002-10-31 02:06:23 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.1  2002-10-15 05:01:47  ericn
+ * Revision 1.2  2002-10-31 02:06:23  ericn
+ * -modified to allow run (sort of) without frame buffer
+ *
+ * Revision 1.1  2002/10/15 05:01:47  ericn
  * -Initial import
  *
  *
@@ -24,7 +27,7 @@
 
 class fbDevice_t {
 public:
-   bool isOpen( void ) const { return 0 <= fd_ ; }
+   bool isOpen( void ) const { return 0 != mem_ ; }
    
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }

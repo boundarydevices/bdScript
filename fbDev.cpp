@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.3  2002-10-25 04:49:11  ericn
+ * Revision 1.4  2002-10-31 02:06:28  ericn
+ * -modified to allow run (sort of) without frame buffer
+ *
+ * Revision 1.3  2002/10/25 04:49:11  ericn
  * -removed debug statements
  *
  * Revision 1.2  2002/10/24 13:17:56  ericn
@@ -201,13 +204,27 @@ fbDevice_t :: fbDevice_t( char const *name )
       fd_ = -1 ;
    }
    else
+   {
       perror( name );
+      printf( "simulating fbDevice" );
+      width_ = 320 ;
+      height_ = 240 ;
+      memSize_ = width_ * height_ * sizeof( unsigned short );
+      mem_ = new unsigned short[ width_ * height_ ];
+   }
 }
 
 fbDevice_t :: ~fbDevice_t( void )
 {
    if( 0 <= fd_ )
+   {
+      munmap( mem_, memSize_ );
       close( fd_ );
+   }
+   else if( 0 != mem_ )
+   {
+      delete [] (unsigned short *)mem_ ;
+   }
 }
 
 static fbDevice_t *dev_ = 0 ;
