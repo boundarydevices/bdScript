@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include "memFile.h"
 
 static unsigned const SENDSIZE = 16384 ;
 
@@ -32,13 +33,33 @@ int main( int argc, char const * const argv[] )
                remote.sin_addr   = targetIP ;
                remote.sin_port   = htons(targetPort) ;
 
-               int const len = strlen( argv[3] );
-               int const numSent = sendto( sFd, argv[3], len, 0, 
-                                           (struct sockaddr *)&remote, sizeof( remote ) );
-               if( numSent == len )
-                  printf( "sent %d bytes\n", numSent );
+               if( '@' != argv[3][0] )
+               {
+                  int const len = strlen( argv[3] );
+                  int const numSent = sendto( sFd, argv[3], len, 0, 
+                                              (struct sockaddr *)&remote, sizeof( remote ) );
+                  if( numSent == len )
+                     printf( "sent %d bytes\n", numSent );
+                  else
+                     perror( "sendto" );
+               }
                else
-                  perror( "sendto" );
+               {
+                  printf( "send file here\n" );
+                  char const *fileName = argv[3]+1 ;
+                  memFile_t fIn( fileName );
+                  if( fIn.worked() )
+                  {
+                     int const numSent = sendto( sFd, fIn.getData(), fIn.getLength(), 0, 
+                                                 (struct sockaddr *)&remote, sizeof( remote ) );
+                     if( numSent == fIn.getLength() )
+                        printf( "sent %d bytes\n", numSent );
+                     else
+                        perror( "sendto" );
+                  }
+                  else
+                     perror( fileName );
+               }
                
                close( sFd );
             }
