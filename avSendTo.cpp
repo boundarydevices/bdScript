@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.17  2003-11-04 00:40:12  tkisky
+ * Revision 1.18  2003-11-04 13:09:32  ericn
+ * -added keyence support, beep
+ *
+ * Revision 1.17  2003/11/04 00:40:12  tkisky
  * -htons
  *
  * Revision 1.16  2003/11/02 17:59:06  ericn
@@ -674,7 +677,7 @@ udpBarcode_t :: udpBarcode_t
 
    terminator_ = scannerTerminators[type];
 
-   if( other_e == type ) // Symbol scanners don't beep
+   if( sick_e != type ) // only Sick scanners beep
    {   
       int fdBeep = open( "badumm.wav", O_RDONLY );
       if( 0 <= fdBeep )
@@ -707,32 +710,39 @@ void udpBarcode_t :: onBarcode( void )
       }
    }
 
-   unsigned long const now = tickMs();
-   if( ( 0 != strcmp( barcode_, prevBarcode_ ) )
-       ||
-       ( 1000 < now-prevTick_ ) )
+   if( 0 != strcmp( "OK", barcode_ ) )
    {
-      char data[sizeof(udpHeader_t)+sizeof(barcode_)];
-      udpHeader_t &header = *(udpHeader_t *)data ;
-      header.type_   = header.barcode ;
-      header.length_ = len + 1 ; // include trailing NULL
-      strcpy( data+sizeof(header), getBarcode() );
-   
-      unsigned numToSend = sizeof(udpHeader_t)+header.length_ ;
-      int numSent = sendto( udpSock_, data, numToSend, 0, 
-                            (struct sockaddr *)&remote_, sizeof( remote_ ) );
-      if( numSent != numToSend )
-         perror( "barcode sendto" );
-      strcpy( prevBarcode_, barcode_ );
-      prevTick_ = now ;
-      
-      if( ( 0 != beepData_ ) && ( 0 != beepBytes_ ) )
+      unsigned long const now = tickMs();
+      if( ( 0 != strcmp( barcode_, prevBarcode_ ) )
+          ||
+          ( 1000 < now-prevTick_ ) )
       {
-         write( audioFd_, beepData_, beepBytes_ );
-      } // play beep sound
+         char data[sizeof(udpHeader_t)+sizeof(barcode_)];
+         udpHeader_t &header = *(udpHeader_t *)data ;
+         header.type_   = header.barcode ;
+         header.length_ = len + 1 ; // include trailing NULL
+         strcpy( data+sizeof(header), getBarcode() );
+      
+         unsigned numToSend = sizeof(udpHeader_t)+header.length_ ;
+         int numSent = sendto( udpSock_, data, numToSend, 0, 
+                               (struct sockaddr *)&remote_, sizeof( remote_ ) );
+         if( numSent != numToSend )
+            perror( "barcode sendto" );
+         strcpy( prevBarcode_, barcode_ );
+         prevTick_ = now ;
+         
+         if( ( 0 != beepData_ ) && ( 0 != beepBytes_ ) )
+         {
+            write( audioFd_, beepData_, beepBytes_ );
+         } // play beep sound
+      }
+      else
+         printf( "duplicate barcode %s ignored\n", barcode_ );
    }
-   else
-      printf( "duplicate barcode %s ignored\n", barcode_ );
+
+   if( keyence_e == scannerType_ )
+      write( fd_, "LON\r", 4 );
+
 }
 
 class udpTouch_t : public touchPoll_t {
