@@ -137,7 +137,7 @@ CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
 LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
             $(INSTALL_ROOT)/lib/libmpeg2.a \
-            $(INSTALL_ROOT)/lib/libmad.a 
+            $(INSTALL_ROOT)/lib/libmad.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
@@ -216,6 +216,7 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
+	cp $@ $@.prestrip
 	$(STRIP) $@
 
 flashThreadMain.o : flashThread.cpp
