@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.18  2003-02-02 21:00:50  ericn
+ * Revision 1.19  2003-02-02 23:30:46  ericn
+ * -added read setup ioctls
+ *
+ * Revision 1.18  2003/02/02 21:00:50  ericn
  * -modified to set secsRecorded
  *
  * Revision 1.17  2003/02/02 13:46:17  ericn
@@ -172,7 +175,7 @@ static void audioCallback( void *cbParam )
 
 void *audioThread( void *arg )
 {
-printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
+printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
    audioQueue_t *queue = (audioQueue_t *)arg ;
    if( 0 <= queue->writeFd_ )
    {
@@ -472,15 +475,47 @@ audioQueue_t :: audioQueue_t( void )
    : queue_(),
      threadHandle_( (void *)-1 ),
      shutdown_( false ),
-     readFd_( open( "/dev/dsp", O_RDONLY ) ),
-     writeFd_( open( "/dev/dsp", O_WRONLY ) )
+     readFd_( open( "/dev/dsp", O_RDONLY ) )
 {
    assert( 0 == audioQueue_ );
    audioQueue_ = this ;
    pthread_t tHandle ;
-   
-   if( ( 0 <= readFd_ ) && ( 0 <= writeFd_ ) )
+
+   if( 0 <= readFd_ )
    {
+      ioctl( readFd_, SNDCTL_DSP_SYNC, 0 );
+
+      int const format = AFMT_S16_LE ;
+      if( 0 != ioctl( readFd_, SNDCTL_DSP_SETFMT, &format) ) 
+         perror( "set record format" );
+      
+      int const channels = 1 ;
+      if( 0 != ioctl( readFd_, SNDCTL_DSP_CHANNELS, &channels ) )
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
+
+      int speed = 44100 ;
+      if( 0 != ioctl( readFd_, SNDCTL_DSP_SPEED, &speed ) )
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+
+      int recordLevel = 0 ;
+      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+         perror( "get record level" );
+
+      recordLevel = 100 ;
+      if( 0 != ioctl( readFd_, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+         perror( "set record level" );
+
+      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+         perror( "get record level" );
+
+      int recSrc ;
+      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_RECSRC ), &recSrc ) )
+         perror( "get record srcs" );
+      
+      int recMask ;
+      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_RECMASK ), &recMask ) )
+         perror( "get record mask" );
+
       audio_buf_info bufInfo ;
       int biResult = ioctl( readFd_, SNDCTL_DSP_GETISPACE, &bufInfo );
       if( 0 == biResult )
@@ -497,20 +532,22 @@ audioQueue_t :: audioQueue_t( void )
          maxReadBytes_ = numReadFrags_ * readFragSize_ ;
       }
 
-      int recordLevel = 100 ;
-      if( 0 != ioctl( readFd_, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-         perror( "set record level" );
-      
-      int const create = pthread_create( &tHandle, 0, audioThread, this );
-      if( 0 == create )
+      writeFd_ = open( "/dev/dsp", O_WRONLY );
+      if( 0 <= writeFd_ )
       {
-         struct sched_param tsParam ;
-         tsParam.__sched_priority = 90 ;
-         pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
-         threadHandle_ = (void *)tHandle ;
+         int const create = pthread_create( &tHandle, 0, audioThread, this );
+         if( 0 == create )
+         {
+            struct sched_param tsParam ;
+            tsParam.__sched_priority = 90 ;
+            pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
+            threadHandle_ = (void *)tHandle ;
+         }
+         else
+            fprintf( stderr, "Error %m creating curl-reader thread\n" );
       }
       else
-         fprintf( stderr, "Error %m creating curl-reader thread\n" );
+         perror( "/dev/dsp" );
    }
    else
       perror( "/dev/dsp" );
@@ -637,8 +674,10 @@ void audioQueue_t :: shutdown( void )
 
    if( old )
    {
-      close( old->readFd_ );
-      close( old->writeFd_ );
+      if( 0 <= old->readFd_ )
+         close( old->readFd_ );
+      if( 0 <= old->writeFd_ )
+         close( old->writeFd_ );
       old->shutdown_ = true ;
       unsigned cancelled ;
       old->clear( cancelled );
@@ -664,6 +703,8 @@ bool audioQueue_t :: pull( item_t *&item )
 audioQueue_t &getAudioQueue( void )
 {
    if( 0 == audioQueue_ )
+   {
       audioQueue_ = new audioQueue_t();
+   }
    return *audioQueue_ ;
 }
