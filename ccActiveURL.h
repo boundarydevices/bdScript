@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.5 2003-08-01 14:27:24 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.6 2003-12-06 22:06:22 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.5  2003-08-01 14:27:24  ericn
+ * Revision 1.6  2003-12-06 22:06:22  ericn
+ * -added support for temp file and offset
+ *
+ * Revision 1.5  2003/08/01 14:27:24  ericn
  * -added addRef, deref
  *
  * Revision 1.4  2002/12/02 15:07:51  ericn
@@ -86,6 +89,14 @@ public:
    bool deref( unsigned long  identifier,
                void const   *&data,
                unsigned long &length );
+   
+   // Be very careful with these calls. The cache can change (or move) from
+   // under you if additional files are retrieved, and the
+   //
+   void getTempFileName( unsigned long  identifier,   // input
+                         std::string   &localName );  // output: be careful with this one... file can go away!
+   void getDataOffset( unsigned long identifier,      // input
+                       unsigned     &offset );        // output
 
    void cancel( std::string const &url ); // cancel all
    void deleteURL( std::string const &url );

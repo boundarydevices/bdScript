@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.7  2003-08-01 14:27:01  ericn
+ * Revision 1.8  2003-12-06 22:06:24  ericn
+ * -added support for temp file and offset
+ *
+ * Revision 1.7  2003/08/01 14:27:01  ericn
  * -better error msg and recovery from cache failure
  *
  * Revision 1.6  2002/12/03 02:11:05  ericn
@@ -230,6 +233,24 @@ bool curlCache_t :: deref
    data = item->diskInfo_.data_ ;
    length = item->diskInfo_.length_ ;
    return true ;
+}
+
+void curlCache_t :: getTempFileName( unsigned long identifier, std::string &localName )
+{
+   mutexLock_t lock( mutex_ );
+   item_t *item = (item_t *)identifier ;
+   assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
+   localName = getDiskCache().constructName( item->diskInfo_.sequence_ );
+}
+
+void curlCache_t :: getDataOffset( unsigned long identifier, unsigned &offset )
+{
+   mutexLock_t lock( mutex_ );
+   item_t *item = (item_t *)identifier ;
+   assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
+
+   if( !getDiskCache().getDataOffset( item->diskInfo_.sequence_, offset ) )
+      offset = 0xFFFFFFFF ;
 }
 
 void curlCache_t :: cancel( std::string const &url )

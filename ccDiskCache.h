@@ -1,5 +1,5 @@
 #ifndef __CCDISKCACHE_H__
-#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.3 2003-08-01 14:28:35 ericn Exp $"
+#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.4 2003-12-06 22:06:37 ericn Exp $"
 
 /*
  * ccDiskCache.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.h,v $
- * Revision 1.3  2003-08-01 14:28:35  ericn
+ * Revision 1.4  2003-12-06 22:06:37  ericn
+ * -added support for temp file and offset
+ *
+ * Revision 1.3  2003/08/01 14:28:35  ericn
  * -modified to return status of storeData
  *
  * Revision 1.2  2002/11/30 05:24:18  ericn
@@ -53,6 +56,13 @@ public:
    void inUse( unsigned       sequence,
                void const   *&data,
                unsigned long &length );
+
+   //
+   // Get offset of data within file. Note that this is inherently unsafe and
+   // should only be used by trained professionals (and then only when the
+   // cacheing program is shutting down!)
+   //
+   bool getDataOffset( unsigned sequence, unsigned &offset );
 
    //
    // Tell disk cache that an item is no longer in use
@@ -125,6 +135,8 @@ public:
    void dump( void ) const ;
 
    void retrieveURLs( std::vector<std::string> &urls ) const ;
+
+   std::string constructName( unsigned long sequence ) const ;
 
 private:
    ccDiskCache_t( ccDiskCache_t const & ); // no copies

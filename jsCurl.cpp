@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.21  2003-11-28 14:09:56  ericn
+ * Revision 1.22  2003-12-06 22:07:12  ericn
+ * -added support for temp file and offset
+ *
+ * Revision 1.21  2003/11/28 14:09:56  ericn
  * -lock lhObj_ via jsval
  *
  * Revision 1.20  2003/03/23 01:10:03  ericn
@@ -126,6 +129,29 @@ static void curlFileOnComplete( jsCurlRequest_t &req, void const *data, unsigned
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
+   std::string tempFile ;
+   getCurlCache().getTempFileName( req.handle_, tempFile );
+   sData = JS_NewStringCopyN( req.cx_, tempFile.c_str(), tempFile.size() );
+   JS_DefineProperty( req.cx_, req.lhObj_, "tmpFile",
+                      STRING_TO_JSVAL( sData ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+
+   unsigned dataOffs ;
+   getCurlCache().getDataOffset( req.handle_, dataOffs );
+   if( ( 0 < dataOffs ) && ( dataOffs < size ) )
+   {
+      JS_DefineProperty( req.cx_, req.lhObj_, "tmpOffs",
+                         INT_TO_JSVAL( dataOffs ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+   }
+   else
+      JS_ReportError( req.cx_, "invalid tmp file offset: %u" );
 }
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )

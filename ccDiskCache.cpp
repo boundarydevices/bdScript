@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.4  2003-08-01 14:28:05  ericn
+ * Revision 1.5  2003-12-06 22:06:41  ericn
+ * -added support for temp file and offset
+ *
+ * Revision 1.4  2003/08/01 14:28:05  ericn
  * -fixed urlLen in initial cache load
  *
  * Revision 1.3  2003/07/31 04:30:52  ericn
@@ -109,7 +112,7 @@ void ccDiskCache_t :: inUse
       header_t &header = *((*it).second);
       if( header.completed_ && ( 0 > header.fd_ ) && ( 0 == header.data_ ) )
       {
-         std::string const &cachedFileName = getCacheName( basePath_, sequence );
+         std::string const cachedFileName = getCacheName( basePath_, sequence );
          header.fd_ = open( cachedFileName.c_str(), O_RDONLY );
          if( 0 <= header.fd_ )
          {
@@ -159,6 +162,23 @@ void ccDiskCache_t :: inUse
       fprintf( stderr, "%s:%s: Invalid sequence %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
+}
+
+bool ccDiskCache_t :: getDataOffset( unsigned sequence, unsigned &offset )
+{
+   bySequence_t :: const_iterator it = cacheEntries_.find( sequence );
+   if( it != cacheEntries_.end() )
+   {
+      header_t &header = *((*it).second);
+      if( header.completed_ )
+      {
+         unsigned const urlLen = strlen( header.name_ ) + 1 ;
+         unsigned const pad = ( 4 - ( urlLen & 3 ) ) & 3 ;
+         offset = urlLen + pad + sizeof( urlLen ) + sizeof( header.size_ );
+         return true ;
+      }
+   }
+   return false ;
 }
 
 void ccDiskCache_t :: notInUse( unsigned sequence )
@@ -699,6 +719,11 @@ void ccDiskCache_t :: retrieveURLs( std::vector<std::string> &urls ) const
       header_t const &header = *((header_t const *) h );
       urls.push_back( header.name_ );
    }
+}
+
+std::string ccDiskCache_t :: constructName( unsigned long sequence ) const 
+{
+   return getCacheName( basePath_, sequence );
 }
 
 static ccDiskCache_t *diskCache = 0 ;
