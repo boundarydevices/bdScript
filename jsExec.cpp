@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.18  2002-11-30 18:52:57  ericn
+ * Revision 1.19  2002-12-01 02:43:39  ericn
+ * -changed queueCode() to root code, moved handler execution to pollCodeQueue()
+ *
+ * Revision 1.18  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.17  2002/11/30 16:33:12  ericn
@@ -150,13 +153,9 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    *rval = JSVAL_TRUE ;
    for( int arg = 0 ; arg < argc ; arg++ )
    {
-      if( queueSource( obj, argv[arg], "queueCode" ) )
+      if( !queueUnrootedSource( obj, argv[arg], "queueCode" ) )
       {
-         printf( "code queued\n" );
-      }
-      else
-      {
-         fprintf( stderr, "error queuing code\n" );
+         JS_ReportError( cx, "queuing code" );
          *rval = JSVAL_FALSE ;
       }
    }
@@ -196,7 +195,6 @@ static JSFunctionSpec shell_functions[] = {
     {"nanosleep",       jsNanosleep,    0},
     {0}
 };
-
 
 static void myError( JSContext *cx, const char *message, JSErrorReport *report)
 {
@@ -285,6 +283,7 @@ int prMain(int argc, char **argv)
    
                                  while( 1 )
                                  {
+                                    pollCodeQueue( cx, 5000, 10 );
                                     if( gotoCalled_ )
                                     {
                                        printf( "executing %s\n", gotoURL_.c_str() );
@@ -292,27 +291,10 @@ int prMain(int argc, char **argv)
                                     }
                                     else 
                                     {
-                                       bool doGC = ( 0 == ( ++numEvents % 10 ) );
-   
-                                       JSObject *scope ;
-                                       if( dequeueByteCode( script, scope, 5000 ) )
-                                       {
-                                          mutexLock_t lock( execMutex_ );
-                                          exec = JS_ExecuteScript( cx, scope, script, &rval );
-                                          if( !exec )
-                                             fprintf( stderr, "error executing code\n" );
-                                          JS_DestroyScript( cx, script );
-                                       }
-                                       else
-                                          doGC = true ;
-                                       
-                                       if( doGC )
-                                       {
-                                          printf( "collectin' garbage\n" );
-                                          mutexLock_t lock( execMutex_ );
-                                          JS_GC( cx );
-                                          printf( "done\n" );
-                                       }
+                                       printf( "collectin' garbage\n" );
+                                       mutexLock_t lock( execMutex_ );
+                                       JS_GC( cx );
+                                       printf( "done\n" );
                                     }
                                  }
                               }
