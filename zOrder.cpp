@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: zOrder.cpp,v $
- * Revision 1.2  2002-12-07 23:19:07  ericn
+ * Revision 1.3  2003-11-24 19:08:49  ericn
+ * -modified to check range of inputs to getBox()
+ *
+ * Revision 1.2  2002/12/07 23:19:07  ericn
  * -removed debug msg
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -37,6 +40,14 @@ zOrderMap_t :: ~zOrderMap_t( void )
    delete [] boxes_ ;
 }
    
+box_t *zOrderMap_t :: getBox( unsigned short x, unsigned short y ) const 
+{
+   if( ( x < width_ ) && ( y < height_ ) )
+      return getBoxById( boxes_[y*width_+x] );
+   else
+      return 0 ;
+}
+
 void zOrderMap_t :: addBox( box_t const &b )
 {
    for( unsigned y = b.yTop_ ; ( y < height_ ) && ( y < b.yBottom_ ); y++ )

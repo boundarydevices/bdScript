@@ -1,5 +1,5 @@
 #ifndef __ZORDER_H__
-#define __ZORDER_H__ "$Id: zOrder.h,v 1.1 2002-11-21 14:09:52 ericn Exp $"
+#define __ZORDER_H__ "$Id: zOrder.h,v 1.2 2003-11-24 19:08:46 ericn Exp $"
 
 /*
  * zOrder.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: zOrder.h,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2003-11-24 19:08:46  ericn
+ * -modified to check range of inputs to getBox()
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -33,7 +36,8 @@ public:
    zOrderMap_t( void );    // starts off empty
    ~zOrderMap_t( void );
    
-   box_t *getBox( unsigned short x, unsigned short y ) const { return getBoxById( boxes_[y*width_+x] ); }
+   box_t *getBox( unsigned short x, unsigned short y ) const ;
+
    void   addBox( box_t const & );
    void   removeBox( box_t const & );
 
