@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.4  2002-11-30 16:23:59  ericn
+ * Revision 1.5  2002-12-03 02:48:44  ericn
+ * -added initialization for expectedBytes
+ *
+ * Revision 1.4  2002/11/30 16:23:59  ericn
  * -made urls char arrays instead of strings
  *
  * Revision 1.3  2002/11/30 05:24:32  ericn
@@ -61,7 +64,6 @@ struct progressData_t {
 
 static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
 {
-   printf( "writeData:%u\n", size*nmemb );
    unsigned const total = size*nmemb;
 
    progressData_t *pd = (progressData_t *)userp ;
@@ -131,8 +133,9 @@ static void *readerThread( void *arg )
                      if( 0 == result )
                      {
                         progressData_t pd ;
-                        pd.request_ = &request ;
-                        pd.data_    = &data ;
+                        pd.request_       = &request ;
+                        pd.data_          = &data ;
+                        pd.expectedBytes_ = 0 ;
    
                         result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &pd );
                         if( 0 == result )
