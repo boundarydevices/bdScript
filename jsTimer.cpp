@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.3  2002-10-31 02:07:14  ericn
+ * Revision 1.4  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.3  2002/10/31 02:07:14  ericn
  * -modified to include scope in queueSource
  *
  * Revision 1.2  2002/10/27 17:48:57  ericn
@@ -32,7 +35,7 @@
 struct timerParam_t {
    JSObject     *scope_ ;
    unsigned long milliseconds_ ;
-   std::string   sourceCode_ ;
+   jsval         sourceCode_ ;
 };
 
 static void *interval( void *arg )
@@ -97,12 +100,10 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        && 
        JSVAL_IS_STRING( argv[1] ) )
    {
-      JSString *str = JS_ValueToString( cx, argv[1] );
-      
       timerParam_t *param = new timerParam_t ;
       param->scope_        = obj ;
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
-      param->sourceCode_   = JS_GetStringBytes( str );
+      param->sourceCode_   = argv[1];
 
       pthread_t thread ;
       int create = pthread_create( &thread, 0, interval, param );
@@ -129,12 +130,10 @@ jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        && 
        JSVAL_IS_STRING( argv[1] ) )
    {
-      JSString *str = JS_ValueToString( cx, argv[1] );
-      
       timerParam_t *param = new timerParam_t ;
       param->scope_        = obj ;
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
-      param->sourceCode_   = JS_GetStringBytes( str );
+      param->sourceCode_   = argv[1];
 
       pthread_t thread ;
       int create = pthread_create( &thread, 0, oneShot, param );

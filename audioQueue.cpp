@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.9  2002-11-30 00:53:43  ericn
+ * Revision 1.10  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.9  2002/11/30 00:53:43  ericn
  * -changed name to semClasses.h
  *
  * Revision 1.8  2002/11/24 19:08:19  ericn
@@ -225,13 +228,15 @@ printf( "opened dsp device\n" );
                if( _cancel )
                {
                   _cancel = false ;
-                  queueSource( item.obj_, item.onCancel_, "audioComplete" );
+                  if( JSVAL_VOID != item.onCancel_ )
+                     queueSource( item.obj_, item.onCancel_, "audioComplete" );
                   if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_RESET, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                }
                else
                {
-                  queueSource( item.obj_, item.onComplete_, "audioComplete" );
+                  if( JSVAL_VOID != item.onComplete_ )
+                     queueSource( item.obj_, item.onComplete_, "audioComplete" );
                   if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                }
@@ -285,8 +290,8 @@ bool audioQueue_t :: insert
    ( JSObject            *mp3Obj,
      unsigned char const *data,
      unsigned             length,
-     std::string const   &onComplete,
-     std::string const   &onCancel )
+     jsval                onComplete,
+     jsval                onCancel )
 {
    item_t item ;
    item.obj_        = mp3Obj ;

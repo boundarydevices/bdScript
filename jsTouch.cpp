@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.4  2002-11-30 17:32:47  ericn
+ * Revision 1.5  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.4  2002/11/30 17:32:47  ericn
  * -added support for touch-by-move
  *
  * Revision 1.3  2002/11/21 14:09:30  ericn
@@ -56,7 +59,7 @@ public:
    box_t            *curBox_ ;
 };
 
-static std::string onTouchCode_ ;
+static jsval onTouchCode_ = JSVAL_VOID ;
 
 static JSBool
 jsOnTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -70,14 +73,9 @@ jsOnTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         char const *cCode = JS_GetStringBytes( sCode );
-         if( cCode )
-         {
-            onTouchCode_ = cCode ;
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Error reading code bytes" );
+         JS_AddRoot( cx, sCode );
+         onTouchCode_ = argv[0] ;
+         *rval = JSVAL_TRUE ;
       }
       else
          JS_ReportError( cx, "Error reading code param" );
@@ -86,7 +84,7 @@ jsOnTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static std::string onReleaseCode_ ;
+static jsval onReleaseCode_ = JSVAL_VOID ;
 
 static JSBool
 jsOnRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -100,14 +98,9 @@ jsOnRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         char const *cCode = JS_GetStringBytes( sCode );
-         if( cCode )
-         {
-            onReleaseCode_ = cCode ;
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Error reading code bytes" );
+         JS_AddRoot( cx, sCode );
+         onReleaseCode_ = argv[0] ;
+         *rval = JSVAL_TRUE ;
       }
       else
          JS_ReportError( cx, "Error reading code param" );
@@ -116,7 +109,7 @@ jsOnRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
-static std::string onMoveCode_ ;
+static jsval onMoveCode_ = JSVAL_VOID ;
 
 static JSBool
 jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -130,14 +123,9 @@ jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         char const *cCode = JS_GetStringBytes( sCode );
-         if( cCode )
-         {
-            onMoveCode_ = cCode ;
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Error reading code bytes" );
+         JS_AddRoot( cx, sCode );
+         onMoveCode_ = argv[0] ;
+         *rval = JSVAL_TRUE ;
       }
       else
          JS_ReportError( cx, "Error reading code param" );
@@ -183,7 +171,7 @@ void jsTouchScreenThread_t :: onTouch
    }
    else
    {
-      if( 0 != onTouchCode_.size() )
+      if( JSVAL_VOID != onTouchCode_ )
          queueSource( scope_, onTouchCode_, "onTouch" );
       else
       {
@@ -202,7 +190,7 @@ void jsTouchScreenThread_t :: onRelease( void )
       curBox_ = 0 ;
    } // touching, move or release box
 
-   if( 0 != onReleaseCode_.size() )
+   if( JSVAL_VOID != onReleaseCode_ )
       queueSource( scope_, onReleaseCode_, "onRelease" );
 }
 
@@ -218,8 +206,8 @@ void jsTouchScreenThread_t :: onMove
    if( 0 == curBox_ )
       onTouch( x, y );
 
-//   if( 0 != onMoveCode_.size() )
-//      queueSource( scope_, onMoveCode_, "onMove" );
+   if( JSVAL_VOID != onMoveCode_ )
+      queueSource( scope_, onMoveCode_, "onMove" );
 }
 
 static JSFunctionSpec touch_functions[] = {

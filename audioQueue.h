@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.2 2002-11-14 13:14:03 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.3 2002-11-30 18:52:57 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.2  2002-11-14 13:14:03  ericn
+ * Revision 1.3  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.2  2002/11/14 13:14:03  ericn
  * -modified to expose dsp file descriptor
  *
  * Revision 1.1  2002/11/07 02:16:31  ericn
@@ -40,8 +43,8 @@ public:
       JSObject            *obj_ ;
       unsigned char const *data_ ;
       unsigned             length_ ;
-      std::string          onComplete_ ;
-      std::string          onCancel_ ;
+      jsval                onComplete_ ;
+      jsval                onCancel_ ;
    };
 
    //
@@ -50,8 +53,8 @@ public:
    bool insert( JSObject            *mp3Obj,
                 unsigned char const *data,
                 unsigned             length,
-                std::string const   &onComplete,
-                std::string const   &onCancel );
+                jsval                onComplete = JSVAL_VOID,
+                jsval                onCancel = JSVAL_VOID );
    
    //
    // flush all outbound audio

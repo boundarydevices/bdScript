@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.14  2002-11-30 16:26:33  ericn
+ * Revision 1.15  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.14  2002/11/30 16:26:33  ericn
  * -better error checking, new curl interface
  *
  * Revision 1.13  2002/11/30 05:30:16  ericn
@@ -83,8 +86,8 @@ printf( "playing file\n" );
    {
       unsigned const length = JS_GetStringLength( dataStr );
 
-      std::string onComplete ;
-      std::string onCancel ;
+      jsval onComplete = JSVAL_VOID ;
+      jsval onCancel = JSVAL_VOID ;
       
       JSObject *rhObj ;
       if( ( 1 <= argc )
@@ -98,23 +101,19 @@ printf( "playing file\n" );
          
          if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
              &&
-             JSVAL_IS_STRING( val ) 
-             &&
-             ( 0 != ( sHandler = JSVAL_TO_STRING( val ) ) ) )
+             JSVAL_IS_STRING( val ) )
          {
-            onComplete = JS_GetStringBytes( sHandler );
+            onComplete = val ;
          } // have onComplete handler
          
          if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
              &&
-             JSVAL_IS_STRING( val ) 
-             &&
-             ( 0 != ( sHandler = JSVAL_TO_STRING( val ) ) ) )
+             JSVAL_IS_STRING( val ) )
          {
-            onCancel = JS_GetStringBytes( sHandler );
+            onCancel = val ;
          } // have onComplete handler
       } // have right-hand object
-      
+
       if( getAudioQueue().insert( obj, data, length, onComplete, onCancel ) )
       {
 //         JS_ReportError( cx, "queued MP3 for playback" );

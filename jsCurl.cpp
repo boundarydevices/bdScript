@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.13  2002-11-30 16:29:07  ericn
+ * Revision 1.14  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.13  2002/11/30 16:29:07  ericn
  * -fixed locking and allocation of requests
  *
  * Revision 1.12  2002/11/30 05:27:13  ericn
@@ -200,11 +203,9 @@ void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned long siz
 
    if( JS_GetProperty( req.cx_, req.rhObj_, "onLoad", &handlerVal ) 
        && 
-       JSVAL_IS_STRING( handlerVal )
-       && 
-       ( 0 != ( handlerCode = JSVAL_TO_STRING( handlerVal ) ) ) )
+       JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onLoad" ) )
+      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onLoad" ) )
          JS_ReportError( req.cx_, "Error queueing onLoad\n" );
    }
    
@@ -239,11 +240,9 @@ void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
 
    if( JS_GetProperty( req.cx_, req.rhObj_, "onLoadError", &handlerVal ) 
        && 
-       JSVAL_IS_STRING( handlerVal )
-       && 
-       ( 0 != ( handlerCode = JSVAL_TO_STRING( handlerVal ) ) ) )
+       JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onLoadError" ) )
+      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onLoadError" ) )
          JS_ReportError( req.cx_, "Error queueing onLoadError\n" );
    }
    
@@ -267,11 +266,9 @@ void jsCurlOnCancel( jsCurlRequest_t &req )
 
    if( JS_GetProperty( req.cx_, req.rhObj_, "onCancel", &handlerVal ) 
        && 
-       JSVAL_IS_STRING( handlerVal )
-       && 
-       ( 0 != ( handlerCode = JSVAL_TO_STRING( handlerVal ) ) ) )
+       JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onCancel" ) )
+      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onCancel" ) )
          JS_ReportError( req.cx_, "Error queueing onCancel\n" );
    }
    
@@ -304,11 +301,9 @@ void jsCurlOnSize( jsCurlRequest_t &req, unsigned long size )
 
    if( JS_GetProperty( req.cx_, req.rhObj_, "onSize", &handlerVal ) 
        && 
-       JSVAL_IS_STRING( handlerVal )
-       && 
-       ( 0 != ( handlerCode = JSVAL_TO_STRING( handlerVal ) ) ) )
+       JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onSize" ) )
+      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onSize" ) )
          JS_ReportError( req.cx_, "Error queueing onSize\n" );
    }
    
@@ -338,11 +333,9 @@ void jsCurlOnProgress( jsCurlRequest_t &req, unsigned long numReadSoFar )
 
    if( JS_GetProperty( req.cx_, req.rhObj_, "onProgress", &handlerVal ) 
        && 
-       JSVAL_IS_STRING( handlerVal )
-       && 
-       ( 0 != ( handlerCode = JSVAL_TO_STRING( handlerVal ) ) ) )
+       JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onProgress" ) )
+      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onProgress" ) )
          JS_ReportError( req.cx_, "Error queueing onProgress\n" );
    }
 
@@ -495,6 +488,7 @@ bool queueCurlRequest
          }
 
          request.isComplete_ = false ;
+printf( "retrieving %s\n", absolute.c_str() );
 
          if( 0 == postHead )
          {

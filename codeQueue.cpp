@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.3  2002-11-17 16:09:22  ericn
+ * Revision 1.4  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.3  2002/11/17 16:09:22  ericn
  * -fixed non-rooted JSScript bug
  *
  * Revision 1.2  2002/10/31 02:09:38  ericn
@@ -23,11 +26,12 @@
 
 #include "codeQueue.h"
 #include "mtQueue.h"
+#include "jsGlobals.h"
 
 typedef struct scriptAndScope_t {
-   JSObject    *scope_ ;
-   std::string  script_ ;
-   std::string  source_ ;
+   JSObject   *scope_ ;
+   jsval       script_ ;
+   char const *source_ ;
 };
 
 typedef mtQueue_t<scriptAndScope_t> codeList_t ;
@@ -40,9 +44,9 @@ static codeList_t  codeList_ ;
 // returns true if compiled and queued successfully, 
 // false if the code couldn't be compiled 
 //
-bool queueSource( JSObject          *scope,
-                  std::string const &sourceCode,
-                  char const        *sourceFile )
+bool queueSource( JSObject   *scope,
+                  jsval       sourceCode,
+                  char const *sourceFile )
 {
    scriptAndScope_t item ;
    item.script_ = sourceCode ;
@@ -75,18 +79,27 @@ bool dequeueByteCode( JSScript    *&script,
                        : codeList_.pull( item, milliseconds );
    if( result )
    {
-      JSScript *scr = JS_CompileScript( context_, item.scope_, 
-                                        item.script_.c_str(), 
-                                        item.script_.size(), 
-                                        item.source_.c_str(), 1 );
-      if( scr )
+      mutexLock_t lock( execMutex_ );
+      JSString *sVal ;
+      if( JSVAL_IS_STRING( item.script_ ) 
+          &&
+          ( 0 != ( sVal = JSVAL_TO_STRING( item.script_ ) ) ) )
       {
-         script = scr ;
-         scope  = item.scope_ ;
-         return true ;
+         JSScript *scr = JS_CompileScript( context_, item.scope_, 
+                                           JS_GetStringBytes( sVal ), 
+                                           JS_GetStringLength( sVal ), 
+                                           item.source_, 1 );
+         if( scr )
+         {
+            script = scr ;
+            scope  = item.scope_ ;
+            return true ;
+         }
+         else
+            fprintf( stderr, "Compiling %s code\n", item.script_ );
       }
       else
-         fprintf( stderr, "Error compiling code %s\n", item.script_.c_str() );
+         fprintf( stderr, "Invalid script ptr\n" );
    }
    else
       return false ;

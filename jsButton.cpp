@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.6  2002-11-30 05:26:39  ericn
+ * Revision 1.7  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.6  2002/11/30 05:26:39  ericn
  * -removed debug msgs, added lock
  *
  * Revision 1.5  2002/11/30 00:32:18  ericn
@@ -146,7 +149,7 @@ static void doit( box_t         &box,
    jsval jsv ;
    if( JS_GetProperty( button->cx_, button->jsObj_, method, &jsv ) && JSVAL_IS_STRING( jsv ) )
    {
-      if( !queueSource( button->jsObj_, JS_GetStringBytes( JSVAL_TO_STRING(jsv) ), "buttonTouch" ) )
+      if( !queueSource( button->jsObj_, jsv, "buttonTouch" ) )
          JS_ReportError( button->cx_, "Error queueing button handler" );
    }
 }
@@ -180,7 +183,7 @@ static void buttonTouch( box_t         &box,
       audioQueue_t &q = getAudioQueue();
       unsigned numCancelled ;
       q.clear( numCancelled );
-      q.insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_, "", "" );
+      q.insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
    }
 
    doit( box, x, y, defaultTouch, "onTouch" );
@@ -212,7 +215,7 @@ static void buttonRelease( box_t         &box,
       audioQueue_t &q = getAudioQueue();
       unsigned numCancelled ;
       q.clear( numCancelled );
-      q.insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_, "", "" );
+      q.insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
    }
 
    doit( box, x, y, defaultRelease, "onRelease" );

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.18  2002-11-30 16:28:32  ericn
+ * Revision 1.19  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.18  2002/11/30 16:28:32  ericn
  * -added MP3 support
  *
  * Revision 1.17  2002/11/30 05:29:21  ericn
@@ -147,22 +150,11 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    *rval = JSVAL_TRUE ;
    for( int arg = 0 ; arg < argc ; arg++ )
    {
-      JSString *str = JS_ValueToString(cx, argv[0]);
-      if( str )
+      if( !queueSource( obj, argv[arg], "queueCode" ) )
       {
-         if( queueSource( obj,
-                          std::string( JS_GetStringBytes( str ), JS_GetStringLength( str ) ), 
-                          "queueCode" ) )
-         {
-         }
-         else
-         {
-            fprintf( stderr, "error queuing code\n" );
-            *rval = JSVAL_FALSE ;
-         }
+         fprintf( stderr, "error queuing code\n" );
+         *rval = JSVAL_FALSE ;
       }
-      else
-         *rval = JSVAL_FALSE ;        
    }
 
    return JS_TRUE;

@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.2 2002-10-31 02:09:35 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.3 2002-11-30 18:52:57 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.2  2002-10-31 02:09:35  ericn
+ * Revision 1.3  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.2  2002/10/31 02:09:35  ericn
  * -added scope to code queue
  *
  * Revision 1.1  2002/10/27 17:42:08  ericn
@@ -36,9 +39,9 @@
 // returns true if compiled and queued successfully, 
 // false if the code couldn't be compiled 
 //
-bool queueSource( JSObject          *scope,
-                  std::string const &sourceCode,
-                  char const        *sourceFile );
+bool queueSource( JSObject   *scope,
+                  jsval       sourceCode,
+                  char const *sourceFile );
 
 //
 // returns a valid pointer if successful. 

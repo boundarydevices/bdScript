@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.1  2002-11-17 00:51:34  ericn
+ * Revision 1.2  2002-11-30 18:52:57  ericn
+ * -modified to queue jsval's instead of strings
+ *
+ * Revision 1.1  2002/11/17 00:51:34  ericn
  * -Added Javascript barcode support
  *
  *
@@ -24,7 +27,7 @@
 
 static std::string sBarcode_ ;
 static std::string sSymbology_( "unknown" );
-static std::string sHandler_ ;
+static jsval       sHandler_ = JSVAL_VOID ;
 static JSObject   *handlerScope_ ;
 
 static JSBool
@@ -36,20 +39,8 @@ jsOnBarcode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
        &&
        JSVAL_IS_STRING( argv[0] ) )
    {
-      JSString *sCode = JSVAL_TO_STRING( argv[0] );
-      if( sCode )
-      {
-         char const *cCode = JS_GetStringBytes( sCode );
-         if( cCode )
-         {
-            sHandler_ = cCode ;
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Error reading code bytes" );
-      }
-      else
-         JS_ReportError( cx, "Error reading code param" );
+      sHandler_ = argv[0];
+      *rval = JSVAL_TRUE ;
    }
 
    return JS_TRUE ;
@@ -130,7 +121,7 @@ static void *barcodeThread( void *arg )
                inBuf[numRead] = '\0' ;
                sBarcode_ = inBuf ;
                printf( "%d:%s\n", numRead, inBuf );
-               if( ( 0 < sHandler_.size() ) && ( 0 != handlerScope_ ) )
+               if( ( JSVAL_VOID != sHandler_ ) && ( 0 != handlerScope_ ) )
                {
                   queueSource( handlerScope_, sHandler_, "onBarcode" );
                }
