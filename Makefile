@@ -5,8 +5,8 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsBarcode.o jsCurl.o jsGlobals.o jsHyperlink.o \
-       jsImage.o jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsTouch.o \
-       jsURL.o jsVolume.o \
+       jsImage.o jsMP3.o jsProc.o jsScreen.o jsShell.o jsText.o \
+       jsTimer.o jsTouch.o jsURL.o jsVolume.o \
        madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o \
        ultodd.o
 LIB = $(INSTALL_LIB)/libCurlCache.a
