@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.7  2002-10-20 16:30:11  ericn
+ * Revision 1.8  2002-10-24 13:16:21  ericn
+ * -added MP3, relative URL support
+ *
+ * Revision 1.7  2002/10/20 16:30:11  ericn
  * -added URL support
  *
  * Revision 1.6  2002/10/18 01:18:13  ericn
@@ -45,6 +48,7 @@
 #include "jsImage.h"
 #include "jsText.h"
 #include "jsScreen.h"
+#include "jsMP3.h"
 #include "jsURL.h"
 #include "curlCache.h"
 
@@ -94,7 +98,7 @@ Print(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 static JSBool
-UrlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+urlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     uintN i ;
     
@@ -108,6 +112,7 @@ UrlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
            curlFile_t f( cache.get( cURL, false ) );
            if( f.isOpen() )
            {
+              pushURL( f.getEffectiveURL() );
                JSScript *script= JS_CompileScript( cx, JS_GetGlobalObject( cx ), (char const *)f.getData(), f.getSize(), cURL, 1 );
                if( script )
                {
@@ -124,6 +129,8 @@ UrlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                }
                else
                   printf( "Error compiling script\n" );
+               
+               popURL();
            }
            else
               fprintf( stderr, "Error opening %s\n", cURL );
@@ -140,7 +147,7 @@ static JSFunctionSpec shell_functions[] = {
 };
 
 static JSFunctionSpec shell_functions2[] = {
-    {"urlExec",         UrlExec,        0},
+    {"urlExec",         urlExec,        0},
     {0}
 };
 
@@ -187,6 +194,7 @@ int main(int argc, char **argv)
                initJSText( cx, glob );
                initJSScreen( cx, glob );
                initJSURL( cx, glob );
+               initJSMP3( cx, glob );
                printf( "initialized jsCurl and jsImage\n" );
 
                curlCache_t &cache = getCurlCache();
@@ -198,6 +206,8 @@ int main(int argc, char **argv)
                   curlFile_t f( cache.get( url, false ) );
                   if( f.isOpen() )
                   {
+                     pushURL( f.getEffectiveURL() );
+
                      printf( "opened url\n" );
                      
                      JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), url, 1 );
@@ -216,6 +226,8 @@ int main(int argc, char **argv)
                      }
                      else
                         printf( "Error compiling script\n" );
+                     
+                     popURL();
                   }
                   else
                      printf( "Error opening url %s\n", url );
