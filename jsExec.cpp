@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.68  2004-01-02 23:36:56  ericn
+ * Revision 1.69  2004-02-03 06:12:22  ericn
+ * -saves base url for scripts
+ *
+ * Revision 1.68  2004/01/02 23:36:56  ericn
  * -allow shebang
  *
  * Revision 1.67  2004/01/01 20:31:44  ericn
@@ -551,9 +554,13 @@ int prMain(int argc, char **argv)
 
                         JSScript *script = 0 ;
                         
-                        if( ( 2 < argc ) && ( 0 == strcmp( "-", argv[1] ) ) )
+                        if( ( 2 <= argc ) && ( '-' == argv[1][0] ) )
                         {
+                           char fullpath[PATH_MAX];
                            argc-- ; argv++ ;
+                           std::string url( "file://" );
+                           url += realpath( argv[1], fullpath );
+                           pushURL( url );
                            memFile_t fIn( argv[1] );
                            if( fIn.worked() )
                            {
