@@ -18,10 +18,10 @@ ifneq (,$(findstring arm, $(CC)))
    LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
    IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
 else
-   CC=gcc
+   CC=g++
    AR=ar
    LIBS=-L/usr/local/lib -L./
-   IFLAGS=-I/usr/include/freetype2
+   IFLAGS=-I$(INSTALL_ROOT)/include/g++-3 -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
    STRIP=strip
 endif
 
@@ -98,6 +98,20 @@ madHeaders: madHeadersMain.o Makefile $(LIB)
 	$(CC) -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz 
 	arm-linux-nm madHeaders >madHeaders.map
 	$(STRIP) madHeaders
+
+imgJPEGMain.o : imgJPEG.cpp Makefile
+	$(CC) -c $(IFLAGS) -o imgJPEGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgJPEG.cpp
+
+imgJPEG : imgJPEGMain.o memFile.o hexDump.o fbDev.o
+	$(CC) -o imgJPEG imgJPEGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -ljpeg
+	$(STRIP) imgJPEG
+
+imgPNGMain.o : imgPNG.cpp Makefile
+	$(CC) -c $(IFLAGS) -o imgPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgPNG.cpp
+
+imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
+	$(CC) -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
+	$(STRIP) imgPNG
 
 all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
