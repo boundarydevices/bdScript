@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.7  2002-11-30 18:52:57  ericn
+ * Revision 1.8  2002-12-01 02:42:44  ericn
+ * -modified to root handlers on way through queue
+ *
+ * Revision 1.7  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.6  2002/11/30 05:26:39  ericn
@@ -149,7 +152,7 @@ static void doit( box_t         &box,
    jsval jsv ;
    if( JS_GetProperty( button->cx_, button->jsObj_, method, &jsv ) && JSVAL_IS_STRING( jsv ) )
    {
-      if( !queueSource( button->jsObj_, jsv, "buttonTouch" ) )
+      if( !queueUnrootedSource( button->jsObj_, jsv, "buttonTouch" ) )
          JS_ReportError( button->cx_, "Error queueing button handler" );
    }
 }
