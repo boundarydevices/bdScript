@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.5 2002-11-30 05:28:22 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.6 2002-12-02 15:05:54 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.5  2002-11-30 05:28:22  ericn
+ * Revision 1.6  2002-12-02 15:05:54  ericn
+ * -removed use of mutex_t (because of nesting)
+ *
+ * Revision 1.5  2002/11/30 05:28:22  ericn
  * -fixed timed wait, added isEmpty()
  *
  * Revision 1.4  2002/11/30 00:52:59  ericn
@@ -40,7 +43,12 @@
 template <class T>
 class mtQueue_t {
 public:
-   mtQueue_t( void ) : mutex_(), cond_(), list_(), abort_( false ){}
+   mtQueue_t( void ) : mutex_(), cond_(), list_(), abort_( false )
+   {
+      pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER ; 
+      mutex_ = m2 ; 
+      pthread_cond_init( &cond_, 0 );
+   }
    ~mtQueue_t( void ){}
 
    //
@@ -61,12 +69,12 @@ public:
 
    inline bool isEmpty( void );
 
-   mutex_t        mutex_ ;
-   condition_t    cond_ ;
-   std::list<T>   list_ ;
-   bool volatile  abort_ ;
 private:
    mtQueue_t( mtQueue_t const & ); // no copies
+   pthread_mutex_t   mutex_ ;
+   pthread_cond_t    cond_ ;
+   std::list<T>      list_ ;
+   bool volatile     abort_ ;
 };
 
 //
@@ -75,38 +83,44 @@ private:
 template <class T>
 bool mtQueue_t<T>::pull( T &item )
 {
-//   printf( "locking\n" );
-   mutexLock_t lock( mutex_ );
-   if( lock.worked() )
+   int err = pthread_mutex_lock( &mutex_ );
+   if( 0 == err )
    {
       if( !abort_ && list_.empty() )
       {
-//   printf( "waiting\n" );
-         while( cond_.wait( lock ) )
+         while( 0 == pthread_cond_wait( &cond_, &mutex_ ) )
          {
             if( !list_.empty() )
             {
                item = list_.front();
                list_.pop_front();
 //   printf( "returning\n" );
+               pthread_mutex_unlock( &mutex_ );
                return true ;
             }
             else if( abort_ )
+            {
+               pthread_mutex_unlock( &mutex_ );
                return false ;
+            }
          }
          
+         pthread_mutex_unlock( &mutex_ );
          printf( "aborting(wait)\n" );
          return false ;
       }
       else if( !abort_ )
       {
-//   printf( "returning immediately\n" );
          item = list_.front();
          list_.pop_front();
+         pthread_mutex_unlock( &mutex_ );
          return true ;
       } // no need to wait
       else
+      {
+         pthread_mutex_unlock( &mutex_ );
          return false ;
+      }
    }
    else
    {
@@ -118,22 +132,40 @@ bool mtQueue_t<T>::pull( T &item )
 template <class T>
 bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
 {
-   mutexLock_t lock( mutex_ );
-   if( lock.worked() )
+   int err = pthread_mutex_lock( &mutex_ );
+   if( 0 == err )
    {
       if( !abort_ && list_.empty() )
       {
-         while( cond_.wait( lock, milliseconds ) )
+         struct timeval now ; gettimeofday( &now, 0 );
+         now.tv_usec += milliseconds*1000 ;
+         if( 1000000 < now.tv_usec )
+         {
+            now.tv_sec  += now.tv_usec / 1000000 ;
+            now.tv_usec  = now.tv_usec % 1000000 ;
+         }
+         timespec then ; 
+         
+         then.tv_sec  = now.tv_sec ;
+         then.tv_nsec = now.tv_usec*1000 ;
+         
+         while( 0 == pthread_cond_timedwait( &cond_, &mutex_, &then ) )
          {
             if( !abort_ && !list_.empty() )
             {
                item = list_.front();
                list_.pop_front();
+               pthread_mutex_unlock( &mutex_ );
                return true ;
             }
             else if( abort_ )
+            {
+               pthread_mutex_unlock( &mutex_ );
                return false ;
+            }
          }
+
+         pthread_mutex_unlock( &mutex_ );
 
          return false ;
       }
@@ -141,6 +173,7 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
       {
          item = list_.front();
          list_.pop_front();
+         pthread_mutex_unlock( &mutex_ );
          return true ;
       } // no need to wait
    }
@@ -154,25 +187,34 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
 template <class T>
 bool mtQueue_t<T>::push( T const &item )
 {
-   mutexLock_t lock( mutex_ );
-   if( lock.worked() )
+printf( "push\n" );   
+   int err = pthread_mutex_lock( &mutex_ );
+   if( 0 == err )
    {
+printf( "pushLock\n" );   
       list_.push_back( item );
-      cond_.signal();
+      pthread_cond_signal( &cond_ );
+printf( "pushUnLock\n" );   
+      pthread_mutex_unlock( &mutex_ );
+printf( "pushDone\n" );   
       return true ;
    }
    else
+   {
+printf( "pushLockErr\n" );   
       return false ;
+   }
 }
    
 template <class T>
 bool mtQueue_t<T>::abort( void )
 {
-   mutexLock_t lock( mutex_ );
-   if( lock.worked() )
+   int err = pthread_mutex_lock( &mutex_ );
+   if( 0 == err )
    {
       abort_ = true ;
-      cond_.broadcast();
+      pthread_cond_broadcast( &cond_ );
+      pthread_mutex_unlock( &mutex_ );
       return true ;
    }
    else
@@ -181,8 +223,14 @@ bool mtQueue_t<T>::abort( void )
 template <class T>
 bool mtQueue_t<T>::isEmpty( void )
 {
-   mutexLock_t lock( mutex_ );
-   return list_.empty();
+   int err = pthread_mutex_lock( &mutex_ );
+   
+   bool result = list_.empty();
+   
+   if( 0 == err )
+      pthread_mutex_unlock( &mutex_ );
+
+   return result ;
 }
 
 #endif
