@@ -15,11 +15,13 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        jsFileIO.o
 
 CC=arm-linux-gcc
+LIBBDGRAPH=bdGraph/libbdGraph.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
+   OBJCOPY=arm-linux-objcopy
    LIBS=-L./ -L../install/arm-linux/lib
    IFLAGS= \
           -I../linux-2.4.19/include \
@@ -34,6 +36,7 @@ else
    LIBS=-L./
    IFLAGS=-I$(INSTALL_ROOT)/include/g++-3 -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
    STRIP=strip
+   OBJCOPY=objcopy
    LIB = ./libCurlCache.a
 endif
 
@@ -43,8 +46,14 @@ else
    TSINPUTFLAG=1
 endif
 
-%.o : %.cpp Makefile
+%.o : %.cpp
 	$(CC) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+#jsImage.o : jsImage.cpp Makefile
+#	$(CC) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
+
+$(LIBBDGRAPH):
+	make -C bdGraph all
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
@@ -61,20 +70,22 @@ curlGet: curlGet.cpp $(LIB) Makefile
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
-urlTest: urlTest.o $(LIB) 
+urlTest: urlTest.o $(LIB)
 	$(CC) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread
 
-mp3Play: mp3Play.o $(LIB) 
+mp3Play: mp3Play.o $(LIB)
 	$(CC) -D_REENTRANT=1 -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
 	$(STRIP) mp3Play
 
 testJS: testJS.cpp $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
-jsExec: jsExec.o $(LIB) Makefile
-	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH)
+	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
-	$(STRIP) jsExec
+
+jpegview: jpegview.o $(LIBBDGRAPH)
+	$(CC) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph
 
 madTest: madTest.o $(LIB)
 	$(CC) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
@@ -114,7 +125,7 @@ madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
 	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o madHeadersMain.o -O2 -D__STANDALONE__ $(IFLAGS) madHeaders.cpp
 
 madHeaders: madHeadersMain.o Makefile $(LIB)
-	$(CC) -D_REENTRANT=1 -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz 
+	$(CC) -D_REENTRANT=1 -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz
 	arm-linux-nm madHeaders >madHeaders.map
 	$(STRIP) madHeaders
 
@@ -164,15 +175,15 @@ ffPlay: ffPlay.cpp $(LIB)
 	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
 	$(STRIP) $@
 
-cbmGraph: cbmGraph.cpp 
+cbmGraph: cbmGraph.cpp
 	$(CC) $(IFLAGS) -o cbmGraph -Xlinker -Map -Xlinker cbmGraph.map cbmGraph.cpp $(LIBS)
 	$(STRIP) $@
 
-cbmStat: cbmStat.cpp 
+cbmStat: cbmStat.cpp
 	$(CC) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS)
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat
+all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
 
 .PHONY: install-libs install-headers
 
@@ -186,7 +197,8 @@ install-headers:
 	cp -f -v $(shared-headers) ../install/arm-linux/include
 
 install-bin:
-	cp -f -v jsExec ../install/arm-linux/bin
+	$(OBJCOPY) -S -v jsExec   ../install/arm-linux/bin/jsExec
+	$(OBJCOPY) -S -v jpegview ../install/arm-linux/bin/jpegview
 
 install: install-bin install-headers
 
