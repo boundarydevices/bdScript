@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.2  2002-11-30 00:30:15  ericn
+ * Revision 1.3  2002-11-30 05:29:45  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.2  2002/11/30 00:30:15  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
@@ -23,7 +26,8 @@
 #include "ccActiveURL.h"
 #include <string.h>
 
-static semaphore_t sem_ ;
+static mutex_t     mutex_ ;
+static condition_t cond_ ;
 
 static void onComplete( void         *opaque,
                         void const   *data,
@@ -32,10 +36,8 @@ static void onComplete( void         *opaque,
    urlFile_t *f = (urlFile_t *)opaque ;
    unsigned long identifier ;
    getCurlCache().openHandle( f->url_, f->data_, f->size_, f->handle_ );
-   printf( "signalling...\n" );
-   if( sem_.signal() )
-      printf( "done\n" );
-   else
+   mutexLock_t lock( mutex_ );
+   if( !cond_.signal() )
       fprintf( stderr, "Error %m signalling completion\n" );
 }
 
@@ -43,13 +45,15 @@ static void onFailure( void              *opaque,
                        std::string const &errorMsg )
 {
    printf( "failed:%s\n", errorMsg.c_str() );
-   sem_.signal();
+   mutexLock_t lock( mutex_ );
+   cond_.signal();
 }
 
 static void onCancel( void *opaque )
 {
    printf( "cancelled\n" );
-   sem_.signal();
+   mutexLock_t lock( mutex_ );
+   cond_.signal();
 }
 
 static void onSize( void         *opaque,
@@ -75,13 +79,9 @@ urlFile_t :: urlFile_t( char const url[] )
      size_( 0 ),
      data_( 0 )
 {
+   mutexLock_t lock( mutex_ );
    getCurlCache().get( url, this, callbacks_ );
-   printf( "locking...\n" );
-   printf( "waiting...\n" );
-   if( sem_.wait() )
-      printf( "done...\n" );
-   else
-      printf( "abort...\n" );
+   cond_.wait( lock );
 }
 
 urlFile_t :: ~urlFile_t( void )
