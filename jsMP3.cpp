@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.4  2002-10-25 03:00:56  ericn
+ * Revision 1.5  2002-10-25 14:19:11  ericn
+ * -added mp3Skip() and mp3Count() routines
+ *
+ * Revision 1.4  2002/10/25 03:00:56  ericn
  * -fixed return value
  *
  * Revision 1.3  2002/10/25 02:57:04  ericn
@@ -141,9 +144,39 @@ jsMP3Wait( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsMP3Skip( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   childProcessLock_t lock ;
+   if( curProcess_.isRunning() )
+      kill( curProcess_.pid_, 9 );
+   
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSBool
+jsMP3Count( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   int numQueued = 0 ;
+
+   {
+      childProcessLock_t lock ;
+      if( curProcess_.isRunning() )
+         numQueued = 1 ;
+   
+      numQueued += playList_.size();
+   }
+
+   *rval = INT_TO_JSVAL( numQueued );
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec text_functions[] = {
     {"mp3Play",           jsMP3Play,        1 },
     {"mp3Wait",           jsMP3Wait,        1 },
+    {"mp3Skip",           jsMP3Skip,        1 },
+    {"mp3Count",          jsMP3Count,       1 },
     {0}
 };
 
