@@ -18,6 +18,7 @@ OBJS = \
        ddtoul.o \
        dirByATime.o \
        dither.o \
+       dumpCPP.o \
        fbDev.o \
        flashThread.o \
        ftObjs.o \
@@ -61,6 +62,7 @@ OBJS = \
        memFile.o \
        monitorWLAN.o \
        openFds.o \
+       palette.o \
        parsedFlash.o \
        parsedURL.o \
        ping.o \
