@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.6  2002-10-24 13:18:25  ericn
+ * Revision 1.7  2002-10-25 02:53:33  ericn
+ * -moved non-Javascript URL stuff to relativeURL.cpp
+ *
+ * Revision 1.6  2002/10/24 13:18:25  ericn
  * -modified for relative URLs
  *
  * Revision 1.5  2002/10/15 05:00:55  ericn
@@ -41,7 +44,7 @@
 #include <stdio.h>
 #include "dirByATime.h"
 #include <zlib.h>
-#include "jsURL.h"
+#include "relativeURL.h"
 
 bool findEnd( void const   *mem,            // input : mapped file
               unsigned long fileSize,       // input : size of mapped memory
