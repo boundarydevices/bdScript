@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: childProcess.cpp,v $
- * Revision 1.2  2003-08-24 14:11:32  ericn
+ * Revision 1.3  2003-08-24 15:47:46  ericn
+ * -exposed child process map
+ *
+ * Revision 1.2  2003/08/24 14:11:32  ericn
  * -fixed exec-error problem
  *
  * Revision 1.1  2002/10/25 02:55:01  ericn
@@ -20,7 +23,6 @@
 
 
 #include "childProcess.h"
-#include <map>
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -28,7 +30,6 @@
 #include <sys/wait.h>
 #include <sys/errno.h>
 
-typedef std::map<int,childProcess_t *> pidToChild_t ;
 
 static pidToChild_t children_ ;
 static struct sigaction oldint_ ;
@@ -126,6 +127,11 @@ childProcessLock_t :: ~childProcessLock_t( void )
    sigprocmask( SIG_UNBLOCK, &mask_, 0 );
 }
 
+pidToChild_t const &getProcessMap( childProcessLock_t & )
+{
+   return children_ ;
+}
+
 #ifdef __MODULETEST__
 
 int main( int argc, char **argv )
@@ -146,8 +152,18 @@ int main( int argc, char **argv )
 
       printf( "waiting for process completion\n" );
 
-      while( 0 < children_.size() )
+      do {
+         {
+            childProcessLock_t lock ;
+            pidToChild_t const &children = getProcessMap( lock );
+            if( 0 == children.size() )
+               break;
+         }
+         
+         // only get here if children are alive
          pause();
+
+      } while( 1 );
       
       printf( "process complete\n" );
       
