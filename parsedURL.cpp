@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.1  2002-11-29 18:38:05  ericn
+ * Revision 1.2  2002-11-30 18:00:30  ericn
+ * -modified to include host always
+ *
+ * Revision 1.1  2002/11/29 18:38:05  ericn
  * -Initial import
  *
  *
@@ -210,23 +213,19 @@ void parsedURL_t :: getAbsolute( std::string &absolute ) const
    {
       absolute = protocol_ ;
       absolute += "://" ;
-      if( host_.size() )
+      absolute += host_ ;
+      if( 0 != port_ )
+         absolute += ultoa_t( port_, 0 ).getValue();
+
+      absolute += '/' ;
+
+      for( unsigned i = 0 ; i < pathParts_.size() ; i++ )
       {
-         absolute += host_ ;
-         if( 0 != port_ )
-            absolute += ultoa_t( port_, 0 ).getValue();
-
+         absolute += pathParts_[i];
          absolute += '/' ;
-
-         for( unsigned i = 0 ; i < pathParts_.size() ; i++ )
-         {
-            absolute += pathParts_[i];
-            absolute += '/' ;
-         }
-         
-         absolute += file_ ;
+      }
       
-      } // have host
+      absolute += file_ ;
    } // have protocol
    else
       absolute = "none:" ;
