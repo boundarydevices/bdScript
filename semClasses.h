@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.7 2002-11-30 05:28:54 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.8 2002-12-02 15:05:03 ericn Exp $"
 
 /*
  * semClasses.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.7  2002-11-30 05:28:54  ericn
+ * Revision 1.8  2002-12-02 15:05:03  ericn
+ * -added names to mutexes (for debug), moved stuff out-of-line
+ *
+ * Revision 1.7  2002/11/30 05:28:54  ericn
  * -removed semaphore_t
  *
  * Revision 1.6  2002/11/30 01:41:46  ericn
@@ -43,10 +46,13 @@
 
 class mutex_t {
 public:
-   mutex_t( void ) : handle_(){ pthread_mutex_t h2 = PTHREAD_MUTEX_INITIALIZER ; handle_ = h2 ; }
-   ~mutex_t( void ){ pthread_mutex_destroy( &handle_ ); }
+   mutex_t( char const *name = "unnamed" );
+   ~mutex_t( void );
 
-   pthread_mutex_t handle_ ;
+   pthread_mutex_t   handle_ ;
+   pthread_t         owner_ ;
+   unsigned          lockCount_ ;
+   char const *const name_ ;
 
 private:
    mutex_t( mutex_t const & ); // no copies
@@ -54,19 +60,17 @@ private:
 
 class mutexLock_t {
 public:
-   mutexLock_t( mutex_t &m ) : handle_( m.handle_ ), result_( pthread_mutex_lock( &handle_ ) ){}
-   mutexLock_t( pthread_mutex_t &m ) : handle_( m ), result_( pthread_mutex_lock( &handle_ ) ){}
-   inline ~mutexLock_t( void );
+   mutexLock_t( mutex_t &m );
+   ~mutexLock_t( void );
 
    bool worked( void ) const { return 0 == result_ ; }
 
-   pthread_mutex_t &handle_ ;
-   int              result_ ;
+   mutex_t &mutex_ ;
+   int      result_ ;
 
 private:
    mutexLock_t( mutexLock_t const & ); // no copies
 };
-
 
 class condition_t {
 public:
@@ -101,20 +105,9 @@ private:
 
 
 
-mutexLock_t :: ~mutexLock_t( void )
-{ 
-   if( 0 == result_ ) 
-   {
-//      int rval = 
-      pthread_mutex_unlock( &handle_ ); 
-//      if( 0 != rval )
-//         printf( "Error unlocking mutex!\n" );
-   }
-}
-
 bool condition_t :: wait( mutexLock_t &lock )
 { 
-   if( 0 == pthread_cond_wait( &handle_, &lock.handle_ ) )
+   if( 0 == pthread_cond_wait( &handle_, &lock.mutex_.handle_ ) )
    {
       return true ;
    }
@@ -141,7 +134,7 @@ inline bool condition_t :: wait
    then.tv_sec  = now.tv_sec ;
    then.tv_nsec = now.tv_usec*1000 ;
    
-   if( 0 == pthread_cond_timedwait( &handle_, &lock.handle_, &then ) )
+   if( 0 == pthread_cond_timedwait( &handle_, &lock.mutex_.handle_, &then ) )
    {
       return true ;
    }
