@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.3 2002-10-09 01:10:03 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.4 2002-10-13 13:42:09 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.3  2002-10-09 01:10:03  ericn
+ * Revision 1.4  2002-10-13 13:42:09  ericn
+ * -got rid of content reference for file posts
+ *
+ * Revision 1.3  2002/10/09 01:10:03  ericn
  * -added post support
  *
  * Revision 1.2  2002/10/06 14:52:02  ericn
@@ -87,18 +90,12 @@ public:
    curlRequest_t( char const url[] ); // must stay around 'til destructor
    ~curlRequest_t( void );
 
-   struct fileValue_t {
-      char const   *path_ ;
-      void const   *content_ ;
-      unsigned long length_ ;
-   };
-
    struct param_t {
       bool        isFile_ ;
       char const *name_ ;
       union {
          char const *stringValue_ ;
-         fileValue_t fileValue_ ;
+         char const *fileValue_ ;
       } value_ ;
    };
 
@@ -110,9 +107,7 @@ public:
                      char const *value );
 
    void addFile( char const   *name,
-                 char const   *path,
-                 void const   *content,
-                 unsigned long length );
+                 char const   *path );
 
    bool hasFile( void ) const { return hasFile_ ; }
 

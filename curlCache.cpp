@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.2  2002-10-09 01:10:07  ericn
+ * Revision 1.3  2002-10-13 13:42:13  ericn
+ * -got rid of content reference for file posts
+ *
+ * Revision 1.2  2002/10/09 01:10:07  ericn
  * -added post support
  *
  * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
@@ -299,16 +302,12 @@ void curlRequest_t :: addVariable
 
 void curlRequest_t :: addFile
    ( char const   *name,
-     char const   *path,
-     void const   *content,
-     unsigned long length )
+     char const   *path )
 {
    param_t param ;
-   param.name_                      = name ;
-   param.isFile_                    = true ;
-   param.value_.fileValue_.path_    = path ;
-   param.value_.fileValue_.content_ = content ;
-   param.value_.fileValue_.length_  = length ;
+   param.name_             = name ;
+   param.isFile_           = true ;
+   param.value_.fileValue_ = path ;
    parameters_.push_back( param );
 }
 
@@ -447,7 +446,7 @@ bool curlCache_t :: startPost
                   else
                      curl_formadd( &postHead, &last,
                                    CURLFORM_PTRNAME, param.name_,
-                                   CURLFORM_FILE, param.value_.fileValue_.path_,
+                                   CURLFORM_FILE, param.value_.fileValue_,
                                    CURLFORM_CONTENTTYPE, "application/octet-stream",
                                    CURLFORM_END );
                }
@@ -618,8 +617,7 @@ std::string curlCache_t :: getCachedName( curlRequest_t const &req )
       else
       {
          adler = ~adler ;
-         adler = adler32( adler, (Bytef const *)param.value_.fileValue_.path_, strlen( param.value_.fileValue_.path_ ) );
-         adler = adler32( adler, (Bytef const *)param.value_.fileValue_.content_, param.value_.fileValue_.length_ );
+         adler = adler32( adler, (Bytef const *)param.value_.fileValue_, strlen( param.value_.fileValue_ ) );
       } // file
    }
    
@@ -697,18 +695,7 @@ int main( int argc, char const * const argv[] )
             } // string parameter
             else
             {
-               files.push_back( memFile_t( argv[arg+1]+1 ) );
-               memFile_t const &fIn = files.back();
-
-               if( fIn.worked() )
-               {
-                  req.addFile( argv[arg], argv[arg+1]+1, fIn.getData(), fIn.getLength() );
-               }
-               else
-               {
-                  fprintf( stderr, "Error %s opening %s\n", fIn.getError(), argv[arg+1]+1 );
-                  return -3 ;
-               }
+               req.addFile( argv[arg], argv[arg+1]+1 );
             } // file parameter
          }
 
