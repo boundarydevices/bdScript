@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.16  2003-02-09 02:58:52  ericn
+ * Revision 1.17  2003-02-10 01:16:49  ericn
+ * -modified to allow truncation of text
+ *
+ * Revision 1.16  2003/02/09 02:58:52  ericn
  * -moved font dump to ftObjs
  *
  * Revision 1.15  2003/02/07 03:01:33  ericn
@@ -448,11 +451,17 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 {
    *rval = JSVAL_FALSE ;
    
-   if( ( 2 == argc )
+   if( ( 2 <= argc )
+       &&
+       ( 3 >= argc )
        &&
        JSVAL_IS_INT( argv[0] )
        &&
-       JSVAL_IS_STRING( argv[1] ) )
+       JSVAL_IS_STRING( argv[1] ) 
+       &&
+       ( ( 2 == argc ) 
+         || 
+         ( JSVAL_IS_INT( argv[2] ) ) ) )
    {
       jsval     dataVal ;
       JSString *fontString ; 
@@ -473,7 +482,8 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
             char const *renderString = JS_GetStringBytes( sParam );
             unsigned const renderLen = JS_GetStringLength( sParam );
    
-            freeTypeString_t ftString( font, pointSize, renderString, renderLen );
+            unsigned maxWidth = ( 3 == argc ) ? JSVAL_TO_INT( argv[2] ) : 0xFFFFFFFF ;
+            freeTypeString_t ftString( font, pointSize, renderString, renderLen, maxWidth );
             
             JSObject *returnObj = JS_NewObject( cx, &jsAlphaMapClass_, 0, 0 );
             if( returnObj )

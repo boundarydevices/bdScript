@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.8  2003-02-09 03:44:44  ericn
+ * Revision 1.9  2003-02-10 01:16:56  ericn
+ * -modified to allow truncation of text
+ *
+ * Revision 1.8  2003/02/09 03:44:44  ericn
  * -added filename for batch dump output
  *
  * Revision 1.7  2003/02/09 02:58:52  ericn
@@ -210,7 +213,8 @@ freeTypeString_t :: freeTypeString_t
    ( freeTypeFont_t &font,
      unsigned        pointSize,
      char const     *dataStr,
-     unsigned        strLen )
+     unsigned        strLen,
+     unsigned        maxWidth )
    : width_( 0 ),
      height_( 0 ),
      baseline_( 0 ),
@@ -347,6 +351,8 @@ freeTypeString_t :: freeTypeString_t
 
    if( ( 0 != width_ ) && ( 0 != height_ ) )
    {
+      if( width_ > maxWidth )
+         width_ = maxWidth ;
       unsigned const outBytes = width_*height_ ;
       data_ = new unsigned char [ outBytes ];
       memset( data_, 0, outBytes );
@@ -385,8 +391,6 @@ freeTypeString_t :: freeTypeString_t
                      {
                         if( nextX >= width_ )
                         {
-                           fprintf( stderr, "Invalid x : %d, penX = %d, width_ = %u\n", (short)nextX, penX, width_ );
-                           fprintf( stderr, "bitmap_left = %d\n", glyph->glyphBitmap_left );
                            continue ;
                         }
                         
@@ -416,17 +420,21 @@ freeTypeString_t :: freeTypeString_t
                      unsigned short nextX = penX + glyph->glyphBitmap_left ;
                      for( int col = 0 ; col < glyph->bmpWidth ; col++, nextX++ )
                      {
-                        assert( nextX < width_ );
-                        unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
-                        *nextOut++ = ( 0 == ( *rasterCol & mask ) )
-                                     ? 0 
-                                     : 255 ;
-                        mask >>= 1 ;
-                        if( 0 == mask )
+                        if( nextX < width_ )
                         {
-                           mask = 0x80 ;
-                           rasterCol++ ;
+                           unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
+                           *nextOut++ = ( 0 == ( *rasterCol & mask ) )
+                                        ? 0 
+                                        : 255 ;
+                           mask >>= 1 ;
+                           if( 0 == mask )
+                           {
+                              mask = 0x80 ;
+                              rasterCol++ ;
+                           }
                         }
+                        else
+                           break;
                      } // for each column
                      rasterLine += glyph->bmpPitch ;
                   }
@@ -471,7 +479,7 @@ int main( int argc, char const * const argv[] )
             freeTypeFont_t font( fIn.getData(), fIn.getLength() );
             if( font.worked() )
             {
-               freeTypeString_t render( font, atoi( argv[2] ), stringToRender, stringLen );
+               freeTypeString_t render( font, atoi( argv[2] ), stringToRender, stringLen, 0xFFFFFFFF );
                if( 0 == i )
                   printf( "width %u, height %u, y advance %u\n", render.getWidth(), render.getHeight(), render.getFontHeight() );
 /*

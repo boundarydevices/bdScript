@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.4 2003-02-09 02:58:52 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.5 2003-02-10 01:17:00 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.4  2003-02-09 02:58:52  ericn
+ * Revision 1.5  2003-02-10 01:17:00  ericn
+ * -modified to allow truncation of text
+ *
+ * Revision 1.4  2003/02/09 02:58:52  ericn
  * -moved font dump to ftObjs
  *
  * Revision 1.3  2003/02/07 03:01:33  ericn
@@ -57,7 +60,8 @@ public:
    freeTypeString_t( freeTypeFont_t &font,
                      unsigned        pointSize,
                      char const     *dataStr,
-                     unsigned        strLen );
+                     unsigned        strLen,
+                     unsigned        maxWidth );
    ~freeTypeString_t( void );
 
    // bitmap dimensions

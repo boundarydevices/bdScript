@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.19  2003-02-07 04:41:35  ericn
+ * Revision 1.20  2003-02-10 01:17:46  ericn
+ * -modified to allow truncation of text
+ *
+ * Revision 1.19  2003/02/07 04:41:35  ericn
  * -removed audio cancel on press/release
  *
  * Revision 1.18  2003/02/07 03:01:33  ericn
@@ -241,9 +244,10 @@ static void drawButton( buttonData_t const &button, bool pressed )
    freeTypeFont_t font( button.fontData_, button.fontSize_ );
    if( font.worked() )
    {
-      freeTypeString_t ftString( font, button.pointSize_, button.msgString_, strlen( button.msgString_ ) );
-
       unsigned const boxWidth  = b[2]-b[0];
+      freeTypeString_t ftString( font, button.pointSize_, button.msgString_, strlen( button.msgString_ ),
+                                 boxWidth );
+
       if( boxWidth > ftString.getWidth() )
       {
          unsigned const diff = boxWidth-ftString.getWidth();
