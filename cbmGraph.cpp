@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: cbmGraph.cpp,v $
- * Revision 1.1  2003-05-09 04:28:12  ericn
+ * Revision 1.2  2003-05-10 03:17:47  ericn
+ * -changed cut command
+ *
+ * Revision 1.1  2003/05/09 04:28:12  ericn
  * -Initial import
  *
  *
@@ -87,8 +90,7 @@ int main( void )
       int const numWritten = write( fd, outBuf, nextOut-outBuf );
       printf( "wrote %d bytes\n", numWritten );
 
-      sleep( 3 );
-      write( fd, "\x1bm", 6 );
+      write( fd, "\x1dV", 6 );
 
 /*
       int const width = 410 ;
