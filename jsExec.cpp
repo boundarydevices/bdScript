@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.50  2003-08-12 01:20:27  ericn
+ * Revision 1.51  2003-08-20 02:54:02  ericn
+ * -added module jsMonWLAN
+ *
+ * Revision 1.50  2003/08/12 01:20:27  ericn
  * -added WLAN sniffing support
  *
  * Revision 1.49  2003/08/06 13:51:33  ericn
@@ -211,6 +214,7 @@
 #include "jsMPEG.h"
 #include "jsFlash.h"
 #include "jsSniffWLAN.h"
+#include "jsMonWLAN.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -352,6 +356,7 @@ int prMain(int argc, char **argv)
                      initJSMPEG( cx, glob );
                      initJSFlash( cx, glob );
                      initSniffWLAN( cx, glob );
+                     initMonitorWLAN( cx, glob );
 
                      getCurlCache();
 
