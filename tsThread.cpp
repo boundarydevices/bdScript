@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.3  2002-11-21 14:08:13  ericn
+ * Revision 1.4  2002-11-29 16:41:54  ericn
+ * -added return value from reader thread
+ *
+ * Revision 1.3  2002/11/21 14:08:13  ericn
  * -modified to clamp at display bounds
  *
  * Revision 1.2  2002/11/08 13:57:02  ericn
@@ -123,6 +126,7 @@ static void *tsThread( void *arg )
    
    fprintf( stderr, "touch screen thread shutting down due to error %m\n" );
 
+   return 0 ;
 }
 
 touchScreenThread_t :: touchScreenThread_t( void )
