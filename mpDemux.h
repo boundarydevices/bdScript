@@ -1,5 +1,5 @@
 #ifndef __MPDEMUX_H__
-#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.1 2003-07-20 15:43:13 ericn Exp $"
+#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.2 2003-07-20 18:36:05 ericn Exp $"
 
 /*
  * mpDemux.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: mpDemux.h,v $
- * Revision 1.1  2003-07-20 15:43:13  ericn
+ * Revision 1.2  2003-07-20 18:36:05  ericn
+ * -added PTS interface
+ *
+ * Revision 1.1  2003/07/20 15:43:13  ericn
  * -Initial version, using libavformat
  *
  *
@@ -36,7 +39,8 @@ public:
    };
 
    frameType_e getFrame( void const   *&fData,
-                         unsigned long &length );     // #bytes
+                         unsigned long &length,       // #bytes
+                         INT64         &when_ms );    // when to play, ms relative to start
 
 private:
    typedef enum state_e {

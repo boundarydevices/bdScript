@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.1  2003-07-20 15:43:16  ericn
+ * Revision 1.2  2003-07-20 18:36:07  ericn
+ * -added PTS interface
+ *
+ * Revision 1.1  2003/07/20 15:43:16  ericn
  * -Initial version, using libavformat
  *
  *
@@ -60,13 +63,20 @@ mpegDemux_t :: ~mpegDemux_t( void )
 {
 }
 
+inline INT64 pts_to_ms( INT64 pts )
+{
+   return ( pts / 90 );
+}
+
 mpegDemux_t :: frameType_e 
    mpegDemux_t :: getFrame
       ( void const  *&fData,
-        unsigned long &length )
+        unsigned long &length,
+        INT64         &when_ms )
 {
    fData = 0 ;
    length = 0 ;
+   when_ms = -1 ;
    switch( state_ )
    {
       case processing_e :
@@ -82,6 +92,7 @@ mpegDemux_t :: frameType_e
                int result = av_read_packet( avfCtx_, &packet_ );
                if( 0 <= result )
                {
+                  when_ms = pts_to_ms( packet_.pts );
                   int const codecType = avfCtx_->streams[packet_.stream_index]->codec.codec_type;
                   if( CODEC_TYPE_AUDIO == codecType )
                   {
