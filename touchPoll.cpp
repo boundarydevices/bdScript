@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.5  2004-01-01 20:11:42  ericn
+ * Revision 1.6  2004-11-26 15:28:54  ericn
+ * -use median/mean instead of range filter
+ *
+ * Revision 1.5  2004/01/01 20:11:42  ericn
  * -added isOpen() routine, and switched pollHandlers to use close()
  *
  * Revision 1.4  2003/11/28 14:04:48  ericn
@@ -34,6 +37,16 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "debugPrint.h"
+#include "rollingMedian.h"
+#include "rollingMean.h"
+
+#define MEDIANRANGE 5
+static rollingMedian_t medianX_( MEDIANRANGE );
+static rollingMedian_t medianY_( MEDIANRANGE );
+
+#define MEANRANGE 5
+static rollingMean_t meanX_( MEANRANGE );
+static rollingMean_t meanY_( MEANRANGE );
 
 struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
 	unsigned short pressure;
@@ -47,12 +60,6 @@ touchPoll_t :: touchPoll_t
    ( pollHandlerSet_t &set,
      char const       *devName )
    : pollHandler_t( open( devName, O_RDONLY ), set )
-   , prevX_( -1 )
-   , xRange_( 0 )
-   , prevY_( -1 )
-   , xMotion_( 0 )
-   , yRange_( 0 )
-   , yMotion_( 0 )
 {
    if( isOpen() )
    {
@@ -88,19 +95,16 @@ void touchPoll_t :: onDataAvail( void )
    unsigned count = 0 ;
    int numRead ;
 
-   //
-   // prevX and prevY are used to de-glitch
-   //
-   int prevX = prevX_ ;
-   int prevY = prevY_ ;
-
    while( sizeof( nextEvent ) == ( numRead = read( fd_, &nextEvent, sizeof( nextEvent ) ) ) )
    {
-      if( 0 < count )
-      {
-         prevX = event.x ;
-         prevY = event.y ;
-      }
+      medianX_.feed( event.x );
+      medianY_.feed( event.y );
+      unsigned short sample ;
+      if( medianX_.read( sample ) )
+         meanX_.feed( sample );
+      if( medianY_.read( sample ) )
+         meanY_.feed( sample );
+
       event = nextEvent ;
       count++ ;
    }
@@ -109,77 +113,37 @@ void touchPoll_t :: onDataAvail( void )
    {
       if( 0 < event.pressure )
       {
-         int minX, maxX ;
-         if( 0 != xRange_ )
-         {
-            minX = prevX - xRange_ ;
-            maxX = prevX + xRange_ ;
-            if( 0 <= xMotion_ )
-               maxX += xMotion_ ; // allow extra in same direction
-            else
-               minX -= xMotion_ ;
-         }
-         else
-         {
-            minX = 0x80000000 ;
-            maxX = 0x7fffffff ;
-         }
-
-         int minY, maxY ;
-         if( 0 != yRange_ )
-         {
-            minY = prevY - yRange_ ;
-            maxY = prevY + yRange_ ;
-            if( 0 <= yMotion_ )
-               maxY += yMotion_ ; // allow extra in same direction
-            else
-               minY -= yMotion_ ;
-         }
-         else
-         {
-            minY = 0x80000000 ;
-            maxY = 0x7fffffff ;
-         }
-
-         if( ( event.x >= minX ) && ( event.x <= maxX )
-             &&
-             ( event.y >= minY ) && ( event.y <= maxY ) )
+         unsigned short x, y ;
+//         if( medianX_.read( x ) && medianY_.read( y ) )
+         if( meanX_.read( x ) && meanY_.read( y ) )
          {
             onTouch( event.x, event.y, event.pressure, event.stamp );
+            if( !wasDown )
+            {
+debugPrint( "first touch at %u:%u\n", event.x, event.y );
+               wasDown = true ;
+            }
          }
          else
          {
-//            debugPrint( "x: range[%d,%d], value %d\n", minX, maxX, event.x );
-//            debugPrint( "y: range[%d,%d], value %d\n", minY, maxY, event.y );
-//            debugPrint( "e" ); 
-//            fflush( stdout );
-         } // eat wild one
-         
-         xMotion_ = event.x - prevX_ ;
-         yMotion_ = event.y - prevY_ ;
-         prevX_ = event.x ;
-         prevY_ = event.y ;
-         if( !wasDown )
-         {
-debugPrint( "first touch at %u:%u\n", event.x, event.y );
-            wasDown = true ;
+debugPrint( "not enough values\n" );
          }
       }
       else
       {
-debugPrint( "release at %u/%u\n", prevX_, prevY_ );
-         xMotion_ = yMotion_ = 0 ;
-         prevX_ = prevY_ = 0 ;
-         onRelease( event.stamp );
-         wasDown = false ;
+         if( wasDown )
+         {
+            onRelease( event.stamp );
+            wasDown = false ;
+         }
+         else
+         {
+debugPrint( "missed touch\n" );
+         }
+         medianX_.reset(); medianY_.reset();
+         meanX_.reset(); meanY_.reset();
       }
    }
-}
-
-void touchPoll_t :: setRange( unsigned x, unsigned y )
-{
-   xRange_ = x ;
-   yRange_ = y ;
 }
 
 #ifdef STANDALONE

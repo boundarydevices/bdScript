@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.3 2004-01-01 20:11:42 ericn Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.4 2004-11-26 15:28:52 ericn Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.3  2004-01-01 20:11:42  ericn
+ * Revision 1.4  2004-11-26 15:28:52  ericn
+ * -use median/mean instead of range filter
+ *
+ * Revision 1.3  2004/01/01 20:11:42  ericn
  * -added isOpen() routine, and switched pollHandlers to use close()
  *
  * Revision 1.2  2003/11/24 19:09:07  ericn
@@ -41,15 +44,7 @@ public:
    virtual void onRelease( timeval const &tv );
 
    virtual void onDataAvail( void );
-
-   void setRange( unsigned x, unsigned y );
 protected:
-   int      prevX_ ;
-   unsigned xRange_ ;
-   long     xMotion_ ;
-   int      prevY_ ;
-   unsigned yRange_ ;
-   long     yMotion_ ;
 };
 
 #endif
