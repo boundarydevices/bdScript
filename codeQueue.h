@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.5 2002-12-01 03:14:21 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.6 2002-12-01 15:56:48 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.5  2002-12-01 03:14:21  ericn
+ * Revision 1.6  2002-12-01 15:56:48  ericn
+ * -added filter support
+ *
+ * Revision 1.5  2002/12/01 03:14:21  ericn
  * -added executeCode() method for handlers
  *
  * Revision 1.4  2002/12/01 02:42:04  ericn
@@ -40,6 +43,7 @@
 
 #include <string>
 #include "js/jsapi.h"
+#include "dlList.h"
 
 //
 // returns true if queued successfully, 
@@ -68,6 +72,47 @@ bool queueCallback( callback_t callback,
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
                   char const *sourceFile );
+
+
+class codeFilter_t {
+public:
+   codeFilter_t( void );
+   virtual ~codeFilter_t( void ); // removes itself from the chain
+
+   //
+   // the default returns false.
+   // override this to divert callbacks.
+   //
+   // return true if your class handled the callback,
+   // false to let it pass into the queue.
+   //
+   // if you return true, the wait() call will return so
+   // that your code can check status
+   //
+   virtual bool isHandled( callback_t callback,
+                           void      *cbData );
+
+   //
+   // Call this to wait for events. Any messages in the
+   // queue will be ignored.
+   //
+   void wait( void );
+
+   //
+   // Override this to indicate completion. When this
+   // returns true, the wait() routine will return.
+   //
+   virtual bool isDone( void );
+
+private:
+   codeFilter_t( codeFilter_t const & );
+
+   friend bool queueCallback( callback_t callback,
+                              void      *cbData );
+
+   list_head   chain_ ;
+};
+
 
 //
 // returns when idle for specified time in milliseconds,

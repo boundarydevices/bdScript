@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.7  2002-12-01 14:58:51  ericn
+ * Revision 1.8  2002-12-01 15:56:51  ericn
+ * -added filter support
+ *
+ * Revision 1.7  2002/12/01 14:58:51  ericn
  * -changed queue to only deal with callbacks
  *
  * Revision 1.6  2002/12/01 03:14:42  ericn
@@ -37,6 +40,7 @@
 #include "mtQueue.h"
 #include "jsGlobals.h"
 #include "jsHyperlink.h"
+#include <linux/stddef.h>
 
 struct scriptAndScope_t {
    JSObject   *scope_ ;
@@ -54,6 +58,8 @@ typedef mtQueue_t<callbackAndData_t> codeList_t ;
 static JSContext  *context_ = 0 ;
 static JSObject   *global_ = 0 ;
 static codeList_t  codeList_ ;
+
+LIST_HEAD(filters_);
 
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
@@ -103,6 +109,25 @@ static void runAndFree( void *scriptAndScope )
 bool queueCallback( callback_t callback,
                     void      *cbData )
 {
+   {
+      mutexLock_t lock( codeList_.mutex_ );
+      for( list_head *next = filters_.next ; next != &filters_ ; next = next->next )
+      {
+         printf( "checking filter %p\n", next );
+         char *address = (char *)next - offsetof(codeFilter_t,chain_);
+         codeFilter_t *filter = (codeFilter_t *)address ;
+         if( filter->isHandled( callback, cbData ) )
+         {
+            if( filter->isDone() )
+               codeList_.cond_.signal();
+            return true ;
+         }
+      } // walk filter chain
+   } // limit scope of lock
+   
+   //
+   // not handled by filter, post to queue
+   //
    callbackAndData_t cbd ;
    cbd.callback_ = callback ;
    cbd.cbData_   = cbData ;
@@ -145,6 +170,49 @@ bool queueSource( JSObject   *scope,
    return queueCallback( runAndFree, newSS );
 }
 
+codeFilter_t :: codeFilter_t( void )
+{
+   mutexLock_t lock( codeList_.mutex_ );
+   list_add( &chain_, &filters_ );
+}
+
+codeFilter_t :: ~codeFilter_t( void )
+{
+   mutexLock_t lock( codeList_.mutex_ );
+   list_del( &chain_ );
+}
+
+bool codeFilter_t :: isHandled
+   ( callback_t callback,
+     void      *cbData )
+{
+   return false ;
+}
+
+void codeFilter_t :: wait( void )
+{
+   while( !isDone() )
+   {
+      mutexLock_t lock( codeList_.mutex_ );
+      if( lock.worked() )
+      {
+         if( !codeList_.abort_ )
+         {
+            if( !codeList_.cond_.wait( lock ) )
+               break;
+         }
+         else
+            break; // queue abort
+      }
+      else
+         break; // lock error
+   } // until app says done
+}
+
+bool codeFilter_t :: isDone( void )
+{
+   return false ;
+}
 
 //
 // returns true and a string full of bytecode if
