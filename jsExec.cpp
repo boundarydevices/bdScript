@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.40  2003-06-07 16:41:52  ericn
+ * Revision 1.41  2003-06-08 15:20:48  ericn
+ * -added ffTest
+ *
+ * Revision 1.40  2003/06/07 16:41:52  ericn
  * -removed debug msg
  *
  * Revision 1.39  2003/06/06 03:38:57  ericn
@@ -378,7 +381,6 @@ int prMain(int argc, char **argv)
                      closeCBM( cx, glob );
                      shutdownTTY();
                      shutdownGpio();
-                     stopBarcodeThread();
 
                      shutdownCurlWorkers();
                      shutdownCCDiskCache();

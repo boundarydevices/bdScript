@@ -20,6 +20,7 @@ LIBBDGRAPH=bdGraph/libbdGraph.a
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
+   NM=arm-linux-nm
    STRIP=arm-linux-strip
    OBJCOPY=arm-linux-objcopy
    LIBS=-L./ -L../install/arm-linux/lib
@@ -33,6 +34,7 @@ ifneq (,$(findstring arm, $(CC)))
 else
 #   CC=g++
    AR=ar
+   NM=nm
    LIBS=-L./
    IFLAGS=-I$(INSTALL_ROOT)/include/g++-3 -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
    STRIP=strip
@@ -173,6 +175,11 @@ ffFrames: ffFrames.cpp $(LIB)
 
 ffPlay: ffPlay.cpp $(LIB)
 	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
+	$(STRIP) $@
+
+ffTest: ffTest.cpp $(LIB)
+	$(CC) $(IFLAGS) -ggdb -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lstdc++
+	$(NM) --demangle $@ | sort >$@.sym
 	$(STRIP) $@
 
 cbmGraph: cbmGraph.cpp
