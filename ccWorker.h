@@ -1,5 +1,5 @@
 #ifndef __CCWORKER_H__
-#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.3 2002-11-30 16:22:41 ericn Exp $"
+#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.4 2003-08-01 14:29:31 ericn Exp $"
 
 /*
  * ccWorker.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: ccWorker.h,v $
- * Revision 1.3  2002-11-30 16:22:41  ericn
+ * Revision 1.4  2003-08-01 14:29:31  ericn
+ * -change onComplete interface
+ *
+ * Revision 1.3  2002/11/30 16:22:41  ericn
  * -made urls char arrays instead of strings
  *
  * Revision 1.2  2002/11/29 16:42:44  ericn
@@ -71,8 +74,7 @@ curlQueue_t &getCurlRequestQueue( void );
 // the callback should make a copy if necessary.
 //
 typedef void (*onCurlComplete_t)( curlTransferRequest_t &request,
-                                  void const            *data,
-                                  unsigned long          numRead );
+                                  std::string           &data );
 
 //
 // called if transfer fails
@@ -94,6 +96,7 @@ typedef void (*onCurlCancel_t)( curlTransferRequest_t &request );
 //
 typedef void (*onCurlSize_t)( curlTransferRequest_t &request,
                               unsigned long          size );
+
 //
 // called during transfer to indicate progress
 //

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.7  2003-01-05 01:58:15  ericn
+ * Revision 1.8  2003-08-01 14:29:26  ericn
+ * -change onComplete interface
+ *
+ * Revision 1.7  2003/01/05 01:58:15  ericn
  * -added identification of threads
  *
  * Revision 1.6  2002/12/07 21:00:42  ericn
@@ -75,7 +78,9 @@ static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
    progressData_t *pd = (progressData_t *)userp ;
    if( !*(pd->request_->cancel_) )
    {
+// printf( "appending %u bytes...\n", total );
       pd->data_->append( (char *)buffer, total );
+// printf( "done appending...\n" );
       return total ;
    }
    else
@@ -93,11 +98,12 @@ static int progress_callback
 
    if( 0 == pd->expectedBytes_ )
    {
-      if( 0.0 != dltotal )
+      if( ( 0.0 != dltotal ) && ( 0 == pd->expectedBytes_ ) )
       {
          unsigned long const expectedSize = (unsigned long)floor( dltotal );
          onSize_( *(pd->request_), expectedSize );
          pd->expectedBytes_ = expectedSize ;
+         pd->data_->reserve( expectedSize ); // prevent multiple realloc
       }
    }
    
@@ -190,7 +196,9 @@ printf( "curlReader %p (id %x)\n", &arg, pthread_self() );
 
          if( ( 0 == errorMsg.size() ) && ( !(*request.cancel_) ) )
          {
-            onComplete_( request, data.c_str(), data.size() );
+// printf( ">>> before onComplete_, size == %u\n", data.size() );
+            onComplete_( request, data );
+// printf( ">>> after onComplete_, size == %u\n", data.size() );
          }
          else if( (*request.cancel_) )
          {
