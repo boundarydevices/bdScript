@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.3 2002-11-30 00:53:43 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.4 2002-12-02 15:07:51 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.3  2002-11-30 00:53:43  ericn
+ * Revision 1.4  2002-12-02 15:07:51  ericn
+ * -added callback param for file handle
+ *
+ * Revision 1.3  2002/11/30 00:53:43  ericn
  * -changed name to semClasses.h
  *
  * Revision 1.2  2002/11/29 18:37:43  ericn
@@ -38,7 +41,8 @@
 
 typedef void (*curlCacheComplete_t)( void         *opaque,
                                      void const   *data,
-                                     unsigned long numRead );
+                                     unsigned long numRead,
+                                     unsigned long handle ); // use this to remove reference
 typedef void (*curlCacheFailure_t)( void              *opaque,
                                     std::string const &errorMsg );
 typedef void (*curlCacheCancel_t)( void *opaque );
