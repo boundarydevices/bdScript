@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.6 2002-12-02 15:05:54 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.7 2002-12-02 15:06:59 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.6  2002-12-02 15:05:54  ericn
+ * Revision 1.7  2002-12-02 15:06:59  ericn
+ * -removed debug stuff
+ *
+ * Revision 1.6  2002/12/02 15:05:54  ericn
  * -removed use of mutex_t (because of nesting)
  *
  * Revision 1.5  2002/11/30 05:28:22  ericn
@@ -94,7 +97,6 @@ bool mtQueue_t<T>::pull( T &item )
             {
                item = list_.front();
                list_.pop_front();
-//   printf( "returning\n" );
                pthread_mutex_unlock( &mutex_ );
                return true ;
             }
@@ -106,7 +108,6 @@ bool mtQueue_t<T>::pull( T &item )
          }
          
          pthread_mutex_unlock( &mutex_ );
-         printf( "aborting(wait)\n" );
          return false ;
       }
       else if( !abort_ )
@@ -124,7 +125,7 @@ bool mtQueue_t<T>::pull( T &item )
    }
    else
    {
-      printf( "aborting(lock)\n" );
+      fprintf( stderr, "mtQueue aborting(lock)\n" );
       return false ;
    }
 }
@@ -187,21 +188,16 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
 template <class T>
 bool mtQueue_t<T>::push( T const &item )
 {
-printf( "push\n" );   
    int err = pthread_mutex_lock( &mutex_ );
    if( 0 == err )
    {
-printf( "pushLock\n" );   
       list_.push_back( item );
       pthread_cond_signal( &cond_ );
-printf( "pushUnLock\n" );   
       pthread_mutex_unlock( &mutex_ );
-printf( "pushDone\n" );   
       return true ;
    }
    else
    {
-printf( "pushLockErr\n" );   
       return false ;
    }
 }
