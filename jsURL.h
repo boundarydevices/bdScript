@@ -1,5 +1,5 @@
 #ifndef __JSURL_H__
-#define __JSURL_H__ "$Id: jsURL.h,v 1.1 2002-10-20 16:31:23 ericn Exp $"
+#define __JSURL_H__ "$Id: jsURL.h,v 1.2 2002-10-24 13:15:58 ericn Exp $"
 
 /*
  * jsURL.h
@@ -18,12 +18,15 @@
  *    absoluteURL( relative )     - returns absolute URL for relative
  *    isRelativeURL( url )        - returns true if url is relative
  *    pushURL( url )              - activates a new url (relative or absolute)
- *    popURL( url )               - deactivates the previous url
+ *    popURL()                    - deactivates the previous url
  * 
  * Change History : 
  *
  * $Log: jsURL.h,v $
- * Revision 1.1  2002-10-20 16:31:23  ericn
+ * Revision 1.2  2002-10-24 13:15:58  ericn
+ * -added pushURL() and popURL()
+ *
+ * Revision 1.1  2002/10/20 16:31:23  ericn
  * -Initial import
  *
  *
@@ -51,6 +54,16 @@ bool absoluteURL( std::string const &relative,   // input : arbitrary URL
 // returns true if the specified URL is relative (missing protocol and server)
 //
 bool isRelativeURL( std::string const &url );
+
+//
+// activates a new url (relative or absolute)
+//
+void pushURL( std::string const &url );
+
+//
+// deactivates the previous url
+//
+void popURL( void );
 
 bool initJSURL( JSContext *cx, JSObject *glob );
 

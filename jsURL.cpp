@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsURL.cpp,v $
- * Revision 1.1  2002-10-20 16:31:23  ericn
+ * Revision 1.2  2002-10-24 13:16:01  ericn
+ * -added pushURL() and popURL()
+ *
+ * Revision 1.1  2002/10/20 16:31:23  ericn
  * -Initial import
  *
  *
@@ -309,6 +312,26 @@ bool isRelativeURL( std::string const &url )
    parsedURL_t parsed( url );
 //   printURL( parsed );
    return parsed.isRelative();
+}
+
+//
+// activates a new url (relative or absolute)
+//
+void pushURL( std::string const &url )
+{
+   parsedURL_t parsed( url );
+   if( 0 < urlStack_.size() )
+      parsed.fixup( urlStack_.back() );
+   urlStack_.push_back( parsed );
+}
+
+//
+// deactivates the previous url
+//
+void popURL( void )
+{
+   if( 0 < urlStack_.size() )
+      urlStack_.pop_back();
 }
 
 static JSBool
