@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.5  2002-11-30 18:52:57  ericn
+ * Revision 1.6  2002-11-30 23:45:49  ericn
+ * -rooted touch handlers
+ *
+ * Revision 1.5  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.4  2002/11/30 17:32:47  ericn
@@ -73,7 +76,6 @@ jsOnTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         JS_AddRoot( cx, sCode );
          onTouchCode_ = argv[0] ;
          *rval = JSVAL_TRUE ;
       }
@@ -98,7 +100,6 @@ jsOnRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         JS_AddRoot( cx, sCode );
          onReleaseCode_ = argv[0] ;
          *rval = JSVAL_TRUE ;
       }
@@ -123,7 +124,6 @@ jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *sCode = JSVAL_TO_STRING( argv[0] );
       if( sCode )
       {
-         JS_AddRoot( cx, sCode );
          onMoveCode_ = argv[0] ;
          *rval = JSVAL_TRUE ;
       }
@@ -298,6 +298,10 @@ bool initJSTouch( touchScreenThread_t *&thread,
          if( thread_->begin() )
          {
             thread = thread_ ;
+            JS_AddRoot( cx, &onTouchCode_ );
+            JS_AddRoot( cx, &onMoveCode_ );
+            JS_AddRoot( cx, &onReleaseCode_ );
+
             return true ;
          }
          else
