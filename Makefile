@@ -14,7 +14,8 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        popen.o jsPopen.o jsCBM.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
        jsFileIO.o jsExit.o mpegDecode.o mpDemux.o videoQueue.o videoFrames.o \
        jsMPEG.o jsFlash.o jsSniffWLAN.o sniffWLAN.o jsMonWLAN.o monitorWLAN.o \
-       ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o
+       ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o \
+       pollHandler.o barcodePoll.o touchPoll.o gpioPoll.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
@@ -221,7 +222,19 @@ md5: md5.cpp $(LIB)
 	$(STRIP) $@
 
 avSendTo: avSendTo.cpp $(LIB)
-	$(CC) $(IFLAGS) -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(CC) $(IFLAGS) -fno-rtti -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+pollHandlerTest: pollHandler.cpp $(LIB)
+	$(CC) $(IFLAGS) -o pollHandlerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollHandlerTest.map pollHandler.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+barcodePoll: barcodePoll.cpp $(LIB)
+	$(CC) $(IFLAGS) -fno-rtti -o barcodePoll -DSTANDALONE=1 -Xlinker -Map -Xlinker barcodePoll.map barcodePoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+touchPoll: touchPoll.cpp $(LIB)
+	$(CC) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
 	$(STRIP) $@
 
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
