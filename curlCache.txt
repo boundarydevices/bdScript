@@ -432,3 +432,109 @@ Since the use count tracking is in the active URL cache, that's where we'll put
 file:// handling. What we need are a file handle and flag indicating that the 
 disk info isn't in the cache, but directly opened/mmap'd.
 
+
+                        Notes on threading and locks
+                        ----------------------------
+
+The general flow of control for objects which use the curl cache is:
+
+      Javascript constructor or method call needs data from 
+      curl cache. (i.e. image())
+
+      The initializer for the object or method contains information
+      about what is to be obtained (i.e. the URL), and what to do
+      when it is loaded or cancelled:
+
+         image({url:"http://my.machine/test.png", onLoad:"this.draw(0,0);"} );
+
+      If the object is initialized using the 'new' keyword, the call is
+      asynchronous, and the onLoad, onCancel, or onLoadError handlers are
+      deferred until the main-line script is complete.
+      
+      If the object is 'new' keyword is not used, execution of the Javascript
+      file containing the call stalls until the object is loaded. In other
+      words, it is a synchronous call.
+
+      Each of the function-specific methods calls the queueCurlRequest() routine
+      to transfer the data, passing a callback routine to parse the data upon
+      retrieval.
+      
+      queueCurlRequest() in turn constructs a request for the ccActiveURL module,
+      and hands off callbacks in the form required by ccActiveURL.
+
+      Here's where things get a little messy.
+      
+      From the caller's perspective, there is a single decision which affects the
+      flow of control: whether the call is synchronous or asynchronous.
+      
+      From ccActiveURL's standpoint, though, there is another decision point:
+      Is the data immediately available? If it is, ccActiveURL calls the supplied
+      callbacks directly and never queues the request. This means that the callbacks
+      can occur in the context of either the thread which calls get() or post()
+      (for immediate results), or in the context of a worker thread.
+
+      There are a couple of ramifications of these two variables. In the asynchronous 
+      case, we want the completion handler to be executed in the C++ scope of the
+      main Javascript thread at the end of script execution (i.e. through pollCodeQueue()).
+
+      In the synchronous case, we want to stall execution of the Javascript thread
+      until the finalizing callback from ccActiveURL, so that the results of the
+      callbacks and handlers is available to the next line of Javascript.
+
+      The result needs to be a lot like the modal message handlers in a Windows 
+      application, in that some messages need to be trapped, and others queued
+      to the main message pump.
+
+                                             callbacks
+      sync/async     immediate/deferred      trapped?
+      ----------     ------------------      ----------
+      sync           immediate                  yes
+      sync           deferred                   yes
+      async          immediate                  no
+      async          deferred                   no
+
+      A couple of thoughts on implementation of this:
+
+         1. We could install a filter on the 'inbound' end of the code queue
+            which diverts certain messages to a second queue.
+
+            If we just implement this trap for callbacks, we can limit the 
+            amount of code and data needed for the filter to either a pointer
+            match on the callback data, or a combination of pointer match on
+            the data with pointer match(es) on the callback function.
+
+            In the case of the jsCurl callbacks, there are at least three 
+            function pointers of interest: onComplete, onFailure, onCancel,
+            but we'll also want to trap onProgress and onSize (and any others
+            which get added later).
+
+            We should probably re-implement the original code queue (scope,script,
+            source) to use the callback method to get rid of the union and 
+            if/else logic in the filter.
+
+         2. We could add a routine to the 'outbound' end of the code queue which
+            allows us to pull certain messages. The code queue is already set
+            up as an std::list, so pulling messages from the middle is no
+            big deal.
+
+
+      Either way (g'zin or g'zout), we need a filter, and implementing a filter will
+      be easier without the callback vs. code fragment duality in the code queue.
+      
+      Okay, the original code queue now generates a callback.
+
+      Now on to the filter.
+      
+      Rather than implementing a generic "works for everyone" kind of filter framework
+      for the one piece of code that needs it, it makes more sense to just have yet 
+      another callback that can trap events.
+
+      Install a callback and have it trap messages.
+
+      Just for grins, I'm going to implement this as a C++ base class that can be
+      overridden to provide specifics. The base class will provide insertion of
+      itself into a chain of filters, and a wait() function to wait for events to
+      come in.
+
+      Derived class(es) will override the isHandled() and isDone() methods.
+

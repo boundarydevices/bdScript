@@ -70,3 +70,46 @@ Work to be done:
                     for JSObject as well as rooting.
 
    That's not so bad.
+
+   There are 7 places that code (handlers) are stored and queued:
+      x timer thread params
+         - Modified to root when command executed, remove when shut down
+      x global touch handlers ( bare onTouch(), onMove(), onRelease() )
+         - Modified to root on startup. Never unrooted.
+      x barcode handler
+         - Modified to root on startup, unroot on shutdown of barcode thread.
+      x queueCode() routine in jsExec - handler code is a parameter to the function.
+         - Modified to root on way into queue, execute and unroot on way out
+      x jsButton - onTouch, onMove, onRelease
+
+         Because the button() class uses Javascript storage for it's internals,
+         it should generally be GC-safe, with the exception of terminating conditions
+         (i.e. button is pressed and handler queued immediately prior to destruction
+         and Garbage Collection).
+
+         To be safe, the button object should be rooted prior to handler call and
+         unrooted after handler execution.
+
+      x audioQueue_t when playback finished or cancelled
+         Note that the audio queue actually has refs to either two or three 
+         objects:
+            the MP3 file itself (used for scoping the callbacks)
+            the unnamed object used to define the onComplete and onCancel handlers
+            the onComplete and onCancel code strings
+
+            The items are now in a dynamically allocated and rooted in the insert() 
+            call and a callback is used to execute the handlers, unroot the objects,
+            and free the structure.
+
+      jsCurl - onLoad, onLoadError, onCancel, onSize, onProgress
+         as mentioned before, this routine/module/class currently has references 
+         to two GC-objects, the left and right hand objects, but they can 
+         be collapsed into a single object. 
+
+         The code that depends on this also requires a bunch of C++ post-processing 
+         before handlers are invoked and allows synchronous calls (i.e. intercepted
+         callbacks).
+
+   The curl completion handlers (called by ccActiveURL) also currently store
+   member data (image,text,MP3 parsing).
+
