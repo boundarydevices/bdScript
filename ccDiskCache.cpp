@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.1  2002-11-26 23:28:06  ericn
+ * Revision 1.2  2002-11-29 16:44:54  ericn
+ * -removed error message for normal occurrence
+ *
+ * Revision 1.1  2002/11/26 23:28:06  ericn
  * -Initial import
  *
  *
@@ -211,8 +214,6 @@ bool ccDiskCache_t :: deleteFromCache( char const *url )
       else
          fprintf( stderr, "Error getting sequence %lu:%s for deletion\n", sequence, url );
    }
-   else
-      fprintf( stderr, "Error finding %s for deletion\n", url );
 
    return false ;
 }
