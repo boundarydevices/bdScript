@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.15  2003-09-05 13:04:44  ericn
+ * Revision 1.16  2003-11-22 20:20:41  ericn
+ * -use pipe for code queue
+ *
+ * Revision 1.15  2003/09/05 13:04:44  ericn
  * -made pollCodeQueue() return bool (not timed out), added exec and exit tests
  *
  * Revision 1.14  2003/07/06 01:21:41  ericn
@@ -58,11 +61,12 @@
  */
 
 #include "codeQueue.h"
-#include "mtQueue.h"
 #include "jsGlobals.h"
 #include "jsHyperlink.h"
 #include "jsExit.h"
 #include <linux/stddef.h>
+#include <unistd.h>
+#include <poll.h>
 
 #define MAXARGS 8
 
@@ -79,11 +83,10 @@ struct callbackAndData_t {
    void      *cbData_ ;
 };
 
-typedef mtQueue_t<callbackAndData_t> codeList_t ;
-
 static JSContext  *context_ = 0 ;
 static JSObject   *global_ = 0 ;
-static codeList_t  codeList_ ;
+static int         codeListRead_ = -1 ;
+static int         codeListWrite_ = -1 ;
 
 pthread_mutex_t filterMutex_ = PTHREAD_MUTEX_INITIALIZER ; 
 pthread_cond_t  filterCond_ = PTHREAD_COND_INITIALIZER ;
@@ -212,7 +215,7 @@ bool queueCallback( callback_t callback,
    cbd.callback_ = callback ;
    cbd.cbData_   = cbData ;
 
-   bool const worked = codeList_.push( cbd );
+   bool const worked = (sizeof(cbd) == write( codeListWrite_, &cbd, sizeof(cbd) ) );
    if( worked )
    {
       return true ;
@@ -337,25 +340,37 @@ bool pollCodeQueue( JSContext *cx,
    for( unsigned i = 0 ; i < iterations ; i++ )
    {
       callbackAndData_t cbd ;
-      bool const result = ( 0xFFFFFFFF == milliseconds )
-                          ? codeList_.pull( cbd )
-                          : codeList_.pull( cbd, milliseconds );
-      if( result && ( 0 != cbd.callback_ ) )
+      pollfd filedes ;
+      filedes.fd = codeListRead_ ;
+      filedes.events = POLLIN ;
+      if( 0 < poll( &filedes, 1, milliseconds ) )
       {
-         cbd.callback_( cbd.cbData_ );
-
-         if( gotoCalled_ || execCalled_ || exitRequested_ )
-            break;
+         int const numRead = read( codeListRead_, &cbd, sizeof( cbd ) );
+         if( ( sizeof(cbd) == numRead ) && ( 0 != cbd.callback_ ) )
+         {
+            cbd.callback_( cbd.cbData_ );
+   
+            if( gotoCalled_ || execCalled_ || exitRequested_ )
+               break;
+         }
+         else
+            return ( sizeof(cbd) != numRead) ; // timed out
       }
       else
-         return result ; // timed out
+         return false ;
    }
+
    return true ; // not timed out
 }
 
 void abortCodeQueue( void )
 {
-   codeList_.abort();
+   int const fds[2] = {
+      codeListRead_, codeListWrite_
+   };
+   codeListRead_ = codeListWrite_ = -1 ;
+   close( fds[0] );
+   close( fds[1] );
 }
 
 
@@ -363,8 +378,19 @@ void initializeCodeQueue
    ( JSContext *cx,
      JSObject  *glob )
 {
-   context_ = cx ;
-   global_  = glob ;
+   int fds[2];
+   if( 0 == pipe( fds ) )
+   {
+      codeListRead_  = fds[0];
+      codeListWrite_ = fds[1];
+      context_ = cx ;
+      global_  = glob ;
+   }
+   else
+   {
+      perror( "codePipe" );
+      exit( 1 );
+   }
 }
 
 
