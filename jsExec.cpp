@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.5  2002-11-03 15:38:20  ericn
+ * Revision 1.6  2002-11-05 15:13:46  ericn
+ * -added MP3 support (headers anyway)
+ *
+ * Revision 1.5  2002/11/03 15:38:20  ericn
  * -added touch screen, hyperlink support
  *
  * Revision 1.4  2002/11/02 18:36:09  ericn
@@ -51,6 +54,7 @@
 #include "jsText.h"
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
+#include "jsMP3.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -201,6 +205,7 @@ int main(int argc, char **argv)
                      initializeCodeQueue( cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
+                     initJSMP3( cx, glob );
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
 
