@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.8  2004-02-07 18:42:50  ericn
+ * Revision 1.9  2004-12-18 18:29:43  ericn
+ * -rename tcp handler
+ *
+ * Revision 1.8  2004/02/07 18:42:50  ericn
  * -simplified, simplified, simplified
  *
  * Revision 1.7  2004/01/01 20:10:44  ericn
@@ -50,13 +53,13 @@
 #include "jsGlobals.h"
 #include <sys/ioctl.h>
 
-class tcpHandler_t : public pollHandler_t {
+class jsTcpHandler_t : public pollHandler_t {
 public:
-   tcpHandler_t( JSContext     *cx,
+   jsTcpHandler_t( JSContext     *cx,
                  JSObject      *scope,
                  unsigned long  serverIP,       // network order
                  unsigned short serverPort );   //    "      "
-   ~tcpHandler_t( void );
+   ~jsTcpHandler_t( void );
 
    virtual void onDataAvail( void );     // POLLIN
    virtual void onHUP( void );           // POLLHUP
@@ -70,7 +73,7 @@ private:
    JSObject     *scope_ ;
 };
 
-tcpHandler_t::tcpHandler_t
+jsTcpHandler_t::jsTcpHandler_t
    ( JSContext     *cx,
      JSObject      *scope,
      unsigned long  serverIP,       // network order
@@ -110,7 +113,7 @@ tcpHandler_t::tcpHandler_t
       JS_ReportError( cx, "tcpClient:socket create" );
 }
 
-bool tcpHandler_t::readln( std::string &s )
+bool jsTcpHandler_t::readln( std::string &s )
 {
    if( !lines_.empty() )
    {
@@ -122,7 +125,7 @@ bool tcpHandler_t::readln( std::string &s )
       return false ;
 }
 
-void tcpHandler_t::onDataAvail( void )      // POLLIN
+void jsTcpHandler_t::onDataAvail( void )      // POLLIN
 {
    int numAvail ;
    int const ioctlResult = ioctl( getFd(), FIONREAD, &numAvail );
@@ -192,7 +195,7 @@ void tcpHandler_t::onDataAvail( void )      // POLLIN
       perror( "FIONREAD" );
 }
 
-void tcpHandler_t::onHUP( void )      // POLLHUP
+void jsTcpHandler_t::onHUP( void )      // POLLHUP
 {
    if( 0 < prevTail_.size() )
    {
@@ -232,11 +235,11 @@ void tcpHandler_t::onHUP( void )      // POLLHUP
    setMask( 0 ); // no more events
 }
 
-tcpHandler_t::~tcpHandler_t( void )
+jsTcpHandler_t::~jsTcpHandler_t( void )
 {
 }
 
-static void closeSocket( tcpHandler_t &socketData,
+static void closeSocket( jsTcpHandler_t &socketData,
                          JSContext    *cx, 
                          JSObject     *obj )
 {
@@ -250,7 +253,7 @@ jsTCPClientSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 
    if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
    {
-      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
+      jsTcpHandler_t *const socketData = (jsTcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
          if( 0 <= socketData->getFd() )
@@ -286,7 +289,7 @@ jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
    *rval = JSVAL_FALSE ;
    if( 0 == argc )
    {
-      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
+      jsTcpHandler_t *const socketData = (jsTcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
          std::string s ;
@@ -312,7 +315,7 @@ jsTCPClientClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 
    if( 0 == argc )
    {
-      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
+      jsTcpHandler_t *const socketData = (jsTcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
          if( 0 <= socketData->getFd() )
@@ -336,7 +339,7 @@ void jsTCPClientFinalize(JSContext *cx, JSObject *obj)
 {
    if( obj )
    {
-      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
+      jsTcpHandler_t *const socketData = (jsTcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
          JS_SetPrivate( cx, obj, 0 );
@@ -438,7 +441,7 @@ static JSBool tcpClient( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
                    JSVAL_IS_STRING( jsv ) )
                   JS_DefineProperty( cx, thisObj, "onClose", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
    
-               tcpHandler_t *const socketData = new tcpHandler_t( cx, thisObj, 
+               jsTcpHandler_t *const socketData = new jsTcpHandler_t( cx, thisObj, 
                                                                   fromDotted.networkOrder(),
                                                                   htons( (unsigned short)JSVAL_TO_INT(vServerPort) ) );
                JS_SetPrivate( cx, thisObj, socketData );
