@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.5  2002-11-30 23:58:01  ericn
+ * Revision 1.6  2002-12-15 00:00:44  ericn
+ * -modified to allow 'interrupted system call status'
+ *
+ * Revision 1.5  2002/11/30 23:58:01  ericn
  * -rooted timer handlers
  *
  * Revision 1.4  2002/11/30 18:52:57  ericn
@@ -176,11 +179,11 @@ jsCancelTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    {
       pthread_t thread = JSVAL_TO_INT( argv[0] );
       int result = pthread_cancel( thread );
-      if( 0 == result )
+      if( ( 0 == result ) || ( 3 == result ) )
       {
          void *exitStat ;
          result = pthread_join( thread, &exitStat );
-         if( 0 == result )
+         if( ( 0 == result ) || ( 3 == result ) )
          {
             *rval = JSVAL_TRUE ;
             return JS_TRUE ;
