@@ -1,7 +1,7 @@
 #
 # Makefile for curlCache library and utility programs
 #
-OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
+OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o curlGet.o \
        curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsBarcode.o jsButton.o jsCurl.o jsGlobals.o \
@@ -9,7 +9,8 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        jsText.o jsTimer.o jsTouch.o jsURL.o jsVolume.o \
        madDecode.o madHeaders.o memFile.o \
        relativeURL.o tsThread.o ultoa.o urlFile.o \
-       ultodd.o box.o zOrder.o
+       ultodd.o box.o zOrder.o \
+       ccDiskCache.o ccWorker.o
 
 
 ifneq (,$(findstring arm, $(CC)))
@@ -117,7 +118,10 @@ imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
 	$(STRIP) imgPNG
 
 ccDiskCache: ccDiskCache.cpp memFile.o Makefile
-	$(CC) -D__STANDALONE__ -ggdb -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
+	$(CC) -D__STANDALONE__ -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
+
+ccWorker: ccWorker.cpp memFile.o Makefile
+	$(CC) -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread
 
 all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
