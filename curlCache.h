@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.5 2002-10-13 14:36:51 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.6 2002-10-24 13:18:22 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.5  2002-10-13 14:36:51  ericn
+ * Revision 1.6  2002-10-24 13:18:22  ericn
+ * -modified for relative URLs
+ *
+ * Revision 1.5  2002/10/13 14:36:51  ericn
  * -made cache usage optional
  *
  * Revision 1.4  2002/10/13 13:42:09  ericn
@@ -90,7 +93,7 @@ private:
 
 class curlRequest_t {
 public:
-   curlRequest_t( char const url[] ); // must stay around 'til destructor
+   curlRequest_t( char const url[] );
    ~curlRequest_t( void );
 
    struct param_t {
@@ -114,12 +117,12 @@ public:
 
    bool hasFile( void ) const { return hasFile_ ; }
 
-   char const *getURL( void ) const { return url_ ; }
+   char const *getURL( void ) const { return url_.c_str(); }
 
 private:
    friend class curlCache_t ;
 
-   char const             *url_ ;
+   std::string             url_ ;
    bool                    hasFile_ ;
    std::vector<param_t>    parameters_ ;
 };

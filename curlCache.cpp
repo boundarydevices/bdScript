@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.5  2002-10-15 05:00:55  ericn
+ * Revision 1.6  2002-10-24 13:18:25  ericn
+ * -modified for relative URLs
+ *
+ * Revision 1.5  2002/10/15 05:00:55  ericn
  * -.
  *
  * Revision 1.4  2002/10/13 14:36:54  ericn
@@ -38,6 +41,7 @@
 #include <stdio.h>
 #include "dirByATime.h"
 #include <zlib.h>
+#include "jsURL.h"
 
 bool findEnd( void const   *mem,            // input : mapped file
               unsigned long fileSize,       // input : size of mapped memory
@@ -212,38 +216,43 @@ curlFile_t :: ~curlFile_t( void )
 //
 curlFile_t curlCache_t :: get( char const url[], bool useCache )
 {
-   std::string const cacheName( getCachedName( url ) );
+   std::string absolute ;
+   std::string cacheName ;
 
-   struct stat st ;
-   int const statResult = stat( cacheName.c_str(), &st );
-   if( useCache && ( 0 == statResult ) )
+   if( absoluteURL( url, absolute ) )
    {
-   } // file in cache... return it
-   else
-   {
-      if( 0 == statResult )
-         unlink( cacheName.c_str() ); // get rid of old one
-
-      makeSpace( 1, 1<<20 ); // 1MB
-
-      CURL *curl ;
-      int   fd ;
-      if( startTransfer( cacheName, url, curl, fd ) )
+      cacheName = getCachedName( absolute.c_str() );
+      struct stat st ;
+      int const statResult = stat( cacheName.c_str(), &st );
+      if( useCache && ( 0 == statResult ) )
       {
-         CURLcode result = curl_easy_perform( curl );
-         if( 0 == result )
+      } // file in cache... return it
+      else
+      {
+         if( 0 == statResult )
+            unlink( cacheName.c_str() ); // get rid of old one
+   
+         makeSpace( 1, 1<<20 ); // 1MB
+   
+         CURL *curl ;
+         int   fd ;
+         if( startTransfer( cacheName, absolute.c_str(), curl, fd ) )
          {
-            if( store( curl, fd ) )
+            CURLcode result = curl_easy_perform( curl );
+            if( 0 == result )
             {
+               if( store( curl, fd ) )
+               {
+               }
+               else
+                  unlink( cacheName.c_str() );
             }
             else
-               unlink( cacheName.c_str() );
+               discard( cacheName, curl, fd );
          }
-         else
-            discard( cacheName, curl, fd );
-      }
-
-   } // file not found, retrieve it
+   
+      } // file not found, retrieve it
+   }
    
    return curlFile_t( cacheName.c_str() );
 }
@@ -294,9 +303,15 @@ curlFile_t curlCache_t :: post( curlRequest_t const &req, bool useCache )
 }
 
 curlRequest_t :: curlRequest_t( char const url[] )
-   : url_( url ),
+   : url_( "" ),
      hasFile_( false )
 {
+   std::string absolute ;
+
+   if( absoluteURL( url, absolute ) )
+   {
+      url_ = absolute ;
+   }
 }
    
 curlRequest_t :: ~curlRequest_t( void )
@@ -618,7 +633,7 @@ std::string curlCache_t :: getCachedName( char const url[] )
 
 std::string curlCache_t :: getCachedName( curlRequest_t const &req )
 {
-   std::string name( getCachedName( req.url_ ) );
+   std::string name( getCachedName( req.url_.c_str() ) );
    unsigned long adler = adler32( 0, (Bytef const *)name.c_str(), name.size() );
    for( unsigned i = 0 ; i < req.parameters_.size(); i++ )
    {
