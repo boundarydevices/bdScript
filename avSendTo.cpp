@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.15  2003-10-31 13:57:57  ericn
+ * Revision 1.16  2003-11-02 17:59:06  ericn
+ * -added symbol scanner support
+ *
+ * Revision 1.15  2003/10/31 13:57:57  ericn
  * -modified to ignore duplicate barcodes (within 1 second)
  *
  * Revision 1.14  2003/10/31 13:48:45  ericn
@@ -552,6 +555,8 @@ static void invertScreen( void )
    }
 }
 
+static int const waveDataStart = 64 ; // offset of might be off, but no matter
+
 void uiState_t :: setState
    ( input_e input,
      bool    setNotCleared )
@@ -585,7 +590,8 @@ class udpBarcode_t : public barcodePoll_t {
 public:
    udpBarcode_t( pollHandlerSet_t  &set,
                  int                udpSock,
-                 sockaddr_in const &remote );
+                 sockaddr_in const &remote,
+                 int                audioFd );
 
    virtual void onBarcode( void );
 
@@ -601,6 +607,9 @@ private:
    scannerType_e  scannerType_ ;
    unsigned long  prevTick_ ;
    char           prevBarcode_[256];
+   int      const audioFd_ ;
+   unsigned char *beepData_ ;
+   unsigned       beepBytes_ ;
 };
 
 static int strTableLookup( char const * const strTable[],
@@ -619,12 +628,16 @@ static int strTableLookup( char const * const strTable[],
 udpBarcode_t :: udpBarcode_t
    ( pollHandlerSet_t  &set,
      int                udpSock,
-     sockaddr_in const &remote )
+     sockaddr_in const &remote,
+     int                audioFd )
    : barcodePoll_t( set )
    , udpSock_( udpSock )
    , remote_( remote )
    , scannerType_( sick_e )
    , prevTick_( 0 )
+   , audioFd_( audioFd )
+   , beepData_( 0 )
+   , beepBytes_( 0 )
 {
    static char const *const scannerTypes[] = {
       "sick", "keyence", "other"
@@ -658,6 +671,24 @@ udpBarcode_t :: udpBarcode_t
 
    terminator_ = scannerTerminators[type];
 
+   if( other_e == type ) // Symbol scanners don't beep
+   {   
+      int fdBeep = open( "badumm.wav", O_RDONLY );
+      if( 0 <= fdBeep )
+      {
+         long eof = lseek( fdBeep, 0, SEEK_END );
+         if( 64 < eof )
+         {
+            beepData_  = new unsigned char[ eof-64 ];
+            beepBytes_ = (unsigned)eof ;
+            lseek( fdBeep, waveDataStart, SEEK_SET );
+            read( fdBeep, beepData_, beepBytes_ );
+         }
+         close( fdBeep );
+      }
+      else
+         perror( "beep" );
+   }
 }
 
 void udpBarcode_t :: onBarcode( void )
@@ -691,6 +722,11 @@ void udpBarcode_t :: onBarcode( void )
          perror( "barcode sendto" );
       strcpy( prevBarcode_, barcode_ );
       prevTick_ = now ;
+      
+      if( ( 0 != beepData_ ) && ( 0 != beepBytes_ ) )
+      {
+         write( audioFd_, beepData_, beepBytes_ );
+      } // play beep sound
    }
    else
       printf( "duplicate barcode %s ignored\n", barcode_ );
@@ -738,8 +774,6 @@ udpTouch_t :: udpTouch_t
    , dongData_( 0 )
    , dongBytes_( 0 )
 {
-   int const waveDataStart = 64 ; // might be off, but no matter
-
    int fdDing = open( "ding.wav", O_RDONLY );
    if( 0 <= fdDing )
    {
@@ -1060,7 +1094,7 @@ static void *pollThread( void *arg )
    threadParam_t const &params = *( threadParam_t const *)arg ;
    
    pollHandlerSet_t handlers ;
-   udpBarcode_t     bcPoll( handlers, params.udpSock_, params.remote_ );
+   udpBarcode_t     bcPoll( handlers, params.udpSock_, params.remote_, params.mediaFd_ );
    if( bcPoll.isOpen() )
    {
       printf( "opened bcPoll: fd %d, mask %x\n", bcPoll.getFd(), bcPoll.getMask() );
@@ -1086,11 +1120,16 @@ static void *pollThread( void *arg )
                               handlers,
                               params.mediaFd_,
                               uiState );
-
          int iterations = 0 ;
          while( 1 )
          {
-            handlers.poll( -1 );
+            int const ms = ( bcPoll.haveTerminator() || !bcPoll.havePartial() ) 
+                           ? -1 
+                           : 10 ;
+            if( !handlers.poll( ms ) )
+            {
+               bcPoll.timeout();
+            }
          }
       }
       else
