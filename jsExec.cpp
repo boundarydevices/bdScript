@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.11  2002-11-17 03:31:48  ericn
+ * Revision 1.12  2002-11-17 16:08:33  ericn
+ * -modified to initialize NSPR
+ *
+ * Revision 1.11  2002/11/17 03:31:48  ericn
  * -temporary while checkin garbage collection
  *
  * Revision 1.10  2002/11/17 03:17:11  ericn
@@ -192,7 +195,7 @@ static void myError( JSContext *cx, const char *message, JSErrorReport *report)
  * a context, and a global object, then initializes the JS run time,
  * and creates a context. */
 
-int main(int argc, char **argv)
+int prMain(int argc, char **argv)
 {
    if( 2 == argc )
    {
@@ -283,12 +286,8 @@ int main(int argc, char **argv)
                                     }
                                     else
                                     {
-/*
                                        mutexLock_t lock( execMutex_ );
-                                       printf( "takin' out the trash\n" );
                                        JS_GC( cx );
-                                       printf( "done takin' out the trash\n" );
-*/                                       
                                     }
                                  }
                               }
@@ -341,3 +340,13 @@ int main(int argc, char **argv)
 
 }
 
+#include <prinit.h>
+
+int main( int argc, char *argv[] )
+{
+   printf( "starting via PR_Initialize\n" );
+   int result = PR_Initialize( prMain, argc, argv, 0 );
+   printf( "prMain exited %d\n", result );
+
+   return result ;
+}
