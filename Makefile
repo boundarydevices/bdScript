@@ -10,7 +10,14 @@ KERNEL_BOARDTYPE ?= "BD2003"
 ifeq ("BD2003",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_BD2003
 else
+ifeq ("BD2004",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
+else
+ifeq ("NEON",$(KERNEL_BOARDTYPE))
+   HARDWARE_TYPE=-DCONFIG_BD2003 -DNEON
+else
+endif
+endif
 endif
 
 MPEG2LIBS = -lmpeg2 -lvo
@@ -99,7 +106,7 @@ OBJS = \
        flashVar.o \
        jsFlashVar.o \
 
-ifeq ("BD2003",$(KERNEL_BOARDTYPE))
+ifneq ("BD2004",$(KERNEL_BOARDTYPE))
 
 OBJS += \
        audioQueue.o \
@@ -395,6 +402,14 @@ tcpPoll: tcpPoll.cpp Makefile $(LIB)
 
 flashVar: flashVar.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
+	$(STRIP) $@
+
+mpegDecodeMain.o: mpegDecode.o
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -D__MODULETEST__ -c $(IFLAGS) -O2 -o mpegDecodeMain.o mpegDecode.cpp
+
+mpegDecode: mpegDecodeMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegDecode mpegDecodeMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegDecode | sort >mpegDecode.map
 	$(STRIP) $@
 
 hexDump: hexDump.cpp Makefile $(LIB)

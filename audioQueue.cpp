@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.34  2004-03-17 04:56:19  ericn
+ * Revision 1.35  2004-10-30 19:37:33  ericn
+ * -Neon yuv support
+ *
+ * Revision 1.34  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.33  2004/01/02 23:37:13  ericn
@@ -345,12 +348,14 @@ static void *videoThreadRtn( void *arg )
    videoParams_t const &params = *(videoParams_t const *)arg ;
    videoFrames_t &frames = params.frames_ ;
 printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_, params.height_ );
-   fbDevice_t    &fb = getFB();
-   videoQueue_t :: entry_t *entry ;
    unsigned picCount = 0 ;
-//   frames.setStart( tickMs() );
    unsigned const rowStride = frames.getRowStride();
    unsigned const height    = frames.getHeight();
+
+#ifndef NEON
+   fbDevice_t    &fb = getFB();
+   videoQueue_t :: entry_t *entry ;
+//   frames.setStart( tickMs() );
    unsigned const fbStride  = 2*fb.getWidth();
    unsigned char *fbStart = (unsigned char *)fb.getRow(params.y_) 
                             + params.x_ * 2 ;
@@ -368,7 +373,35 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
 //      memcpy( fb.getMem(), entry->data_, fb.getMemSize() );
       picCount++ ;
    }
+#else
+   
+   int const fdYUV = open( "/dev/yuv", O_WRONLY );
+   if( 0 <= fdYUV )
+   {
+printf( "input row stride: %u\n", rowStride );
+printf( "frame size: %u x %u\n", frames.maxWidth_, frames.maxHeight_ );
+printf( "queue size: %u x %u, %u, %u\n", 
+        frames.queue_->width_, 
+        frames.queue_->height_,
+        frames.queue_->rowStride_,
+        frames.queue_->entrySize_ );
 
+      unsigned const bytesPerFrame = rowStride*height ;
+printf( "%u bytes/frame\n", bytesPerFrame );
+      
+      videoQueue_t :: entry_t *entry ;
+      while( !_cancel && frames.pull( entry ) )
+      {
+         unsigned char const *dataMem = entry->data_ ;
+         write( fdYUV, dataMem, bytesPerFrame );
+         picCount++ ;
+      }
+
+      close( fdYUV );
+   }
+   else
+      perror( "/dev/yuv" );
+#endif 
    printf( "%u pictures\n", picCount );
 }
 
@@ -545,12 +578,12 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                madHeaders_t headers( item->data_, item->length_ );
                if( headers.worked() )
                {
-   /*
+
                   printf( "playback %lu bytes (%lu seconds) from %p here\n", 
                           item->length_, 
                           headers.lengthSeconds(),
                           item->data_ );
-   */
+
                   struct mad_stream stream;
                   struct mad_frame	frame;
                   struct mad_synth	synth;
@@ -990,6 +1023,7 @@ printf( "MPEG playback here at x:%u, y:%u, w:%u, h:%u\n", item->xPos_, item->yPo
                
                mpegDemux_t demuxer( item->data_, item->length_ );
 
+printf( "demuxing mpeg data\n" );
                mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
 
 printf( "have %u streams\n", bi->count_ ); fflush( stdout );
@@ -1032,7 +1066,7 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                      unsigned height = ( 0 != item->height_ ) ? item->height_ : fb.getHeight();
                      if( height > fb.getHeight() )
                         height = fb.getHeight();
-
+printf( "allocate frames: %u x %u\n", width, height );
                      videoFrames_t vFrames( *streams.videoFrames_, width, height );
                      if( vFrames.preload() )
                      {
