@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.7  2004-01-01 20:10:44  ericn
+ * Revision 1.8  2004-02-07 18:42:50  ericn
+ * -simplified, simplified, simplified
+ *
+ * Revision 1.7  2004/01/01 20:10:44  ericn
  * -got rid of secondary thread
  *
  * Revision 1.6  2003/07/03 13:36:38  ericn
@@ -65,7 +68,6 @@ private:
    std::string   prevTail_ ; // previously un-terminated line
    JSContext    *cx_ ;
    JSObject     *scope_ ;
-   unsigned char terminators_ ;
 };
 
 tcpHandler_t::tcpHandler_t
@@ -76,7 +78,6 @@ tcpHandler_t::tcpHandler_t
    : pollHandler_t( socket( AF_INET, SOCK_STREAM, 0 ), pollHandlers_ )
    , cx_( cx )
    , scope_( scope )
-   , terminators_( 0 )
 {
    if( 0 <= getFd() )
    {
@@ -123,24 +124,18 @@ bool tcpHandler_t::readln( std::string &s )
 
 void tcpHandler_t::onDataAvail( void )      // POLLIN
 {
-printf( "tcp data available\n" );
    int numAvail ;
    int const ioctlResult = ioctl( getFd(), FIONREAD, &numAvail );
    if( ( 0 == ioctlResult )
        &&
        ( 0 < numAvail ) )
    {
-printf( "%u bytes\n", numAvail );
-
       char inData[2048];
       int numRead ;
       
-      bool haveLine = false ;
       std::string tail = prevTail_ ;
       prevTail_ = "" ;
-      int readSize = numAvail ;
-      if( readSize )
-         readSize = sizeof( inData );
+      int readSize ;
 
       while( ( 0 < numAvail )
              &&
@@ -151,45 +146,18 @@ printf( "%u bytes\n", numAvail );
              ( 0 <= ( numRead = read( getFd(), inData, readSize ) ) ) )
       {
          numAvail -= numRead ;
-         enum {
-            haveCR_ = 1,
-            haveLF_ = 2,
-            haveBoth_ = haveCR_ | haveLF_
-         };
          
          for( int i = 0 ; i < numRead ; i++ )
          {
-            unsigned char termMask = haveLF_ ;
             char const inChar = inData[i];
-            switch( inChar )
+            if( ( '\r' == inChar ) || ( '\n' == inChar ) )
             {
-               case '\r' :
-                  {
-                     termMask = haveCR_ ;
-                     // intentional fall-through
-                  }
-               case '\n' :
-                  {
-                     haveLine = true ;
-                     lines_.push_back( tail ); // flush line
-                     tail = "" ;
-
-                     if( terminators_ & termMask )
-                     {
-                        lines_.push_back( "" ); // empty line
-                     } // duplicate terminator
-                     else
-                     {
-                        terminators_ |= termMask ;
-                        if( haveBoth_ == terminators_ )
-                           terminators_ = 0 ;
-                     } // first time we've seen this one
-                     break;
-                  }
-
-               default:
-                  tail += inChar ;
+               if( 0 < tail.size() )
+                  lines_.push_back( tail ); // flush line
+               tail = "" ;
             }
+            else
+               tail += inChar ;
          } // 
 
          readSize = numAvail ;
@@ -199,7 +167,7 @@ printf( "%u bytes\n", numAvail );
 
       prevTail_ = tail ;
 
-      if( haveLine )
+      if( 0 < lines_.size() )
       {
          jsval jsv ;
 
