@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.1  2002-12-15 20:02:58  ericn
+ * Revision 1.2  2002-12-16 14:20:14  ericn
+ * -added mutex, fixed AddRoot, removed debug msgs
+ *
+ * Revision 1.1  2002/12/15 20:02:58  ericn
  * -added module jsTCP
  *
  *
@@ -20,9 +23,13 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include "codeQueue.h"
 #include "ddtoul.h"
 #include "stringList.h"
+#include "semClasses.h"
+
+static mutex_t mutex_ ;
 
 struct socketData_t {
    int          fd_ ;      // socket file descriptor
@@ -51,6 +58,7 @@ static void *readerThread( void *param )
       int numRead = recv( sd->fd_, inData, sizeof( inData ) - 1, 0 );
       if( 0 < numRead )
       {
+printf( "read %d bytes\n", numRead );
          for( int i = 0 ; i < numRead ; i++ )
          {
             char const c = inData[i];
@@ -69,6 +77,7 @@ static void *readerThread( void *param )
                    ( 0 != ( mask & terminators ) ) )
                {
                   terminators = mask ;
+                  mutexLock_t lock( mutex_ );
                   sd->lines_.push_back( curLine );
                   curLine = "" ;
                   if( JSVAL_VOID != jsv )
@@ -96,6 +105,7 @@ static void *readerThread( void *param )
 
    if( 0 != curLine.size() )
    {
+      mutexLock_t lock( mutex_ );
       sd->lines_.push_back( curLine );
       curLine = "" ;
       if( JSVAL_VOID != jsv )
@@ -111,6 +121,7 @@ static void closeSocket( socketData_t &socketData,
                          JSContext    *cx, 
                          JSObject     *obj )
 {
+printf( "closin'\n" );
    close( socketData.fd_ );
    socketData.fd_ = -1 ;
    jsval jsv = JSVAL_FALSE ;
@@ -123,6 +134,7 @@ static void closeSocket( socketData_t &socketData,
 JSBool
 jsTCPClientSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+printf( "jsTCPSend\n" );
    *rval = JSVAL_FALSE ;
 
    if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
@@ -161,12 +173,14 @@ printf( "sent %u bytes to host\n", len );
 JSBool
 jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+printf( "jsTCPReadln\n" );
    *rval = JSVAL_FALSE ;
    if( 0 == argc )
    {
       socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
+         mutexLock_t lock( mutex_ );
          if( !socketData->lines_.empty() )
          {
             std::string const s( socketData->lines_.front() );
@@ -186,6 +200,7 @@ jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
 JSBool
 jsTCPClientClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+printf( "TCPClientClose\n" );
    *rval = JSVAL_FALSE ;
 
    if( 0 == argc )
@@ -213,16 +228,21 @@ jsTCPClientClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 void jsTCPClientFinalize(JSContext *cx, JSObject *obj)
 {
 printf( "tcpClientFinalize %p\n", obj );
-   socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
-   if( socketData )
+   if( obj )
    {
-      JS_SetPrivate( cx, obj, 0 );
-      if( 0 <= socketData->fd_ )
-         close( socketData->fd_ );
-      delete socketData ;
-   } // have button data
+      socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
+      if( socketData )
+      {
+         JS_SetPrivate( cx, obj, 0 );
+         if( 0 <= socketData->fd_ )
+            close( socketData->fd_ );
+         delete socketData ;
+      } // have socket data
+      else
+         printf( "no socket data\n" );
+   }
    else
-      printf( "no socket data\n" );
+      printf( "TCP finalize NULL object\n" );
 }
 
 static JSFunctionSpec tcpClientMethods_[] = {
@@ -329,7 +349,9 @@ printf( "connectin' to %lx,%lx\n", serverAddr.sin_addr.s_addr, serverAddr.sin_po
                   if( 0 == connect( sFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) )
                   {
 printf( "connected\n" );
-                     JS_AddRoot( cx, thisObj );
+                     int doit = 1 ;
+                     setsockopt( sFd, IPPROTO_TCP, TCP_NODELAY, &doit, sizeof( doit ) );
+                     JS_AddRoot( cx, &socketData->obj_ );
                      pthread_t thread ;
                      int create = pthread_create( &thread, 0, readerThread, socketData );
 printf( "threadCreate %d\n", create );
