@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.4  2002-11-02 18:36:09  ericn
+ * Revision 1.5  2002-11-03 15:38:20  ericn
+ * -added touch screen, hyperlink support
+ *
+ * Revision 1.4  2002/11/02 18:36:09  ericn
  * -added alphaMap support
  *
  * Revision 1.3  2002/11/02 04:10:43  ericn
@@ -47,6 +50,7 @@
 #include "jsScreen.h"
 #include "jsText.h"
 #include "jsAlphaMap.h"
+#include "jsTouch.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -198,7 +202,12 @@ int main(int argc, char **argv)
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
                      initJSAlphaMap( cx, glob );
+                     initJSHyperlink( cx, glob );
 
+                     touchScreenThread_t *tsThread ;
+                     if( !initJSTouch( tsThread, cx, glob ) )
+                        tsThread = 0 ;
+                     
                      startCurlThreads();
 
                      curlCache_t &cache = getCurlCache();
@@ -262,6 +271,8 @@ int main(int argc, char **argv)
                         fprintf( stderr, "Error opening url %s\n", argv[1] );
 
                      stopCurlThreads();
+                     if( tsThread )
+                        delete tsThread ;
                   }
                   else
                      fprintf( stderr, "Error defining Javascript shell functions\n" );
