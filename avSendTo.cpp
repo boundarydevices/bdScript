@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.7  2003-10-05 19:13:20  ericn
+ * Revision 1.8  2003-10-17 05:59:04  ericn
+ * -added doorbell
+ *
+ * Revision 1.7  2003/10/05 19:13:20  ericn
  * -added barcode, touch, and GPIO
  *
  * Revision 1.6  2003/10/05 04:34:06  ericn
@@ -60,6 +63,8 @@
 #include "touchPoll.h"
 #include "tickMs.h"
 #include "gpioPoll.h"
+#include "fbDev.h"
+#include <errno.h>
 
 extern "C" {
 #include <jpeglib.h>
@@ -269,9 +274,9 @@ typedef struct udpHeader_t {
 
 typedef struct gpioPins_t {
    enum {
-      guardShack_e   = 1,
+      carDetect_e    = 1,
       gateOpen_e     = 2,
-      carDetect_e    = 4
+      guardShack_e   = 4,
    };
    
    unsigned short pinState_ ;
@@ -303,8 +308,6 @@ static void *audioThread( void *arg )
          int numRead = read( fdAudio, audioInBuf, inf.fragsize );
          if( inf.fragsize == numRead )
          {
-            if( playingSomething )
-               memset( audioInBuf, 0, inf.fragsize );
             header.length_ = numRead ;
             header.type_   = header.audio ;
             int numSent = sendto( params.udpSock_, audioInBuf, sizeof(udpHeader_t)+numRead, 0, 
@@ -312,32 +315,23 @@ static void *audioThread( void *arg )
             if( numSent == ( sizeof(udpHeader_t)+numRead ) )
             {
                audioBytesOut += numRead ;
-//               printf( "audio %u, %u\n", numRead, audioBytesOut );
-               if( playingSomething )
-               {
-                  audio_buf_info ai ;
-                  if( 0 == ioctl( fdAudio, SNDCTL_DSP_GETOSPACE, &ai) ) 
-                  {
-                     if( ai.fragments == ai.fragstotal )
-                        playingSomething = false ;
-                  }
-                  else
-                  {
-                     perror( "SNDCTL_DSP_GETOSPACE" );
-                     break;
-                  }
-               }
             }
-            else
+            else if( 0 != errno )
             {
                perror( "audioSendTo" );
-               break;
             }
          }
-         else
+         else if( 0 != errno )
          {
-            perror( "audioRead" );
-            break;
+            fprintf( stderr, "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                             "audioRead:%m\n"
+                      );
          }
       } while( 1 );
    }
@@ -399,8 +393,9 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
                {
                   header.length_ = numJPEGBytes ;
                   header.type_ = header.image ;
-                  int const numSent = sendto( udpSock, imageBuf, sizeof( udpHeader_t)+numJPEGBytes, 0, (struct sockaddr *)&params.remote_, sizeof( params.remote_ ) );
-                  if( numSent == sizeof( udpHeader_t)+numJPEGBytes )
+                  unsigned const numToSend = sizeof( udpHeader_t)+numJPEGBytes ;
+                  int const numSent = sendto( udpSock, imageBuf, numToSend, 0, (struct sockaddr *)&params.remote_, sizeof( params.remote_ ) );
+                  if( numSent == numToSend )
                   {
                      frameCnt++ ;
                      time_t const now = time( 0 );
@@ -414,7 +409,7 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
                      }
                   }
                   else
-                     perror( "sendto" );
+                     fprintf( stderr, "%m sending image: %u/%u\n", numSent, numToSend );
                }
                else
                   printf( "jpegError\n" );
@@ -462,16 +457,16 @@ private:
 
 void udpBarcode_t :: onBarcode( void )
 {
-   printf( "barcode <%s>\n", getBarcode() );
-
    unsigned const len = strlen( getBarcode() );
+   printf( "barcode <%s>, len %u\n", getBarcode(), len );
+
    char data[sizeof(udpHeader_t)+sizeof(barcode_)];
    udpHeader_t &header = *(udpHeader_t *)data ;
    header.type_   = header.barcode ;
    header.length_ = len + 1 ; // include trailing NULL
    strcpy( data+sizeof(header), getBarcode() );
 
-   unsigned numToSend = sizeof(udpHeader_t)+len ;
+   unsigned numToSend = sizeof(udpHeader_t)+header.length_ ;
    int numSent = sendto( udpSock_, data, numToSend, 0, 
                          (struct sockaddr *)&remote_, sizeof( remote_ ) );
    if( numSent != numToSend )
@@ -482,12 +477,8 @@ class udpTouch_t : public touchPoll_t {
 public:
    udpTouch_t( pollHandlerSet_t  &set,
                int                udpSock,
-               sockaddr_in const &remote )
-      : touchPoll_t( set )
-      , udpSock_( udpSock )
-      , remote_( remote )
-      , wasTouched_( true )
-      , prevTime_( 0LL ){}
+               sockaddr_in const &remote,
+               int                audioOutFd );
 
    // override this to perform processing of a touch
    virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
@@ -495,19 +486,95 @@ public:
    virtual void onRelease( timeval const &tv );
 
 private:
-   int         udpSock_ ;
-   sockaddr_in remote_ ;
-   bool        wasTouched_ ;
-   long long   prevTime_ ;
+   int            udpSock_ ;
+   sockaddr_in    remote_ ;
+   bool           first_ ;
+   bool           wasTouched_ ;
+   long long      prevTime_ ;
+   int            audioFd_ ;
+   unsigned char *dingData_ ;
+   unsigned       dingBytes_ ;
+   unsigned char *dongData_ ;
+   unsigned       dongBytes_ ;
 };
+
+udpTouch_t :: udpTouch_t
+   ( pollHandlerSet_t  &set,
+     int                udpSock,
+     sockaddr_in const &remote,
+     int                audioOutFd )
+   : touchPoll_t( set )
+   , udpSock_( udpSock )
+   , remote_( remote )
+   , first_( true )
+   , wasTouched_( false )
+   , prevTime_( 0LL )
+   , audioFd_( audioOutFd )
+   , dingData_( 0 )
+   , dingBytes_( 0 )
+   , dongData_( 0 )
+   , dongBytes_( 0 )
+{
+   int const waveDataStart = 64 ; // might be off, but no matter
+
+   int fdDing = open( "ding.wav", O_RDONLY );
+   if( 0 <= fdDing )
+   {
+      long eof = lseek( fdDing, 0, SEEK_END );
+      if( 64 < eof )
+      {
+         dingData_  = new unsigned char[ eof-64 ];
+         dingBytes_ = (unsigned)eof ;
+         lseek( fdDing, waveDataStart, SEEK_SET );
+         read( fdDing, dingData_, dingBytes_ );
+      }
+      close( fdDing );
+   }
+   else
+      perror( "ding" );
+
+   int fdDong = open( "dong.wav", O_RDONLY );
+   if( 0 <= fdDong )
+   {
+      long eof = lseek( fdDong, 0, SEEK_END );
+      if( 64 < eof )
+      {
+         dongData_  = new unsigned char[ eof-64 ];
+         dongBytes_ = (unsigned)eof ;
+         lseek( fdDong, waveDataStart, SEEK_SET );
+         read( fdDong, dongData_, dongBytes_ );
+      }
+      close( fdDong );
+   }
+   else
+      perror( "dong" );
+}
+
+static void invertScreen( void )
+{
+   fbDevice_t &fb = getFB();
+   unsigned long *fbMem = (unsigned long *)fb.getMem();
+   unsigned long longs = fb.getMemSize()/sizeof(fbMem[0]);
+
+   while( 0 < longs-- )
+   {
+      *fbMem = ~(*fbMem);
+      fbMem++ ;
+   }
+}
 
 void udpTouch_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
    bool send ;
-   if( !wasTouched_ )
+   if( first_ || ( !wasTouched_ ) )
    {
+      ioctl( audioFd_, SNDCTL_DSP_RESET, 0 );
+      invertScreen();
       wasTouched_ = true ;
       send = true ; // first press
+      if( 0 < dingBytes_ )
+         write( audioFd_, dingData_, dingBytes_ );
+      first_ = false ;
    }
    else 
    {
@@ -532,6 +599,10 @@ void udpTouch_t :: onRelease( timeval const &tv )
 {
    if( wasTouched_ )
    {
+      invertScreen();
+      ioctl( audioFd_, SNDCTL_DSP_RESET, 0 );
+      if( 0 < dongBytes_ )
+         write( audioFd_, dongData_, dongBytes_ );
       wasTouched_ = false ;
       udpHeader_t header ;
       header.type_ = header.release ;
@@ -577,7 +648,7 @@ void udpGPIO_t :: sendPinState( void )
 
    int numSent = sendto( udpSock_, data, sizeof( data ), 0, 
                          (struct sockaddr *)&remote_, sizeof( remote_ ) );
-   if( sizeof( header ) != numSent )
+   if( sizeof( data ) != numSent )
       perror( "pinState sendto" );
 }
 
@@ -602,7 +673,8 @@ struct pinData_t {
 
 static pinData_t const pins_[] = {
    { "/dev/Feedback",  gpioPins_t::gateOpen_e },
-   { "/dev/Feedback2", gpioPins_t::guardShack_e },
+   { "/dev/Feedback2", gpioPins_t::carDetect_e },
+   { "/dev/Feedback3", gpioPins_t::guardShack_e },
 };
 
 static unsigned const pinCount_ = sizeof( pins_ )/sizeof( pins_[0] );
@@ -617,7 +689,7 @@ static void *pollThread( void *arg )
    {
       printf( "opened bcPoll: fd %d, mask %x\n", bcPoll.getFd(), bcPoll.getMask() );
 
-      udpTouch_t touchPoll( handlers, params.udpSock_, params.remote_ );
+      udpTouch_t touchPoll( handlers, params.udpSock_, params.remote_, params.mediaFd_ );
       if( touchPoll.isOpen() )
       {
          printf( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
@@ -638,7 +710,7 @@ static void *pollThread( void *arg )
          while( 1 )
          {
             handlers.poll( -1 );
-            printf( "poll %d\n", ++iterations );
+            printf( "poll %d\r", ++iterations );
          }
       }
       else
@@ -650,7 +722,9 @@ static void *pollThread( void *arg )
 
 struct deviceMsg_t {
    enum type_e {
-      audio_e = 0
+      audio_e  = 0,
+      unlock_e = 1,
+      lock_e   = 2,
    };
 
    enum {
@@ -666,6 +740,7 @@ static void *udpRxThread( void *arg )
 {
    threadParam_t const &params = *( threadParam_t const *)arg ;
    int const fdAudio = params.mediaFd_ ;
+   int fdLock = open( "/dev/Turnstile", O_WRONLY );
    while( 1 )
    {
       sockaddr_in fromAddr ;
@@ -693,6 +768,26 @@ static void *udpRxThread( void *arg )
             }
             else
                fprintf( stderr, "Weird size : len %lu, expected %lu, read %u\n", msg.length_, expected, numRead );
+         }
+         else if( deviceMsg_t :: unlock_e == msg.type_ )
+         {
+            if( -1 != fdLock )
+            {
+               char const cOut = '\1' ;
+               write( fdLock, &cOut, 1 );
+            }
+            else
+               perror( "/dev/Turnstile" );
+         }
+         else if( deviceMsg_t :: lock_e == msg.type_ )
+         {
+            if( -1 != fdLock )
+            {
+               char const cOut = '\0' ;
+               write( fdLock, &cOut, 1 );
+            }
+            else
+               perror( "/dev/Turnstile" );
          }
          else
             printf( "unknown msgtype %d\n", msg.type_ );
@@ -779,8 +874,16 @@ int main( int argc, char const * const argv[] )
                   if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
                      perror( "STEREO" );
 
+                  int const vol = 0x4646 ;
+                  if( 0 > ioctl( fdAudio, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+                     perror( "Error setting volume" );
+
                   if( 0 < speed )
                   {
+                     close( fdAudio );
+                     fdAudio = open( "/dev/dsp", O_RDONLY );
+                     int fdAudioWrite = open( "/dev/dsp", O_WRONLY );
+
                      int fdCamera = open( "/dev/video0", O_RDONLY );
 //                     if( 0 <= fdCamera )
                      {
@@ -802,7 +905,7 @@ int main( int argc, char const * const argv[] )
                            if( 0 == create )
                            {
                               threadParam_t audioOutParams = audioParams ;
-                              audioOutParams.mediaFd_ = fdAudio ;
+                              audioOutParams.mediaFd_ = fdAudioWrite ;
                               pthread_t udpHandle ;
                               create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
                               if( 0 == create )
