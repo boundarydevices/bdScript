@@ -64,7 +64,7 @@ testJS: testJS.o $(LIB)
 testEvents: testEvents.o $(LIB)
 	$(CC) -o testEvents testEvents.o $(LIB) $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 
-all: curlCache curlGet dirTest urlTest testJS mp3Play
+all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play
 
 clean:
-	rm -f *.o curlCache curlGet dirTest urlTest testJS
+	rm -f *.o curlCache curlGet dirTest urlTest testEvents testJS mp3Play
