@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.13  2003-06-10 23:53:31  ericn
+ * Revision 1.14  2003-07-06 01:21:41  ericn
+ * -added method abortCodeQueue()
+ *
+ * Revision 1.13  2003/06/10 23:53:31  ericn
  * -made error message more explicit
  *
  * Revision 1.12  2003/06/08 15:20:02  ericn
@@ -333,16 +336,21 @@ void pollCodeQueue( JSContext *cx,
       bool const result = ( 0xFFFFFFFF == milliseconds )
                           ? codeList_.pull( cbd )
                           : codeList_.pull( cbd, milliseconds );
-      if( result )
+      if( result && ( 0 != cbd.callback_ ) )
       {
          cbd.callback_( cbd.cbData_ );
-         
+
          if( gotoCalled_ )
             break;
       }
       else
          break;
    }
+}
+
+void abortCodeQueue( void )
+{
+   codeList_.abort();
 }
 
 

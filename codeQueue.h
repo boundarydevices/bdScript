@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.8 2003-06-08 15:19:59 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.9 2003-07-06 01:21:37 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.8  2003-06-08 15:19:59  ericn
+ * Revision 1.9  2003-07-06 01:21:37  ericn
+ * -added method abortCodeQueue()
+ *
+ * Revision 1.8  2003/06/08 15:19:59  ericn
  * -added support for queued function call
  *
  * Revision 1.7  2003/01/06 04:29:49  ericn
@@ -135,6 +138,12 @@ private:
 void pollCodeQueue( JSContext *cx,
                     unsigned   milliseconds,
                     unsigned   iterations );
+
+//
+// called to terminate the normal read cycle of the code 
+// queue in response to a gotoURL(), exit(), or exec() call.
+//
+void abortCodeQueue( void );
 
 //
 // This should be called after the initial script is 
