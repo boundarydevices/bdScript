@@ -1,5 +1,5 @@
 #ifndef __MPDEMUX_H__
-#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.2 2003-07-20 18:36:05 ericn Exp $"
+#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.3 2003-07-20 19:03:56 ericn Exp $"
 
 /*
  * mpDemux.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: mpDemux.h,v $
- * Revision 1.2  2003-07-20 18:36:05  ericn
+ * Revision 1.3  2003-07-20 19:03:56  ericn
+ * -added comment
+ *
+ * Revision 1.2  2003/07/20 18:36:05  ericn
  * -added PTS interface
  *
  * Revision 1.1  2003/07/20 15:43:13  ericn
@@ -38,7 +41,7 @@ public:
       endOfFile_e
    };
 
-   frameType_e getFrame( void const   *&fData,
+   frameType_e getFrame( void const   *&fData,        // audio or video data
                          unsigned long &length,       // #bytes
                          INT64         &when_ms );    // when to play, ms relative to start
 
