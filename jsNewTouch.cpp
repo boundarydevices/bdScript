@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsNewTouch.cpp,v $
- * Revision 1.1  2003-11-24 19:42:42  ericn
+ * Revision 1.2  2003-11-25 00:07:49  ericn
+ * -modified so touchScreen.getX() works properly in handlers
+ *
+ * Revision 1.1  2003/11/24 19:42:42  ericn
  * -polling touch screen
  *
  * Revision 1.17  2003/02/01 18:14:02  ericn
@@ -164,6 +167,9 @@ void jsTouchPoll_t :: translate( int &x, int &y ) const
 void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
    translate( x, y );
+   prevX_ = x ; // set here so code has access to it
+   prevY_ = y ;
+
    if( 0 != curBox_ )
    {
       onMove( x, y, pressure, tv );
@@ -190,8 +196,6 @@ void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &t
       } // no boxes... look for global handler
    }
 
-   prevX_ = x ;
-   prevY_ = y ;
    wasDown_ = true ;
 }
 
