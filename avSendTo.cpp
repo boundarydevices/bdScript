@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.14  2003-10-31 13:48:45  ericn
+ * Revision 1.15  2003-10-31 13:57:57  ericn
+ * -modified to ignore duplicate barcodes (within 1 second)
+ *
+ * Revision 1.14  2003/10/31 13:48:45  ericn
  * -removed some debug msgs
  *
  * Revision 1.13  2003/10/31 13:32:54  ericn
@@ -596,6 +599,8 @@ private:
    int            udpSock_ ;
    sockaddr_in    remote_ ;
    scannerType_e  scannerType_ ;
+   unsigned long  prevTick_ ;
+   char           prevBarcode_[256];
 };
 
 static int strTableLookup( char const * const strTable[],
@@ -618,6 +623,8 @@ udpBarcode_t :: udpBarcode_t
    : barcodePoll_t( set )
    , udpSock_( udpSock )
    , remote_( remote )
+   , scannerType_( sick_e )
+   , prevTick_( 0 )
 {
    static char const *const scannerTypes[] = {
       "sick", "keyence", "other"
@@ -656,7 +663,7 @@ udpBarcode_t :: udpBarcode_t
 void udpBarcode_t :: onBarcode( void )
 {
    unsigned len = strlen( getBarcode() );
-   printf( "barcode <%s>, len %u\n", getBarcode(), len );
+//   printf( "barcode <%s>, len %u\n", getBarcode(), len );
 
    if( sick_e == scannerType_ )
    {
@@ -666,17 +673,27 @@ void udpBarcode_t :: onBarcode( void )
       }
    }
 
-   char data[sizeof(udpHeader_t)+sizeof(barcode_)];
-   udpHeader_t &header = *(udpHeader_t *)data ;
-   header.type_   = header.barcode ;
-   header.length_ = len + 1 ; // include trailing NULL
-   strcpy( data+sizeof(header), getBarcode() );
-
-   unsigned numToSend = sizeof(udpHeader_t)+header.length_ ;
-   int numSent = sendto( udpSock_, data, numToSend, 0, 
-                         (struct sockaddr *)&remote_, sizeof( remote_ ) );
-   if( numSent != numToSend )
-      perror( "barcode sendto" );
+   unsigned long const now = tickMs();
+   if( ( 0 != strcmp( barcode_, prevBarcode_ ) )
+       ||
+       ( 1000 < now-prevTick_ ) )
+   {
+      char data[sizeof(udpHeader_t)+sizeof(barcode_)];
+      udpHeader_t &header = *(udpHeader_t *)data ;
+      header.type_   = header.barcode ;
+      header.length_ = len + 1 ; // include trailing NULL
+      strcpy( data+sizeof(header), getBarcode() );
+   
+      unsigned numToSend = sizeof(udpHeader_t)+header.length_ ;
+      int numSent = sendto( udpSock_, data, numToSend, 0, 
+                            (struct sockaddr *)&remote_, sizeof( remote_ ) );
+      if( numSent != numToSend )
+         perror( "barcode sendto" );
+      strcpy( prevBarcode_, barcode_ );
+      prevTick_ = now ;
+   }
+   else
+      printf( "duplicate barcode %s ignored\n", barcode_ );
 }
 
 class udpTouch_t : public touchPoll_t {
