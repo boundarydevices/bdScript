@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.10  2002-12-26 19:04:26  ericn
+ * Revision 1.11  2002-12-26 19:26:59  ericn
+ * -added onMoveOff support
+ *
+ * Revision 1.10  2002/12/26 19:04:26  ericn
  * -lock touch flags, execute code directly from Javascript thread
  *
  * Revision 1.9  2002/12/26 18:18:28  ericn
@@ -181,7 +184,7 @@ static void doOnMove( void *data )
       } // still on this button
       else
       {
-         thread_->curBox_->onRelease_( *thread_->curBox_, x, y );
+         thread_->curBox_->onTouchMoveOff_( *thread_->curBox_, x, y );
          thread_->curBox_ = 0 ;
       } // moved off of the button
    } // have a box
@@ -252,8 +255,7 @@ static void doOnRelease( void *data )
       thread_->curBox_->onRelease_( *thread_->curBox_, thread_->lastX_, thread_->lastY_ );
       thread_->curBox_ = 0 ;
    } // touching, move or release box
-
-   if( JSVAL_VOID != onReleaseCode_ )
+   else if( JSVAL_VOID != onReleaseCode_ )
       executeCode( thread_->scope_, onReleaseCode_, "onRelease" );
    
    mutexLock_t lock( mutex_ );
@@ -273,8 +275,6 @@ void jsTouchScreenThread_t :: onTouch
       flags_ |= queuedTouch_ ;
       queueCallback( doOnTouch, this );
    }
-   else
-      printf( "eatTouch\n" );
 }
 
 
@@ -286,8 +286,6 @@ void jsTouchScreenThread_t :: onRelease( void )
       flags_ |= queuedRelease_ ;
       queueCallback( doOnRelease, this );
    }
-   else
-      printf( "eatRelease\n" );
 }
 
 
@@ -304,8 +302,6 @@ void jsTouchScreenThread_t :: onMove
       flags_ |= queuedTouch_ ;
       queueCallback( doOnMove, this );
    }
-   else
-      printf( "eatMove\n" );
 }
 
 static JSFunctionSpec touch_functions[] = {

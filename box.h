@@ -1,5 +1,5 @@
 #ifndef __BOX_H__
-#define __BOX_H__ "$Id: box.h,v 1.1 2002-11-21 14:09:52 ericn Exp $"
+#define __BOX_H__ "$Id: box.h,v 1.2 2002-12-26 19:26:59 ericn Exp $"
 
 /*
  * box.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: box.h,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-12-26 19:26:59  ericn
+ * -added onMoveOff support
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -79,6 +82,7 @@ public:
    void           *objectData_ ;
    touchHandler_t  onTouch_ ;
    touchHandler_t  onTouchMove_ ;
+   touchHandler_t  onTouchMoveOff_ ;
    touchHandler_t  onRelease_ ;
 
 };
@@ -93,6 +97,9 @@ extern void defaultTouch( box_t         &,
 extern void defaultTouchMove( box_t         &,
                               unsigned short x,
                               unsigned short y );
+extern void defaultTouchMoveOff( box_t         &,
+                                 unsigned short x,
+                                 unsigned short y );
 extern void defaultRelease( box_t         &,
                             unsigned short x,
                             unsigned short y );

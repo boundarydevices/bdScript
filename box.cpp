@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: box.cpp,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-12-26 19:26:59  ericn
+ * -added onMoveOff support
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -35,6 +38,13 @@ void defaultTouchMove( box_t         &box,
 {
    box.lastTouchX_ = x ;
    box.lastTouchY_ = y ;
+}
+
+void defaultTouchMoveOff( box_t         &box,
+                          unsigned short x,
+                          unsigned short y )
+{
+   box.state_ = box.notPressed_ ;
 }
 
 void defaultRelease( box_t         &box,
@@ -69,20 +79,21 @@ box_t *newBox( unsigned short xLeft,
          if( 0 == boxesById_[i] )
          {
             box_t * const newOne = new box_t ;
-            newOne->id_          = i ;
-            newOne->xLeft_       = xLeft ;
-            newOne->xRight_      = xRight ;
-            newOne->yTop_        = yTop ;
-            newOne->yBottom_     = yBottom ;
-            newOne->state_       = box_t::notPressed_ ;
-            newOne->startTouchX_ = 0 ;
-            newOne->startTouchY_ = 0 ;
-            newOne->lastTouchX_  = 0 ;
-            newOne->lastTouchY_  = 0 ;
-            newOne->objectData_  = objectData ;
-            newOne->onTouch_     = defaultTouch ;
-            newOne->onTouchMove_ = defaultTouchMove ;
-            newOne->onRelease_   = defaultRelease ;
+            newOne->id_             = i ;
+            newOne->xLeft_          = xLeft ;
+            newOne->xRight_         = xRight ;
+            newOne->yTop_           = yTop ;
+            newOne->yBottom_        = yBottom ;
+            newOne->state_          = box_t::notPressed_ ;
+            newOne->startTouchX_    = 0 ;
+            newOne->startTouchY_    = 0 ;
+            newOne->lastTouchX_     = 0 ;
+            newOne->lastTouchY_     = 0 ;
+            newOne->objectData_     = objectData ;
+            newOne->onTouch_        = defaultTouch ;
+            newOne->onTouchMove_    = defaultTouchMove ;
+            newOne->onTouchMoveOff_ = defaultTouchMoveOff ;
+            newOne->onRelease_      = defaultRelease ;
 
             boxesById_[i] = newOne ;
             nextBoxId_ = i ;

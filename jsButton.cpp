@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.14  2002-12-26 19:04:26  ericn
+ * Revision 1.15  2002-12-26 19:26:59  ericn
+ * -added onMoveOff support
+ *
+ * Revision 1.14  2002/12/26 19:04:26  ericn
  * -lock touch flags, execute code directly from Javascript thread
  *
  * Revision 1.13  2002/12/16 14:25:41  ericn
@@ -138,6 +141,7 @@ enum jsImage_tinyId {
    BUTTON_RELEASESOUND,
    BUTTON_TOUCHCODE,
    BUTTON_MOVECODE,
+   BUTTON_MOVEOFFCODE,
    BUTTON_RELEASECODE,
    BUTTON_FONT,
    BUTTON_TEXT
@@ -164,6 +168,7 @@ static JSPropertySpec buttonProperties_[] = {
   {"releaseSound",      BUTTON_RELEASESOUND,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onTouch",           BUTTON_TOUCHCODE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onMove",            BUTTON_MOVECODE,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"onMoveOff",         BUTTON_MOVEOFFCODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onRelease",         BUTTON_RELEASECODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"font",              BUTTON_FONT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"text",              BUTTON_TEXT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
@@ -293,6 +298,22 @@ static void buttonMove( box_t         &box,
    doit( box, x, y, defaultTouchMove, "onMove" );
 }
 
+static void buttonMoveOff( box_t         &box, 
+                           unsigned short x, 
+                           unsigned short y )
+{
+   buttonData_t *const button = (buttonData_t *)box.objectData_ ;
+   assert( 0 != button );
+   assert( button->box_ == &box );
+
+   if( 0 != button->img_ )
+      display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
+   else if( 0 != button->fontData_ )
+      drawButton( *button, false );
+   
+   doit( box, x, y, defaultTouchMoveOff, "onMoveOff" );
+}
+
 static void buttonRelease( box_t         &box, 
                            unsigned short x, 
                            unsigned short y )
@@ -382,11 +403,12 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   bottom = fb.getHeight();
 
                box_t *const box = buttonData->box_ = newBox( x, right, y, bottom, buttonData );
-               buttonData->cx_    = cx ;
-               buttonData->jsObj_ = thisObj ;
-               box->onTouch_     = buttonTouch ;
-               box->onTouchMove_ = buttonMove ;
-               box->onRelease_   = buttonRelease ;
+               buttonData->cx_      = cx ;
+               buttonData->jsObj_   = thisObj ;
+               box->onTouch_        = buttonTouch ;
+               box->onTouchMove_    = buttonMove ;
+               box->onTouchMoveOff_ = buttonMoveOff ;
+               box->onRelease_      = buttonRelease ;
 
                jsval     jsv ;
                JSObject *jsO ;
@@ -415,6 +437,8 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   JS_DefineProperty( cx, thisObj, "onTouch", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                if( JS_GetProperty( cx, rhObj, "onMove", &jsv ) && JSVAL_IS_STRING( jsv ) )
                   JS_DefineProperty( cx, thisObj, "onMove", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+               if( JS_GetProperty( cx, rhObj, "onMoveOff", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                  JS_DefineProperty( cx, thisObj, "onMoveOff", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                if( JS_GetProperty( cx, rhObj, "onRelease", &jsv ) && JSVAL_IS_STRING( jsv ) )
                   JS_DefineProperty( cx, thisObj, "onRelease", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
 
