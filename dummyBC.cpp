@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dummyBC.cpp,v $
- * Revision 1.3  2003-03-19 21:59:07  ericn
+ * Revision 1.4  2003-07-04 02:42:04  ericn
+ * -added support for hostIP (for compatibility)
+ *
+ * Revision 1.3  2003/03/19 21:59:07  ericn
  * -removed hardcoded port
  *
  * Revision 1.2  2003/02/10 01:17:38  ericn
@@ -217,7 +220,7 @@ int main( int argc, char const *const argv[] )
          fprintf( stderr, ":socket:%m\n" );
    }
    else
-      fprintf( stderr, "Usage : bc port#\n" );
+      fprintf( stderr, "Usage : bc hostIP port#\n" );
 
    return 0 ;
 }
