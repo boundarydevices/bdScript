@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.2  2004-02-03 06:11:12  ericn
+ * Revision 1.3  2004-02-07 12:14:34  ericn
+ * -allow zero-length values
+ *
+ * Revision 1.2  2004/02/03 06:11:12  ericn
  * -allow empty strings
  *
  * Revision 1.1  2004/02/01 09:53:18  ericn
@@ -279,7 +282,7 @@ char const *readFlashVar( char const *varName )
          }
       }
 
-      if( ( 0 != rVal ) && ( 0 < rLen ) )
+      if( ( 0 != rVal ) && ( 0 <= rLen ) )
       {
          char *out = (char *)malloc( rLen + 1 );
          if( out )
