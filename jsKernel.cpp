@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.2  2003-12-01 04:54:58  ericn
+ * Revision 1.3  2003-12-04 02:23:45  ericn
+ * -more error messages
+ *
+ * Revision 1.2  2003/12/01 04:54:58  ericn
  * -adde progress bar
  *
  * Revision 1.1  2003/11/30 16:45:53  ericn
@@ -136,7 +139,8 @@ printf( "0x%x bytes of kernel partition\n"
 // a horizontal progress bar.
 //
 
-static bool programParams( uintN        argc, 
+static bool programParams( JSContext   *cx, 
+                           uintN        argc, 
                            jsval const  argv[],
                            char const *&programData,
                            unsigned    &programLength,
@@ -185,10 +189,13 @@ static bool programParams( uintN        argc,
       } // have progress bar parameters
       else
       {
+         printf( "No progress bar parameters\n" );
       } // no optional parameters
 
       return true ;
    }
+   else
+      printf( "invalid parameter count %u or param0 type %u\n", argc, JS_TypeOfValue( cx, argv[0] ) );
    
    return false ;
 }
@@ -260,6 +267,7 @@ static bool doProgram( JSContext  *cx,
       xNext   = xLeft ;
       red = blue = 0 ;
       green   = 0x80 ;
+      unsigned failures = 0 ;
       while( 0 < dataLength )
       {
          unsigned numToWrite = dataLength > meminfo.erasesize ? meminfo.erasesize : dataLength ;
@@ -276,8 +284,24 @@ static bool doProgram( JSContext  *cx,
          }
          else
          {
-            JS_ReportError( cx, "Error writing flash block\n" );
-            break;
+            JS_ReportError( cx, "%s writing flash block\n", strerror( errno ) );
+            if( 10 > failures++ )
+            {
+               if( 0 == lseek( devFd, bytePos, SEEK_SET ) )
+               {
+                  JS_ReportError( cx, "re-try\n" );
+               }
+               else
+               {
+                  JS_ReportError( cx, "%s seeking flash position", strerror( errno ) );
+                  break;
+               }
+            }
+            else
+            {
+               JS_ReportError( cx, "too many retries, giving up\n" );
+               break;
+            }
          }
       }
       
@@ -303,7 +327,7 @@ jsKernelUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
    unsigned    yTop, height ;
    char const *kernelData ;
    unsigned    kernelLength ;
-   if( programParams( argc, argv, kernelData, kernelLength, xLeft, xRight, yTop, height ) )
+   if( programParams( cx, argc, argv, kernelData, kernelLength, xLeft, xRight, yTop, height ) )
    {
       if( ( (1<<16) < kernelLength ) && ( '\xEA' == kernelData[3] ) )
       {
@@ -372,7 +396,7 @@ jsFileSysUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
    unsigned    yTop, height ;
    char const *fileSysData ;
    unsigned    fileSysLength ;
-   if( programParams( argc, argv, fileSysData, fileSysLength, xLeft, xRight, yTop, height ) )
+   if( programParams( cx, argc, argv, fileSysData, fileSysLength, xLeft, xRight, yTop, height ) )
    {
       if( (1<<20) < fileSysLength )
       {
