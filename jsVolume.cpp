@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsVolume.cpp,v $
- * Revision 1.2  2002-12-15 00:11:42  ericn
+ * Revision 1.3  2003-02-08 14:56:12  ericn
+ * -changed interface to audio fd
+ *
+ * Revision 1.2  2002/12/15 00:11:42  ericn
  * -removed debug msgs
  *
  * Revision 1.1  2002/11/14 13:14:50  ericn
@@ -30,21 +33,7 @@
 static JSBool
 jsGetVolume( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = JSVAL_FALSE ;
-
-   int const dspFd = getDspFd();
-   if( 0 <= dspFd )
-   {
-      int vol;
-      if( 0 <= ioctl( dspFd, SOUND_MIXER_READ_VOLUME, &vol)) 
-      {
-         *rval = INT_TO_JSVAL( vol ) & 0xFF ;
-      }
-      else
-         JS_ReportError( cx, "Error reading volume" );
-   }
-   else
-      JS_ReportError( cx, "Error %d:%s opening dsp device", dspFd, strerror(errno) );
+   *rval = INT_TO_JSVAL( getVolume() );
    
    return JS_TRUE ;
 }
@@ -62,20 +51,7 @@ jsSetVolume( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
        &&
        ( 100 > (unsigned)( volParam = JSVAL_TO_INT(argv[0]) ) ) )
    {
-      int const dspFd = getDspFd();
-      if( 0 <= dspFd )
-      {
-         int const vol = (volParam << 8) | volParam ;
-         if( 0 <= ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
-         {
-            printf( "volume == 0x%x\n", vol );
-            *rval = INT_TO_JSVAL( vol ) & 0xFF ;
-         }
-         else
-            JS_ReportError( cx, "Error setting volume" );
-      }
-      else
-         JS_ReportError( cx, "Error %d:%s opening dsp device", dspFd, strerror(errno) );
+      setVolume( (unsigned char)volParam );
    }
    else
       JS_ReportError( cx, "Usage : setVolume( int [0..99] );\n" );
