@@ -1,24 +1,24 @@
 # 
 # Makefile for curlCache library and utility programs
 # 
-OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o \
+OBJS = childProcess.o codeQueue.o curlCache.o \
        curlThread.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
        jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsTouch.o jsURL.o \
        memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o 
-LIB = curlCacheLib.a
+LIB = libCurlCache.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
-   LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib
+   LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib -L ./
    IFLAGS=-I/usr/local/arm/2.95.3/arm-linux/include/freetype2 
 else
    CC=gcc
    AR=ar
-   LIBS=-L /usr/local/lib
+   LIBS=-L /usr/local/lib -L ./
    IFLAGS=-I/usr/include/freetype2 
    STRIP=strip
 endif
@@ -87,7 +87,15 @@ tsThread: tsThreadMain.o Makefile
 	arm-linux-nm tsThread >tsThread.map
 	$(STRIP) tsThread
 
-all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread
+madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
+	$(CC) -c -o madHeadersMain.o -O2 -D__STANDALONE__ $(IFLAGS) madHeaders.cpp
+
+madHeaders: madHeadersMain.o Makefile $(LIB)
+	$(CC) -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz 
+	arm-linux-nm madHeaders >madHeaders.map
+	$(STRIP) madHeaders
+
+all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread
+	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
