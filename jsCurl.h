@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.5 2002-11-30 00:32:05 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.6 2002-11-30 05:27:32 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.5  2002-11-30 00:32:05  ericn
+ * Revision 1.6  2002-11-30 05:27:32  ericn
+ * -moved async into request structure
+ *
+ * Revision 1.5  2002/11/30 00:32:05  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.4  2002/11/03 17:55:51  ericn
@@ -159,9 +162,10 @@ struct jsCurlRequest_t {
                                     //    optional useCache property
                                     //    optionally urlParams[] array property
    JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
+   bool                 async_ ;
 
    //
-   // one of these called when transfer terminates. 
+   // one of these called when transfer terminates. Specify zero to use default
    //
    onComplete_t onComplete_ ;
    onFailure_t  onFailure_ ;
@@ -175,7 +179,7 @@ struct jsCurlRequest_t {
 };
 
 //
-// If overridden, completion handlers should call these to execute code 
+// If overridden, completion handlers should call these to execute code
 // specified by onLoad, onCancel, onLoadError, onSize, and onProgress
 // initializers, and to signal completion of synchronous calls.
 //
@@ -185,8 +189,7 @@ void jsCurlOnCancel( jsCurlRequest_t & );
 void jsCurlOnSize( jsCurlRequest_t &, unsigned long size );
 void jsCurlOnProgress( jsCurlRequest_t &, unsigned long numReadSoFar );
 
-bool queueCurlRequest( jsCurlRequest_t &request,
-                       bool             async );
+bool queueCurlRequest( jsCurlRequest_t &request );
 
 bool initJSCurl( JSContext *cx, JSObject *glob );
 
