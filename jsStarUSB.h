@@ -1,5 +1,5 @@
 #ifndef __JSSTARUSB_H__
-#define __JSSTARUSB_H__ "$Id: jsStarUSB.h,v 1.1 2004-06-28 02:57:34 ericn Exp $"
+#define __JSSTARUSB_H__ "$Id: jsStarUSB.h,v 1.2 2004-07-04 21:30:08 ericn Exp $"
 
 /*
  * jsStarUSB.h
@@ -57,7 +57,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.h,v $
- * Revision 1.1  2004-06-28 02:57:34  ericn
+ * Revision 1.2  2004-07-04 21:30:08  ericn
+ * -publish star USB class
+ *
+ * Revision 1.1  2004/06/28 02:57:34  ericn
  * -Initial import
  *
  *
@@ -66,6 +69,8 @@
  */
 
 #include "js/jsapi.h"
+
+extern JSClass jsStarUSBClass_ ;
 
 bool initJSStarUSB( JSContext *cx, JSObject *glob );
 
