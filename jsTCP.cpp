@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.6  2003-07-03 13:36:38  ericn
+ * Revision 1.7  2004-01-01 20:10:44  ericn
+ * -got rid of secondary thread
+ *
+ * Revision 1.6  2003/07/03 13:36:38  ericn
  * -misc multi-tasking and multi-threading fixes
  *
  * Revision 1.5  2003/01/05 01:58:15  ericn
@@ -42,108 +45,234 @@
 #include "stringList.h"
 #include "semClasses.h"
 #include "jsGlobals.h"
+#include <sys/ioctl.h>
 
-struct socketData_t {
-   int          fd_ ;      // socket file descriptor
-   stringList_t lines_ ;   // list of input strings
-   JSContext   *cx_ ;
-   JSObject    *obj_ ;
-   pthread_t    thread_ ;
+class tcpHandler_t : public pollHandler_t {
+public:
+   tcpHandler_t( JSContext     *cx,
+                 JSObject      *scope,
+                 unsigned long  serverIP,       // network order
+                 unsigned short serverPort );   //    "      "
+   ~tcpHandler_t( void );
+
+   virtual void onDataAvail( void );     // POLLIN
+   virtual void onHUP( void );           // POLLHUP
+
+   bool readln( std::string &s );
+
+private:
+   stringList_t  lines_ ;    // list of input strings
+   std::string   prevTail_ ; // previously un-terminated line
+   JSContext    *cx_ ;
+   JSObject     *scope_ ;
+   unsigned char terminators_ ;
 };
 
-enum {
-   haveCR_ = 1,
-   haveLF_ = 2
-};
-
-static void *readerThread( void *arg )
+tcpHandler_t::tcpHandler_t
+   ( JSContext     *cx,
+     JSObject      *scope,
+     unsigned long  serverIP,       // network order
+     unsigned short serverPort )    //    "      "
+   : pollHandler_t( socket( AF_INET, SOCK_STREAM, 0 ), pollHandlers_ )
+   , cx_( cx )
+   , scope_( scope )
+   , terminators_( 0 )
 {
-printf( "socketReader %p (id %x)\n", &arg, pthread_self() );   
-   socketData_t *const sd = (socketData_t *)arg ;
-   jsval jsv ;
-
-   if( JS_GetProperty( sd->cx_, sd->obj_, "onLineIn", &jsv ) && JSVAL_IS_STRING( jsv ) )
+   if( 0 <= getFd() )
    {
-      JS_AddRoot( sd->cx_, &jsv );
-   }
-   else
-      jsv = JSVAL_VOID ;
-
-   unsigned char terminators = 0 ;
-   std::string   curLine ;
-   do {
-      char inData[80];
-      int numRead = recv( sd->fd_, inData, sizeof( inData ) - 1, 0 );
-      if( 0 < numRead )
+      fcntl( getFd(), F_SETFD, FD_CLOEXEC );
+      sockaddr_in serverAddr ;
+   
+      memset( &serverAddr, 0, sizeof( serverAddr ) );
+   
+      serverAddr.sin_family      = AF_INET;
+      serverAddr.sin_addr.s_addr = serverIP ;
+      serverAddr.sin_port        = serverPort ;
+   
+      if( 0 == connect( getFd(), (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) )
       {
-         for( int i = 0 ; i < numRead ; i++ )
-         {
-            char const c = inData[i];
-            unsigned char mask ;
-            if( '\r' == c )
-               mask = haveCR_ ;
-            else if( '\n' == c )
-               mask = haveLF_ ;
-            else
-               mask = 0 ;
-
-            if( mask )
-            {
-               if( ( 0 == terminators )
-                   ||
-                   ( 0 != ( mask & terminators ) ) )
-               {
-                  terminators = mask ;
-                  mutexLock_t lock( execMutex_ );
-                  sd->lines_.push_back( curLine );
-                  curLine = "" ;
-                  if( JSVAL_VOID != jsv )
-                     queueUnrootedSource( sd->obj_, jsv, "tcpClientRead" );
-               } // first or duplicate terminator
-               else
-               {
-                  terminators = 0 ;
-               } // have alternate terminator, ignore and reset
-            }
-            else
-            {
-               curLine += c ;
-               terminators = 0 ;
-            }
-         }
+         int doit = 1 ;
+         setsockopt( getFd(), IPPROTO_TCP, TCP_NODELAY, &doit, sizeof( doit ) );
+   
+         jsval jsv = JSVAL_TRUE ;
+         JS_DefineProperty( cx, scope, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+         setMask( POLLIN|POLLHUP );
+         pollHandlers_.add( *this );
       }
       else
-         break; // eof
-   } while( 1 );
-
-   if( 0 != curLine.size() )
-   {
-      mutexLock_t lock( execMutex_ );
-      sd->lines_.push_back( curLine );
-      curLine = "" ;
-      if( JSVAL_VOID != jsv )
-         queueUnrootedSource( sd->obj_, jsv, "tcpClientRead" );
+      {
+         JS_ReportError( cx, "tcpClient:connect" );
+         close();
+      }
    }
-
-   if( JSVAL_VOID != jsv )
-      JS_RemoveRoot( sd->cx_, &jsv );
-
-   JS_RemoveRoot( sd->cx_, sd->obj_ );
-
-   return 0 ;
+   else
+      JS_ReportError( cx, "tcpClient:socket create" );
 }
 
-static void closeSocket( socketData_t &socketData,
+bool tcpHandler_t::readln( std::string &s )
+{
+   if( !lines_.empty() )
+   {
+      s = lines_.front();
+      lines_.pop_front();
+      return true ;
+   }
+   else
+      return false ;
+}
+
+void tcpHandler_t::onDataAvail( void )      // POLLIN
+{
+printf( "tcp data available\n" );
+   int numAvail ;
+   int const ioctlResult = ioctl( getFd(), FIONREAD, &numAvail );
+   if( ( 0 == ioctlResult )
+       &&
+       ( 0 < numAvail ) )
+   {
+printf( "%u bytes\n", numAvail );
+
+      char inData[2048];
+      int numRead ;
+      
+      bool haveLine = false ;
+      std::string tail = prevTail_ ;
+      prevTail_ = "" ;
+      int readSize = numAvail ;
+      if( readSize )
+         readSize = sizeof( inData );
+
+      while( ( 0 < numAvail )
+             &&
+             ( 0 < ( readSize = ( ( numAvail > sizeof( inData ) ) 
+                                  ? sizeof( inData )
+                                  : numAvail ) ) )
+             &&
+             ( 0 <= ( numRead = read( getFd(), inData, readSize ) ) ) )
+      {
+         numAvail -= numRead ;
+         enum {
+            haveCR_ = 1,
+            haveLF_ = 2,
+            haveBoth_ = haveCR_ | haveLF_
+         };
+         
+         for( int i = 0 ; i < numRead ; i++ )
+         {
+            unsigned char termMask = haveLF_ ;
+            char const inChar = inData[i];
+            switch( inChar )
+            {
+               case '\r' :
+                  {
+                     termMask = haveCR_ ;
+                     // intentional fall-through
+                  }
+               case '\n' :
+                  {
+                     haveLine = true ;
+                     lines_.push_back( tail ); // flush line
+                     tail = "" ;
+
+                     if( terminators_ & termMask )
+                     {
+                        lines_.push_back( "" ); // empty line
+                     } // duplicate terminator
+                     else
+                     {
+                        terminators_ |= termMask ;
+                        if( haveBoth_ == terminators_ )
+                           terminators_ = 0 ;
+                     } // first time we've seen this one
+                     break;
+                  }
+
+               default:
+                  tail += inChar ;
+            }
+         } // 
+
+         readSize = numAvail ;
+         if( readSize > sizeof( inData ) )
+            readSize = sizeof( inData );
+      }
+
+      prevTail_ = tail ;
+
+      if( haveLine )
+      {
+         jsval jsv ;
+
+         if( JS_GetProperty( cx_, scope_, "onLineIn", &jsv ) )
+         {
+            JSType const jst = JS_TypeOfValue( cx_, jsv );
+            if( ( JSTYPE_STRING == jst ) ||  ( JSTYPE_FUNCTION == jst ) )
+            {
+               executeCode( scope_, jsv, "tcpClient.onLineIn" );
+            }
+            else
+               JS_ReportError( cx_, "invalid type %u for tcpClient.onLineIn\n" );
+         }
+      } // fire JS handler
+   }
+   else if( 0 == ioctlResult )
+   {
+      printf( "?? closed ??\n" );
+      onHUP();
+   }
+   else
+      perror( "FIONREAD" );
+}
+
+void tcpHandler_t::onHUP( void )      // POLLHUP
+{
+   if( 0 < prevTail_.size() )
+   {
+      lines_.push_back( prevTail_ );
+      prevTail_ = "" ;
+      jsval jsv ;
+
+      if( JS_GetProperty( cx_, scope_, "onLineIn", &jsv ) )
+      {
+         JSType const jst = JS_TypeOfValue( cx_, jsv );
+         if( ( JSTYPE_STRING == jst ) ||  ( JSTYPE_FUNCTION == jst ) )
+         {
+            executeCode( scope_, jsv, "tcpClient.onLineIn" );
+         }
+         else
+            JS_ReportError( cx_, "invalid type %u for tcpClient.onLineIn\n" );
+      }
+   } // flush tail-end data
+
+   close();
+   
+   jsval jsv = JSVAL_FALSE ;
+   JS_SetProperty( cx_, scope_, "isConnected", &jsv );
+   
+
+   if( JS_GetProperty( cx_, scope_, "onClose", &jsv ) )
+   {
+      JSType const jst = JS_TypeOfValue( cx_, jsv );
+      if( ( JSTYPE_STRING == jst ) ||  ( JSTYPE_FUNCTION == jst ) )
+      {
+         executeCode( scope_, jsv, "tcpClient.onClose" );
+      }
+      else
+         JS_ReportError( cx_, "invalid type %u for tcpClient.onClose\n" );
+   }
+
+   setMask( 0 ); // no more events
+}
+
+tcpHandler_t::~tcpHandler_t( void )
+{
+}
+
+static void closeSocket( tcpHandler_t &socketData,
                          JSContext    *cx, 
                          JSObject     *obj )
 {
-   close( socketData.fd_ );
-   socketData.fd_ = -1 ;
-   jsval jsv = JSVAL_FALSE ;
-   JS_SetProperty( cx, obj, "isConnected", &jsv );
-
-   if( JS_GetProperty( cx, obj, "onClose", &jsv ) )
-      queueSource( obj, jsv, "tcpClient::onClose" );
+   socketData.onHUP();
 }
 
 JSBool
@@ -153,14 +282,14 @@ jsTCPClientSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 
    if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
    {
-      socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
+      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
-         if( 0 <= socketData->fd_ )
+         if( 0 <= socketData->getFd() )
          {
             JSString *sArg = JSVAL_TO_STRING( argv[0] );
             unsigned const len = JS_GetStringLength( sArg );
-            int numSent = send( socketData->fd_, JS_GetStringBytes( sArg ), len, 0 );
+            int numSent = send( socketData->getFd(), JS_GetStringBytes( sArg ), len, 0 );
             if( len == (unsigned)numSent )
             {
                *rval = JSVAL_TRUE ;
@@ -189,13 +318,12 @@ jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
    *rval = JSVAL_FALSE ;
    if( 0 == argc )
    {
-      socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
+      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
-         if( !socketData->lines_.empty() )
+         std::string s ;
+         if( socketData->readln( s ) )
          {
-            std::string const s( socketData->lines_.front() );
-            socketData->lines_.pop_front();
 fprintf( stderr, "---> host data %s\n", s.c_str() );
             *rval = STRING_TO_JSVAL( JS_NewStringCopyN( cx, s.c_str(), s.size() ) );
          }
@@ -216,10 +344,10 @@ jsTCPClientClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 
    if( 0 == argc )
    {
-      socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
+      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
-         if( 0 <= socketData->fd_ )
+         if( 0 <= socketData->getFd() )
          {
             closeSocket( *socketData, cx, obj );
             *rval = JSVAL_TRUE ;
@@ -240,12 +368,12 @@ void jsTCPClientFinalize(JSContext *cx, JSObject *obj)
 {
    if( obj )
    {
-      socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
+      tcpHandler_t *const socketData = (tcpHandler_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
          JS_SetPrivate( cx, obj, 0 );
-         if( 0 <= socketData->fd_ )
-            close( socketData->fd_ );
+         if( 0 <= socketData->getFd() )
+            socketData->close();       // no completion handler
          delete socketData ;
       } // have socket data
 //      else
@@ -286,7 +414,7 @@ static JSPropertySpec tcpClientProperties_[] = {
 };
 
 static char const tcpClientUsage[] = {
-   "Usage : new tcpClient( { serverSock:int\n"
+   "Usage : new tcpClient( { serverPort:int\n"
    "                         [,serverIP:192.168.0.1]\n"
    "                         [,onLineIn:jsCode]\n"
    "                         [,onClose:jsCode] } )\n"
@@ -305,81 +433,53 @@ static JSBool tcpClient( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
           &&
           JSVAL_IS_INT( vServerPort )  )
       {
-         JSObject *const thisObj = JS_NewObject( cx, &jsTCPClientClass_, NULL, NULL );
-   
-         if( thisObj )
+         std::string serverIP = "127.0.0.1" ;
+         jsval vServerIP ;
+         if( JS_GetProperty( cx, rhObj, "serverIP", &vServerIP ) 
+             &&
+             JSVAL_IS_STRING( vServerIP ) )
          {
-            *rval = OBJECT_TO_JSVAL( thisObj ); // root
-            jsval jsv = JSVAL_FALSE ;
-            JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-
-            if( JS_GetProperty( cx, rhObj, "onLineIn", &jsv ) 
-                &&
-                JSVAL_IS_STRING( jsv ) )
-               JS_DefineProperty( cx, thisObj, "onLineIn", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-
-            if( JS_GetProperty( cx, rhObj, "onClose", &jsv ) 
-                &&
-                JSVAL_IS_STRING( jsv ) )
-               JS_DefineProperty( cx, thisObj, "onClose", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-            
-            std::string serverIP = "127.0.0.1" ;
-            jsval vServerIP ;
-            if( JS_GetProperty( cx, rhObj, "serverIP", &vServerIP ) 
-                &&
-                JSVAL_IS_STRING( vServerIP ) )
+            JSString *sIP = JSVAL_TO_STRING( vServerIP );
+            serverIP.assign( JS_GetStringBytes( sIP ), JS_GetStringLength( sIP ) );
+         }
+         
+         ddtoul_t fromDotted( serverIP.c_str() );
+         if( fromDotted.worked() )
+         {
+            JSObject *const thisObj = JS_NewObject( cx, &jsTCPClientClass_, NULL, NULL );
+      
+            if( thisObj )
             {
-               JSString *sIP = JSVAL_TO_STRING( vServerIP );
-               serverIP.assign( JS_GetStringBytes( sIP ), JS_GetStringLength( sIP ) );
-            }
-
-            socketData_t *const socketData = new socketData_t ;
-            socketData->cx_  = cx ;
-            socketData->obj_ = thisObj ;
-            socketData->fd_  = -1 ;
-            JS_SetPrivate( cx, thisObj, socketData );
-
-            ddtoul_t fromDotted( serverIP.c_str() );
-            if( fromDotted.worked() )
-            {
-               int sFd = socket( AF_INET, SOCK_STREAM, 0 );
-               if( 0 <= sFd )
+               *rval = OBJECT_TO_JSVAL( thisObj ); // root
+               jsval jsv = JSVAL_FALSE ;
+               JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+   
+               if( JS_GetProperty( cx, rhObj, "onLineIn", &jsv ) )
                {
-                  fcntl( sFd, F_SETFD, FD_CLOEXEC );
-                  socketData->fd_ = sFd ;
-                  sockaddr_in serverAddr ;
-
-                  memset( &serverAddr, 0, sizeof( serverAddr ) );
-
-                  serverAddr.sin_family      = AF_INET;
-                  serverAddr.sin_addr.s_addr = fromDotted.networkOrder(); // server's IP
-                  serverAddr.sin_port        = htons( (unsigned short)JSVAL_TO_INT(vServerPort) );
-
-                  if( 0 == connect( sFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) )
+                  JSType const jst = JS_TypeOfValue( cx, jsv );
+                  if( ( JSTYPE_STRING == jst ) ||  ( JSTYPE_FUNCTION == jst ) )
                   {
-                     int doit = 1 ;
-                     setsockopt( sFd, IPPROTO_TCP, TCP_NODELAY, &doit, sizeof( doit ) );
-                     JS_AddRoot( cx, &socketData->obj_ );
-                     int create = pthread_create( &socketData->thread_, 0, readerThread, socketData );
-                     pthread_detach( socketData->thread_ );
-
-                     jsval jsv = JSVAL_TRUE ;
-                     JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                     JS_DefineProperty( cx, thisObj, "onLineIn", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                   }
                   else
-                  {
-                     JS_ReportError( cx, "tcpClient:connect" );
-                     close( sFd );
-                  }
+                     JS_ReportError( cx, "onLineIn member must be string or function" );
                }
-               else
-                  JS_ReportError( cx, "tcpClient:socket create" );
+   
+               if( JS_GetProperty( cx, rhObj, "onClose", &jsv ) 
+                   &&
+                   JSVAL_IS_STRING( jsv ) )
+                  JS_DefineProperty( cx, thisObj, "onClose", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+   
+               tcpHandler_t *const socketData = new tcpHandler_t( cx, thisObj, 
+                                                                  fromDotted.networkOrder(),
+                                                                  htons( (unsigned short)JSVAL_TO_INT(vServerPort) ) );
+               JS_SetPrivate( cx, thisObj, socketData );
             }
             else
-               JS_ReportError( cx, "named hosts not yet implemented" );
+               JS_ReportError( cx, "allocating TCP client" );
          }
          else
-            JS_ReportError( cx, "allocating TCP client" );
+            JS_ReportError( cx, "named hosts not yet implemented" );
       }
       else
          JS_ReportError( cx, tcpClientUsage );
