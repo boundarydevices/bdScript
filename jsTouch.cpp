@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.8  2002-12-15 20:01:04  ericn
+ * Revision 1.9  2002-12-26 18:18:28  ericn
+ * -modified to throttle touch events
+ *
+ * Revision 1.8  2002/12/15 20:01:04  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.7  2002/12/14 23:59:58  ericn
@@ -53,6 +56,7 @@ public:
         curBox_( 0 ){}
    virtual ~jsTouchScreenThread_t( void ){}
 
+   // these are called directly by the touch screen thread
    virtual void onTouch( unsigned        x, 
                          unsigned        y );
    virtual void onRelease( void );
@@ -60,8 +64,14 @@ public:
    virtual void onMove( unsigned        x, 
                         unsigned        y );
 
+   enum {
+      queuedTouch_   = 1,
+      queuedRelease_ = 2
+   };
+
    int               lastX_ ;
    int               lastY_ ;
+   int               flags_ ; // enums above used to throttle delivery
 
    JSContext * const cx_ ;
    JSObject  * const scope_ ;
@@ -142,62 +152,102 @@ jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
 static jsTouchScreenThread_t *thread_ = 0 ;
 
-void jsTouchScreenThread_t :: onTouch
-   ( unsigned x, 
-     unsigned y )
+//
+// These routines are called in the context of the Javascript
+// interpreter thread
+//
+void doOnTouch( void *data )
 {
-   lastX_ = x ;
-   lastY_ = y ;
+   assert( data == (void *)thread_ );
+   int const x = thread_->lastX_ ;
+   int const y = thread_->lastY_ ;
 
-   if( 0 != curBox_ )
+   if( 0 != thread_->curBox_ )
    {
-      if( ( x >= curBox_->xLeft_ )
+      if( ( x >= thread_->curBox_->xLeft_ )
           &&
-          ( x < curBox_->xRight_ )
+          ( x < thread_->curBox_->xRight_ )
           &&
-          ( y >= curBox_->yTop_ )
+          ( y >= thread_->curBox_->yTop_ )
           &&
-          ( y < curBox_->yBottom_ ) )
+          ( y < thread_->curBox_->yBottom_ ) )
       {
-         curBox_->onTouch_( *curBox_, x, y );
+         thread_->curBox_->onTouch_( *thread_->curBox_, x, y );
          return ;
       } // still on this button
       else
       {
-         curBox_->onRelease_( *curBox_, x, y );
-         curBox_ = 0 ;
+         thread_->curBox_->onRelease_( *thread_->curBox_, x, y );
+         thread_->curBox_ = 0 ;
       } // moved off of the button
    } // already touching, move or release
 
    std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
    if( 0 < boxes.size() )
    {
-      curBox_ = boxes[0];
-      curBox_->onTouch_( *boxes[0], x, y );
+      thread_->curBox_ = boxes[0];
+      thread_->curBox_->onTouch_( *boxes[0], x, y );
    }
    else
    {
       if( JSVAL_VOID != onTouchCode_ )
-         queueSource( scope_, onTouchCode_, "onTouch" );
+         executeCode( thread_->scope_, onTouchCode_, "onTouch" );
       else
       {
          printf( "no touch handler %u/%u\n", x, y );
 //         dumpZMaps();
       }
    } // no boxes... look for global handler
+
+   thread_->flags_ &= ~thread_->queuedTouch_ ;
+}
+
+void doOnMove( void *data )
+{
+   if( 0 == thread_->curBox_ )
+   {
+      if( JSVAL_VOID != onMoveCode_ )
+         executeCode( thread_->scope_, onMoveCode_, "onMove" );
+   }
+   thread_->flags_ &= ~thread_->queuedTouch_ ;
+}
+
+void doOnRelease( void *data )
+{
+   if( 0 != thread_->curBox_ )
+   {
+      thread_->curBox_->onRelease_( *thread_->curBox_, thread_->lastX_, thread_->lastY_ );
+      thread_->curBox_ = 0 ;
+   } // touching, move or release box
+
+   if( JSVAL_VOID != onReleaseCode_ )
+      executeCode( thread_->scope_, onReleaseCode_, "onRelease" );
+   
+   thread_->flags_ &= ~thread_->queuedRelease_ ;
+}
+
+void jsTouchScreenThread_t :: onTouch
+   ( unsigned x, 
+     unsigned y )
+{
+   if( 0 == ( flags_ & queuedTouch_ ) )
+   {
+      lastX_ = x ;
+      lastY_ = y ;
+   
+      flags_ |= queuedTouch_ ;
+      queueCallback( doOnTouch, this );
+   }
 }
 
 
 void jsTouchScreenThread_t :: onRelease( void )
 {
-   if( 0 != curBox_ )
+   if( 0 == ( flags_ & queuedRelease_ ) )
    {
-      curBox_->onRelease_( *curBox_, lastX_, lastY_ );
-      curBox_ = 0 ;
-   } // touching, move or release box
-
-   if( JSVAL_VOID != onReleaseCode_ )
-      queueSource( scope_, onReleaseCode_, "onRelease" );
+      flags_ |= queuedRelease_ ;
+      queueCallback( doOnRelease, this );
+   }
 }
 
 
@@ -205,13 +255,13 @@ void jsTouchScreenThread_t :: onMove
    ( unsigned x, 
      unsigned y )
 {
-   lastX_ = x ;
-   lastY_ = y ;
-
-   if( 0 == curBox_ )
+   if( 0 == ( flags_ & queuedTouch_ ) )
    {
-      if( JSVAL_VOID != onMoveCode_ )
-         queueSource( scope_, onMoveCode_, "onMove" );
+      lastX_ = x ;
+      lastY_ = y ;
+   
+      flags_ |= queuedTouch_ ;
+      queueCallback( doOnMove, this );
    }
 }
 
