@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: cbmImage.cpp,v $
- * Revision 1.3  2003-06-26 08:44:46  tkisky
+ * Revision 1.4  2003-07-29 20:06:32  tkisky
+ * -no logic change, minor
+ *
+ * Revision 1.3  2003/06/26 08:44:46  tkisky
  * -whoops, length fix
  *
  * Revision 1.2  2003/06/26 08:01:33  tkisky
@@ -109,10 +112,10 @@ void cbmImage_t :: setPixel
          // high order bit is top row
          //
 // printf( "yOffs 0x%x\n", yOffs );
-         int rowBytesInSeg = ((ySeg < (numSegments_-1)) ? rowsPerSegment_ : rowsLastSegment_) /8;
+         int rowBytesInSeg = ((ySeg < (numSegments_-1)) ? rowsPerSegment_ : rowsLastSegment_) >>3;
          int maxBytes = actualWidth_ * rowBytesInSeg;
-         int bytes = ( yOffs / 8 );
-         unsigned char bitOffs = yOffs % 8 ;
+         int bytes = ( yOffs >> 3 );
+         unsigned char bitOffs = yOffs & 7;
          if( x )
          {
             bytes += x * rowBytesInSeg;
