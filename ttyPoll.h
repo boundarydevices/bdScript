@@ -1,5 +1,5 @@
 #ifndef __TTYPOLL_H__
-#define __TTYPOLL_H__ "$Id: ttyPoll.h,v 1.2 2004-12-28 03:36:11 ericn Exp $"
+#define __TTYPOLL_H__ "$Id: ttyPoll.h,v 1.3 2004-12-28 03:46:07 ericn Exp $"
 
 /*
  * ttyPoll.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: ttyPoll.h,v $
- * Revision 1.2  2004-12-28 03:36:11  ericn
+ * Revision 1.3  2004-12-28 03:46:07  ericn
+ * -never mind
+ *
+ * Revision 1.2  2004/12/28 03:36:11  ericn
  * -restore BLOCK state
  *
  * Revision 1.1  2003/12/28 15:25:47  ericn
@@ -51,7 +54,6 @@ public:
 
 protected:
    struct termios oldTermState_ ;
-   int            oldFl_ ;
    char           dataBuf_[512];
    unsigned       numRead_ ;
    char           terminator_ ;
