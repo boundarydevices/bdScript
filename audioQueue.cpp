@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.17  2003-02-02 13:46:17  ericn
+ * Revision 1.18  2003-02-02 21:00:50  ericn
+ * -modified to set secsRecorded
+ *
+ * Revision 1.17  2003/02/02 13:46:17  ericn
  * -added recordBuffer support
  *
  * Revision 1.16  2003/02/01 18:15:29  ericn
@@ -137,6 +140,20 @@ static void audioCallback( void *cbParam )
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
+      audioQueue_t::waveHeader_t const &header = *(audioQueue_t::waveHeader_t const *)item->data_ ;
+      if( ( 0 < header.sampleRate_ ) && ( 0 < header.numSamples_ ) )
+      {
+         double secs = (1.0*header.numSamples_)/header.sampleRate_ ;
+         jsdouble *jsSecs = JS_NewDouble( execContext_, secs );
+         JS_DefineProperty( execContext_, 
+                            item->obj_, 
+                            "secsRecorded",
+                            DOUBLE_TO_JSVAL( jsSecs ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+      }
    }
 
    jsval handler = item->isComplete_ ? item->onComplete_ : item->onCancel_ ;
@@ -391,7 +408,8 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                }
 
                unsigned char *nextSample = (unsigned char *)header.samples_ ;
-               unsigned long bytesLeft = header.numSamples_ * sizeof( header.samples_[0] );
+               unsigned long const maxSamples = header.numSamples_ ;
+               unsigned long bytesLeft = maxSamples * sizeof( header.samples_[0] );
                unsigned const maxRead = queue->readFragSize_ ;
                while( !( _cancel || queue->shutdown_ ) 
                       && 
@@ -411,7 +429,7 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                   }
                }
 
-               header.numSamples_ = ( header.numSamples_*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
+               header.numSamples_ = ( maxSamples*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
                header.numChannels_ = 1 ;
 
                normalize( (short *)header.samples_, header.numSamples_ );
