@@ -52,7 +52,7 @@ static JSBool jsSetGpio( int &fd, char* device,JSContext *cx, JSObject *obj, uin
       }
       if ( (fd > 0) && (write( fd, &ledState, 1) >= 0) )
       {
-         printf( "%s = %i\n", device,state);
+//         printf( "%s = %i\n", device,state);
          *rval = JSVAL_TRUE;
       }
       else
@@ -97,7 +97,7 @@ static void* FeedbackThread( void *arg )
       {
          if ( numRead > 0)
          {
-            printf( "feedback %02x", (unsigned char)ch );
+//            printf( "feedback %02x", (unsigned char)ch );
             if (feedbackHandlerScope != 0)
             {
                if (ch&1)
