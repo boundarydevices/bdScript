@@ -1,5 +1,5 @@
 #ifndef __HTTPPOLL_H__
-#define __HTTPPOLL_H__ "$Id: httpPoll.h,v 1.1 2004-03-17 04:56:19 ericn Exp $"
+#define __HTTPPOLL_H__ "$Id: httpPoll.h,v 1.2 2004-12-18 18:30:41 ericn Exp $"
 
 /*
  * httpPoll.h
@@ -38,9 +38,11 @@
  * Change History : 
  *
  * $Log: httpPoll.h,v $
- * Revision 1.1  2004-03-17 04:56:19  ericn
- * -updates for mini-board (no sound, video, touch screen)
+ * Revision 1.2  2004-12-18 18:30:41  ericn
+ * -require tcpHandler, not more generic pollHandler, add dns support
  *
+ * Revision 1.1  2004/03/17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
  *
  *
  * Copyright Boundary Devices, Inc. 2004
@@ -53,9 +55,9 @@
 #include <string>
 #include <list>
 
-class httpPoll_t : public tcpClient_t {
+class httpPoll_t {
 public:
-   httpPoll_t( char const *path );              // from server's root
+   httpPoll_t();     // from server's root, server is specified through TCP handler
    virtual ~httpPoll_t( void );
 
    struct header_t {
@@ -70,7 +72,10 @@ public:
    void addParam( std::string const &fieldName, std::string const &value );
    void addFile( std::string const &fieldName, std::string const &fileName );
 
+   void setName( char const *fileName ); // server-relative, include leading slash
+   void setHandler( tcpHandler_t *h );
    void start( void );
+   void clearHandler();
 
    bool isComplete( void ) const { return ( error == state_ ) || ( complete == state_ ); }
 
@@ -113,15 +118,17 @@ public:
    // poll-handler callbacks (much of the work happens here)
    // ---------------------------------------------------------------
    //
-   virtual void onConnect( tcpHandler_t & );
-   virtual void onDisconnect( tcpHandler_t & );
-   
-   virtual void onDataAvail( pollHandler_t &h );     // POLLIN
-   virtual void onWriteSpace( pollHandler_t &h );    // POLLOUT
-   virtual void onError( pollHandler_t &h );         // POLLERR
-   virtual void onHUP( pollHandler_t &h );           // POLLHUP
+   virtual bool onConnect( tcpHandler_t & );
+   virtual bool onDisconnect( tcpHandler_t & );
+
+   virtual bool onDataAvail( pollHandler_t &h );     // POLLIN
+   virtual bool onWriteSpace( pollHandler_t &h );    // POLLOUT
+   virtual bool onError( pollHandler_t &h );         // POLLERR
+   virtual bool onHUP( pollHandler_t &h );           // POLLHUP
 
 protected:
+   tcpHandler_t        *h_ ;
+   std::string          file_ ;
    state_e              state_ ;
    std::list<header_t>  headers_ ;
    std::list<header_t>  params_ ;
