@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.2 2002-10-13 13:50:55 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.3 2002-10-13 14:36:11 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -16,17 +16,16 @@
  *                                                                fileTime
  *                                                                mimeType 
  *
- * and curl routines.
+ * and curl routines:
  *
- *    curlGet()      - grabs a URL using http GET and returns the content
- *    curlPost()     - grabs a URL using http POST and returns the content
+ *    curlGet()      - grabs a URL using http GET or POST and returns the content
  *
- * Each of these takes one or more parameters:
+ * curlGet these takes one or more parameters:
  *    url         - relative or absolute (http://) URL
+ *    useCache    - boolean indicating whether cached copy should be used
  *    variables   - Any variables to be posted. Variable
  *                  names will be used as form variable names
- *                  for POSTs, or as part of the query string
- *                  for GETs
+ *                  for POSTs. No GET parameter name support is available
  * 
  * and each returns an object (array) with the following
  * members:
@@ -38,7 +37,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.2  2002-10-13 13:50:55  ericn
+ * Revision 1.3  2002-10-13 14:36:11  ericn
+ * -removed curlPost(), fleshed out variable handling
+ *
+ * Revision 1.2  2002/10/13 13:50:55  ericn
  * -merged curlGet() and curlPost() with curlFile object
  *
  * Revision 1.1  2002/09/29 17:36:23  ericn

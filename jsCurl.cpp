@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.3  2002-10-13 13:50:57  ericn
+ * Revision 1.4  2002-10-13 14:36:13  ericn
+ * -removed curlPost(), fleshed out variable handling
+ *
+ * Revision 1.3  2002/10/13 13:50:57  ericn
  * -merged curlGet() and curlPost() with curlFile object
  *
  * Revision 1.2  2002/10/06 14:54:10  ericn
@@ -184,83 +187,86 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
    return JS_FALSE ;
 }
 
+static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
+{
+   if( f.isOpen() )
+   {
+      bool worked = false ;
+   
+      JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
+      if( sReturn )
+         *rval = STRING_TO_JSVAL( sReturn );
+   }
+   else
+      *rval = JSVAL_FALSE ;
+
+   return JS_TRUE ;
+}
+
 static JSBool
 curlGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
    //
-   // need at least 
-   //    url
-   //    cacheFlag
+   // need at least url. 
    //
-   if( ( 2 <= argc )
+   // If more parameters, cacheFlag(bool) is next ( must be bool )
+   // and the remainder must be name/value pairs
+   //
+   // names beginning with '@' indicate files to upload
+   // 
+   //
+   if( ( 1 <= argc )
        &&
        JSVAL_IS_STRING( argv[0] ) 
        &&
-       JSVAL_IS_BOOLEAN( argv[1] ) )
+       ( ( 1 == argc ) 
+         || 
+         JSVAL_IS_BOOLEAN( argv[1] ) ) )   // second parameter must be boolean
    {
-      printf( "have url and cache parameter\n" );
-
-      JSString *str = JS_ValueToString(cx, argv[0]);
+      printf( "have url parameter\n" );
+      JSString *str = JS_ValueToString( cx, argv[0] );
       if( str )
       {
-         char const *cURL = JS_GetStringBytes( str );
          curlCache_t &cache = getCurlCache();
-         curlFile_t f( cache.get( cURL ) );
-         if( f.isOpen() )
-         {
-            bool worked = false ;
-         
-            JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
-            if( sReturn )
-            {
-               *rval = STRING_TO_JSVAL( sReturn );
-               return JS_TRUE ;
-            }
-         }
-      }
-
-      *rval = JSVAL_FALSE ;
-      return JS_TRUE ;
-
-   } // need at least two params
-
-   return JS_FALSE ;
-}
-
-static JSBool
-curlPost(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{
-   //
-   // need at least 
-   //    url
-   //    cacheFlag
-   //
-   if( ( 2 <= argc )
-       &&
-       JSVAL_IS_STRING( argv[0] ) 
-       &&
-       JSVAL_IS_BOOLEAN( argv[1] ) )
-   {
-      printf( "have url and cache parameter\n" );
-
-      JSString *str = JS_ValueToString(cx, argv[0]);
-      if( str )
-      {
          char const *cURL = JS_GetStringBytes( str );
-         curlCache_t &cache = getCurlCache();
-         curlFile_t f( cache.get( cURL ) );
-         if( f.isOpen() )
+         bool const useCache = ( 1 == argc ) 
+                               || 
+                               ( 0 != JSVAL_TO_BOOLEAN( argv[1] ) );
+         if( 2 < argc )
          {
-            bool worked = false ;
-         
-            JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
-            if( sReturn )
+            bool failed = false ;
+            curlRequest_t request( cURL );
+            for( uintN arg = 2 ; ( arg < argc-1 ) && !failed ; )
             {
-               *rval = STRING_TO_JSVAL( sReturn );
-               return JS_TRUE ;
+               JSString *jsName = JS_ValueToString( cx, argv[arg++] );
+               JSString *jsVal = JS_ValueToString( cx, argv[arg++] );
+               if( ( 0 != jsName ) && ( 0 != jsVal ) )
+               {
+                  char const *cName = JS_GetStringBytes( jsName );
+                  char const *cValue = JS_GetStringBytes( jsVal );
+                  if( '@' != cName[0] )
+                     request.addVariable( cName, cValue );
+                  else
+                     request.addFile( cName+1, cValue );
+               }
+               else
+               {
+                  failed = true ;
+               }
+            } // add each post variable
+
+            if( !failed )
+            {
+               curlFile_t f( cache.post( request, useCache ) );
+               return returnFile( cx, rval, f );
             }
-         }
-      }
+         } // have parameters to post
+         else
+         {
+            curlFile_t f( cache.get( cURL, useCache ) );
+            return returnFile( cx, rval, f );
+         } // simple get
+      } // retrieved string
 
       *rval = JSVAL_FALSE ;
       return JS_TRUE ;
@@ -272,7 +278,6 @@ curlPost(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
 static JSFunctionSpec curl_functions[] = {
     {"curlGet",         curlGet,        0},
-    {"curlPost",        curlPost,       0},
     {0}
 };
 
