@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.57  2003-09-04 13:16:19  ericn
+ * Revision 1.58  2003-09-05 13:07:34  ericn
+ * -added waitFor() routine to allow modal input
+ *
+ * Revision 1.57  2003/09/04 13:16:19  ericn
  * -made command line arguments available to script
  *
  * Revision 1.56  2003/09/01 23:35:31  ericn
@@ -280,6 +283,50 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+// returns true if execution should continue
+static bool mainLoop( JSContext *cx )
+{
+   if( !pollCodeQueue( cx, 5000, 1 ) )
+   {
+      mutexLock_t lock( execMutex_ );
+      JS_GC( cx );
+   }
+   return !( gotoCalled_ || execCalled_ || exitRequested_ );
+}
+
+static JSBool
+jsWaitFor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = JSVAL_TRUE ;
+   if( ( 2 == argc ) 
+       && 
+       ( JSTYPE_OBJECT == JS_TypeOfValue( cx, argv[0] ) ) 
+       && 
+       ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, argv[1] ) ) )
+   {
+      while( mainLoop( cx ) )
+      {
+         jsval functionReturn ;
+         JSFunction *function = JS_ValueToFunction( cx, argv[1] );
+         JSObject   *callObj ;
+         JS_ValueToObject( cx, argv[0], &callObj );
+         if( JS_CallFunction( cx, callObj, function, 0, NULL, &functionReturn ) )
+         {
+            if( JSVAL_FALSE != functionReturn )
+            {
+               break;
+            }
+         }
+         else
+            JS_ReportError( cx, "evaluating function from waitFor\n" );
+      }
+   }
+   else
+      JS_ReportError( cx, "Usage: waitFor( object, function );" );
+
+   return JS_TRUE ;
+}
+
 static JSBool
 jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -318,6 +365,7 @@ static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
     {"garbageCollect",  jsGarbageCollect, 0},
+    {"waitFor",         jsWaitFor,        0},
     {0}
 };
 
@@ -451,19 +499,9 @@ int prMain(int argc, char **argv)
                            {
                               unsigned numEvents = 0 ;
 
-                              while( 1 )
-                              {
-                                 pollCodeQueue( cx, 5000, 10 );
-                                 if( gotoCalled_ || execCalled_ || exitRequested_ )
-                                 {
-                                    break;
-                                 }
-                                 else 
-                                 {
-                                    mutexLock_t lock( execMutex_ );
-                                    JS_GC( cx );
-                                 }
-                              }
+                              while( mainLoop( cx ) )
+                                 ;
+//                                 printf( "in main loop\n" );
                            }
                            else
                               fprintf( stderr, "exec error %s\n", argv[1] );
