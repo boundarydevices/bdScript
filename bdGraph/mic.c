@@ -357,7 +357,7 @@ static  WAVE_HEADER  waveHeader =
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
-	unsigned long const maxNormalizeRatio = 0x243f6f ;
+	unsigned long const maxNormalizeRatio = 0x800000 ; //*128 max
 	signed short *next = samples ;
 	signed short min = *next;
 	signed short max = *next++;
