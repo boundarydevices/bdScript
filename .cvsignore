@@ -20,3 +20,5 @@ dumpCPP palette serialPoll
 starImage starGraph
 config.mk
 config.h
+mpegDecode testYUV *.prestrip
+mpegDecodeMain
