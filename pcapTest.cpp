@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: pcapTest.cpp,v $
- * Revision 1.1  2003-08-10 15:15:58  ericn
+ * Revision 1.2  2003-08-10 15:38:41  ericn
+ * -added WEP flag to output
+ *
+ * Revision 1.1  2003/08/10 15:15:58  ericn
  * -minimal WLAN sniffer
  *
  *
@@ -316,6 +319,7 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
                                        char ssid[32];
                                        ssid[0] = '\0' ; // flag not present
                                        unsigned channel = 0 ;
+                                       bool     hasWep  = IS_WEP_REQUIRED(M->Capabilities);
                                        unsigned char const *varBits = &fixbits[sizeof(FixedMgmt_t)];
                                        unsigned char const *end = buf + dataBytes ;
                                        while( varBits < end )
@@ -368,11 +372,12 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
                                        }
                                        if( ssid[0] && ( 0 != channel ) )
                                        {
-                                          printf( "BSS %.2X:%.2X:%.2X:%.2X:%.2X:%.2X "
-                                                  "SSID %s, channel %u, signal %u, noise %u\n", 
+                                          printf( "BSS %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
+                                                  " %s SSID %s, channel %u, signal %u, noise %u\n", 
                                                   M->BssId[0], M->BssId[1],
                                                   M->BssId[2], M->BssId[3],
                                                   M->BssId[4], M->BssId[5],
+                                                  wepFlags[hasWep],
                                                   ssid, channel, A->signal.data, A->noise.data );
                                        }
                                     }
