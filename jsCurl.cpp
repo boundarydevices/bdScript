@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.5  2002-10-13 15:52:28  ericn
+ * Revision 1.6  2002-10-15 05:00:39  ericn
+ * -added error messages
+ *
+ * Revision 1.5  2002/10/13 15:52:28  ericn
  * -made return value an object
  *
  * Revision 1.4  2002/10/13 14:36:13  ericn
@@ -126,6 +129,7 @@ static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
       {
          if( f.isOpen() )
          {
+//            printf( "file opened\n" );
             JS_DefineProperty( cx, obj, "data",
                                STRING_TO_JSVAL( JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() ) ),
                                0, 0, 
@@ -160,11 +164,18 @@ static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
             *rval = OBJECT_TO_JSVAL( obj );
          }
          else
+         {
+            printf( "error opening file\n" );
             *rval = JSVAL_FALSE ;
+         }
       
          return JS_TRUE ;
       }
+      else
+         printf( "Error defining property\n" );
    }
+   else
+      printf( "Error allocating object\n" );
    
    return JS_FALSE ;
 }
