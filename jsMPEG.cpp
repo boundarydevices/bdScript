@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.4  2003-08-01 14:31:28  ericn
+ * Revision 1.5  2003-08-02 15:20:39  ericn
+ * -memory leak fix
+ *
+ * Revision 1.4  2003/08/01 14:31:28  ericn
  * -use mmap from disk cache, not JS data RAM
  *
  * Revision 1.3  2003/07/31 03:49:43  ericn
@@ -289,6 +292,9 @@ printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
       printf( "cc handle %lu\n", req.handle_ );
       getCurlCache().addRef( req.handle_ );
       JS_SetPrivate( req.cx_, req.lhObj_, (void *)req.handle_ );
+      
+      mpegDemux_t::bulkInfo_t::clear( bi );
+
    }
    else
    {
