@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
- * Revision 1.2  2003-08-31 15:06:32  ericn
+ * Revision 1.3  2003-08-31 16:52:46  ericn
+ * -added optional timestamp to writeFile, added touch() routine
+ *
+ * Revision 1.2  2003/08/31 15:06:32  ericn
  * -added method stat
  *
  * Revision 1.1  2003/03/04 14:45:18  ericn
@@ -28,6 +31,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <utime.h>
 
 /*    readFile( filename );   - returns string with file content
  *    writeFile( filename, data ); - writes data to filename, returns bool or errorMsg
@@ -67,11 +71,17 @@ static JSBool
 jsWriteFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 2 == argc )
+   if( ( 2 <= argc )
+       &&
+       ( 3 >= argc )
        &&
        JSVAL_IS_STRING( argv[0] ) 
        &&
-       JSVAL_IS_STRING( argv[1] ) )
+       JSVAL_IS_STRING( argv[1] ) 
+       &&
+       ( ( 2 == argc ) 
+         ||
+         ( JSVAL_IS_INT( argv[2] ) ) ) )
    {
       JSString *jsPath = JSVAL_TO_STRING( argv[0] );
       char const *fileName = JS_GetStringBytes( jsPath );
@@ -88,12 +98,18 @@ jsWriteFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
             JS_ReportError( cx, "%m writing to %s", fileName );
          
          fclose( fOut );
+         if( ( *rval == JSVAL_TRUE ) && ( 3 == argc ) )
+         {
+            utimbuf tb ;
+            tb.actime = tb.modtime = JSVAL_TO_INT( argv[2] );
+            utime( fileName, &tb );
+         } // set timestamp
       }
       else
          JS_ReportError( cx, "%s opening %s for write", strerror( errno ), fileName );
    }
    else
-      JS_ReportError( cx, "Usage: writeFile( fileName, data )" );
+      JS_ReportError( cx, "Usage: writeFile( fileName, data [,timestamp] )" );
    return JS_TRUE ;
 }
 
@@ -251,7 +267,35 @@ jsStat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
 }
 
+static JSBool
+jsTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) 
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      JSString *sFileName = JSVAL_TO_STRING( argv[0] );
+      char const *fileName = JS_GetStringBytes( sFileName );
 
+      utimbuf tb ;
+      tb.actime = tb.modtime = JSVAL_TO_INT( argv[1] );
+      int const result = utime( fileName, &tb );
+      if( 0 == result )
+      {
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "%m setting timestamp for %s\n", fileName );
+   }
+   else
+      JS_ReportError( cx, "Usage: stat( fileName )" );
+   
+   return JS_TRUE ;
+
+}
 
 static JSFunctionSpec _functions[] = {
     {"readFile",           jsReadFile,    0 },
@@ -260,6 +304,7 @@ static JSFunctionSpec _functions[] = {
     {"copyFile",           jsCopyFile,    0 },
     {"renameFile",         jsRenameFile,  0 },
     {"stat",               jsStat,        0 },
+    {"touch",              jsTouch,       0 },
     {0}
 };
 
