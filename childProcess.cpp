@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: childProcess.cpp,v $
- * Revision 1.3  2003-08-24 15:47:46  ericn
+ * Revision 1.4  2003-08-24 15:51:11  ericn
+ * -modified to close all file handles before exec()
+ *
+ * Revision 1.3  2003/08/24 15:47:46  ericn
  * -exposed child process map
  *
  * Revision 1.2  2003/08/24 14:11:32  ericn
@@ -23,6 +26,7 @@
 
 
 #include "childProcess.h"
+#include "openFds.h"
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -94,6 +98,9 @@ bool childProcess_t :: run
    int childPid = fork();
    if( 0 == childPid )
    {
+      openFds_t openFds ;
+      for( unsigned i = 0 ; i < openFds.count(); i++ )
+         close( openFds[i] );
       execve( path, argv, envp );
       perror( path );
       exit(errno);
