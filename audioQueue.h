@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.7 2003-02-08 14:56:40 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.8 2003-04-24 11:16:44 tkisky Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.7  2003-02-08 14:56:40  ericn
+ * Revision 1.8  2003-04-24 11:16:44  tkisky
+ * -include js/jsapi.h
+ *
+ * Revision 1.7  2003/02/08 14:56:40  ericn
  * -added mixer fd (to no avail)
  *
  * Revision 1.6  2003/02/02 13:46:17  ericn
@@ -42,7 +45,7 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-#include "js/jsapi.h"
+#include <js/jsapi.h>
 
 #ifndef __MTQUEUE_H__
 #include "mtQueue.h"
