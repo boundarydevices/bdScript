@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.16  2002-11-30 00:31:48  ericn
+ * Revision 1.17  2002-11-30 16:33:12  ericn
+ * -limit scope of urlFile
+ *
+ * Revision 1.16  2002/11/30 00:31:48  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.15  2002/11/21 14:04:27  ericn
@@ -261,72 +264,74 @@ int prMain(int argc, char **argv)
                      //
                      audioQueue_t &audioOut = getAudioQueue(); 
 
-                     urlFile_t f( argv[1] );
-                     if( f.isOpen() )
                      {
-                        pushURL( argv[1] );
-         
-                        JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
-
-                        JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
-                        if( script )
+                        urlFile_t f( argv[1] );
+                        if( f.isOpen() )
                         {
-                           jsval rval; 
-                           JSBool exec ;
+                           pushURL( argv[1] );
+            
+                           JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
+   
+                           JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
+                           if( script )
                            {
-                              mutexLock_t lock( execMutex_ );
-                              exec = JS_ExecuteScript( cx, glob, script, &rval );
-                              JS_DestroyScript( cx, script );
-                           } // limit 
-
-
-                           if( exec )
-                           {
-                              unsigned numEvents = 0 ;
-
-                              while( 1 )
+                              jsval rval; 
+                              JSBool exec ;
                               {
-                                 if( gotoCalled_ )
+                                 mutexLock_t lock( execMutex_ );
+                                 exec = JS_ExecuteScript( cx, glob, script, &rval );
+                                 JS_DestroyScript( cx, script );
+                              } // limit 
+   
+   
+                              if( exec )
+                              {
+                                 unsigned numEvents = 0 ;
+   
+                                 while( 1 )
                                  {
-                                    printf( "executing %s\n", gotoURL_.c_str() );
-                                    break;
-                                 }
-                                 else 
-                                 {
-                                    bool doGC = ( 0 == ( ++numEvents % 10 ) );
-
-                                    JSObject *scope ;
-                                    if( dequeueByteCode( script, scope, 5000 ) )
+                                    if( gotoCalled_ )
                                     {
-                                       mutexLock_t lock( execMutex_ );
-                                       exec = JS_ExecuteScript( cx, scope, script, &rval );
-                                       if( !exec )
-                                          fprintf( stderr, "error executing code\n" );
-                                       JS_DestroyScript( cx, script );
+                                       printf( "executing %s\n", gotoURL_.c_str() );
+                                       break;
                                     }
-                                    else
-                                       doGC = true ;
-                                    
-                                    if( doGC )
+                                    else 
                                     {
-                                       printf( "collectin' garbage\n" );
-                                       mutexLock_t lock( execMutex_ );
-                                       JS_GC( cx );
-                                       printf( "done\n" );
+                                       bool doGC = ( 0 == ( ++numEvents % 10 ) );
+   
+                                       JSObject *scope ;
+                                       if( dequeueByteCode( script, scope, 5000 ) )
+                                       {
+                                          mutexLock_t lock( execMutex_ );
+                                          exec = JS_ExecuteScript( cx, scope, script, &rval );
+                                          if( !exec )
+                                             fprintf( stderr, "error executing code\n" );
+                                          JS_DestroyScript( cx, script );
+                                       }
+                                       else
+                                          doGC = true ;
+                                       
+                                       if( doGC )
+                                       {
+                                          printf( "collectin' garbage\n" );
+                                          mutexLock_t lock( execMutex_ );
+                                          JS_GC( cx );
+                                          printf( "done\n" );
+                                       }
                                     }
                                  }
                               }
+                              else
+                                 fprintf( stderr, "exec error %s\n", argv[1] );
                            }
                            else
-                              fprintf( stderr, "exec error %s\n", argv[1] );
+                              fprintf( stderr, "Error compiling script %s\n", argv[1] );
+                              
+                           popURL();
                         }
                         else
-                           fprintf( stderr, "Error compiling script %s\n", argv[1] );
-                           
-                        popURL();
-                     }
-                     else
-                        fprintf( stderr, "Error opening url %s\n", argv[1] );
+                           fprintf( stderr, "Error opening url %s\n", argv[1] );
+                     } // limit scope of urlFile
 
                      stopBarcodeThread();
 
