@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.21  2003-02-08 19:52:43  ericn
+ * Revision 1.22  2003-02-24 03:37:49  ericn
+ * -
+ *
+ * Revision 1.21  2003/02/08 19:52:43  ericn
  * -removed debug msgs
  *
  * Revision 1.20  2003/02/08 14:56:42  ericn
@@ -187,6 +190,15 @@ void setVolume( unsigned char volParam )
       perror( "audioWriteFd" );
 }
 
+//
+// This number is magic and was determined by the scientific process
+// of trying to record something soft.
+// 
+// It is used to keep the slightest bit of background noise from being
+// amplified to full-scale.
+//
+static unsigned long const maxNormalizeRatio = 0x243f6f ; 
+
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
@@ -207,7 +219,10 @@ static void normalize( short int *samples,
    //
    // fixed point 16:16
    //
-   unsigned long const ratio = ( 0x70000000UL / max );
+   unsigned long ratio = ( 0x70000000UL / max );
+   if( ratio > maxNormalizeRatio )
+      ratio = maxNormalizeRatio ;
+
    next = samples ;
    for( unsigned i = 0 ; i < numSamples ; i++ )
    {

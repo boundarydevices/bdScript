@@ -433,10 +433,15 @@ static INT64 bytesToUsec( int bytes,
 static void *outThread( void *param )
 {
    fbDevice_t &fbDev = getFB();
-
-   mmQueue_t &queue = *( mmQueue_t * )param ;
-
+   mmQueue_t  &queue = *( mmQueue_t * )param ;
+   
+   unsigned char *fbStart = (unsigned char *)fbDev.getMem();
+   if( fbDev.getWidth() > queue.width_ )
+      fbStart += (fbDev.getWidth()-queue.width_);
    unsigned const fbStride = fbDev.getWidth() * sizeof( unsigned short );
+   if( fbDev.getHeight() > queue.height_ )
+      fbStart += ( ( fbDev.getHeight() - queue.height_ ) / 2 ) * fbStride ;
+
    INT64 prevPTS  = 0 ; // PTS of previous audio clip
    INT64 prevTime = 0 ; // time of previous audio clip
    INT64 maxPTSDiff = 0 ;
@@ -450,6 +455,7 @@ static void *outThread( void *param )
    filedes.events = POLLOUT ;
    bool first = true ;
 
+   memset( fbDev.getMem(), 0, fbDev.getMemSize() );
    while( !queue.shutdown_ )
    {
       if( !vFrame )
@@ -569,12 +575,12 @@ static void *outThread( void *param )
 //               else
 //                  printf( "backTimeVid\n" );
             }
-
-            unsigned char *fbMem = (unsigned char *)fbDev.getMem();
+            
+            unsigned char *dest = fbStart ;
             unsigned char const *src = vFrame->data_ ;
-            for( unsigned i = 0 ; i < queue.height_ ; i++, fbMem += fbStride, src += queue.imgStride_ )
+            for( unsigned i = 0 ; i < queue.height_ ; i++, dest += fbStride, src += queue.imgStride_ )
             {
-               memcpy( fbMem, src, queue.imgStride_ );
+               memcpy( dest, src, queue.imgStride_ );
             }
 
             queue.releaseVideoFrame();
