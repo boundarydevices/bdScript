@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.13  2003-10-31 13:32:54  ericn
+ * Revision 1.14  2003-10-31 13:48:45  ericn
+ * -removed some debug msgs
+ *
+ * Revision 1.13  2003/10/31 13:32:54  ericn
  * -inverted guard shack pin, added barcode type and terminator
  *
  * Revision 1.12  2003/10/20 03:49:27  ericn
@@ -654,19 +657,14 @@ void udpBarcode_t :: onBarcode( void )
 {
    unsigned len = strlen( getBarcode() );
    printf( "barcode <%s>, len %u\n", getBarcode(), len );
+
    if( sick_e == scannerType_ )
    {
-      printf( "Sick scanner\n" );
       if( '\x03' == barcode_[--len] ) 
       {
-         printf( "Have terminator\n" );
          barcode_[--len] = '\0' ; // trim symbology
       }
-      else
-         printf( "No terminator\n" );
    }
-   else
-      printf( "Not sick scanner\n" );
 
    char data[sizeof(udpHeader_t)+sizeof(barcode_)];
    udpHeader_t &header = *(udpHeader_t *)data ;
