@@ -1,5 +1,5 @@
 #ifndef __JSBARCODE_H__
-#define __JSBARCODE_H__ "$Id: jsBarcode.h,v 1.2 2003-06-08 15:19:05 ericn Exp $"
+#define __JSBARCODE_H__ "$Id: jsBarcode.h,v 1.3 2004-05-07 13:32:32 ericn Exp $"
 
 /*
  * jsBarcode.h
@@ -73,7 +73,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.h,v $
- * Revision 1.2  2003-06-08 15:19:05  ericn
+ * Revision 1.3  2004-05-07 13:32:32  ericn
+ * -made internals external (and shareable)
+ *
+ * Revision 1.2  2003/06/08 15:19:05  ericn
  * -objectified scanner interface
  *
  * Revision 1.1  2002/11/17 00:51:34  ericn
@@ -85,6 +88,22 @@
  */
 
 #include "js/jsapi.h"
+
+enum bcrTinyId {
+   BCR_NOSYM,      // unknown symbology
+   BCR_UPC,        // UPC
+   BCR_I2OF5,      // Interleaved 2 of 5
+   BCR_CODE39,     // Code 39 (alpha)
+   BCR_CODE128,    // Code 128
+   BCR_EAN,        // European Article Numbering System
+   BCR_EAN128,     //    "        "        "        "
+   BCR_CODABAR,    // 
+   BCR_CODE93,     // 
+   BCR_PHARMACODE, // 
+   BCR_NUMSYMBOLOGIES
+};
+
+extern char const *const bcrSymNames_[BCR_NUMSYMBOLOGIES];
 
 bool initJSBarcode( JSContext *cx, JSObject *glob );
 

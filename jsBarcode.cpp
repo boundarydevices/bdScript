@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.13  2003-12-28 00:36:03  ericn
+ * Revision 1.14  2004-05-07 13:32:34  ericn
+ * -made internals external (and shareable)
+ *
+ * Revision 1.13  2003/12/28 00:36:03  ericn
  * -removed secondary thread
  *
  * Revision 1.12  2003/12/27 15:09:29  ericn
@@ -630,21 +633,7 @@ static JSFunctionSpec barcodeReader_methods[] = {
 
 static pthread_t threadHandle_ = 0 ;
 
-enum bcrTinyId {
-   BCR_NOSYM,      // unknown symbology
-   BCR_UPC,        // UPC
-   BCR_I2OF5,      // Interleaved 2 of 5
-   BCR_CODE39,     // Code 39 (alpha)
-   BCR_CODE128,    // Code 128
-   BCR_EAN,        // European Article Numbering System
-   BCR_EAN128,     //    "        "        "        "
-   BCR_CODABAR,    // 
-   BCR_CODE93,     // 
-   BCR_PHARMACODE, // 
-   BCR_NUMSYMBOLOGIES
-};
-
-static char const *const bcrSymNames_[] = {
+char const *const bcrSymNames_[BCR_NUMSYMBOLOGIES] = {
    "unknownSym",
    "upc",
    "i2of5",
