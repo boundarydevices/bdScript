@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.4  2004-11-16 07:37:22  tkisky
+ * Revision 1.5  2004-12-05 00:56:11  tkisky
+ * -minor
+ *
+ * Revision 1.4  2004/11/16 07:37:22  tkisky
  * -fix letter quality,add reverse for top margin
  *
  * Revision 1.3  2004/09/10 19:20:15  tkisky
@@ -264,7 +267,7 @@ void starPoll_t :: fire( void )
             if (p) {
                int const numWritten = usb_bulk_write( udev_, outep,(char*)p,len, 1000 );
                if (numWritten==4) asbInitialized = 1;
-               statusWaitTicks = 10;	//wait a second before next write
+               statusWaitTicks = (numWritten==len) ? 40 : 10;	//wait up to 4 seconds for response, before next write
             }
          } else statusWaitTicks--;
       }

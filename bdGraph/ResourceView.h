@@ -3,6 +3,10 @@
 /////////////////////////////////////////////////////////////////////////////
 typedef void (*ConvertRgb24Line_t)(unsigned short* fbMem, unsigned char const *video,int cnt);
 
+#ifndef NULL
+#define NULL 0
+#endif
+
 class ResourceView
 {
 	ResourceView();
