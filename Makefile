@@ -19,7 +19,7 @@ ifneq (,$(findstring arm, $(CC)))
    AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
-   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
+   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2 -I$(BUILDDIR)/$(LINUX_V)/include
    LIB = $(INSTALL_LIB)/libCurlCache.a
 else
 #   CC=g++
