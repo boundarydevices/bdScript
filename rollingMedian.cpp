@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: rollingMedian.cpp,v $
- * Revision 1.1  2004-11-26 15:30:04  ericn
+ * Revision 1.2  2004-12-03 04:43:16  ericn
+ * -added dump method,standalone program, then fixed
+ *
+ * Revision 1.1  2004/11/26 15:30:04  ericn
  * -Initial import
  *
  *
@@ -18,6 +21,9 @@
 
 #include "rollingMedian.h"
 #include <stdlib.h>
+#include <stdio.h>
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 rollingMedian_t :: rollingMedian_t( unsigned N )
    : N_( N )
@@ -48,6 +54,8 @@ void rollingMedian_t :: feed( unsigned short newValue )
    circ_[circPos] = newValue ;
    ++numIn_ ;
 
+   debugPrint( "replacing %u with %u at position %u\n", oldValue, newValue, circPos );
+
    if( N_ < numIn_ )
    {
       // binary search for old value
@@ -74,6 +82,7 @@ void rollingMedian_t :: feed( unsigned short newValue )
       
       while( lbound < rbound )
       {
+debugPrint( "  oldSearch: l->r %u->%u\n", lbound, rbound );
          unsigned const midPos = lbound+((rbound-lbound) >> 1 );
          int diff = oldValue - sorted_[midPos];
          if( 0 == diff )
@@ -91,6 +100,7 @@ void rollingMedian_t :: feed( unsigned short newValue )
       }
 
       unsigned oldPos = lbound ;
+debugPrint( "  oldPos == %u\n", oldPos );
 
       //
       // binary search for new value insert position
@@ -110,6 +120,7 @@ void rollingMedian_t :: feed( unsigned short newValue )
       
       while( lbound < rbound )
       {
+debugPrint( "  newSearch: l->r %u->%u\n", lbound, rbound );
          unsigned const midPos = lbound+((rbound-lbound) >> 1 );
          int diff = newValue - sorted_[midPos];
          if( 0 == diff )
@@ -125,9 +136,13 @@ void rollingMedian_t :: feed( unsigned short newValue )
             rbound = midPos ;
          }
       }
-      unsigned const insertPos = ( lbound >= N_ )
-                                 ? N_
-                                 : lbound ;
+
+      // adjust insertPos for missing oldPos
+      unsigned insertPos = ( lbound > oldPos )
+                           ? lbound - 1 
+                           : lbound ;
+
+debugPrint( "insertPos: %u, %u\n", insertPos, lbound );
 
       while( oldPos < insertPos )
       {
@@ -170,3 +185,70 @@ void rollingMedian_t :: reset( void )
    numIn_ = 0 ;
 }
 
+void rollingMedian_t :: dump( void ) const 
+{
+   unsigned max ;
+   unsigned start ;
+   if( numIn_ > N_ )
+   { 
+      max = N_ ;
+      start = numIn_ ;
+   }
+   else
+   {
+      max = numIn_ ;
+      start = 0 ;
+   }
+
+   printf( "history:\n" );
+   for( unsigned i = 0 ; i < max ; i++ )
+   {
+      unsigned pos = ( start + i ) % N_ ;
+      printf( "   %u", circ_[pos] );
+   }
+   
+   if( numIn_ >= N_ )
+   {
+      printf( "\nsorted:\n" );
+      unsigned short prev = 0 ;
+      for( unsigned i = 0 ; i < max ; i++ )
+      {
+         unsigned short next = sorted_[i];
+         printf( "   %u", next );
+         if( next < prev )
+            printf( "!!!!!" );
+         prev = next ;
+      }
+   }
+   printf( "\n" );
+}
+
+
+#ifdef __STANDALONE__
+
+
+int main( int argc, char const * const argv[] )
+{
+   printf( "Hello %s\n", argv[0] );
+
+   rollingMedian_t rm( 5 );
+   while( 1 )
+   {
+      char inBuf[80];
+      if( fgets( inBuf, sizeof(inBuf), stdin ) )
+      {
+         unsigned short nextVal ;
+         if( 1 == sscanf( inBuf, "%hu", &nextVal ) )
+         {
+            printf( "add: %u\n", nextVal );
+            rm.feed( nextVal );
+         }
+         rm.dump();
+      }
+      else
+         break;
+   }
+   return 0 ;
+}
+
+#endif
