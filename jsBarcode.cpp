@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.3  2002-12-01 00:02:50  ericn
+ * Revision 1.4  2002-12-18 04:12:25  ericn
+ * -removed debug msg, added root for handler scope
+ *
+ * Revision 1.3  2002/12/01 00:02:50  ericn
  * -rooted barcode handler code
  *
  * Revision 1.2  2002/11/30 18:52:57  ericn
@@ -124,7 +127,6 @@ static void *barcodeThread( void *arg )
             {
                inBuf[numRead] = '\0' ;
                sBarcode_ = inBuf ;
-               printf( "%d:%s\n", numRead, inBuf );
                if( ( JSVAL_VOID != sHandler_ ) && ( 0 != handlerScope_ ) )
                {
                   queueSource( handlerScope_, sHandler_, "onBarcode" );
@@ -160,6 +162,7 @@ bool initJSBarcode( JSContext *cx, JSObject *glob )
       if( 0 == create )
       {
          JS_AddRoot( cx, &sHandler_ );
+         JS_AddRoot( cx, &handlerScope_ );
          handlerScope_ = glob ;
          return true ;
       }
