@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.6  2002-12-03 02:11:05  ericn
+ * Revision 1.7  2003-08-01 14:27:01  ericn
+ * -better error msg and recovery from cache failure
+ *
+ * Revision 1.6  2002/12/03 02:11:05  ericn
  * -added onComplete parameter for file handle
  *
  * Revision 1.5  2002/12/02 15:32:25  ericn
@@ -196,13 +199,37 @@ void curlCache_t :: openHandle
    identifier = (unsigned long)item ;
 }
 
-void curlCache_t :: closeHandle( unsigned long &identifier )
+void curlCache_t :: addRef( unsigned long identifier )
+{
+   mutexLock_t lock( mutex_ );
+   item_t *item = (item_t *)identifier ;
+   assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
+   ++item->diskInfo_.useCount_ ;
+}
+
+void curlCache_t :: closeHandle( unsigned long identifier )
 {
    mutexLock_t lock( mutex_ );
    item_t *item = (item_t *)identifier ;
    assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
    if( 0 == --item->diskInfo_.useCount_ )
+   {
+// printf( "ccA:releasing %s\n", item->url_.c_str() );
       removeItem( item );  // done, remove item from active list
+   }
+}
+
+bool curlCache_t :: deref
+   ( unsigned long  identifier,
+     void const   *&data,
+     unsigned long &length )
+{
+   mutexLock_t lock( mutex_ );
+   item_t *item = (item_t *)identifier ;
+   assert( 0 < item->diskInfo_.useCount_ ); // or why still in cache?
+   data = item->diskInfo_.data_ ;
+   length = item->diskInfo_.length_ ;
+   return true ;
 }
 
 void curlCache_t :: cancel( std::string const &url )
@@ -244,8 +271,7 @@ void curlCache_t :: deleteURL( std::string const &url )
 
 void curlCache_t :: transferComplete
    ( void         *request,
-     void const   *data,
-     unsigned long numRead )
+     std::string  &data )
 {
    mutexLock_t lock( mutex_ );
    item_t *const item = (item_t *)request ;
@@ -256,47 +282,72 @@ void curlCache_t :: transferComplete
 
    if( retrieving_ == item->state_ )
    {
+      std::string errorMsg ;
       ccDiskCache_t &diskCache = getDiskCache();
-      if( diskCache.allocateInitial( item->url_.c_str(), numRead, item->diskInfo_.sequence_ ) )
+      if( diskCache.allocateInitial( item->url_.c_str(), data.size(), item->diskInfo_.sequence_ ) )
       {
+         unsigned const numRead = data.size();
          //
-         // store and map the data
-         //
-         diskCache.storeData( item->diskInfo_.sequence_,
-                              numRead,
-                              data, 
-                              item->deleteOnClose_ );
-         diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
-         assert( item->diskInfo_.length_ == numRead );
-
-         item->state_ = open_ ;
-
-         while( nextReq != head )
+         // try to store and map the data
+         // (try to allocate more on failure)
+         bool worked ;
+         if( !diskCache.storeData( item->diskInfo_.sequence_,
+                                   data.size(),
+                                   data.c_str(), 
+                                   item->deleteOnClose_ ) )
          {
-            request_t *req = (request_t *)nextReq ;
-            ++item->diskInfo_.useCount_ ;
-            req->callbacks_.onComplete_( req->opaque_, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
-            nextReq = req->chain_.next ;
-            removeRequest( *req );
+            if( diskCache.allocateMore( item->diskInfo_.sequence_, data.size() ) )
+               worked = diskCache.storeData( item->diskInfo_.sequence_,
+                                             data.size(),
+                                             data.c_str(), 
+                                             item->deleteOnClose_ );
+            else
+               worked = false ;
          }
+         else
+            worked = true ;
+
+         if( worked )
+         {
+            data.resize(0);
+            data.reserve(0);
+            diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
+            assert( item->diskInfo_.length_ == numRead );
+   
+            item->state_ = open_ ;
+   
+            while( nextReq != head )
+            {
+               request_t *req = (request_t *)nextReq ;
+               ++item->diskInfo_.useCount_ ;
+               req->callbacks_.onComplete_( req->opaque_, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
+               nextReq = req->chain_.next ;
+               removeRequest( *req );
+            }
+            return ;
+         }
+         else
+            errorMsg = "out of disk space:not cache" ;
       }
       else
+         errorMsg = "out of disk space:cache too small" ;
+         
+      //
+      // disk cache failure
+      //
+
+      while( nextReq != head )
       {
-         //
-         // disk cache failure
-         //
-         std::string const errorMsg = "out of disk space" ;
-
-         while( nextReq != head )
-         {
-            request_t *req = (request_t *)nextReq ;
-            req->callbacks_.onFailure_( req->opaque_, errorMsg );
-            nextReq = req->chain_.next ;
-            removeRequest( *req );
-         }
-
-         removeItem( item );  // done, remove item from active list
+         request_t *req = (request_t *)nextReq ;
+         req->callbacks_.onFailure_( req->opaque_, errorMsg );
+         nextReq = req->chain_.next ;
+         removeRequest( *req );
       }
+
+      removeItem( item );  // done, remove item from active list
+
+      diskCache.dump();
+
    }
    else
    {
@@ -517,10 +568,9 @@ void curlCache_t :: removeRequest( request_t &req )
 }
 
 static void onCurlComplete( curlTransferRequest_t  &request,
-                            void const             *data,
-                            unsigned long           numRead )
+                            std::string            &data )
 {
-   getCurlCache().transferComplete( request.opaque_, data, numRead );
+   getCurlCache().transferComplete( request.opaque_, data );
 }
 
 static void onCurlFailure
