@@ -21,14 +21,21 @@ endif
 CC_BFLAGS=-c $(IFLAGS) -O2
 CCC_FLAGS1=$(CC_BFLAGS) -DX386
 
+ARM_ROOT		?= arm-linux
+ARM_AR          ?= $(ARM_ROOT)-ar
+ARM_GCC         ?= $(ARM_ROOT)-gcc
+ARM_LD          ?= $(ARM_ROOT)-ld
+ARM_STRIP       ?= $(ARM_ROOT)-strip
+ARM_CCAS        ?= $(ARM_GCC)
+
 ifneq (,$(findstring arm, $(CC)))
-   CC=arm-linux-gcc
-   AR=arm-linux-ar
-   LD=arm-linux-ld
-   STRIP=arm-linux-strip
+   CC=$(ARM_GCC)
+   AR=$(ARM_AR)
+   LD=$(ARM_LD)
+   STRIP=$(ARM_STRIP)
    LIBS=-L./ -L$(INSTALL_ROOT)lib
    IFLAGS= -I$(KERNEL_DIR)/include
-   CCAS=arm-linux-gcc
+   CCAS=$(ARM_CCAS)
    CCC_FLAGS=$(CC_BFLAGS) -mcpu=strongarm -DARM
 else
    CCAS = gcc

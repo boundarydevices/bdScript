@@ -53,7 +53,7 @@ int SImageDataRLE::GetRow(ImagePosition* pSample,int colorIndex,int parm)
 		pSample->SetPosition(pB,rr->rowsLeft,rr->repeat,m_width);
 		return (int)(rr-1);
 	}
-	pSample->SetPosition(NULL,0,-1,0);
+	pSample->SetPosition(NULL,0,0xffffffff,0);
 	return parm;
 }
 

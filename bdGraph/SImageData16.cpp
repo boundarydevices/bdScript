@@ -51,7 +51,7 @@ int SImageData16::GetRow(ImagePosition* pSample,int colorIndex,int parm)
 		pSample->SetPosition(m_tempBuf,1,0,m_width);
 		return reinterpret_cast<int>(rr);
 	}
-	pSample->SetPosition(NULL,0,-1,0);
+	pSample->SetPosition(NULL,0,0xffffffff,0);
 	return parm;
 }
 

@@ -52,7 +52,7 @@ int SImageDataJpeg::GetRow(ImagePosition* pSample,int colorIndex,int parm)
 	}
 	else
 	{
-		pSample->SetPosition(NULL,0,-1,0);
+		pSample->SetPosition(NULL,0,0xffffffff,0);
 	}
 	return -1;
 }
