@@ -1,5 +1,5 @@
 #ifndef __JSURL_H__
-#define __JSURL_H__ "$Id: jsURL.h,v 1.2 2002-10-24 13:15:58 ericn Exp $"
+#define __JSURL_H__ "$Id: jsURL.h,v 1.3 2002-10-25 02:20:50 ericn Exp $"
 
 /*
  * jsURL.h
@@ -23,7 +23,10 @@
  * Change History : 
  *
  * $Log: jsURL.h,v $
- * Revision 1.2  2002-10-24 13:15:58  ericn
+ * Revision 1.3  2002-10-25 02:20:50  ericn
+ * -moved non-Javascript stuff to relativeURL.cpp
+ *
+ * Revision 1.2  2002/10/24 13:15:58  ericn
  * -added pushURL() and popURL()
  *
  * Revision 1.1  2002/10/20 16:31:23  ericn
@@ -36,34 +39,6 @@
 
 
 #include "js/jsapi.h"
-#include <string>
-
-//
-// returns true and the url if established
-//
-bool currentURL( std::string &url );
-
-//
-// returns true and the absolute URL if an absolute URL 
-// has been established or is present in relative
-//
-bool absoluteURL( std::string const &relative,   // input : arbitrary URL
-                  std::string       &absolute ); // output : absolute URL
-
-//
-// returns true if the specified URL is relative (missing protocol and server)
-//
-bool isRelativeURL( std::string const &url );
-
-//
-// activates a new url (relative or absolute)
-//
-void pushURL( std::string const &url );
-
-//
-// deactivates the previous url
-//
-void popURL( void );
 
 bool initJSURL( JSContext *cx, JSObject *glob );
 
