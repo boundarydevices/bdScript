@@ -121,7 +121,7 @@ all: curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madH
 shared-headers = ddtoul.h dirByATime.h hexDump.h  \
    imgGIF.h imgJPEG.h imgPNG.h \
    macros.h madHeaders.h memFile.h \
-   mtQueue.h relativeURL.h semaphore.h \
+   mtQueue.h relativeURL.h semClasses.h \
    ultoa.h ultodd.h urlFile.h
 
 install-headers:
