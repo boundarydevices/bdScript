@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.7  2003-02-09 02:58:52  ericn
+ * Revision 1.8  2003-02-09 03:44:44  ericn
+ * -added filename for batch dump output
+ *
+ * Revision 1.7  2003/02/09 02:58:52  ericn
  * -moved font dump to ftObjs
  *
  * Revision 1.6  2003/02/07 04:41:52  ericn
@@ -516,6 +519,7 @@ int main( int argc, char const * const argv[] )
          freeTypeFont_t font( fIn.getData(), fIn.getLength() );
          if( font.worked() )
          {
+            printf( "----------> information from %s\n", argv[1] );
             font.dump();
          }
          else
