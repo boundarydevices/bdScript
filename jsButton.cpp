@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.5  2002-11-30 00:32:18  ericn
+ * Revision 1.6  2002-11-30 05:26:39  ericn
+ * -removed debug msgs, added lock
+ *
+ * Revision 1.5  2002/11/30 00:32:18  ericn
  * -removed curlCache and curlThread modules
  *
  * Revision 1.4  2002/11/25 00:10:59  ericn
@@ -63,20 +66,16 @@ typedef struct buttonData_t {
 
 void jsButtonFinalize(JSContext *cx, JSObject *obj)
 {
-   printf( "finalizing button\n" );
    buttonData_t *button = (buttonData_t *)JS_GetPrivate( cx, obj );
    if( button )
    {
-      printf( "button at %p\n", button );
       JS_SetPrivate( cx, obj, 0 );
 
       if( button->box_ )
       {
-         printf( "box at %p\n", button->box_ );
          assert( button == (buttonData_t *)button->box_->objectData_ );
          getZMap().removeBox( *button->box_ );
          destroyBox( button->box_ );
-         printf( "done destroying box\n" );
          button->box_ = 0 ;
       }
       delete button ;
@@ -135,6 +134,8 @@ static void doit( box_t         &box,
                   touchHandler_t defHandler,
                   char const    *method )
 {
+   mutexLock_t lock( execMutex_ );
+
    buttonData_t *const button = (buttonData_t *)box.objectData_ ;
    assert( 0 != button );
    assert( button->box_ == &box );
