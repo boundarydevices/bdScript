@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.55  2003-08-31 16:53:00  ericn
+ * Revision 1.56  2003-09-01 23:35:31  ericn
+ * -added method garbageCollect()
+ *
+ * Revision 1.55  2003/08/31 16:53:00  ericn
  * -added jsDir module
  *
  * Revision 1.54  2003/08/24 22:02:13  ericn
@@ -300,9 +303,18 @@ jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsGarbageCollect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   JS_GC( cx );
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
-    {"queueCode",       jsQueueCode,    0},
-    {"nanosleep",       jsNanosleep,    0},
+    {"queueCode",       jsQueueCode,      0},
+    {"nanosleep",       jsNanosleep,      0},
+    {"garbageCollect",  jsGarbageCollect, 0},
     {0}
 };
 
