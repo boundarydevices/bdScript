@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.15  2003-01-08 15:20:49  ericn
+ * Revision 1.16  2003-01-31 13:28:20  ericn
+ * -modified to stay on button at edges, added touchScreen global
+ *
+ * Revision 1.15  2003/01/08 15:20:49  ericn
  * -modified to prevent trailing touch
  *
  * Revision 1.14  2003/01/06 04:29:18  ericn
@@ -184,11 +187,11 @@ static void doOnMove( void *data )
    {
       if( ( x >= thread_->curBox_->xLeft_ )
           &&
-          ( x < thread_->curBox_->xRight_ )
+          ( x <= thread_->curBox_->xRight_ )
           &&
           ( y >= thread_->curBox_->yTop_ )
           &&
-          ( y < thread_->curBox_->yBottom_ ) )
+          ( y <= thread_->curBox_->yBottom_ ) )
       {
          thread_->curBox_->onTouchMove_( *thread_->curBox_, x, y );
          mutexLock_t lock( mutex_ );
@@ -410,6 +413,19 @@ bool initJSTouch( touchScreenThread_t *&thread,
    {
       if( JS_DefineFunctions( cx, glob, touch_functions ) )
       {
+         JSObject *obj = JS_NewObject( cx, &jsTouchClass_, NULL, NULL );
+         if( obj )
+         {
+            JS_DefineProperty( cx, glob, "touchScreen", 
+                               OBJECT_TO_JSVAL( obj ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+         }
+         else
+            JS_ReportError( cx, "defining touch screen" );
+
          JS_AddRoot( cx, &onTouchCode_ );
          JS_AddRoot( cx, &onMoveCode_ );
          JS_AddRoot( cx, &onReleaseCode_ );
