@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.2 2002-10-31 02:06:23 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.3 2002-11-02 18:39:16 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.2  2002-10-31 02:06:23  ericn
+ * Revision 1.3  2002-11-02 18:39:16  ericn
+ * -added getRed(), getGreen(), getBlue() methods to descramble pins
+ *
+ * Revision 1.2  2002/10/31 02:06:23  ericn
  * -modified to allow run (sort of) without frame buffer
  *
  * Revision 1.1  2002/10/15 05:01:47  ericn
@@ -39,6 +42,13 @@ public:
    unsigned short &getPixel( unsigned x, unsigned y ){ return getRow( y )[ x ]; }
 
    static unsigned short get16( unsigned char red, unsigned char green, unsigned char blue );
+
+   //
+   // un-mix the screen bits and return 8-bit values for each of red, green, blue
+   //
+   static unsigned char getRed( unsigned short screenRGB );
+   static unsigned char getGreen( unsigned short screenRGB );
+   static unsigned char getBlue( unsigned short screenRGB );
 
 private:
    fbDevice_t( char const *name );

@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.4  2002-10-31 02:06:28  ericn
+ * Revision 1.5  2002-11-02 18:39:25  ericn
+ * -added getRed(), getGreen(), getBlue() methods to descramble pins
+ *
+ * Revision 1.4  2002/10/31 02:06:28  ericn
  * -modified to allow run (sort of) without frame buffer
  *
  * Revision 1.3  2002/10/25 04:49:11  ericn
@@ -73,6 +76,39 @@ unsigned short fbDevice_t :: get16( unsigned char red, unsigned char green, unsi
    return rTable[red>>3]
         | gTable[green>>2]
         | bTable[blue>>3];
+}
+
+unsigned char fbDevice_t :: getRed( unsigned short screenRGB )
+{
+   unsigned short const shortMasks[] = {1<<10,1<<9,1<<2,1<<1,1<<0};
+   unsigned char out = 0 ;
+   unsigned char mask = 1 ;
+   for( unsigned i = 0 ; i < 5 ; i++, mask <<= 1 )
+      if( screenRGB & shortMasks[i] )
+         out |= mask ;
+   return out << 3 ;
+}
+
+unsigned char fbDevice_t :: getGreen( unsigned short screenRGB )
+{
+   unsigned short const shortMasks[] = {1<<13,1<<12,1<<11,1<<5,1<<4,1<<3};
+   unsigned char out = 0 ;
+   unsigned char mask = 1 ;
+   for( unsigned i = 0 ; i < 6 ; i++, mask <<= 1 )
+      if( screenRGB & shortMasks[i] )
+         out |= mask ;
+   return out << 2 ;
+}
+
+unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
+{
+   unsigned short const shortMasks[] = {1<<15,1<<14,1<<8,1<<7,1<<6};
+   unsigned char out = 0 ;
+   unsigned char mask = 1 ;
+   for( unsigned i = 0 ; i < 5 ; i++, mask <<= 1 )
+      if( screenRGB & shortMasks[i] )
+         out |= mask ;
+   return out << 3 ;
 }
 
 fbDevice_t :: fbDevice_t( char const *name )
