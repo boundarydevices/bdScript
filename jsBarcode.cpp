@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.7  2003-02-08 16:09:26  ericn
+ * Revision 1.8  2003-05-21 23:24:32  tkisky
+ * -added character delay to scanner
+ *
+ * Revision 1.7  2003/02/08 16:09:26  ericn
  * -added baud,parity,bits support
  *
  * Revision 1.6  2003/01/12 03:04:12  ericn
@@ -92,6 +95,7 @@ jsGetBarcodeSymbology( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 }
 
 static int       bcDev_ ;
+static int scannerDelay=0;
 
 static JSBool
 jsSendToScanner( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -99,7 +103,20 @@ jsSendToScanner( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
    if( 1 == argc )
    {
       JSString *jsMsg = JSVAL_TO_STRING( argv[0] );
-      int const numWritten = write( bcDev_, JS_GetStringBytes( jsMsg ), JS_GetStringLength( jsMsg ) );
+      char * p = JS_GetStringBytes( jsMsg );
+      int len = JS_GetStringLength( jsMsg );
+      int numWritten;
+      if (scannerDelay==0)
+         numWritten = write( bcDev_, p, len );
+      else {
+         numWritten=0;
+	 while (len) {
+	    usleep(scannerDelay);
+            numWritten += write( bcDev_, p, 1 );
+	    p++;
+	    len--;
+         }
+      }
       *rval = INT_TO_JSVAL( numWritten );
    }
    else
@@ -496,6 +513,33 @@ jsSetScannerBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 }
 
 
+static JSBool
+jsGetScannerDelay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = INT_TO_JSVAL( scannerDelay );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetScannerDelay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
+   {
+      int const delay = JSVAL_TO_INT( argv[0] );
+      if( ( 0 <= delay ) && ( delay <= 500000 ) )
+      {
+         scannerDelay= delay;
+      }
+      else
+         JS_ReportError( cx, "must be 0-500000" );
+   }
+   else
+      JS_ReportError( cx, "Usage: scanner.setBits( 0-500000);" );
+   
+   *rval = JSVAL_FALSE ;
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec scanner_methods[] = {
    { "getBaud",      jsGetScannerBaud,   0,0,0 },
    { "setBaud",      jsSetScannerBaud,   0,0,0 },
@@ -503,6 +547,8 @@ static JSFunctionSpec scanner_methods[] = {
    { "setParity",    jsSetScannerParity, 0,0,0 },
    { "getBits",      jsGetScannerBits,   0,0,0 },
    { "setBits",      jsSetScannerBits,   0,0,0 },
+   { "getDelay",     jsGetScannerDelay,   0,0,0 },
+   { "setDelay",     jsSetScannerDelay,   0,0,0 },
    { 0 }
 };
 
