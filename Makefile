@@ -4,11 +4,11 @@
 OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
-       jsAlphaMap.o jsBarcode.o jsCurl.o jsGlobals.o jsHyperlink.o \
-       jsImage.o jsMP3.o jsProc.o jsScreen.o jsShell.o jsText.o \
-       jsTimer.o jsTouch.o jsURL.o jsVolume.o \
+       jsAlphaMap.o jsBarcode.o jsButton.o jsCurl.o jsGlobals.o \
+       jsHyperlink.o jsImage.o jsMP3.o jsProc.o jsScreen.o jsShell.o \
+       jsText.o jsTimer.o jsTouch.o jsURL.o jsVolume.o \
        madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o \
-       ultodd.o
+       ultodd.o box.o zOrder.o
 LIB = $(INSTALL_LIB)/libCurlCache.a
 
 ifneq (,$(findstring arm, $(CC)))
@@ -69,6 +69,11 @@ jsExec: jsExec.o $(LIB)
 	$(CC) -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
 	$(STRIP) jsExec
+
+madTest: madTest.o $(LIB)
+	$(CC) -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	arm-linux-nm madTest >madTest.map
+	$(STRIP) madTest
 
 ftRender.o: ftObjs.h ftObjs.cpp Makefile
 	$(CC) -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp

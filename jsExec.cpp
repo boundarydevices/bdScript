@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.14  2002-11-17 23:08:50  ericn
+ * Revision 1.15  2002-11-21 14:04:27  ericn
+ * -preliminary button code
+ *
+ * Revision 1.14  2002/11/17 23:08:50  ericn
  * -changed the name
  *
  * Revision 1.13  2002/11/17 22:24:45  ericn
@@ -83,6 +86,7 @@
 #include "jsVolume.h"
 #include "jsBarcode.h"
 #include "jsShell.h"
+#include "jsButton.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -239,6 +243,7 @@ int prMain(int argc, char **argv)
                      initJSVolume( cx, glob );
                      initJSBarcode( cx, glob );
                      initJSShell( cx, glob );
+                     initJSButton( cx, glob );
 
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
