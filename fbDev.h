@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.5 2002-11-22 21:31:43 tkisky Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.6 2002-11-23 16:09:14 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.5  2002-11-22 21:31:43  tkisky
+ * Revision 1.6  2002-11-23 16:09:14  ericn
+ * -added render with alpha
+ *
+ * Revision 1.5  2002/11/22 21:31:43  tkisky
  * -Optimize render and use it in jsImage
  *
  * Revision 1.4  2002/11/22 15:08:41  ericn
@@ -65,6 +68,10 @@ public:
                 int imageDisplayHeight=0
               );
 
+   void render( unsigned short x, unsigned short y,
+                unsigned short w, unsigned short h, // width and height of image
+                unsigned short const *pixels,
+                unsigned char const  *alpha );
 private:
    fbDevice_t( char const *name );
    ~fbDevice_t( void );

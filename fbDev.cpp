@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.10  2002-11-22 21:31:43  tkisky
+ * Revision 1.11  2002-11-23 16:13:11  ericn
+ * -added render with alpha
+ *
+ * Revision 1.10  2002/11/22 21:31:43  tkisky
  * -Optimize render and use it in jsImage
  *
  * Revision 1.9  2002/11/22 15:13:18  ericn
@@ -337,11 +340,76 @@ void fbDevice_t :: render
       do
       {
          unsigned short *pix = getRow( yPos++ ) + xPos;
-	 memcpy(pix,pixels,minWidth);
-	 pixels += w;
+         memcpy(pix,pixels,minWidth);
+         pixels += w;
       } while (--minHeight);
    }
 }
+
+void fbDevice_t :: render
+   ( unsigned short xPos, 
+     unsigned short yPos,
+     unsigned short w, 
+     unsigned short h, // width and height of image
+     unsigned short const *pixels,
+     unsigned char const  *alpha )
+{
+   if( alpha )
+   {
+      if( ( 0 < w ) && ( 0 < h ) && ( xPos < getWidth() ) && ( yPos < getHeight() ) )
+      {
+         int const left = xPos ;
+         for( unsigned y = 0 ; y < h ; y++, yPos++, alpha += w )
+         {
+            if( yPos < getHeight() )
+            {
+               unsigned short *pix = getRow( yPos ) + left ;
+               xPos = left ;
+               for( unsigned x = 0 ; x < w ; x++, xPos++ )
+               {
+                  if( xPos < getWidth() )
+                  {
+                     unsigned short const foreColor = pixels[y*w+x];
+                     unsigned char const coverage = alpha[x];
+                     if( 0xFF != coverage )
+                     {
+                        if( 0 != coverage )
+                        {
+                           unsigned short const bgColor = *pix ;
+                           unsigned char const bgRed   = getRed( bgColor );
+                           unsigned char const bgGreen = getGreen( bgColor );
+                           unsigned char const bgBlue = getBlue( bgColor );
+
+                           unsigned char const fgRed   = getRed( foreColor );
+                           unsigned char const fgGreen = getGreen( foreColor );
+                           unsigned char const fgBlue = getBlue( foreColor );
+                           unsigned const alias = coverage + 1 ;
+                           unsigned const notAlias = 256 - alias ;
+                           
+                           unsigned mixRed = ((alias*fgRed)+(notAlias*bgRed))/256 ;
+                           unsigned mixGreen = ((alias*fgGreen)+(notAlias*bgGreen))/256 ;
+                           unsigned mixBlue = ((alias*fgBlue)+(notAlias*bgBlue))/256 ;
+                           *pix++ = get16( mixRed, mixGreen, mixBlue );
+                        } // not entirely background, need to mix
+                        else
+                           pix++ ;
+                     }
+                     else
+                        *pix++ = foreColor ;                     
+                  }
+                  else
+                     break; // only going further off the screen
+               }
+            }
+            else
+               break; // only going further off the screen
+         }
+      }
+   }
+   else
+      render( xPos, yPos, w, h, pixels );
+}
+
 
 
 fbDevice_t :: ~fbDevice_t( void )
