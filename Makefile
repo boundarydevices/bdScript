@@ -17,6 +17,9 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
+LIBRARYREFS=../install/arm-linux/lib/libflash.a \
+            ../install/arm-linux/lib/libmpeg2.a \
+            ../install/arm-linux/lib/libmad.a 
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
@@ -50,7 +53,7 @@ else
 endif
 
 %.o : %.cpp
-	$(CC) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -fno-rtti -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
@@ -83,9 +86,13 @@ mp3Play: mp3Play.o $(LIB)
 testJS: testJS.cpp $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
-jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH)
+jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lmpeg2 -lflash -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
+
+madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lid3tag -lmpeg2 -lflash -lts -lpthread -lm -lz
+	arm-linux-nm madDecode >madDecode.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
 	$(CC) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph
@@ -175,7 +182,7 @@ ffFrames: ffFrames.cpp $(LIB)
 	$(STRIP) $@
 
 ffPlay: ffPlay.cpp $(LIB)
-	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lvo -lmpeg2 -lmad -lm -lz -lpthread 
+	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lvo -lmpeg2 -lmad -lid3tag -lm -lz -lpthread 
 	$(STRIP) $@
 
 ffTest: ffTest.cpp $(LIB)
