@@ -118,68 +118,68 @@ int mtdErase( int Fd )
 
 int main(int argc,char **argv, char **envp)
 {
-	int regcount;
-	int devFd;
-        int fileFd ;
-	int res = 0;
-        int arg ;
+     int regcount;
+     int devFd;
+     int fileFd ;
+     int res = 0;
+     int arg ;
 
-	if (2 >= argc)
-	{
-		myPrint( "usage: progFlash device fileName [reboot]\n");
-		return 16;
-	}
+     if (2 >= argc)
+     {
+             myPrint( "usage: progFlash device fileName [reboot]\n");
+             return 16;
+     }
 
-	// Open the device
-	if ((devFd = myOpen( argv[1], O_RDWR)) < 0)
-	{
-		myPrint( argv[1] ); myPrint( ":File open error\r\n");
-                
-		return 8;
-	}
+     // Open the device
+     if ((devFd = myOpen( argv[1], O_RDWR)) < 0)
+     {
+             myPrint( argv[1] ); myPrint( ":File open error\r\n");
+             
+             return 8;
+     }
 
-	// Open the content file
-	if ((fileFd = myOpen( argv[2], O_RDONLY)) < 0)
-	{
-		myPrint( argv[2] ); myPrint( ":File open error\r\n");
-                myClose( devFd );
-		return 8;
-	}
+     // Open the content file
+     if ((fileFd = myOpen( argv[2], O_RDONLY)) < 0)
+     {
+             myPrint( argv[2] ); myPrint( ":File open error\r\n");
+             myClose( devFd );
+             return 8;
+     }
 
-        res = mtdErase(devFd);
-        if( 0 == res )
+     res = mtdErase(devFd);
+     if( 0 == res )
+     {
+        unsigned char dataBuf[8192];
+        int           numRead ;
+
+        myPrint( argv[1] );
+        myPrint( " erased successfully\n" );
+
+        while( 0 < ( numRead = myRead( fileFd, dataBuf, sizeof( dataBuf ) ) ) )
         {
-           unsigned char dataBuf[8192];
-           int           numRead ;
-
-           myPrint( argv[1] );
-           myPrint( " erased successfully\n" );
-
-           while( 0 < ( numRead = myRead( fileFd, dataBuf, sizeof( dataBuf ) ) ) )
+           int numWritten ;
+           numWritten = myWrite( devFd, dataBuf, numRead );
+           if( numWritten == numRead )
            {
-              int numWritten ;
-              numWritten = myWrite( devFd, dataBuf, numRead );
-              if( numWritten == numRead )
-              {
-                 myPrint( "." );
-              }
-              else
-              {
-                 myPrint( "read 0x" ); myPrintHex( numRead ); myPrint( " bytes, wrote 0x" ); 
-                                       myPrintHex( numWritten ); myPrint( "\r\n" );
-              }
+              myPrint( "." );
            }
-           myPrint( "\r\n" );
-           
+           else
+           {
+              myPrint( "read 0x" ); myPrintHex( numRead ); myPrint( " bytes, wrote 0x" ); 
+                                    myPrintHex( numWritten ); myPrint( "\r\n" );
+           }
         }
-        else
-           myPrint( "!!!!! erase error\n" );
+        myPrint( "\r\n" );
+        
+     }
+     else
+        myPrint( "!!!!! erase error\n" );
 
-        myClose( fileFd );
-        myClose( devFd );
+     myClose( fileFd );
+     myClose( devFd );
 
-        if( 3 < argc )
-           doReboot();
+     if( 3 < argc )
+        doReboot();
 
-	return res;
+     return res;
 }
