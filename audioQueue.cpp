@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.1  2002-11-07 02:16:33  ericn
+ * Revision 1.2  2002-11-07 02:18:13  ericn
+ * -fixed shutdown_ flag
+ *
+ * Revision 1.1  2002/11/07 02:16:33  ericn
  * -Initial import
  *
  *
@@ -66,7 +69,7 @@ void *audioOutputThread( void *arg )
                fprintf( stderr, "Error parsing MP3 headers\n" );
             }
 
-            if( !shutdown_ )
+            if( !queue->shutdown_ )
             {
                if( _cancel )
                {
