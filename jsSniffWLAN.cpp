@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsSniffWLAN.cpp,v $
- * Revision 1.1  2003-08-12 01:20:38  ericn
+ * Revision 1.2  2003-08-13 00:49:04  ericn
+ * -fixed cancellation process
+ *
+ * Revision 1.1  2003/08/12 01:20:38  ericn
  * -Initial import
  *
  *
@@ -245,11 +248,13 @@ jsStopSniff( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    {
       pthread_t tHandle = snifferThread_ ;
       snifferThread_ = 0 ;
-      sniffer_->close();
 
-      pthread_cancel(tHandle);
+printf( "cancelling sniffer\n" );
+      sniffer_->cancel();
+
       void *exitStat ;
       pthread_join( tHandle, &exitStat );
+printf( "done cancelling sniffer\n" );
 
       delete sniffer_ ;
       sniffer_ = 0 ;

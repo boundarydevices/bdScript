@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sniffWLAN.cpp,v $
- * Revision 1.1  2003-08-12 01:20:38  ericn
+ * Revision 1.2  2003-08-13 00:49:04  ericn
+ * -fixed cancellation process
+ *
+ * Revision 1.1  2003/08/12 01:20:38  ericn
  * -Initial import
  *
  *
@@ -189,7 +192,8 @@ typedef struct p80211msgd
 
 
 sniffWLAN_t :: sniffWLAN_t( void )
-   : fd_( socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL)) ),
+   : cancel_( false ),
+     fd_( socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL)) ),
      firstAP_( 0 )
 {
    if( 0 <= fd_ )
@@ -344,12 +348,12 @@ void sniffWLAN_t :: sniff( unsigned channel, unsigned seconds )
    {
       long long const end = tickMs() + ( seconds * 1000 );
 
-      while( tickMs() < end )
+      while( !cancel_ && ( tickMs() < end ) )
       {
          pollfd filedes ;
          filedes.fd = fd_ ;
          filedes.events = POLLIN ;
-         if( 0 < poll( &filedes, 1, 500 ) && ( 0 != ( filedes.revents & POLLIN ) ) )
+         if( 0 < poll( &filedes, 1, 100 ) && ( 0 != ( filedes.revents & POLLIN ) ) )
          {
             unsigned char buf[2048];
             struct sockaddr_ll from;

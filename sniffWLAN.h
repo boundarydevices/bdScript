@@ -1,5 +1,5 @@
 #ifndef __SNIFFWLAN_H__
-#define __SNIFFWLAN_H__ "$Id: sniffWLAN.h,v 1.1 2003-08-12 01:20:38 ericn Exp $"
+#define __SNIFFWLAN_H__ "$Id: sniffWLAN.h,v 1.2 2003-08-13 00:49:04 ericn Exp $"
 
 /*
  * sniffWLAN.h
@@ -21,7 +21,10 @@
  * Change History : 
  *
  * $Log: sniffWLAN.h,v $
- * Revision 1.1  2003-08-12 01:20:38  ericn
+ * Revision 1.2  2003-08-13 00:49:04  ericn
+ * -fixed cancellation process
+ *
+ * Revision 1.1  2003/08/12 01:20:38  ericn
  * -Initial import
  *
  *
@@ -49,20 +52,24 @@ public:
    // external interfaces
    //
    inline bool sniffing( void ) const { return 0 <= fd_ ; }
-   void close( void );
+   inline void cancel( void ){ cancel_ = true ; }
 
    ap_t *getFirstAP( void ) const { return firstAP_ ; }
    void  clearAPs( void );
 
-   //
-   // worker interface
-   //
+   // override this to get notified
    virtual void onNew( ap_t &newAP );
+
+   //
+   // worker and internal interface
+   //
    void sniff( unsigned channel, unsigned seconds );
+   void close( void );
 
 protected:
-   ap_t *firstAP_ ;
-   int   fd_ ;
+   bool volatile cancel_ ;
+   ap_t         *firstAP_ ;
+   int  volatile fd_ ;
 };
 
 #endif
