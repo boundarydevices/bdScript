@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.21  2003-08-23 21:36:37  ericn
+ * Revision 1.22  2003-08-26 00:33:13  ericn
+ * -added deactivate() method
+ *
+ * Revision 1.21  2003/08/23 21:36:37  ericn
  * -added draw, allow function for callbacks
  *
  * Revision 1.20  2003/02/10 01:17:46  ericn
@@ -685,9 +688,31 @@ jsButtonDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    return JS_TRUE ;
 }
 
+static JSBool
+jsButtonDeactivate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   buttonData_t *const button = (buttonData_t *)JS_GetInstancePrivate( cx, obj, &jsButtonClass_, NULL );
+   if( button )
+   {
+      if( button->box_ )
+      {
+         assert( button == (buttonData_t *)button->box_->objectData_ );
+         getZMap().removeBox( *button->box_ );
+         destroyBox( button->box_ );
+         button->box_ = 0 ;
+      }
+   }
+   else
+      JS_ReportError( cx, "Invalid button data" );
+   
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec buttonMethods_[] = {
     {"changeText", jsButtonChangeText, 0 },
     {"draw",       jsButtonDraw, 0 },
+    {"deactivate", jsButtonDeactivate, 0 },
     {0}
 };
 
