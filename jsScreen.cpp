@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.12  2003-02-08 14:56:27  ericn
+ * Revision 1.13  2003-11-30 16:45:31  ericn
+ * -use prototype for global instance
+ *
+ * Revision 1.12  2003/02/08 14:56:27  ericn
  * -removed redundant declaration
  *
  * Revision 1.11  2002/12/27 23:30:54  ericn
@@ -508,7 +511,7 @@ bool initJSScreen( JSContext *cx, JSObject *glob )
                                   0, 0 );
    if( rval )
    {
-      JSObject *obj = JS_NewObject( cx, &jsScreenClass_, NULL, NULL );
+      JSObject *obj = JS_NewObject( cx, &jsScreenClass_, rval, glob );
       if( obj )
       {
          JS_DefineProperty( cx, glob, "screen", 
