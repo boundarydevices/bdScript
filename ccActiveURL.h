@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.4 2002-12-02 15:07:51 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.5 2003-08-01 14:27:24 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.4  2002-12-02 15:07:51  ericn
+ * Revision 1.5  2003-08-01 14:27:24  ericn
+ * -added addRef, deref
+ *
+ * Revision 1.4  2002/12/02 15:07:51  ericn
  * -added callback param for file handle
  *
  * Revision 1.3  2002/11/30 00:53:43  ericn
@@ -78,7 +81,11 @@ public:
                     void const       *&data,          // output
                     unsigned long     &length,        // output
                     unsigned long     &identifier );  // output : used to close file
-   void closeHandle( unsigned long &identifier );
+   void addRef( unsigned long identifier );    // input : also used later to close file
+   void closeHandle( unsigned long identifier );
+   bool deref( unsigned long  identifier,
+               void const   *&data,
+               unsigned long &length );
 
    void cancel( std::string const &url ); // cancel all
    void deleteURL( std::string const &url );
@@ -87,11 +94,13 @@ public:
    // worker-side calls
    //
    void transferComplete( void         *request,
-                          void const   *data,
-                          unsigned long numRead );
+                          std::string  &data );
    void transferFailed( void              *request,
                         std::string const &errorMsg );
    void transferCancelled( void *request );
+   void transferWrite( void         *request,
+                       void const   *data,
+                       unsigned long size );
    void transferFileSize( void         *request,
                           unsigned long size );
    void transferProgress( void         *request,
