@@ -18,3 +18,5 @@ urlPoll flashVar mkFlash
 tcpPoll tcpPollServer
 dumpCPP palette serialPoll
 starImage starGraph
+config.mk
+config.h
