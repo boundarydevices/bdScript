@@ -113,4 +113,4 @@ install-bin:
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a *.map curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
