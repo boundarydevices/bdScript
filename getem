@@ -1,0 +1,6 @@
+#!/bin/bash
+./curlCache http://linuxbox/curlCache http://linuxbox/demoin.png http://linuxbox/demoout.png http://linuxbox/fttest.png http://linuxbox/gddemo http://linuxbox/gdtest_200_300_150_100.png
+./curlCache http://linuxbox/gdtest.gd2 http://linuxbox/gdtest_merge.png http://linuxbox/gdtest_wbmp_to_png.png http://linuxbox/i2of5.php http://linuxbox/i2of5.php~ http://linuxbox/index.html http://linuxbox/inTheRain.mpga
+./curlCache http://linuxbox/js http://linuxbox/madplay http://linuxbox/minigzip http://linuxbox/onceinalifetime.mpga http://linuxbox/poweredby.png http://linuxbox/priceListBarcodes.html http://linuxbox/priceListBarcodes.php http://linuxbox/priceList.php
+./curlCache http://linuxbox/psychokiller.mpga http://linuxbox/Sensoria.mpga http://linuxbox/ultest.php http://linuxbox/voodooRay.mpga
+./curlCache http://linuxbox/priceList.php
