@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.43  2003-07-03 03:17:47  ericn
+ * Revision 1.44  2003-07-03 14:08:00  ericn
+ * -modified to release js file after compilation
+ *
+ * Revision 1.43  2003/07/03 03:17:47  ericn
  * -expanded JS mem
  *
  * Revision 1.42  2003/06/22 23:03:54  ericn
@@ -335,53 +338,58 @@ int prMain(int argc, char **argv)
                      audioQueue_t &audioOut = getAudioQueue(); 
 
                      {
-                        urlFile_t f( argv[1] );
-                        if( f.isOpen() )
-                        {
-                           pushURL( argv[1] );
-
-                           JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
-
-                           JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
-                           if( script )
+                        JSScript *script = 0 ;
+                        
+                        { // limit scope of urlFile
+                           urlFile_t f( argv[1] );
+                           if( f.isOpen() )
                            {
-                              jsval rval;
-                              JSBool exec ;
-                              {
-                                 mutexLock_t lock( execMutex_ );
-                                 exec = JS_ExecuteScript( cx, glob, script, &rval );
-                                 JS_DestroyScript( cx, script );
-                              } // limit
+                              JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
    
-   
-                              if( exec )
-                              {
-                                 unsigned numEvents = 0 ;
-   
-                                 while( 1 )
-                                 {
-                                    pollCodeQueue( cx, 5000, 10 );
-                                    if( gotoCalled_ || execCalled_ )
-                                    {
-                                       break;
-                                    }
-                                    else 
-                                    {
-                                       mutexLock_t lock( execMutex_ );
-                                       JS_GC( cx );
-                                    }
-                                 }
-                              }
-                              else
-                                 fprintf( stderr, "exec error %s\n", argv[1] );
+                              script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
+                              if( !script )
+                                 fprintf( stderr, "Error compiling script %s\n", argv[1] );
                            }
                            else
-                              fprintf( stderr, "Error compiling script %s\n", argv[1] );
+                              fprintf( stderr, "Error opening url %s\n", argv[1] );
+                        }
+                        
+                        if( script )
+                        {
+                           pushURL( argv[1] );
+                           
+                           jsval rval;
+                           JSBool exec ;
+                           {
+                              mutexLock_t lock( execMutex_ );
+                              exec = JS_ExecuteScript( cx, glob, script, &rval );
+                              JS_DestroyScript( cx, script );
+                              script = 0 ;
+                           } // limit
+
+                           if( exec )
+                           {
+                              unsigned numEvents = 0 ;
+
+                              while( 1 )
+                              {
+                                 pollCodeQueue( cx, 5000, 10 );
+                                 if( gotoCalled_ || execCalled_ )
+                                 {
+                                    break;
+                                 }
+                                 else 
+                                 {
+                                    mutexLock_t lock( execMutex_ );
+                                    JS_GC( cx );
+                                 }
+                              }
+                           }
+                           else
+                              fprintf( stderr, "exec error %s\n", argv[1] );
                               
                            popURL();
                         }
-                        else
-                           fprintf( stderr, "Error opening url %s\n", argv[1] );
                      } // limit scope of urlFile
 
                      shutdownTTY();
