@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.9  2003-06-22 23:03:42  ericn
+ * Revision 1.10  2003-12-27 18:38:51  ericn
+ * -got rid of secondary threads
+ *
+ * Revision 1.9  2003/06/22 23:03:42  ericn
  * -removed debug msg
  *
  * Revision 1.8  2003/06/16 12:54:59  ericn
@@ -44,105 +47,109 @@
 #include "jsTimer.h"
 #include <time.h>
 #include <string>
-#include <pthread.h>
 #include "codeQueue.h"
-#include "jsGlobals.h"
+#include "pollTimer.h"
+#include <set>
 
-struct timerParam_t {
+struct timerObject_t : public pollTimer_t {
+public:
+   timerObject_t( JSContext    *cx, 
+                  JSObject     *scope, 
+                  unsigned long ms, 
+                  jsval         source, 
+                  bool          once );
+   ~timerObject_t( void );
+
+   virtual void fire( void );
+
+   JSContext    *cx_ ;
    JSObject     *scope_ ;
    unsigned long milliseconds_ ;
    jsval         sourceCode_ ;
+   bool const    once_ ;
+
+private:
+   timerObject_t( timerObject_t const & ); // no copies
 };
 
-static void *interval( void *arg )
+typedef std::set<timerObject_t *> timerSet_t ;
+
+static timerSet_t timers_ ;
+
+timerObject_t :: timerObject_t( JSContext    *cx, 
+                                JSObject     *scope, 
+                                unsigned long ms, 
+                                jsval         source, 
+                                bool          once )
+   : cx_( cx )
+   , scope_( scope )
+   , milliseconds_( ms )
+   , sourceCode_( source )
+   , once_( once )
 {
-printf( "timer %p (id %x)\n", &arg, pthread_self() );   
-   timerParam_t *param = (timerParam_t *)arg ;
-
-   unsigned long const ms = param->milliseconds_ ;
-   struct timespec tspec ;
-   tspec.tv_sec  = ms / 1000 ;
-   tspec.tv_nsec = ( ms % 1000 ) * 1000000 ;
-
-   do {
-      struct timespec interval = tspec ;
-      struct timespec remaining ;
-      int result = nanosleep( &interval, &remaining );
-      if( 0 == result )
-      {
-         if( !queueSource( param->scope_, param->sourceCode_, "interval timer" ) )
-            fprintf( stderr, "Error queueing code from interval timer\n" );
-      }
-      else
-      {
-         break;
-      }
-   } while( 1 );
-
-   JS_RemoveRoot( execContext_, &param->sourceCode_ );
-
-   delete param ;
-   
-   return 0 ;
+   JS_AddRoot( cx_, &sourceCode_ );
+   set( milliseconds_ );
 }
 
-static void *oneShot( void *arg )
+timerObject_t :: ~timerObject_t( void )
 {
-   timerParam_t *param = (timerParam_t *)arg ;
+   clear();
+   timerSet_t :: iterator it = timers_.find( this );
+   if( it != timers_.end() )
+      timers_.erase( it );
+   JS_RemoveRoot( cx_, &sourceCode_ );
+}
 
-   unsigned long const ms = param->milliseconds_ ;
-   struct timespec tspec ;
-   tspec.tv_sec  = ms / 1000 ;
-   tspec.tv_nsec = ( ms % 1000 ) * 1000000 ;
-
-   struct timespec remaining ;
-
-   int const result = nanosleep( &tspec, &remaining );
-   if( 0 == result )
-   {
-      if( !queueSource( param->scope_, param->sourceCode_, "oneShot timer" ) )
-         fprintf( stderr, "Error queueing code from oneShot timer\n" );
-   }
+void timerObject_t::fire( void )
+{
+//   printf( "timerObject_t::fire()\n" );
+   executeCode( scope_, sourceCode_, "timer" );
+   
+   if( once_ )
+      delete this ;
    else
-      printf( "oneShot cancelled %d\n", result );
-
-   JS_RemoveRoot( execContext_, &param->sourceCode_ );
-
-   delete param ;
-   return (void *)result ;
+      set( milliseconds_ );
 }
 
 static JSBool
 jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   if( ( 2 == argc ) 
+   *rval = JSVAL_FALSE ;
+   if( ( 2 <= argc ) 
        && 
-       JSVAL_IS_INT( argv[0] )
+       ( 3 >= argc ) 
        && 
-       JSVAL_IS_STRING( argv[1] ) )
+       JSVAL_IS_INT( argv[0] ) )
    {
-      timerParam_t *param = new timerParam_t ;
-      param->scope_        = obj ;
-      param->milliseconds_ = JSVAL_TO_INT( argv[0] );
-      param->sourceCode_   = argv[1];
-
-      JS_AddRoot( execContext_, &param->sourceCode_ );
-      pthread_t thread ;
-      int create = pthread_create( &thread, 0, interval, param );
-      if( 0 == create )
+      JSType type = JS_TypeOfValue( cx, argv[1] );
+      if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
       {
-         pthread_detach( thread );
-         *rval = INT_TO_JSVAL( thread );
-         return JS_TRUE ;
+         JSObject *scope = 0 ;
+         if( 3 == argc )
+         {
+            if( JSVAL_IS_OBJECT( argv[2] ) )
+            {
+               scope = JSVAL_TO_OBJECT( argv[2] );
+            }
+            else
+               JS_ReportError( cx, "timer: third parameter must be an object" );
+         }
+         else
+            scope = obj ;
+
+         if( 0 != scope )
+         {
+            timerObject_t *t = new timerObject_t( cx, scope, JSVAL_TO_INT( argv[0] ), argv[1], false );
+            timers_.insert( t );
+            *rval = INT_TO_JSVAL( (int)t );
+         } // valid scope
       }
       else
-      {
-         JS_RemoveRoot( execContext_, &param->sourceCode_ );
-         delete param ;
-      }
+         JS_ReportError( cx, "Usage: timer( unsigned long ms, 'handler code'||function [,scopeObject] )" );
    }
+   else
+      JS_ReportError( cx, "Usage: timer( unsigned long ms, 'handler code'||function [,scopeObject] )" );
 
-   *rval = JSVAL_FALSE ;
    return JS_TRUE ;
 }
 
@@ -150,35 +157,43 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   if( ( 2 == argc ) 
+   *rval = JSVAL_FALSE ;
+   if( ( 2 <= argc ) 
        && 
-       JSVAL_IS_INT( argv[0] )
+       ( 3 >= argc ) 
        && 
-       JSVAL_IS_STRING( argv[1] ) )
+       JSVAL_IS_INT( argv[0] ) )
    {
-      timerParam_t *param = new timerParam_t ;
-      param->scope_        = obj ;
-      param->milliseconds_ = JSVAL_TO_INT( argv[0] );
-      param->sourceCode_   = argv[1];
-      JS_AddRoot( execContext_, &param->sourceCode_ );
-
-      pthread_t thread ;
-      int create = pthread_create( &thread, 0, oneShot, param );
-      if( 0 == create )
+      JSType type = JS_TypeOfValue( cx, argv[1] );
+      if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
       {
-         pthread_detach( thread );
+         JSObject *scope = 0 ;
+         if( 3 == argc )
+         {
+            if( JSVAL_IS_OBJECT( argv[2] ) )
+            {
+               scope = JSVAL_TO_OBJECT( argv[2] );
+            }
+            else
+               JS_ReportError( cx, "oneShot: third parameter must be an object" );
 
-         *rval = INT_TO_JSVAL( thread );
-         return JS_TRUE ;
+         }
+         else
+            scope = obj ;
+
+         if( 0 != scope )
+         {
+            timerObject_t *t = new timerObject_t( cx, scope, JSVAL_TO_INT( argv[0] ), argv[1], true );
+            timers_.insert( t );
+            *rval = INT_TO_JSVAL( (int)t );
+         } // valid scope
       }
       else
-      {
-         JS_RemoveRoot( execContext_, &param->sourceCode_ );
-         delete param ;
-      }
+         JS_ReportError( cx, "Usage: oneShot( unsigned long ms, 'handler code'|function [,scopeObject] )" );
    }
+   else
+      JS_ReportError( cx, "Usage: oneShot( unsigned long ms, 'handler code'|function [,scopeObject] )" );
 
-   *rval = JSVAL_FALSE ;
    return JS_TRUE ;
 }
 
@@ -190,25 +205,14 @@ jsCancelTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
        && 
        JSVAL_IS_INT( argv[0] ) )
    {
-      pthread_t thread = JSVAL_TO_INT( argv[0] );
-      int result = pthread_cancel( thread );
-      if( ( 0 == result ) || ( 3 == result ) )
-      {
-         void *exitStat ;
-         result = pthread_join( thread, &exitStat );
-         if( ( 0 == result ) || ( 3 == result ) )
-         {
-            *rval = JSVAL_TRUE ;
-            return JS_TRUE ;
-         }
-         else
-            fprintf( stderr, "Error %d(%m) waiting for timer thread\n", result );
-      }
-      else
-         fprintf( stderr, "Error %d(%m) cancelling timer\n", result );
+      timerObject_t *t = (timerObject_t *)JSVAL_TO_INT( argv[0] );
+      timerSet_t :: iterator it = timers_.find( t );
+      if( it != timers_.end() )
+         delete t ;
+      *rval = JSVAL_TRUE ;
    }
-   
-   *rval = JSVAL_FALSE ;
+   else
+      *rval = JSVAL_FALSE ;
    return JS_TRUE ;
 }
 
@@ -224,5 +228,3 @@ bool initJSTimer( JSContext *cx, JSObject *glob )
 {
    return JS_DefineFunctions( cx, glob, _functions);
 }
-
-
