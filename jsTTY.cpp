@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTTY.cpp,v $
- * Revision 1.5  2003-12-28 20:54:59  ericn
+ * Revision 1.6  2003-12-28 23:51:03  ericn
+ * -use non-threaded queue for lines
+ *
+ * Revision 1.5  2003/12/28 20:54:59  ericn
  * -restore on <ctrl-c>
  *
  * Revision 1.4  2003/12/28 16:00:04  ericn
@@ -36,7 +39,7 @@
 #include "js/jsapi.h"
 #include "js/jslock.h"
 #include "jsImage.h"
-#include "mtQueue.h"
+#include "stringList.h"
 #include <stdio.h>
 #include <ctype.h>
 #include "codeQueue.h"
@@ -48,7 +51,7 @@ static JSObject *ttyProto = NULL ;
 static std::string prompt( "js:" );
 static jsval onLineInCode_ = JSVAL_VOID ;
 static jsval onLineInScope_ = JSVAL_VOID ;
-static mtQueue_t<std::string> lineQueue_ ;
+static stringList_t lineQueue_ ;
 
 class jsTTY_t : public ttyPollHandler_t {
 public:
@@ -63,7 +66,7 @@ void jsTTY_t :: onLineIn( void )
 {
    if( ( JSVAL_VOID != onLineInCode_ ) && ( JSVAL_VOID != onLineInScope_ ) )
    {
-      lineQueue_.push( getLine() );
+      lineQueue_.push_back( getLine() );
       executeCode( JSVAL_TO_OBJECT( onLineInScope_ ), onLineInCode_, "tty.onLineIn" );
    }
 }
@@ -100,9 +103,10 @@ jsReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
    if( 0 == argc )
    {
-      std::string line ;
-      if( lineQueue_.pull( line, 0 ) )
+      if( !lineQueue_.empty() )
       {
+         std::string line = lineQueue_.front();
+         lineQueue_.pop_front();
          JSString *str = JS_NewStringCopyN( cx, line.c_str(), line.size() );
          *rval = STRING_TO_JSVAL( str );
       }
