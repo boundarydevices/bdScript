@@ -100,6 +100,7 @@ void ResourceView::RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,i
 				Scale16::render(fbMem,fbWidth,fbHeight,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
+				delete[] pDib;
 			}
 		}
 	}
@@ -122,7 +123,39 @@ void ResourceView::RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,
 			Scale16::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
+			delete[] pDib;
 		}
 	}
 }
 
+void ResourceView::GetData16(const unsigned char* resource, unsigned int length,
+	unsigned short **pfbMem,int* ppicWidth,int* ppicHeight,
+	ConvertRgb24Line_t convertLineFunc)
+{
+	int flags=0;
+	unsigned short* fbMem = NULL;
+	int picWidth=0;
+	int picHeight=0;
+    CResourceObj data;
+    data.Init(resource,length);
+    Scale* pScaleObj = Scale::GetScalableImage(&data,flags);
+
+    if (pfbMem) if (pScaleObj)
+    {
+		if (pScaleObj->GetDimensions(&picWidth,&picHeight))
+		{
+			BYTE *pDib = NULL;
+			if (pDib= pScaleObj->GetDibBits(picWidth,picHeight,
+					0,0,picWidth,picHeight,
+					0,0,0,0))
+			{
+				fbMem = new unsigned short[picWidth*picHeight];
+				Scale16::render(fbMem,picWidth,picHeight,0,0,pDib,picWidth,picHeight,0,0,picWidth,picHeight,convertLineFunc);
+				delete[] pDib;
+			}
+		}
+	}
+	if (pfbMem) *pfbMem = fbMem;
+	if (ppicWidth) *ppicWidth = picWidth;
+	if (ppicHeight) *ppicHeight = picHeight;
+}
