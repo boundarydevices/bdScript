@@ -228,7 +228,7 @@ static JSFunctionSpec gpio_functions[] = {
 
 bool initJSGpio( JSContext *cx, JSObject *glob )
 {
-   JS_AddRoot( cx, &sFeedbackHandlerHigh);
+   JS_AddRoot( cx, &sFeedbackHandlerLow);
    JS_AddRoot( cx, &sFeedbackHandlerHigh);
    feedbackHandlerScope = glob ;
    return JS_DefineFunctions( cx, glob, gpio_functions);
@@ -248,6 +248,6 @@ void shutdownGpio()
       pthread_join( feedbackThreadHandle, &exitStat );
    }
 
-   JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh);
+   JS_RemoveRoot( execContext_, &sFeedbackHandlerLow);
    JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh);
 }
