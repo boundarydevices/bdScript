@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.3 2002-11-17 16:08:48 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.4 2002-11-30 00:30:30 ericn Exp $"
 
 /*
  * semaphore.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.3  2002-11-17 16:08:48  ericn
+ * Revision 1.4  2002-11-30 00:30:30  ericn
+ * -added semaphore_t class
+ *
+ * Revision 1.3  2002/11/17 16:08:48  ericn
  * -fixed timed-out semaphore handling
  *
  * Revision 1.2  2002/10/31 02:04:42  ericn
@@ -26,6 +29,7 @@
  */
 
 #include <pthread.h>
+#include <semaphore.h>
 #include <sys/time.h>
 #include <stdio.h>
 
@@ -87,6 +91,17 @@ private:
    condition_t( condition_t & ); // no copies
 };
 
+
+class semaphore_t {
+public:
+   semaphore_t( void ){ sem_init( &sem_, 0, 0 ); }
+   ~semaphore_t( void ){ sem_destroy( &sem_ ); }
+
+   inline bool wait( void ){ return 0 == sem_wait( &sem_ ); }
+   inline bool signal( void ){ return 0 == sem_post( &sem_ ); }
+
+   sem_t sem_ ;
+};
 
 mutexLock_t :: ~mutexLock_t( void )
 { 
