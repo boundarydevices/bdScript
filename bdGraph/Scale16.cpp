@@ -13,7 +13,7 @@ static inline unsigned short * getPixel(unsigned short *fbMem, int fbWidth,int f
 {
     return fbMem + ((fbTop*fbWidth) + fbLeft);
 }
-static inline void ConvertRgb24(unsigned short* fbMem, unsigned char const *video,int cnt)
+static void ConvertRgb24Line(unsigned short* fbMem, unsigned char const *video,int cnt)
 {
     do {
 	*fbMem++ = (video[0]>>3) | ((video[1]&0xfc)<<(5-2)) | ((video[2]&0xf8)<<(5+6-3));
@@ -29,7 +29,8 @@ void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
      int imageDisplayLeft,			//offset within image to start display
      int imageDisplayTop,
      int imageDisplayWidth,		//portion of image to display
-     int imageDisplayHeight
+     int imageDisplayHeight,
+	 ConvertRgb24Line_t convertLineFunc=NULL
    )
 {
    int minWidth;
@@ -56,6 +57,7 @@ void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
    minWidth = min(fbWidth-fbLeft,imageDisplayWidth);	// << 1;	//2 bytes/pixel
    minHeight= min(fbHeight-fbTop,imageDisplayHeight);
 
+   if (convertLineFunc==NULL)convertLineFunc = ConvertRgb24Line;
    if ((minWidth > 0) && (minHeight > 0))
    {
       unsigned short *fbPix = getPixel(fbMem,fbWidth,fbLeft,fbTop);
@@ -63,8 +65,8 @@ void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
 
       do
       {
-         ConvertRgb24(fbPix,imgMem,minWidth);
-	 fbPix += fbWidth;
+         convertLineFunc(fbPix,imgMem,minWidth);
+		 fbPix += fbWidth;
          imgMem += imgWidth3;
       } while (--minHeight);
    }

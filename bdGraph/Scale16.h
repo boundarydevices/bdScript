@@ -5,6 +5,7 @@
 #define interface struct
 #endif
 interface ImageData;
+typedef void (*ConvertRgb24Line_t)(unsigned short* fbMem, unsigned char const *video,int cnt);
 
 class Scale16
 {
@@ -17,7 +18,8 @@ public:
 	static void render(unsigned short *fbMem,int fbWidth, int fbHeight,
 		int fbLeft, int fbTop,
 		unsigned char const *imgMem, int imgWidth, int imgHeight,
-		int imageDisplayLeft,int imageDisplayTop,int imageDisplayWidth,int imageDisplayHeight);
+		int imageDisplayLeft,int imageDisplayTop,int imageDisplayWidth,int imageDisplayHeight,
+		ConvertRgb24Line_t convertLineFunc=NULL);
 
 	static void scale(unsigned short *dest, int destWidth, int destHeight,
 		unsigned short const *img, int imgWidth, int imgHeight,
