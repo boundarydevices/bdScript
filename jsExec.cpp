@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.69  2004-02-03 06:12:22  ericn
+ * Revision 1.70  2004-02-07 12:14:13  ericn
+ * -added flashVar global
+ *
+ * Revision 1.69  2004/02/03 06:12:22  ericn
  * -saves base url for scripts
  *
  * Revision 1.68  2004/01/02 23:36:56  ericn
@@ -278,6 +281,7 @@
 #include "pollTimer.h"
 #include "memFile.h"
 #include "debugPrint.h"
+#include "jsFlashVar.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -535,6 +539,7 @@ int prMain(int argc, char **argv)
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );
                   initJSKernel( cx, glob );
+                  initJSFlashVar( cx, glob );
 
                   getCurlCache();
 
