@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: childProcess.cpp,v $
- * Revision 1.1  2002-10-25 02:55:01  ericn
+ * Revision 1.2  2003-08-24 14:11:32  ericn
+ * -fixed exec-error problem
+ *
+ * Revision 1.1  2002/10/25 02:55:01  ericn
  * -initial import
  *
  *
@@ -23,6 +26,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/errno.h>
 
 typedef std::map<int,childProcess_t *> pidToChild_t ;
 
@@ -90,6 +94,8 @@ bool childProcess_t :: run
    if( 0 == childPid )
    {
       execve( path, argv, envp );
+      perror( path );
+      exit(errno);
    } // child
    else if( 0 < childPid )
    {
