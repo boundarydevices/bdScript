@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.9  2002-11-03 17:55:51  ericn
+ * Revision 1.10  2002-11-05 15:15:39  ericn
+ * -fixed to initialize members
+ *
+ * Revision 1.9  2002/11/03 17:55:51  ericn
  * -modified to support synchronous gets and posts
  *
  * Revision 1.8  2002/10/31 02:10:46  ericn
@@ -76,15 +79,36 @@ JSClass jsCurlClass_ = {
 
 static JSPropertySpec curlFileProperties_[] = {
   {"isLoaded",       CURLFILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"worked",         CURLFILE_WORKED,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"data",           CURLFILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"url",            CURLFILE_URL,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"httpCode",       CURLFILE_HTTPCODE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"fileTime",       CURLFILE_FILETIME,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"mimeType",       CURLFILE_MIMETYPE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"params",         CURLFILE_PARAMS,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
+
+static void curlFileOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+{
+   JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+   JS_DefineProperty( req.cx_, req.lhObj_, "data",
+                      STRING_TO_JSVAL( sData ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   JS_DefineProperty( req.cx_, req.lhObj_, "fileTime",
+                      INT_TO_JSVAL( f.getFileTime() ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   JSString *sMime = JS_NewStringCopyZ( req.cx_, f.getMimeType() );
+   JS_DefineProperty( req.cx_, req.lhObj_, "mimeType",
+                      STRING_TO_JSVAL( sMime ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   jsCurlOnComplete( req, f );
+}
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -113,7 +137,7 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
          jsCurlRequest_t request ;
-         request.onComplete = jsCurlOnComplete ;
+         request.onComplete = curlFileOnComplete ;
          request.onError    = jsCurlOnError ;
          request.lhObj_ = thisObj ;
          request.rhObj_ = rhObj ;
