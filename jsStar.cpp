@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStar.cpp,v $
- * Revision 1.3  2004-05-08 23:55:05  ericn
+ * Revision 1.4  2004-05-10 15:41:47  ericn
+ * -split parts of initRaster to allow choice in user-space
+ *
+ * Revision 1.3  2004/05/08 23:55:05  ericn
  * -expanded star_methods for pageHeight() call, separate exitRaster
  *
  * Revision 1.2  2004/05/08 16:33:59  ericn
@@ -40,10 +43,24 @@
 
 static char const initPrinter[] = {
    "\x1b@"              // initPrinter
+};
+
+static char const initRaster[] = {
    "\x1b*rR"            // initialize raster mode (to defaults)
    "\x1b*rA"            // enter raster mode
-   "\x1b*rQ0\x00"       // 0 == high speed, 1 == normal, 2 == letter quality
    "\x1b*rC"            // clear image
+};
+
+static char const draftQuality[] = {
+   "\x1b*rQ0\x00"       // 0 == high speed, 1 == normal, 2 == letter quality
+};
+
+static char const normalQuality[] = {
+   "\x1b*rQ0\x01"       // 0 == high speed, 1 == normal, 2 == letter quality
+};
+
+static char const letterQuality[] = {
+   "\x1b*rQ0\x02"       // 0 == high speed, 1 == normal, 2 == letter quality
 };
 
 static char const setPageHeight[] = {
@@ -228,6 +245,13 @@ void starPrinterFixup( JSContext *cx,
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
    JSString *s = JS_NewStringCopyN( cx, initPrinter, sizeof( initPrinter ) - 1  );
+   JS_DefineProperty( cx, obj, "initPrinter", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, initRaster, sizeof( initRaster )-1 );
    JS_DefineProperty( cx, obj, "initRaster", 
                       STRING_TO_JSVAL( s ),
                       0, 0, 
@@ -243,6 +267,27 @@ void starPrinterFixup( JSContext *cx,
                       |JSPROP_READONLY );
    s = JS_NewStringCopyN( cx, exitRaster, sizeof( exitRaster )-1 );
    JS_DefineProperty( cx, obj, "exitRaster", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, draftQuality, sizeof( draftQuality )-1 );
+   JS_DefineProperty( cx, obj, "draftQuality", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, normalQuality, sizeof( normalQuality )-1 );
+   JS_DefineProperty( cx, obj, "normalQuality", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, letterQuality, sizeof( letterQuality )-1 );
+   JS_DefineProperty( cx, obj, "letterQuality", 
                       STRING_TO_JSVAL( s ),
                       0, 0, 
                       JSPROP_ENUMERATE
