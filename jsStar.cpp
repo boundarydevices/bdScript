@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStar.cpp,v $
- * Revision 1.2  2004-05-08 16:33:59  ericn
+ * Revision 1.3  2004-05-08 23:55:05  ericn
+ * -expanded star_methods for pageHeight() call, separate exitRaster
+ *
+ * Revision 1.2  2004/05/08 16:33:59  ericn
  * -high-speed
  *
  * Revision 1.1  2004/05/05 03:20:32  ericn
@@ -28,6 +31,7 @@
 #include "jsAlphaMap.h"
 #include "dither.h"
 #include <assert.h>
+#include "tickMs.h"
 
 #define DPI          203
 #define PAGEHEIGHT   (DPI*2)
@@ -40,6 +44,9 @@ static char const initPrinter[] = {
    "\x1b*rA"            // enter raster mode
    "\x1b*rQ0\x00"       // 0 == high speed, 1 == normal, 2 == letter quality
    "\x1b*rC"            // clear image
+};
+
+static char const setPageHeight[] = {
    "\x01b*rP"           // set page height
 };
 
@@ -61,9 +68,12 @@ static char const skipLine[] = {
 
 static char const formFeed[] = {
    "\x1b\x0C\x00" 
+};
+
+static char const exitRaster[] = {
    "\x1b*rB"            // exit raster mode
 };
-   
+
 static JSBool
 jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -101,21 +111,23 @@ jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          {
             unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
             char cHeightSpec[12];
-            int hSpecLen = sprintf( cHeightSpec, "%d", bmHeight ) + 1 ;
 
             unsigned const rowBytes = (bmWidth+7)/8 ;
             unsigned const imageBytes = bmHeight*(rowBytes+3);    // 'b'+n+m+pixels
-            unsigned const totalBytes = sizeof( initPrinter ) - 1 + imageBytes + hSpecLen + sizeof( formFeed ) - 1 ;
+            unsigned const totalBytes = + imageBytes ;
 
             void *const imageData = JS_malloc( cx, totalBytes );
 
             unsigned char *nextOut = (unsigned char *)imageData ;
-            memcpy( nextOut, initPrinter, sizeof( initPrinter ) - 1 );
-            nextOut += sizeof( initPrinter ) - 1 ;
-            memcpy( nextOut, cHeightSpec, hSpecLen );
-            nextOut += hSpecLen ;
-
+/*
+printf( "dither..." ); fflush( stdout );
+long long const start = tickMs();
+*/
             dither_t dither( pixData, bmWidth, bmHeight );
+/*
+long long const dEnd = tickMs();
+printf( "toBits..." ); fflush( stdout );
+*/
             for( unsigned y = 0 ; y < bmHeight ; y++ )
             {
                unsigned char * const startOfLine = nextOut ;
@@ -165,8 +177,12 @@ jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 //                  nextOut = lastDot ;
                }
             }
-            memcpy( nextOut, formFeed, sizeof( formFeed )-1 );
-            nextOut += sizeof( formFeed ) - 1 ;
+/*
+long long const rEnd = tickMs();
+printf( "done\n"
+        "%5llu total, %5llu dither, %5llu render\n",
+        rEnd-start, dEnd-start, rEnd-dEnd ); fflush( stdout );
+*/
             unsigned const outBytes = nextOut-(unsigned char *)imageData ;
             JSString *sOut = JS_NewString( cx, (char *)imageData, outBytes );
             *rval = STRING_TO_JSVAL( sOut );
@@ -185,6 +201,23 @@ assert( outBytes <= totalBytes );
    return JS_TRUE ;
 }
 
+static JSBool
+jsStarPageHeight( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
+   {
+      char cHeightSpec[80];
+      int hSpecLen = sprintf( cHeightSpec, "%s%d", setPageHeight, JSVAL_TO_INT(argv[0]) ) + 1 ;
+      JSString *s = JS_NewStringCopyN( cx, cHeightSpec, hSpecLen );
+      *rval = STRING_TO_JSVAL( s );
+   }
+   else
+      JS_ReportError( cx, "Usage: printer.pageHeight( #pixels )" );
+
+   return JS_TRUE ;
+}
+
 void starPrinterFixup( JSContext *cx, 
                        JSObject  *obj )
 {
@@ -194,10 +227,32 @@ void starPrinterFixup( JSContext *cx,
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
+   JSString *s = JS_NewStringCopyN( cx, initPrinter, sizeof( initPrinter ) - 1  );
+   JS_DefineProperty( cx, obj, "initRaster", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, formFeed, sizeof( formFeed )-1 );
+   JS_DefineProperty( cx, obj, "formFeed", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   s = JS_NewStringCopyN( cx, exitRaster, sizeof( exitRaster )-1 );
+   JS_DefineProperty( cx, obj, "exitRaster", 
+                      STRING_TO_JSVAL( s ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
 }
 
-JSFunctionSpec star_methods[2] = {
+JSFunctionSpec star_methods[3] = {
    { "imageToString",   jsStarImageToString,      0,0,0 },
+   { "pageHeight",      jsStarPageHeight,         0,0,0 },
    { 0 }
 };
 
