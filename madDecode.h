@@ -1,5 +1,5 @@
 #ifndef __MADDECODE_H__
-#define __MADDECODE_H__ "$Id: madDecode.h,v 1.3 2003-07-27 15:14:24 ericn Exp $"
+#define __MADDECODE_H__ "$Id: madDecode.h,v 1.4 2003-08-04 03:13:40 ericn Exp $"
 
 /*
  * madDecode.h
@@ -23,7 +23,10 @@
  * Change History : 
  *
  * $Log: madDecode.h,v $
- * Revision 1.3  2003-07-27 15:14:24  ericn
+ * Revision 1.4  2003-08-04 03:13:40  ericn
+ * -fixed comment
+ *
+ * Revision 1.3  2003/07/27 15:14:24  ericn
  * -modified to keep track of unread samples
  *
  * Revision 1.2  2003/07/20 15:42:29  ericn
@@ -44,9 +47,6 @@ public:
    madDecoder_t( void );
    ~madDecoder_t( void );
 
-   //
-   // returns true if output is available, false otherwise
-   //
    void feed( void const *inData, unsigned long inBytes );
 
    //
