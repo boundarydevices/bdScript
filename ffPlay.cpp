@@ -29,6 +29,8 @@ static char const * const frameTypes_[] = {
 };
 
 struct playbackArgs_t {
+   unsigned width_ ;
+   unsigned height_ ;
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
 };
@@ -184,7 +186,7 @@ static void *playbackThread( void *arg )
                         tsParam.__sched_priority = 1 ;
                         pthread_setschedparam( pthread_self(), SCHED_FIFO, &tsParam );
       
-                        vFrames.setStart( tickMs() - 2*startPTS );
+                        vFrames.setStart( tickMs() - startPTS - 384 );
    
                         int const create = pthread_create( &videoThread, 0, videoThreadRtn, &vFrames );
                         if( 0 == create )
@@ -301,7 +303,7 @@ int main( int argc, char const * const argv[] )
          mpegDemux_t demuxer( fIn.getData(), fIn.getLength() );
 
          mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
-         playbackArgs_t playbackArgs = { 0, 0 };
+         playbackArgs_t playbackArgs = { 0, 0, 0, 0 };
 
          for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
          {
@@ -313,6 +315,30 @@ int main( int argc, char const * const argv[] )
                case mpegDemux_t::videoFrame_e :
                {
                   playbackArgs.videoFrames_ = bi->streams_[sIdx];
+                  
+                  printf( "pre-read video\n" );
+                  long long start = tickMs();
+                  mpegDecoder_t decoder ;
+                  for( unsigned i = 0 ; ( 0 == playbackArgs.width_ ) && ( i < sAndF.numFrames_ ) ; i++ )
+                  {
+                     mpegDemux_t::frame_t const &frame = sAndF.frames_[i];
+                     decoder.feed( frame.data_, frame.length_ );
+                     void const *picture ;
+                     mpegDecoder_t::picType_e type ;
+                     while( decoder.getPicture( picture, type, 0 ) )
+                     {
+                        if( decoder.haveHeader() && ( 0 == playbackArgs.width_ ) )
+                        {
+                           playbackArgs.width_  = decoder.width();
+                           playbackArgs.height_ = decoder.height();
+                           printf( "video : %u x %u\n", playbackArgs.width_, playbackArgs.height_ );
+                           break;
+                        }
+                     }
+                  }
+                  long long end = tickMs();
+                  unsigned long long msElapsed = end-start ;
+                  printf( "%llu.%03llu seconds elapsed\n", msElapsed / 1000, msElapsed % 1000 );
                   break;
                }
 
