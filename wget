@@ -1,0 +1,29 @@
+#!/bin/jsExec -
+print( "\n" );
+if( ( 1 == argc ) || ( 2 == argc ) )
+{
+   var filename = argv[0];
+   print( "loading ", argv[0], "..." );
+   var f = curlFile( {url:filename} );
+   
+   if( f.isLoaded )
+   {
+      print( "successful\n" );
+      var localFile = ( 2 == argc )
+                      ? argv[1]
+                      : filename.substr( filename.lastIndexOf( '/' ) + 1 );
+      if( writeFile( localFile, f.data ) )
+      {
+         print( 'saved ', f.data.length, ' bytes to ', localFile, '\n' );
+      }
+      else
+         print( 'error saving ', localFile, '\n' );
+   }
+   else
+      print( "error\n", f.loadErrorMsg, "\n" );
+}
+else
+   print( "Usage: wget url [localFileName]\n" );
+
+exit( 0 );
+
