@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.11  2003-10-19 17:02:56  ericn
+ * Revision 1.12  2003-10-20 03:49:27  ericn
+ * -set params for output audio fd
+ *
+ * Revision 1.11  2003/10/19 17:02:56  ericn
  * -added U/I
  *
  * Revision 1.10  2003/10/18 19:15:28  ericn
@@ -429,7 +432,14 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
                   printf( "jpegError\n" );
             }
             else
+            {
                printf( "mismatch:%u/%u\n", bufSize, numRead );
+               if( -1 == numRead )
+               {
+                  fprintf( stderr, "Invalid data from camera:%d:%m\n", errno );
+                  break;
+               }
+            }
          } while( 1 ); // time( 0 )-start < 10 );
          
          printf( "%u frames\n", frameCnt );
@@ -1063,7 +1073,7 @@ int main( int argc, char const * const argv[] )
                   if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
                      perror( "STEREO" );
 
-                  int const vol = 0x5050 ;
+                  int const vol = 0x6060 ;
                   if( 0 > ioctl( fdAudio, SOUND_MIXER_WRITE_VOLUME, &vol)) 
                      perror( "Error setting volume" );
 
@@ -1072,6 +1082,21 @@ int main( int argc, char const * const argv[] )
                      close( fdAudio );
                      fdAudio = open( "/dev/dsp", O_RDONLY );
                      int fdAudioWrite = open( "/dev/dsp", O_WRONLY );
+
+                     if( 0 > ioctl( fdAudioWrite, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+                        perror( "Error setting volume" );
+                     
+                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_SETFMT, &format) ) 
+                        fprintf( stderr, "DSP_SETFMT:%m\n" );
+
+                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_CHANNELS, &channels ) )
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
+         
+                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_SPEED, &speed ) )
+                        fprintf( stderr, "set speed %m\n" );
+                  
+                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_STEREO, &not ) )
+                        perror( "STEREO" );
 
                      int fdCamera = open( "/dev/video0", O_RDONLY );
 //                     if( 0 <= fdCamera )
@@ -1090,7 +1115,8 @@ int main( int argc, char const * const argv[] )
                            audioParams.mediaFd_ = fdAudio ;
                            audioParams.udpSock_ = udpSock ;
                            pthread_t audioHandle ;
-                           int create = pthread_create( &audioHandle, 0, audioThread, &audioParams );
+                           int create ;
+                           create = pthread_create( &audioHandle, 0, audioThread, &audioParams );
                            if( 0 == create )
                            {
                               threadParam_t audioOutParams = audioParams ;
