@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.5  2002-12-03 02:48:44  ericn
+ * Revision 1.6  2002-12-07 21:00:42  ericn
+ * -removed debug msg
+ *
+ * Revision 1.5  2002/12/03 02:48:44  ericn
  * -added initialization for expectedBytes
  *
  * Revision 1.4  2002/11/30 16:23:59  ericn
@@ -183,7 +186,6 @@ static void *readerThread( void *arg )
 
          if( ( 0 == errorMsg.size() ) && ( !(*request.cancel_) ) )
          {
-printf( "completed %s\n", request.url_ );
             onComplete_( request, data.c_str(), data.size() );
          }
          else if( (*request.cancel_) )
