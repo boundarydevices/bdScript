@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.2  2002-12-15 20:01:57  ericn
+ * Revision 1.3  2003-01-12 03:04:41  ericn
+ * -fixed colormap
+ *
+ * Revision 1.2  2002/12/15 20:01:57  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.1  2002/11/02 18:39:42  ericn
@@ -99,8 +102,8 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
             //
             // draw every scanline
             //
-            unsigned const red   = (unsigned char)rgb >> 16 ;
-            unsigned const green = (unsigned char)rgb >> 8 ;
+            unsigned const red   = (unsigned char)( rgb >> 16 );
+            unsigned const green = (unsigned char)( rgb >> 8 );
             unsigned const blue  = (unsigned char)rgb ;
 
             unsigned screenY = screenStartY ;
