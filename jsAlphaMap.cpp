@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.5  2004-03-17 04:56:19  ericn
+ * Revision 1.6  2004-05-05 03:19:50  ericn
+ * -added draw into image
+ *
+ * Revision 1.5  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.4  2003/05/26 22:07:20  ericn
@@ -36,15 +39,74 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 {
    *rval = JSVAL_FALSE ;
 
-   if( ( 3 == argc )
+   JSObject *imageObj ;
+   if( ( 3 <= argc )
+       &&
+       ( 4 >= argc )
        &&
        JSVAL_IS_INT( argv[0] )
        &&
        JSVAL_IS_INT( argv[1] )
        &&
-       JSVAL_IS_INT( argv[2] ) )
+       JSVAL_IS_INT( argv[2] ) 
+       &&
+       ( ( 3 == argc )
+         ||
+         ( JSVAL_IS_OBJECT( argv[3] ) 
+           &&
+           ( 0 != ( imageObj = JSVAL_TO_OBJECT( argv[3] ) ) ) ) )
+       )
    {
       fbDevice_t &fb = getFB();
+      unsigned short *imageMem ;
+      unsigned short  imageWidth ;
+      unsigned short  imageHeight ;
+
+      if( 3 == argc )
+      {
+         imageMem = fb.getRow(0);
+         imageWidth = fb.getWidth();
+         imageHeight = fb.getHeight();
+      }
+      else
+      {
+         jsval     vPixMap ;
+         jsval     vWidth ;
+         jsval     vHeight ;
+         JSString *sPixMap ;
+      
+         if( JS_GetProperty( cx, imageObj, "pixBuf", &vPixMap )
+             &&
+             JSVAL_IS_STRING( vPixMap )
+             &&
+             ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
+             &&
+             JS_GetProperty( cx, imageObj, "width", &vWidth )
+             &&
+             JSVAL_IS_INT( vWidth )
+             &&
+             JS_GetProperty( cx, imageObj, "height", &vHeight )
+             &&
+             JSVAL_IS_INT( vHeight ) )
+         {
+            unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+            unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
+            if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
+            {
+printf( "render into image: %u/%u\n", bmWidth, bmHeight );
+               imageMem = (unsigned short *)JS_GetStringBytes( sPixMap );
+               imageWidth  = bmWidth ;
+               imageHeight = bmHeight ;
+            }
+            else
+               JS_ReportError( cx, "Error getting pixel data" );
+         }
+         else
+            JS_ReportError( cx, "Invalid image" );
+         
+         if( !imageMem )
+            return JS_TRUE ;
+      }
 
       int const specX = JSVAL_TO_INT( argv[0] );
       int const specY = JSVAL_TO_INT( argv[1] );
@@ -100,9 +162,9 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 
          if( ( bmWidth > bmStartX ) 
              && 
-             ( screenStartX <= fb.getWidth() ) 
+             ( screenStartX <= imageWidth ) 
              && 
-             ( screenStartY < fb.getHeight() )
+             ( screenStartY < imageHeight )
              &&
              ( bmStartY < bmWidth ) )
          {
@@ -122,7 +184,8 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
                           screenStartY,
                           screenStartX+bmWidth-1,
                           screenStartY+maxHeight-1,
-                          red, green, blue );
+                          red, green, blue,
+                          imageMem, imageWidth, imageHeight );
          } // room for something
       }
       else

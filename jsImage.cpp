@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.26  2004-03-17 04:56:19  ericn
+ * Revision 1.27  2004-05-05 03:19:37  ericn
+ * -added draw into image
+ *
+ * Revision 1.26  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.25  2003/06/26 08:03:34  tkisky
@@ -108,10 +111,25 @@
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   *rval = JSVAL_FALSE ;
+
    //
-   // need x and y
+   // need x and y [ and optional image destination ]
    //
-   if( 2 == argc )
+   JSObject *destObj = 0 ;
+   if( ( 2 <= argc )
+       &&
+       ( 3 >= argc )
+       &&
+       JSVAL_IS_INT( argv[0] )   // x
+       &&
+       JSVAL_IS_INT( argv[1] )   // y
+       &&
+       ( ( 2 == argc )
+         ||
+         ( JSVAL_IS_OBJECT( argv[2] ) 
+           &&
+           ( 0 != ( destObj = JSVAL_TO_OBJECT( argv[2] ) ) ) ) ) )
    {
       int xPos = JSVAL_TO_INT( argv[0] );
       int yPos = JSVAL_TO_INT( argv[1] );
@@ -128,38 +146,66 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
           &&
           JSVAL_IS_STRING( dataVal ) )
       {
-         int width  = JSVAL_TO_INT( widthVal ); 
-         int height = JSVAL_TO_INT( heightVal );
+         int srcWidth  = JSVAL_TO_INT( widthVal ); 
+         int srcHeight = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
-         unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
-         if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
-         {
-            fbDevice_t &fb = getFB();
-   
+         unsigned short const *const srcPixels = (unsigned short *)JS_GetStringBytes( pixStr );
+         if( JS_GetStringLength( pixStr ) == srcWidth * srcHeight * sizeof( srcPixels[0] ) )
+         {   
             jsval     alphaVal ;
             JSString *sAlpha ;
+            unsigned char const *alpha = 0 ;
+
             if( JS_GetProperty( cx, obj, "alpha", &alphaVal ) 
                 &&
                 JSVAL_IS_STRING( alphaVal )
                 &&
                 ( 0 != ( sAlpha = JSVAL_TO_STRING( alphaVal ) ) ) )
             {
-               unsigned char const *alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
-               fb.render(xPos,yPos,width,height,pixMap, alpha );
+               alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
             } // have alpha channel... use it
+
+            fbDevice_t &fb = getFB();
+            if( 0 == destObj )
+            {
+               fb.render(xPos,yPos,srcWidth,srcHeight,srcPixels, alpha );
+            } // draw to screen
             else
-               fb.render(xPos,yPos,width,height,pixMap);
+            {
+               if( JS_GetProperty( cx, destObj, "width", &widthVal )
+                   &&
+                   JS_GetProperty( cx, destObj, "height", &heightVal )
+                   &&
+                   JS_GetProperty( cx, destObj, "pixBuf", &dataVal )
+                   &&
+                   JSVAL_IS_STRING( dataVal ) )
+               {
+                  int destWidth  = JSVAL_TO_INT( widthVal ); 
+                  int destHeight = JSVAL_TO_INT( heightVal );
+                  pixStr = JSVAL_TO_STRING( dataVal );
+                  unsigned short *const destPixels = (unsigned short *)JS_GetStringBytes( pixStr );
+                  if( JS_GetStringLength( pixStr ) == destWidth * destHeight * sizeof( destPixels[0] ) )
+                  {   
+                     fbDevice_t::render( xPos, yPos, srcWidth, srcHeight, srcPixels, alpha, destPixels, destWidth, destHeight );
+                     printf( "draw image to image\n" );
+                  }
+                  else
+                     JS_ReportError( cx, "Invalid destination pixels" );
+               }
+               else
+                  JS_ReportError( cx, "Invalid destination image" );
+            }
+            
+            *rval = JSVAL_TRUE ;
+      
          }
          else
-            JS_ReportError( cx, "Invalid pixMap\n" );
+            JS_ReportError( cx, "Invalid srcPixels" );
 
 //         JS_ReportError( cx, "w:%d, h:%d", width, height );
       }
       else
-         JS_ReportError( cx, "Object not initialized, can't draw\n" );
-
-      *rval = JSVAL_TRUE ;
-      return JS_TRUE ;
+         JS_ReportError( cx, "Object not initialized, can't draw" );
 
    } // need at least two params
    else
@@ -168,7 +214,7 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       JS_ReportError( cx, "#args == %d", argc );
    }
 
-   return JS_FALSE ;
+   return JS_TRUE ;
 }
 
 JSBool
@@ -488,29 +534,104 @@ static void imageOnComplete( jsCurlRequest_t &req, void const *data, unsigned lo
 
 static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   static char const usage[] = {
+      "Usage : new image( { url:\"something\" | width:int, height:int [,bgColor:0xRRGGBB] } );"
+   };
+
    *rval = JSVAL_FALSE ;
+   JSObject *rhObj ;
    if( ( 1 == argc ) 
        && 
-       JSVAL_IS_OBJECT( argv[0] ) )
+       JSVAL_IS_OBJECT( argv[0] ) 
+       &&
+       ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
    {
       JSObject *thisObj = JS_NewObject( cx, &jsImageClass_, NULL, NULL );
 
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
-         if( queueCurlRequest( thisObj, argv[0], cx, imageOnComplete ) )
+         jsval urlv ;
+         jsval widthv ;
+         jsval heightv ;
+         if( JS_GetProperty( cx, rhObj, "url", &urlv ) 
+             &&
+             JSVAL_IS_STRING( urlv ) )
          {
+            if( queueCurlRequest( thisObj, argv[0], cx, imageOnComplete ) )
+            {
+            }
+            else
+            {
+               JS_ReportError( cx, "Error queueing curlRequest" );
+            }
+         }
+         else if( JS_GetProperty( cx, rhObj, "width", &widthv ) 
+                  &&
+                  JSVAL_IS_INT( widthv )
+                  &&
+                  JS_GetProperty( cx, rhObj, "height", &heightv )
+                  &&
+                  JSVAL_IS_INT( heightv ) )
+         {
+            unsigned short const w = JSVAL_TO_INT( widthv );
+            unsigned short const h = JSVAL_TO_INT( heightv );
+            unsigned long rgb32 = 0xFFFFFF ; // default white
+            jsval colorv ;
+            if( JS_GetProperty( cx, rhObj, "bgColor", &colorv ) 
+                &&
+                JSVAL_IS_INT( colorv ) )
+            {
+               rgb32 = JSVAL_TO_INT( colorv );
+            }
+            JS_DefineProperty( cx, thisObj, "width",
+                               INT_TO_JSVAL( w ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, thisObj, "height",
+                               INT_TO_JSVAL( h ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            unsigned const pixBytes = w*h*sizeof(unsigned short);
+            unsigned short *pixMap = (unsigned short *)JS_malloc( cx, pixBytes );
+            if( pixMap )
+            {
+               fbDevice_t &fb = getFB();
+               unsigned short const rgb16 = fb.get16( rgb32 );
+               unsigned short *nextOut = pixMap ;
+               for( unsigned r = 0 ; r < h ; r++ )
+                  for( unsigned c = 0 ; c < w ; c++ )
+                     *nextOut++ = rgb32 ;
+               JSString *sPix = JS_NewString( cx, (char *)pixMap, pixBytes );
+               JS_DefineProperty( cx, thisObj, "pixBuf",
+                                  STRING_TO_JSVAL( sPix ),
+                                  0, 0, 
+                                  JSPROP_ENUMERATE
+                                  |JSPROP_PERMANENT
+                                  |JSPROP_READONLY );
+               JS_DefineProperty( cx, thisObj, "isLoaded",
+                                  JSVAL_TRUE,
+                                  0, 0, 
+                                  JSPROP_ENUMERATE
+                                  |JSPROP_PERMANENT
+                                  |JSPROP_READONLY );
+
+            }
+            else
+               JS_ReportError( cx, "Out of memory allocating image" );
          }
          else
-         {
-            JS_ReportError( cx, "Error queueing curlRequest" );
-         }
+            JS_ReportError( cx, usage );
       }
       else
          JS_ReportError( cx, "Error allocating image" );
    }
    else
-      JS_ReportError( cx, "Usage : new image( { url:\"something\" } );" );
+      JS_ReportError( cx, usage );
       
    return JS_TRUE ;
 
