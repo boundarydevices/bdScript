@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.7 2002-12-02 15:06:59 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.8 2003-01-06 04:29:06 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.7  2002-12-02 15:06:59  ericn
+ * Revision 1.8  2003-01-06 04:29:06  ericn
+ * -streamlined
+ *
+ * Revision 1.7  2002/12/02 15:06:59  ericn
  * -removed debug stuff
  *
  * Revision 1.6  2002/12/02 15:05:54  ericn
@@ -89,39 +92,24 @@ bool mtQueue_t<T>::pull( T &item )
    int err = pthread_mutex_lock( &mutex_ );
    if( 0 == err )
    {
-      if( !abort_ && list_.empty() )
+      while( !abort_ && list_.empty() )
       {
-         while( 0 == pthread_cond_wait( &cond_, &mutex_ ) )
-         {
-            if( !list_.empty() )
-            {
-               item = list_.front();
-               list_.pop_front();
-               pthread_mutex_unlock( &mutex_ );
-               return true ;
-            }
-            else if( abort_ )
-            {
-               pthread_mutex_unlock( &mutex_ );
-               return false ;
-            }
-         }
-         
-         pthread_mutex_unlock( &mutex_ );
-         return false ;
+         pthread_cond_wait( &cond_, &mutex_ );
       }
-      else if( !abort_ )
+      
+      bool result ;
+      if( !abort_ )
       {
          item = list_.front();
          list_.pop_front();
-         pthread_mutex_unlock( &mutex_ );
-         return true ;
+         result = true ;
       } // no need to wait
       else
-      {
-         pthread_mutex_unlock( &mutex_ );
-         return false ;
-      }
+         result = false ;
+      
+      pthread_mutex_unlock( &mutex_ );
+      
+      return result ;
    }
    else
    {
