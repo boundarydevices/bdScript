@@ -182,6 +182,11 @@ ffTest: ffTest.cpp $(LIB)
 	$(NM) --demangle $@ | sort >$@.sym
 	$(STRIP) $@
 
+mpeg2mp3: mpeg2mp3.cpp $(LIB)
+	$(CC) $(IFLAGS) -ggdb -o mpeg2mp3 -Xlinker -Map -Xlinker mpeg2mp3.map mpeg2mp3.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lstdc++
+	$(NM) --demangle $@ | sort >$@.sym
+	$(STRIP) $@
+
 cbmGraph: cbmGraph.cpp
 	$(CC) $(IFLAGS) -o cbmGraph -Xlinker -Map -Xlinker cbmGraph.map cbmGraph.cpp $(LIBS)
 	$(STRIP) $@
