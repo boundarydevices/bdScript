@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.7 2002-11-30 16:29:14 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.8 2002-12-02 15:09:23 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.7  2002-11-30 16:29:14  ericn
+ * Revision 1.8  2002-12-02 15:09:23  ericn
+ * -added bookkeeping for callbacks
+ *
+ * Revision 1.7  2002/11/30 16:29:14  ericn
  * -fixed locking and allocation of requests
  *
  * Revision 1.6  2002/11/30 05:27:32  ericn
@@ -156,6 +159,13 @@ struct jsCurlRequest_t {
    typedef void (*onProgress_t)( jsCurlRequest_t &,
                                  unsigned long totalReadSoFar );
 
+   enum status_e {
+      inTransit_,
+      completed_,
+      failed_,
+      cancelled_
+   };
+
    //
    // all of these fields must be filled in by the caller of queueCurlRequest
    //
@@ -167,6 +177,22 @@ struct jsCurlRequest_t {
    JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
    bool                 async_ ;
    bool                 isComplete_ ;
+   status_e             status_ ;
+   
+   //
+   // only valid if status_ == completed_ 
+   //
+   void const          *data_ ;
+   unsigned long        length_ ;
+   unsigned long        handle_ ;
+
+   //
+   // only valid if status_ == failed_
+   //
+   std::string          errorMsg_ ;
+
+   unsigned long        expectedSize_ ;
+   unsigned long        bytesSoFar_ ;
 
    pthread_t            callingThread_ ;
 
@@ -183,6 +209,8 @@ struct jsCurlRequest_t {
    onSize_t     onSize_ ; 
    onProgress_t onProgress_ ;
 
+   ~jsCurlRequest_t( void );
+
 private:
    jsCurlRequest_t( JSObject    *lhObj, 
                     JSObject    *rhObj, 
@@ -193,11 +221,7 @@ private:
                     onCancel_t   onCancel,
                     onSize_t     onSize,
                     onProgress_t onProgress );
-   ~jsCurlRequest_t( void );
 
-   friend void jsCurlOnComplete( jsCurlRequest_t &, void const *data, unsigned long numRead );
-   friend void jsCurlOnFailure( jsCurlRequest_t &, std::string const &errorMsg );
-   friend void jsCurlOnCancel( jsCurlRequest_t & );
    friend bool queueCurlRequest( JSObject    *lhObj, 
                                  JSObject    *rhObj, 
                                  JSContext   *cx,
