@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.11  2002-12-26 19:26:59  ericn
+ * Revision 1.12  2002-12-26 19:41:14  ericn
+ * -removed debug statements
+ *
+ * Revision 1.11  2002/12/26 19:26:59  ericn
  * -added onMoveOff support
  *
  * Revision 1.10  2002/12/26 19:04:26  ericn
@@ -201,7 +204,7 @@ static void doOnMove( void *data )
          executeCode( thread_->scope_, onMoveCode_, "onMove" );
       else
       {
-         printf( "no touch handler %u/%u\n", x, y );
+//         printf( "no touch handler %u/%u\n", x, y );
 //         dumpZMaps();
       }
    } // no boxes... look for global handler
@@ -238,8 +241,8 @@ static void doOnTouch( void *data )
             executeCode( thread_->scope_, onTouchCode_, "onTouch" );
          else
          {
-            printf( "no touch handler %u/%u\n", x, y );
-   //         dumpZMaps();
+//            printf( "no touch handler %u/%u\n", x, y );
+//            dumpZMaps();
          }
       } // no boxes... look for global handler
    
