@@ -14,13 +14,16 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        popen.o jsPopen.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
        jsFileIO.o
 
+CC=arm-linux-gcc
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L./ -L../install/arm-linux/lib
-   IFLAGS=-I../install/arm-linux/include/nspr -I../install/arm-linux/include/freetype2 \
+   IFLAGS=-I../install/arm-linux/include/nspr \
+          -I../install/arm-linux/include/freetype2 \
+          -I../install/arm-linux/include \
           -I../linux-2.4.19/include -I../ffmpeg-0.4.6/libavformat -I../ffmpeg-0.4.6/libavcodec
    LIB = ../install/arm-linux/lib/libCurlCache.a
 else
