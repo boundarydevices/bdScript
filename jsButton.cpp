@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.18  2003-02-07 03:01:33  ericn
+ * Revision 1.19  2003-02-07 04:41:35  ericn
+ * -removed audio cancel on press/release
+ *
+ * Revision 1.18  2003/02/07 03:01:33  ericn
  * -made freeTypeLibrary_t internal and persistent
  *
  * Revision 1.17  2003/02/01 18:14:54  ericn
@@ -284,8 +287,8 @@ static void buttonTouch( box_t         &box,
    if( ( 0 != button->touchSoundData_ ) && ( 0 != button->touchSoundLength_ ) )
    {
       audioQueue_t &q = getAudioQueue();
-      unsigned numCancelled ;
-      q.clear( numCancelled );
+//      unsigned numCancelled ;
+//      q.clear( numCancelled );
       q.queuePlayback( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
    }
 
@@ -338,8 +341,8 @@ static void buttonRelease( box_t         &box,
    if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
    {
       audioQueue_t &q = getAudioQueue();
-      unsigned numCancelled ;
-      q.clear( numCancelled );
+//      unsigned numCancelled ;
+//      q.clear( numCancelled );
       q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
    }
 
