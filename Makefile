@@ -16,7 +16,7 @@ ifneq (,$(findstring arm, $(CC)))
    AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
-   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/freetype2
+   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
 else
    CC=gcc
    AR=ar
@@ -62,11 +62,11 @@ testJS.o: testJS.cpp Makefile
 	$(CC) -c $(IFLAGS) -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
 testJS: testJS.o $(LIB)
-	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	$(STRIP) testJS
 
 testEvents: testEvents.o $(LIB)
-	$(CC) -o testEvents testEvents.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	$(CC) -o testEvents testEvents.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm testEvents >testEvents.map
 	$(STRIP) testEvents
 
@@ -74,7 +74,7 @@ ftRender.o: ftObjs.h ftObjs.cpp Makefile
 	$(CC) -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
 
 ftRender: ftRender.o $(LIB)
-	$(CC) -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	$(CC) -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
