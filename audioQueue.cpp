@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.24  2003-07-30 20:26:03  ericn
+ * Revision 1.25  2003-08-01 14:26:28  ericn
+ * -better error msg
+ *
+ * Revision 1.24  2003/07/30 20:26:03  ericn
  * -added MPEG support
  *
  * Revision 1.23  2003/07/29 20:03:56  tkisky
@@ -871,7 +874,7 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                               int numWritten = write( writeFd, samples, bytesToWrite );
                               if( numWritten != bytesToWrite )
                               {
-                                 fprintf( stderr, "!!! short write !!!\n" );
+                                 fprintf( stderr, "!!! short write %u/%u\n", numWritten, bytesToWrite );
                                  return 0 ;
                               }
                   
