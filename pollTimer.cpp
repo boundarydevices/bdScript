@@ -2,14 +2,17 @@
  * Module pollTimer.cpp
  *
  * This module defines the methods of the pollTimer_t
- * class, as well as a timer-based pollHandler_t for 
+ * class, as well as a timer-based pollHandler_t for
  * use in implementing it.
  *
  *
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
- * Revision 1.1  2003-12-27 18:38:08  ericn
+ * Revision 1.2  2004-09-09 21:02:36  tkisky
+ * -error msg /dev/timer not found
+ *
+ * Revision 1.1  2003/12/27 18:38:08  ericn
  * -Initial import
  *
  *
@@ -29,8 +32,8 @@ static timerPollHandler_t *timer_ = 0 ;
 
 class timerPollHandler_t : public pollHandler_t {
 public:
-   timerPollHandler_t( pollHandlerSet_t &set )
-      : pollHandler_t( open( "/dev/timer", O_RDONLY|O_NONBLOCK ), set )
+   timerPollHandler_t( int fd, pollHandlerSet_t &set )
+      : pollHandler_t( fd, set )
       , head_( 0 )
    {
       setMask( POLLIN );
@@ -68,8 +71,8 @@ void timerPollHandler_t :: onDataAvail( void )
 {
    bool fired = false ;
    long long const now = tickMs();
-   while( ( 0 != head_ ) 
-          && 
+   while( ( 0 != head_ )
+          &&
           ( 0 <= (now-head_->expiration_) ) )
    {
       pollTimer_t *temp = head_ ;
@@ -141,8 +144,11 @@ void timerPollHandler_t :: remove( pollTimer_t &pt )
 
 pollHandler_t &getTimerPoll( pollHandlerSet_t &set )
 {
-   if( 0 == timer_ )
-      timer_ = new timerPollHandler_t( set );
+   if( 0 == timer_ ) {
+      int fd = open( "/dev/timer", O_RDONLY|O_NONBLOCK );
+      if (fd >= 0) timer_ = new timerPollHandler_t( fd,set );
+      else printf("!!!!!device /dev/timer not found\n");
+   }
    return *timer_ ;
 }
 
