@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.2  2002-10-24 13:17:56  ericn
+ * Revision 1.3  2002-10-25 04:49:11  ericn
+ * -removed debug statements
+ *
+ * Revision 1.2  2002/10/24 13:17:56  ericn
  * -modified to prevent pxafb complaints
  *
  * Revision 1.1  2002/10/15 05:01:47  ericn
@@ -80,7 +83,7 @@ fbDevice_t :: fbDevice_t( char const *name )
 
    if( 0 <= fd_ )
    {
-      printf( "device %s opened\n", name );
+//      printf( "device %s opened\n", name );
       struct fb_fix_screeninfo fixed_info;
       int err = ioctl( fd_, FBIOGET_FSCREENINFO, &fixed_info);
       if( 0 == err )

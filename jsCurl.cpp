@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.6  2002-10-15 05:00:39  ericn
+ * Revision 1.7  2002-10-25 04:49:05  ericn
+ * -removed debug statements
+ *
+ * Revision 1.6  2002/10/15 05:00:39  ericn
  * -added error messages
  *
  * Revision 1.5  2002/10/13 15:52:28  ericn
@@ -200,7 +203,6 @@ curlGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
          || 
          JSVAL_IS_BOOLEAN( argv[1] ) ) )   // second parameter must be boolean
    {
-      printf( "have url parameter\n" );
       JSString *str = JS_ValueToString( cx, argv[0] );
       if( str )
       {

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.3  2002-10-16 02:03:19  ericn
+ * Revision 1.4  2002-10-25 04:50:58  ericn
+ * -removed debug statements
+ *
+ * Revision 1.3  2002/10/16 02:03:19  ericn
  * -Added GIF support
  *
  * Revision 1.2  2002/10/15 05:00:14  ericn
@@ -88,7 +91,7 @@ imagePNG(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
          png_bytep pngData = (png_bytep)JS_GetStringBytes( str );
          unsigned const pngLength = JS_GetStringLength(str);
-         printf( "have image string : length %u\n", pngLength );
+//         printf( "have image string : length %u\n", pngLength );
          if( 8 < pngLength )
          {
             if( 0 == png_sig_cmp( pngData, 0, pngLength ) )
@@ -145,13 +148,13 @@ imagePNG(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                               fbDevice_t &fb = getFB();
                               if( startY + height > fb.getHeight() )
                               {
-                                 printf( "truncate to screen height %u\n", fb.getHeight() );
+//                                 printf( "truncate to screen height %u\n", fb.getHeight() );
                                  height = fb.getHeight() - startY ;
                               }
 
                               if( startX + width > fb.getWidth() )
                               {
-                                 printf( "truncate to screen width %u\n", fb.getWidth() );
+//                                 printf( "truncate to screen width %u\n", fb.getWidth() );
                                  width = fb.getWidth() - startX ;
                               }
 
@@ -185,12 +188,10 @@ imagePNG(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                }
             }
             else
-               printf( "Not a PNG file\n" );
+               fprintf( stderr, "Not a PNG file\n" );
          }
          else
-         {
-            printf( "PNG too short!\n" );
-         }
+            fprintf( stderr, "PNG too short!\n" );
       } // retrieved string
 
       *rval = JSVAL_FALSE ;
@@ -219,7 +220,7 @@ static void jpg_init_source( j_decompress_ptr cinfo )
 {
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    pSrc->numRead_ = 0 ;
-printf( "init_source\n" );
+//printf( "init_source\n" );
 }
 
 static boolean jpg_fill_input_buffer( j_decompress_ptr cinfo )
@@ -228,7 +229,7 @@ static boolean jpg_fill_input_buffer( j_decompress_ptr cinfo )
    cinfo->src->bytes_in_buffer = pSrc->length_ - pSrc->numRead_ ;
    cinfo->src->next_input_byte = pSrc->data_ + pSrc->numRead_ ;
    pSrc->numRead_ = cinfo->src->bytes_in_buffer ;
-printf( "fill input\n" );
+//printf( "fill input\n" );
    return ( 0 < cinfo->src->bytes_in_buffer );
 }
 
@@ -239,12 +240,12 @@ static void jpg_skip_input_data( j_decompress_ptr cinfo, long num_bytes )
    if( left > num_bytes )
       num_bytes = left ;
    pSrc->numRead_ += num_bytes ;
-printf( "skip input : %u/%ld\n", pSrc->numRead_, num_bytes );
+//printf( "skip input : %u/%ld\n", pSrc->numRead_, num_bytes );
 }
 
 static boolean jpg_resync_to_restart( j_decompress_ptr cinfo, int desired )
 {
-printf( "resync to restart\n" );
+//printf( "resync to restart\n" );
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    pSrc->numRead_ = 0 ;
 }
@@ -289,7 +290,7 @@ imageJPEG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
          JOCTET const *jpegData = (JOCTET *)JS_GetStringBytes( str );
          unsigned const jpegLength = JS_GetStringLength(str);
-         printf( "display %u bytes of JPEG %p at %u,%u\n", jpegLength, jpegData, startX, startY );
+//         printf( "display %u bytes of JPEG %p at %u,%u\n", jpegLength, jpegData, startX, startY );
          
          struct jpeg_decompress_struct cinfo;
          struct jpeg_error_mgr jerr;
@@ -318,11 +319,13 @@ imageJPEG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          jpeg_read_header(&cinfo, TRUE);
          cinfo.out_color_space = JCS_RGB ;
          jpeg_start_decompress(&cinfo);
+/*
          printf( "started decompress\n" );
          printf( "width %u, height %u\n", cinfo.output_width, cinfo.output_height );
          printf( "output components %u\n", cinfo.output_components );
+*/
          int row_stride = cinfo.output_width * cinfo.output_components;
-         printf( "row stride %d\n", row_stride );
+//         printf( "row stride %d\n", row_stride );
 
          JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)( (j_common_ptr)&cinfo,
                                                          JPOOL_IMAGE,
@@ -337,21 +340,20 @@ imageJPEG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          unsigned drawHeight = imageHeight ;
 
          fbDevice_t &fb = getFB();
-         printf( "opened framebuffer\n" );
          if( startY + drawHeight > fb.getHeight() )
          {
-            printf( "truncate to screen drawHeight %u\n", fb.getHeight() );
+//            printf( "truncate to screen drawHeight %u\n", fb.getHeight() );
             drawHeight = fb.getHeight() - startY ;
          }
 
          if( startX + drawWidth > fb.getWidth() )
          {
-            printf( "truncate to screen drawWidth %u\n", fb.getWidth() );
+//            printf( "truncate to screen drawWidth %u\n", fb.getWidth() );
             drawWidth = fb.getWidth() - startX ;
          }
 //                              printf( "writing %u x %u pixels\n", imageWidth, imageHeight );
 
-         printf( "image %u x %u, %u x %u\n", imageWidth, imageHeight, drawWidth, drawHeight );
+//         printf( "image %u x %u, %u x %u\n", imageWidth, imageHeight, drawWidth, drawHeight );
          // read the scanlines
          for( unsigned row = 0 ; row < imageHeight ; row++ )
          {
@@ -563,29 +565,35 @@ imageGIF( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          GifFileType *fGIF = DGifOpen( &src, gifRead );
          if( fGIF )
          {   
-            printf( "opened GIF structure\n" );
+//            printf( "opened GIF structure\n" );
             if( GIF_OK == DGifSlurp( fGIF ) )
             {
                fbDevice_t &fb = getFB();
+/*
                printf( "read GIF successfully\n" );
                printf( "   width %d, height %d\n", fGIF->SWidth, fGIF->SHeight );
                printf( "   colorRes %d\n", fGIF->SColorResolution );
                printf( "   bgColor  %d\n", fGIF->SBackGroundColor );
                printf( "   SColorMap %p\n", fGIF->SColorMap );
+*/               
                if( fGIF->SColorMap )
                   fixupColorMap( fb, *fGIF->SColorMap );
 
+/*
                printf( "   imgCount %d\n", fGIF->ImageCount );
                printf( "   Left,Top,Width,Height = %d,%d,%d,%d\n", fGIF->Image.Left, fGIF->Image.Top, fGIF->Image.Width, fGIF->Image.Height );
                printf( "   %s\n", fGIF->Image.Interlace ? "Interlaced" : "Not interlaced" );
                printf( "   Image.ColorMap %p\n", fGIF->Image.ColorMap );
+*/               
                for( int i = 0 ; i < fGIF->ImageCount ; i++ )
                {
-                  printf( "   --- Image %d ---\n", i );
+//                  printf( "   --- Image %d ---\n", i );
                   SavedImage const *image = fGIF->SavedImages + i ;
+/*
                   printf( "      Left,Top,Width,Height = %d,%d,%d,%d\n", image->ImageDesc.Left, image->ImageDesc.Top, image->ImageDesc.Width, image->ImageDesc.Height );
                   printf( "      %s\n", image->ImageDesc.Interlace ? "Interlaced" : "Not interlaced" );
                   printf( "      ColorMap %p\n", image->ImageDesc.ColorMap );
+*/                  
                   ColorMapObject *colorMap ;
                   if( image->ImageDesc.ColorMap )
                   {
@@ -595,21 +603,22 @@ imageGIF( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                   else 
                      colorMap = fGIF->SColorMap ;
 
-                  printf( "      bits %p\n", image->RasterBits );
+//                  printf( "      bits %p\n", image->RasterBits );
                   if( colorMap )
                   {
-                     printf( "      using map %p\n", colorMap );
+//                     printf( "      using map %p\n", colorMap );
                      displayGIF( fb, *colorMap, *image, startX, startY );
                   }
-                  else
+/*                  else
                      printf( "      no color map... can't display\n" );
+*/                     
 
                }
             }
             DGifCloseFile( fGIF );
          }
          else
-            printf( "Error opening GIF\n" );
+            fprintf( stderr, "Error opening GIF\n" );
 
       } // retrieved string
 
