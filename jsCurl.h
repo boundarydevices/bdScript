@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.8 2002-12-02 15:09:23 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.9 2002-12-03 13:36:13 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.8  2002-12-02 15:09:23  ericn
+ * Revision 1.9  2002-12-03 13:36:13  ericn
+ * -collapsed code and objects for curl transfers
+ *
+ * Revision 1.8  2002/12/02 15:09:23  ericn
  * -added bookkeeping for callbacks
  *
  * Revision 1.7  2002/11/30 16:29:14  ericn
@@ -151,14 +154,6 @@ struct jsCurlRequest_t {
    typedef void (*onComplete_t)( jsCurlRequest_t &,
                                  void const     *data,
                                  unsigned long   numRead );
-   typedef void (*onFailure_t)( jsCurlRequest_t   &,
-                                std::string const &errorMsg );
-   typedef void (*onCancel_t)( jsCurlRequest_t & );
-   typedef void (*onSize_t)( jsCurlRequest_t &,
-                             unsigned long  size );
-   typedef void (*onProgress_t)( jsCurlRequest_t &,
-                                 unsigned long totalReadSoFar );
-
    enum status_e {
       inTransit_,
       completed_,
@@ -170,10 +165,6 @@ struct jsCurlRequest_t {
    // all of these fields must be filled in by the caller of queueCurlRequest
    //
    JSObject            *lhObj_ ;    // generally used for the destination object
-   JSObject            *rhObj_ ;    // generally used to specify the request: 
-                                    //    must be object with at least url property
-                                    //    optional useCache property
-                                    //    optionally urlParams[] array property
    JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
    bool                 async_ ;
    bool                 isComplete_ ;
@@ -197,40 +188,29 @@ struct jsCurlRequest_t {
    pthread_t            callingThread_ ;
 
    //
-   // one of these called when transfer terminates. Specify zero to use default
+   // This is called when(if) transfer terminates to process data
    //
    onComplete_t onComplete_ ;
-   onFailure_t  onFailure_ ;
-   onCancel_t   onCancel_ ;
    
-   //
-   // these are called to indicate forward movement
-   //
-   onSize_t     onSize_ ; 
-   onProgress_t onProgress_ ;
-
    ~jsCurlRequest_t( void );
 
 private:
-   jsCurlRequest_t( JSObject    *lhObj, 
-                    JSObject    *rhObj, 
-                    JSContext   *cx,
-                    bool         async,
-                    onComplete_t onComplete,
-                    onFailure_t  onFailure,
-                    onCancel_t   onCancel,
-                    onSize_t     onSize,
-                    onProgress_t onProgress );
+   jsCurlRequest_t( JSObject    *lhObj,         // input : newly constructed object
+                    JSContext   *cx,            // input : JS execution context
+                    bool         async,         // input : asynchronous call?  
+                    onComplete_t onComplete );  // input : post-processor for completion
 
-   friend bool queueCurlRequest( JSObject    *lhObj, 
-                                 JSObject    *rhObj, 
-                                 JSContext   *cx,
-                                 bool         async,
-                                 onComplete_t onComplete = 0,
-                                 onFailure_t  onFailure = 0,
-                                 onCancel_t   onCancel = 0,
-                                 onSize_t     onSize = 0,
-                                 onProgress_t onProgress = 0 );
+   //
+   // This routine saves initializer values into lhObj->initializer and queues
+   // the file for transfer (possibly immediate return).
+   //
+   // When (if) transfer completes, the onComplete call is made to perform type-specific
+   // parsing of the data. 
+   //
+   friend bool queueCurlRequest( JSObject    *lhObj,        // input : newly constructed object
+                                 jsval        initializer,  // input : right-hand size of constructor or function
+                                 JSContext   *cx,           // input : JS execution context
+                                 onComplete_t onComplete = 0 ); // input : post-processor for completion
 };
 
 bool initJSCurl( JSContext *cx, JSObject *glob );

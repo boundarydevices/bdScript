@@ -104,11 +104,15 @@ Work to be done:
       jsCurl - onLoad, onLoadError, onCancel, onSize, onProgress
          as mentioned before, this routine/module/class currently has references 
          to two GC-objects, the left and right hand objects, but they can 
-         be collapsed into a single object. 
+         be collapsed into a single object (done). 
 
-         The code that depends on this also requires a bunch of C++ post-processing 
-         before handlers are invoked and allows synchronous calls (i.e. intercepted
-         callbacks).
+         The code that depends on this also requires C++ post-processing before handlers 
+         are invoked and allows synchronous calls (i.e. intercepted callbacks).
+
+         An object of type jsCurlRequest_t is initialized and passed by reference through
+         the Curl Cache queues to the completion handler. Its' constructor and destructor
+         have been modified to add and remove roots for the object representing the 
+         file.
 
    The curl completion handlers (called by ccActiveURL) also currently store
    member data (image,text,MP3 parsing).

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.10  2002-11-30 16:26:50  ericn
+ * Revision 1.11  2002-12-03 13:36:13  ericn
+ * -collapsed code and objects for curl transfers
+ *
+ * Revision 1.10  2002/11/30 16:26:50  ericn
  * -better error checking, new curl interface
  *
  * Revision 1.9  2002/11/30 05:30:16  ericn
@@ -784,21 +787,8 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
-         JS_DefineProperty( cx, thisObj, "isLoaded",
-                            JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, thisObj, "initializer",
-                            argv[0],
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
-         if( queueCurlRequest( thisObj, rhObj, cx, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ), fontOnComplete ) )
+         if( queueCurlRequest( thisObj, argv[0], cx, fontOnComplete ) )
          {
             return JS_TRUE ;
          }

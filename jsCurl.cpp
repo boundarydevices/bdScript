@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.16  2002-12-02 15:19:22  ericn
+ * Revision 1.17  2002-12-03 13:36:13  ericn
+ * -collapsed code and objects for curl transfers
+ *
+ * Revision 1.16  2002/12/02 15:19:22  ericn
  * -two-level callback with code queue filter
  *
  * Revision 1.15  2002/11/30 23:45:27  ericn
@@ -125,21 +128,7 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
          
-         JS_DefineProperty( cx, thisObj, "isLoaded",
-                            JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, thisObj, "initializer",
-                            argv[0],
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
-         
-         if( queueCurlRequest( thisObj, rhObj, cx, (cx->fp->flags & JSFRAME_CONSTRUCTING), curlFileOnComplete ) ) 
+         if( queueCurlRequest( thisObj, argv[0], cx, curlFileOnComplete ) ) 
          {
             return JS_TRUE ;
          }
@@ -191,12 +180,22 @@ static void cbOnComplete( void *cbParam )
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   jsval handlerVal ;
-   if( JS_GetProperty( req.cx_, req.rhObj_, "onLoad", &handlerVal ) 
-       && 
-       JSVAL_IS_STRING( handlerVal ) )
+   jsval rhval ;
+   if( JS_GetProperty( req.cx_, 
+                       req.lhObj_, 
+                       "initializer",
+                       &rhval ) 
+       &&
+       JSVAL_IS_OBJECT( rhval ) )
    {
-      executeCode( req.lhObj_, handlerVal, "curlRequest::onLoad" );
+      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
+      jsval handlerVal ;
+      if( JS_GetProperty( req.cx_, rhObj, "onLoad", &handlerVal ) 
+          && 
+          JSVAL_IS_STRING( handlerVal ) )
+      {
+         executeCode( req.lhObj_, handlerVal, "curlRequest::onLoad" );
+      }
    }
 
    getCurlCache().closeHandle( req.handle_ );
@@ -220,15 +219,22 @@ static void cbOnFailure( void *cbParam )
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   if( 0 != req.onFailure_ )
-      req.onFailure_( req, req.errorMsg_ );
-
-   jsval handlerVal ;
-   if( JS_GetProperty( req.cx_, req.rhObj_, "onLoadError", &handlerVal ) 
-       && 
-       JSVAL_IS_STRING( handlerVal ) )
+   jsval rhval ;
+   if( JS_GetProperty( req.cx_, 
+                       req.lhObj_, 
+                       "initializer",
+                       &rhval ) 
+       &&
+       JSVAL_IS_OBJECT( rhval ) )
    {
-      executeCode( req.lhObj_, handlerVal, "curlRequest::onLoadError" );
+      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
+      jsval handlerVal ;
+      if( JS_GetProperty( req.cx_, rhObj, "onLoadError", &handlerVal ) 
+          && 
+          JSVAL_IS_STRING( handlerVal ) )
+      {
+         executeCode( req.lhObj_, handlerVal, "curlRequest::onLoadError" );
+      }
    }
    
    delete &req ;
@@ -240,15 +246,22 @@ static void cbOnCancel( void *cbParam )
    req.status_     = req.cancelled_ ;
    req.isComplete_ = true ;
 
-   if( 0 != req.onCancel_  )
-      req.onCancel_( req );
-   
-   jsval handlerVal ;
-   if( JS_GetProperty( req.cx_, req.rhObj_, "onCancel", &handlerVal ) 
-       && 
-       JSVAL_IS_STRING( handlerVal ) )
+   jsval rhval ;
+   if( JS_GetProperty( req.cx_, 
+                       req.lhObj_, 
+                       "initializer",
+                       &rhval ) 
+       &&
+       JSVAL_IS_OBJECT( rhval ) )
    {
-      executeCode( req.lhObj_, handlerVal, "curlRequest::onCancel" );
+      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
+      jsval handlerVal ;
+      if( JS_GetProperty( req.cx_, rhObj, "onCancel", &handlerVal ) 
+          && 
+          JSVAL_IS_STRING( handlerVal ) )
+      {
+         executeCode( req.lhObj_, handlerVal, "curlRequest::onCancel" );
+      }
    }
 
    delete &req ;
@@ -266,15 +279,22 @@ static void cbOnSize( void *cbParam )
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   if( 0 != req.onSize_ )
-      req.onSize_( req, req.expectedSize_ );
-
-   jsval handlerVal ;
-   if( JS_GetProperty( req.cx_, req.rhObj_, "onSize", &handlerVal ) 
-       && 
-       JSVAL_IS_STRING( handlerVal ) )
+   jsval rhval ;
+   if( JS_GetProperty( req.cx_, 
+                       req.lhObj_, 
+                       "initializer",
+                       &rhval ) 
+       &&
+       JSVAL_IS_OBJECT( rhval ) )
    {
-      executeCode( req.lhObj_, handlerVal, "curlRequest::onSize" );
+      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
+      jsval handlerVal ;
+      if( JS_GetProperty( req.cx_, rhObj, "onSize", &handlerVal ) 
+          && 
+          JSVAL_IS_STRING( handlerVal ) )
+      {
+         executeCode( req.lhObj_, handlerVal, "curlRequest::onSize" );
+      }
    }
 }
 
@@ -291,15 +311,22 @@ static void cbOnProgress( void *cbParam )
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   if( 0 != req.onProgress_ )
-      req.onProgress_( req, req.bytesSoFar_ );
-   
-   jsval handlerVal ;
-   if( JS_GetProperty( req.cx_, req.rhObj_, "onProgress", &handlerVal ) 
-       && 
-       JSVAL_IS_STRING( handlerVal ) )
+   jsval rhval ;
+   if( JS_GetProperty( req.cx_, 
+                       req.lhObj_, 
+                       "initializer",
+                       &rhval ) 
+       &&
+       JSVAL_IS_OBJECT( rhval ) )
    {
-      executeCode( req.lhObj_, handlerVal, "curlRequest::onProgress" );
+      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
+      jsval handlerVal ;
+      if( JS_GetProperty( req.cx_, rhObj, "onProgress", &handlerVal ) 
+          && 
+          JSVAL_IS_STRING( handlerVal ) )
+      {
+         executeCode( req.lhObj_, handlerVal, "curlRequest::onProgress" );
+      }
    }
 }
 
@@ -348,16 +375,10 @@ static curlCallbacks_t const defaultCallbacks_ = {
 
 jsCurlRequest_t :: jsCurlRequest_t
    ( JSObject    *lhObj, 
-     JSObject    *rhObj, 
      JSContext   *cx,
      bool         async,
-     onComplete_t onComplete,
-     onFailure_t  onFailure,
-     onCancel_t   onCancel,
-     onSize_t     onSize,
-     onProgress_t onProgress )
+     onComplete_t onComplete )
    : lhObj_( lhObj ),
-     rhObj_( rhObj ),
      cx_( cx ),
      async_( async ),
      isComplete_( false ),
@@ -369,16 +390,14 @@ jsCurlRequest_t :: jsCurlRequest_t
      expectedSize_( 0 ),
      bytesSoFar_( 0 ),
      callingThread_( pthread_self() ),
-     onComplete_( onComplete ),
-     onFailure_( onFailure ),
-     onCancel_( onCancel ),
-     onSize_( onSize ),
-     onProgress_( onProgress )
+     onComplete_( onComplete )
 {
+   JS_AddRoot( cx, &lhObj_ );
 }
 
 jsCurlRequest_t :: ~jsCurlRequest_t( void )
 {
+   JS_RemoveRoot( cx_, &lhObj_ );
    memset( this, 0, sizeof( this ) );
 }
 
@@ -413,22 +432,32 @@ private:
 
 bool queueCurlRequest
    ( JSObject                     *lhObj, 
-     JSObject                     *rhObj, 
+     jsval                         initializer,
      JSContext                    *cx,
-     bool                          async,
-     jsCurlRequest_t::onComplete_t onComplete,
-     jsCurlRequest_t::onFailure_t  onFailure,
-     jsCurlRequest_t::onCancel_t   onCancel,
-     jsCurlRequest_t::onSize_t     onSize,
-     jsCurlRequest_t::onProgress_t onProgress)
+     jsCurlRequest_t::onComplete_t onComplete )
 {
-   jsCurlRequest_t &request = *( new jsCurlRequest_t( lhObj, rhObj, cx, async, 
-                                                      onComplete, onFailure, onCancel, 
-                                                      onSize, onProgress ) );
+   bool const async = (cx->fp->flags & JSFRAME_CONSTRUCTING);
+   
+   JS_DefineProperty( cx, lhObj, "isLoaded",
+                      JSVAL_FALSE,
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+
+   JS_DefineProperty( cx, lhObj, "initializer",
+                      initializer,
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
+   JSObject *const rhObj = JSVAL_TO_OBJECT( initializer );
+      
+   jsCurlRequest_t &request = *( new jsCurlRequest_t( lhObj, cx, async, onComplete ) );
    jsval urlVal ;
    JSString *propStr ;
 
-   if( JS_GetProperty( request.cx_, request.rhObj_, "url", &urlVal ) 
+   if( JS_GetProperty( request.cx_, rhObj, "url", &urlVal ) 
        &&
        JSVAL_IS_STRING( urlVal ) 
        &&
@@ -444,7 +473,7 @@ bool queueCurlRequest
          bool useCache = true ;
          jsval  useCacheVal ;
          JSBool jsUseCache ;
-         if( JS_GetProperty( request.cx_, request.rhObj_, "useCache", &useCacheVal ) 
+         if( JS_GetProperty( request.cx_, rhObj, "useCache", &useCacheVal ) 
              &&
              JSVAL_IS_BOOLEAN( useCacheVal )
              && 
@@ -457,7 +486,7 @@ bool queueCurlRequest
 
          jsval     paramArrVal ;
          JSObject *paramArr ;
-         if( JS_GetProperty( request.cx_, request.rhObj_, "urlParams", &paramArrVal ) 
+         if( JS_GetProperty( request.cx_, rhObj, "urlParams", &paramArrVal ) 
              &&
              JSVAL_IS_OBJECT( paramArrVal ) 
              &&

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.15  2002-11-30 18:52:57  ericn
+ * Revision 1.16  2002-12-03 13:36:13  ericn
+ * -collapsed code and objects for curl transfers
+ *
+ * Revision 1.15  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.14  2002/11/30 16:26:33  ericn
@@ -72,7 +75,6 @@
 static JSBool
 jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "playing file\n" );
    jsval                dataVal ;
    JSString            *dataStr ;
    unsigned char const *data ;
@@ -234,23 +236,7 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
-         
-         JS_DefineProperty( cx, thisObj, "isLoaded",
-                            JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, thisObj, "initializer",
-                            argv[0],
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
-         
-printf( "retrieving MP3\n" );
-         if( queueCurlRequest( thisObj, rhObj, cx, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ), mp3OnComplete ) )
+         if( queueCurlRequest( thisObj, argv[0], cx, mp3OnComplete ) )
          {
             return JS_TRUE ;
          }
@@ -258,7 +244,6 @@ printf( "retrieving MP3\n" );
          {
             JS_ReportError( cx, "Error queueing curlRequest" );
          }
-printf( "done\n" );
       }
       else
          JS_ReportError( cx, "Error allocating mp3File" );
