@@ -11,8 +11,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        relativeURL.o tsThread.o ultoa.o \
        ultodd.o box.o urlFile.o zOrder.o \
        ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
-       popen.o jsPopen.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
-       voQueue.o
+       popen.o jsPopen.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o 
 
 
 ifneq (,$(findstring arm, $(CC)))
@@ -159,7 +158,7 @@ ffPlay: ffPlay.cpp $(LIB)
 	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc
+all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay
 
 .PHONY: install-libs install-headers
 
