@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlThread.cpp,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-02 04:12:00  ericn
+ * -modified to set isLoaded flag
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -17,7 +20,6 @@
 
 
 #include "curlThread.h"
-#include "testEvents.h"
 #include "js/jsapi.h"
 #include "mtQueue.h"
 #include "codeQueue.h"
@@ -177,6 +179,14 @@ static void *readerThread( void *arg )
          if( f.isOpen() && ( 200 == f.getHttpCode() ) )
          {
             item.jsRequest_.onComplete( item.jsRequest_, f );
+            JS_DefineProperty( item.jsRequest_.cx_, 
+                               item.jsRequest_.lhObj_, 
+                               "isLoaded",
+                               JSVAL_TRUE,
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
          }
          else
          {
