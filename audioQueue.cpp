@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.27  2003-08-02 19:30:03  ericn
+ * Revision 1.28  2003-08-04 12:37:51  ericn
+ * -added raw MP3 (for flash)
+ *
+ * Revision 1.27  2003/08/02 19:30:03  ericn
  * -modified to allow clipping of video
  *
  * Revision 1.26  2003/08/02 16:13:08  ericn
@@ -351,6 +354,38 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    printf( "%u pictures\n", picCount );
 }
 
+
+//
+// Because I'm lazy and can't figure out the
+// right set of loops for putting audio out, 
+// I'm bailing out and making this a state 
+// machine of sorts based on four inputs:
+//
+//    deviceEmpty - set when fragments==fragstotal
+//    deviceAvail - set when fragments > 0
+//    fragfull    - have a full PCM buffer to write
+//    mp3Avail    - set when we have more input frames
+//
+// deviceEmpty    deviceAvail   fragfull    mp3Avail
+//      0             0             0           0           wait for deviceEmpty
+//      0             0             0           1           pull into frag
+//      0             0             1           0           wait for deviceEmpty
+//      0             0             1           1           wait for fragsavail
+//      0             1             0           0           wait for deviceEmpty
+//      0             1             0           1           pull into frag
+//      0             1             1           0           write to device, wait for deviceEmpty
+//      0             1             1           1           write to device, pull into frag
+//      1             1             0           0           done
+//      1             1             0           1           pull into frag
+//      1             1             1           0           write to device
+//      1             1             1           1           write to device, pull into frag
+// 
+#define DEVICEEMPTY  0x08
+#define DEVICEAVAIL  0x04
+#define FRAGFULL     0x02
+#define MP3AVAIL     0x01
+#define MP3DONE      (DEVICEEMPTY|DEVICEAVAIL)
+
 void *audioThread( void *arg )
 {
 printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
@@ -492,9 +527,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                            break;
                      }
                   } while( !( eof || _cancel || queue->shutdown_ ) );
-      
-                  _playing = false ;
-   
+
                   if( eof )
                   {
                      if( OUTBUFSIZE != spaceLeft )
@@ -534,12 +567,173 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   }
                   queueCallback( audioCallback, item );
                }
+               
+               _playing = false ;
+
                closeWriteFd();
             }
             else
                perror( "audioWriteFd" );
 
 //            printf( "wrote %lu samples\n", numWritten );
+         }
+         else if( audioQueue_t :: mp3Raw_ == item->type_ )
+         {
+            writeFd = openWriteFd();
+            if( 0 < writeFd )
+            {
+printf( "MP3 playback here: callback %p\n", item->callback_ );
+               _playing = true ;
+               
+               audio_buf_info ai ;
+               if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+               {
+                  madDecoder_t mp3Decode ;
+                  unsigned short * samples = 0 ;
+                  unsigned         numFilled = 0 ;
+                  unsigned         maxSamples = 0 ;
+                  mp3Decode.feed( item->data_, item->length_ );
+                  bool firstFrame = true ;
+
+                  unsigned char state = DEVICEEMPTY ;
+                  while( !( _cancel || queue->shutdown_ ) 
+                         &&
+                         ( state != MP3DONE ) )
+                  {
+                     //
+                     // build a new fragment for output
+                     //
+                     while( 0 == ( state & FRAGFULL ) )
+                     {
+                        if( 0 == samples )
+                        {
+                           maxSamples = ai.fragsize/sizeof( samples[0] );
+                           samples = new unsigned short [maxSamples];
+                           numFilled = 0 ;
+                        }
+
+                        if( 0 < mp3Decode.numSamples() )
+                        {
+                           unsigned numRead ;
+                           if( mp3Decode.readSamples( samples+numFilled, maxSamples-numFilled, numRead ) )
+                           {
+                              numFilled += numRead ;
+                              if( maxSamples == numFilled )
+                              {
+                                 state |= FRAGFULL ;
+                                 if( firstFrame )
+                                 {
+                                    firstFrame = false ;
+                                    unsigned nChannels = mp3Decode.numChannels();
+                                    unsigned sampleRate = mp3Decode.sampleRate();
+                                    printf( "mad header: %u channels, %u Hz\n", nChannels, sampleRate );
+                                    if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
+                                       fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+                                    if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
+                                       fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                 }
+                              }
+                           }
+                           else
+                           {
+                           }
+                        } // tail end of previous buffer
+                        else if( mp3Decode.getData() )
+                        {
+                        } // synth next frame?
+                        else if( 0 < numFilled )
+                        {
+                           memset( samples+numFilled, 0, (maxSamples-numFilled)*sizeof(samples[0]) );
+                           numFilled = maxSamples ;
+                           state |= FRAGFULL ;
+                        } // fill to end of frag
+                        else
+                           break;
+                     } // read MP3 input
+            
+                     if( (DEVICEAVAIL|FRAGFULL) == (state & (DEVICEAVAIL|FRAGFULL)) )
+                     {
+                        unsigned const bytesToWrite = numFilled*sizeof(samples[0]);
+                        int numWritten = write( writeFd, samples, bytesToWrite );
+                        if( numWritten != bytesToWrite )
+                        {
+                           fprintf( stderr, "!!! short write %u/%u\n", numWritten, bytesToWrite );
+                           return 0 ;
+                        }
+            
+                        numFilled = 0 ;
+                        state &= ~FRAGFULL ;
+                     } // write data!!!
+            
+                     if( FRAGFULL == (state & (DEVICEAVAIL|FRAGFULL)) )
+                     {
+                        pollfd filedes ;
+                        filedes.fd = writeFd ;
+                        filedes.events = POLLOUT ;
+                        if( 0 < poll( &filedes, 1, 0 ) )
+                        {
+                           if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                           {
+                              if( ai.fragments == ai.fragstotal )
+                                 state |= DEVICEEMPTY ;
+                              else
+                                 state &= ~DEVICEEMPTY ;
+                              if( 0 < ai.fragments )
+                                 state |= DEVICEAVAIL ;
+                              else
+                                 state &= ~DEVICEAVAIL ;
+                           }
+                           else
+                           {
+                              perror( "OSPACE2" );
+                              break;
+                           }
+                        }
+                     } // wait for device available
+                     else if( 0 == (state & (FRAGFULL|MP3AVAIL)) )
+                     {
+                        usleep( 10000 );
+      
+                        if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                        {
+                           if( ai.fragments == ai.fragstotal )
+                              state |= DEVICEEMPTY ;
+                           else
+                              state &= ~DEVICEEMPTY ;
+                           if( 0 < ai.fragments )
+                              state |= DEVICEAVAIL ;
+                           else
+                              state &= ~DEVICEAVAIL ;
+                        }
+                        else
+                        {
+                           perror( "OSPACE3" );
+                           break;
+                        }
+                     } // no more data, wait for empty
+                  } // while !done
+
+                  if( samples )
+                     delete [] samples ;
+
+                  if( !queue->shutdown_ )
+                  {
+                     if( _cancel )
+                        _cancel = false ;
+                     else
+                        item->isComplete_ = true ;
+
+                     if( item->callback_ )
+                        item->callback_( item->callbackParam_ );
+                  }
+               }
+               else
+                  perror( "GETOSPACE" );
+               
+               closeWriteFd();
+            }
+            else
+               perror( "audioWriteFd" );
          }
          else if( audioQueue_t::wavPlay_ == item->type_ )
          {
@@ -751,36 +945,6 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                      if( vFrames.preload() )
                      {
                         unsigned picCount = 0 ;
-                        //
-                        // Because I'm lazy and can't figure out the
-                        // right set of loops for this, I'm bailing out
-                        // and making this a state machine of sorts 
-                        // based on four inputs:
-                        //
-                        //    deviceEmpty - set when fragments==fragstotal
-                        //    deviceAvail - set when fragments > 0
-                        //    fragfull    - have a full PCM buffer to write
-                        //    mp3Avail    - set when we have more input frames
-                        //
-                        // deviceEmpty    deviceAvail   fragfull    mp3Avail
-                        //      0             0             0           0           wait for deviceEmpty
-                        //      0             0             0           1           pull into frag
-                        //      0             0             1           0           wait for deviceEmpty
-                        //      0             0             1           1           wait for fragsavail
-                        //      0             1             0           0           wait for deviceEmpty
-                        //      0             1             0           1           pull into frag
-                        //      0             1             1           0           write to device, wait for deviceEmpty
-                        //      0             1             1           1           write to device, pull into frag
-                        //      1             1             0           0           done
-                        //      1             1             0           1           pull into frag
-                        //      1             1             1           0           write to device
-                        //      1             1             1           1           write to device, pull into frag
-                        // 
-            #define DEVICEEMPTY  0x08
-            #define DEVICEAVAIL  0x04
-            #define FRAGFULL     0x02
-            #define MP3AVAIL     0x01
-            #define MP3DONE      (DEVICEEMPTY|DEVICEAVAIL)
                   
                         unsigned      frameIdx = 0 ;
                         long long     startPTS = 0 ;
@@ -914,13 +1078,8 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                                  else
                                  {
                                     perror( "OSPACE2" );
-                                    return 0 ;
+                                    break ;
                                  }
-                              }
-                              else
-                              {
-                                 perror( "POLL" );
-                                 return 0 ;
                               }
                            } // wait for device available
                            else if( 0 == (state & (FRAGFULL|MP3AVAIL)) )
@@ -941,7 +1100,7 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                               else
                               {
                                  perror( "OSPACE3" );
-                                 return 0 ;
+                                 break ;
                               }
                            } // no more data, wait for empty
                         } // while !done
@@ -1093,6 +1252,25 @@ bool audioQueue_t :: queuePlayback
    JS_AddRoot( execContext_, &item->obj_ );
    JS_AddRoot( execContext_, &item->onComplete_ );
    JS_AddRoot( execContext_, &item->onCancel_ );
+   return queue_.push( item );
+}
+   
+bool audioQueue_t :: queuePlayback
+   ( unsigned char const *data,
+     unsigned             length,
+     void                *cbParam,
+     void (*callback)( void *param ) )
+{
+   item_t *item = new item_t ;
+   item->type_       = mp3Raw_ ;
+   item->obj_        = 0 ;
+   item->data_       = data ;
+   item->length_     = length ;
+   item->onComplete_ = JSVAL_VOID ;
+   item->onCancel_   = JSVAL_VOID ;
+   item->isComplete_ = false ;
+   item->callbackParam_ = cbParam ;
+   item->callback_   = callback ;
    return queue_.push( item );
 }
    

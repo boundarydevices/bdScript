@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.10 2003-08-02 19:30:00 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.11 2003-08-04 12:37:48 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.10  2003-08-02 19:30:00  ericn
+ * Revision 1.11  2003-08-04 12:37:48  ericn
+ * -added raw MP3 (for flash)
+ *
+ * Revision 1.10  2003/08/02 19:30:00  ericn
  * -modified to allow clipping of video
  *
  * Revision 1.9  2003/07/30 20:26:00  ericn
@@ -66,9 +69,10 @@ class audioQueue_t {
 public:
    enum itemType_e {
       mp3Play_    = 0,
-      wavRecord_  = 1,
-      wavPlay_    = 2,
-      mpegPlay_   = 3
+      mp3Raw_     = 1,
+      wavRecord_  = 2,
+      wavPlay_    = 3,
+      mpegPlay_   = 4
    };
 
    struct item_t {
@@ -83,6 +87,8 @@ public:
       unsigned             yPos_ ;
       unsigned             width_ ;
       unsigned             height_ ;
+      void                *callbackParam_ ;
+      void               (*callback_)( void *);
    };
 
    //
@@ -103,6 +109,14 @@ public:
                        unsigned             length,
                        jsval                onComplete = JSVAL_VOID,
                        jsval                onCancel = JSVAL_VOID );
+
+   //
+   // queue raw mp3 data for playback
+   //
+   bool queuePlayback( unsigned char const *data,
+                       unsigned             length,
+                       void                *cbParam,
+                       void (*callback)( void *param ) );
 
    //
    // queue an MPEG video file for playback
