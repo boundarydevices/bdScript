@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.8  2003-10-17 05:59:04  ericn
+ * Revision 1.9  2003-10-18 16:37:03  ericn
+ * -added logo
+ *
+ * Revision 1.8  2003/10/17 05:59:04  ericn
  * -added doorbell
  *
  * Revision 1.7  2003/10/05 19:13:20  ericn
@@ -65,6 +68,8 @@
 #include "gpioPoll.h"
 #include "fbDev.h"
 #include <errno.h>
+#include "imgJPEG.h"
+#include "memFile.h"
 
 extern "C" {
 #include <jpeglib.h>
@@ -725,6 +730,7 @@ struct deviceMsg_t {
       audio_e  = 0,
       unlock_e = 1,
       lock_e   = 2,
+      reject_e = 3
    };
 
    enum {
@@ -741,6 +747,37 @@ static void *udpRxThread( void *arg )
    threadParam_t const &params = *( threadParam_t const *)arg ;
    int const fdAudio = params.mediaFd_ ;
    int fdLock = open( "/dev/Turnstile", O_WRONLY );
+   
+   fbDevice_t &fb = getFB();
+   unsigned short logoX = 0 ;
+   unsigned short logoY = 0 ;
+   unsigned short logoWidth = 0 ;
+   unsigned short logoHeight = 0 ;
+   void const    *logoData = 0 ;
+   {
+      memFile_t fIn( "logo.jpg" );
+      if( fIn.worked() )
+      {
+         if( imageJPEG( fIn.getData(), fIn.getLength(),
+                        logoData, logoWidth, logoHeight ) )
+         {
+            if( fb.getWidth() > logoWidth )
+               logoX = (fb.getWidth()-logoWidth)/2 ;
+            if( fb.getHeight() > logoHeight )
+               logoY = (fb.getHeight()-logoHeight)/2 ;
+
+            fb.rect( 0, 0, fb.getWidth()-1, fb.getHeight()-1, 0xFF, 0xFF, 0xFF );
+            fb.render( logoX, logoY, logoWidth, logoHeight, (unsigned short *)logoData );
+            printf( "logo is %u x %u pixels\n", logoWidth, logoHeight );
+         }
+         else
+            fprintf( stderr, "error %m reading logo\n" );
+      }
+      else
+         fprintf( stderr, "error %m reading logo\n" );
+   }
+   
+
    while( 1 )
    {
       sockaddr_in fromAddr ;
