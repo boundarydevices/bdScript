@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.7  2002-11-15 14:40:10  ericn
+ * Revision 1.8  2002-11-24 19:08:19  ericn
+ * -fixed output queueing
+ *
+ * Revision 1.7  2002/11/15 14:40:10  ericn
  * -modified to leave speed alone when possible
  *
  * Revision 1.6  2002/11/14 14:55:48  ericn
@@ -90,16 +93,18 @@ printf( "opened dsp device\n" );
          audioQueue_t :: item_t item ;
          if( queue->pull( item ) )
          {
+            unsigned long numWritten = 0 ;
             _playing = true ;
 
             madHeaders_t headers( item.data_, item.length_ );
             if( headers.worked() )
             {
+/*
                printf( "playback %lu bytes (%lu seconds) from %p here\n", 
                        item.length_, 
                        headers.lengthSeconds(),
                        item.data_ );
-
+*/
                struct mad_stream stream;
                struct mad_frame	frame;
                struct mad_synth	synth;
@@ -110,7 +115,10 @@ printf( "opened dsp device\n" );
 
                bool eof = false ;
                unsigned short nChannels = 0 ;               
-               
+
+               spaceLeft = OUTBUFSIZE ;
+               nextOut = outBuffer ;
+
                unsigned frameId = 0 ;
                do {
                   if( -1 != mad_frame_decode(&frame, &stream ) )
@@ -148,6 +156,7 @@ printf( "opened dsp device\n" );
                            if( 0 == spaceLeft )
                            {
                               write( queue->dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                              numWritten += OUTBUFSIZE ;
                               nextOut = outBuffer ;
                               spaceLeft = OUTBUFSIZE ;
                            }
@@ -167,13 +176,20 @@ printf( "opened dsp device\n" );
                               write( queue->dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                               nextOut = outBuffer ;
                               spaceLeft = OUTBUFSIZE ;
+                              numWritten += OUTBUFSIZE ;
                            }
                         }
                      } // stereo
                   } // frame decoded
                   else
                   {
-                     if( !MAD_RECOVERABLE( stream.error ) )
+                     if( MAD_RECOVERABLE( stream.error ) )
+                        ;
+                     else if( MAD_ERROR_BUFLEN == stream.error )
+                     {
+                        eof = true ;
+                     }
+                     else
                         break;
                   }
                } while( !( eof || _cancel || queue->shutdown_ ) );
@@ -185,12 +201,15 @@ printf( "opened dsp device\n" );
                   if( OUTBUFSIZE != spaceLeft )
                   {
                      write( queue->dspFd_, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
-                     spaceLeft = OUTBUFSIZE ;
-                     nextOut = outBuffer ;
+                     numWritten += OUTBUFSIZE-spaceLeft ;
                   } // flush tail end of output
+//                  memset( outBuffer, 0, OUTBUFSIZE );
+//                  write( queue->dspFd_, outBuffer, OUTBUFSIZE );
                }
                /* close input file */
                
+               mad_synth_finish( &synth );
+               mad_frame_finish( &frame );
                mad_stream_finish(&stream);
             }
             else
@@ -204,10 +223,18 @@ printf( "opened dsp device\n" );
                {
                   _cancel = false ;
                   queueSource( item.obj_, item.onCancel_, "audioComplete" );
+                  if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_RESET, 0 ) ) 
+                     fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                }
                else
+               {
                   queueSource( item.obj_, item.onComplete_, "audioComplete" );
+                  if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+                     fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+               }
             }
+
+//            printf( "wrote %lu samples\n", numWritten );
          }
       }
       
@@ -271,34 +298,34 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
 {
    numCancelled = 0 ;
 
-   //
-   // This should only be run in the context of 
-   // a lock on Javascript execution (i.e. from 
-   // Javascript code), so there's no need to lock
-   // execMutex_.
-   //
-   mutexLock_t lock( queue_.mutex_ );
-   while( !queue_.list_.empty() )
    {
-      item_t item = queue_.list_.front();
-      queue_.list_.pop_front();
-      queueSource( item.obj_, item.onCancel_, "audioComplete" );
-      ++numCancelled ;
-   }
-
-   //
-   // tell player to cancel at next frame
-   //
-   if( _playing )
-   {
-      _cancel = true ;
-      ++numCancelled ;
-   }
-   else
-   {
-      if( 0 != ioctl( dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
-         fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
-   } // not playing
+      //
+      // This should only be run in the context of 
+      // a lock on Javascript execution (i.e. from 
+      // Javascript code), so there's no need to lock
+      // execMutex_.
+      //
+      mutexLock_t lock( queue_.mutex_ );
+      while( !queue_.list_.empty() )
+      {
+         item_t item = queue_.list_.front();
+         queue_.list_.pop_front();
+         queueSource( item.obj_, item.onCancel_, "audioComplete" );
+         ++numCancelled ;
+      }
+   
+      //
+      // tell player to cancel at next frame
+      //
+      if( _playing )
+      {
+         _cancel = true ;
+         ++numCancelled ;
+      }
+   } // limit scope of lock
+      
+   if( 0 != ioctl( dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+      fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
 
    return true ;
 }
