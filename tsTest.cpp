@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: tsTest.cpp,v $
- * Revision 1.2  2002-12-23 05:10:45  ericn
+ * Revision 1.3  2002-12-26 15:13:51  ericn
+ * -fixed overrun problem
+ *
+ * Revision 1.2  2002/12/23 05:10:45  ericn
  * -bunch of changes to measure touch screen performance
  *
  * Revision 1.1  2002/10/25 02:55:01  ericn
@@ -42,10 +45,15 @@ static void diffTime( timeval const &now,
    }
 }
 
+static unsigned const maxSamples = 512 ;
+
 static void showSamples( timeval const &now, timeval const &start, 
                          ts_sample const samples[], 
                          unsigned long numSamples )
 {
+   if( numSamples > maxSamples )
+      numSamples = maxSamples ;
+   
    timeval diff ;
    diffTime( now, start, diff );
    printf("%ld.%06ld: %lu\n", diff.tv_sec, diff.tv_usec, numSamples );
@@ -56,8 +64,6 @@ static void showSamples( timeval const &now, timeval const &start,
               samples[i].x, samples[i].y, samples[i].pressure );
    }
 }
-
-static unsigned const maxSamples = 512 ;
 
 int main( int argc, char const * const argv[] )
 {
