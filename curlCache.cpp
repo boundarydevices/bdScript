@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.3  2002-10-13 13:42:13  ericn
+ * Revision 1.4  2002-10-13 14:36:54  ericn
+ * -made cache usage optional
+ *
+ * Revision 1.3  2002/10/13 13:42:13  ericn
  * -got rid of content reference for file posts
  *
  * Revision 1.2  2002/10/09 01:10:07  ericn
@@ -204,16 +207,20 @@ curlFile_t :: ~curlFile_t( void )
 //
 // returns open curlFile_t if found in cache
 //
-curlFile_t curlCache_t :: get( char const url[] )
+curlFile_t curlCache_t :: get( char const url[], bool useCache )
 {
    std::string const cacheName( getCachedName( url ) );
 
    struct stat st ;
-   if( 0 == stat( cacheName.c_str(), &st ) )
+   int const statResult = stat( cacheName.c_str(), &st );
+   if( useCache && ( 0 == statResult ) )
    {
    } // file in cache... return it
    else
    {
+      if( 0 == statResult )
+         unlink( cacheName.c_str() ); // get rid of old one
+
       makeSpace( 1, 1<<20 ); // 1MB
 
       CURL *curl ;
@@ -239,16 +246,20 @@ curlFile_t curlCache_t :: get( char const url[] )
 }
 
 
-curlFile_t curlCache_t :: post( curlRequest_t const &req )
+curlFile_t curlCache_t :: post( curlRequest_t const &req, bool useCache )
 {
    std::string const cacheName( getCachedName( req ) );
 
    struct stat st ;
-   if( 0 == stat( cacheName.c_str(), &st ) )
+   int const statResult = stat( cacheName.c_str(), &st );
+   if( useCache && ( 0 == statResult ) )
    {
    } // file in cache... return it
    else
    {
+      if( 0 == statResult )
+         unlink( cacheName.c_str() );
+
       makeSpace( 1, 1<<20 ); // 1MB
 
       CURL *curl ;

@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.4 2002-10-13 13:42:09 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.5 2002-10-13 14:36:51 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.4  2002-10-13 13:42:09  ericn
+ * Revision 1.5  2002-10-13 14:36:51  ericn
+ * -made cache usage optional
+ *
+ * Revision 1.4  2002/10/13 13:42:09  ericn
  * -got rid of content reference for file posts
  *
  * Revision 1.3  2002/10/09 01:10:03  ericn
@@ -131,13 +134,13 @@ public:
    // To build up a request with multiple parameters, use
    // curlRequest_t
    //
-   curlFile_t get( char const url[] );
+   curlFile_t get( char const url[], bool useCache = true );
    std::string getCachedName( char const url[] );
 
    //
    // use this routine to build up the parts before a post request
    //
-   curlFile_t post( curlRequest_t const & );
+   curlFile_t post( curlRequest_t const &, bool useCache = false );
    std::string getCachedName( curlRequest_t const & );
 
 private:
