@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.14  2004-03-17 04:56:19  ericn
+ * Revision 1.15  2004-12-05 00:55:26  tkisky
+ * -more info in error message
+ *
+ * Revision 1.14  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.13  2003/11/30 16:45:31  ericn
@@ -336,16 +339,10 @@ static JSBool
 jsLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 4 <= argc ) 
-       &&
-       ( 6 >= argc )
-       &&
-       JSVAL_IS_INT( argv[0] )
-       &&
-       JSVAL_IS_INT( argv[1] )
-       &&
-       JSVAL_IS_INT( argv[2] )
-       &&
+   if( ( 4 <= argc ) && ( 6 >= argc ) &&
+       JSVAL_IS_INT( argv[0] ) &&
+       JSVAL_IS_INT( argv[1] ) &&
+       JSVAL_IS_INT( argv[2] ) &&
        JSVAL_IS_INT( argv[3] ) )
    {
       unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
@@ -358,10 +355,11 @@ jsLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
       unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
       getFB().line( x1, y1, x2, y2, penWidth, red, green, blue );
+   } else {
+      JS_ReportError( cx, "Usage: screen.line( x1, y1, x2, y2 [penWidth=1 [,color=0]] ); argc:%d,%d(%d),%d(%d),%d(%d),%d(%d)",argc,
+		JSVAL_IS_INT( argv[0] ),JSVAL_TO_INT( argv[0] ),JSVAL_IS_INT( argv[1] ),JSVAL_TO_INT( argv[1] ),
+		JSVAL_IS_INT( argv[2] ),JSVAL_TO_INT( argv[2] ),JSVAL_IS_INT( argv[3] ),JSVAL_TO_INT( argv[3] ) );
    }
-   else
-      JS_ReportError( cx, "Usage: screen.line( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
-
    return JS_TRUE ;
 }
 
@@ -369,16 +367,10 @@ static JSBool
 jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 4 <= argc ) 
-       &&
-       ( 6 >= argc )
-       &&
-       JSVAL_IS_INT( argv[0] )
-       &&
-       JSVAL_IS_INT( argv[1] )
-       &&
-       JSVAL_IS_INT( argv[2] )
-       &&
+   if( ( 4 <= argc ) && ( 6 >= argc ) &&
+       JSVAL_IS_INT( argv[0] ) &&
+       JSVAL_IS_INT( argv[1] ) &&
+       JSVAL_IS_INT( argv[2] ) &&
        JSVAL_IS_INT( argv[3] ) )
    {
       unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
