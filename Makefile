@@ -6,9 +6,10 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
        jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsTouch.o jsURL.o \
+       jsVolume.o \
        madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o \
        ultodd.o
-LIB = libCurlCache.a
+LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
@@ -97,9 +98,6 @@ all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest
 
 .PHONY: install-libs install-headers
 
-install-libs:
-	cp $(LIB) $(INSTALL_ROOT)/lib
-
 shared-headers = ddtoul.h dirByATime.h hexDump.h  \
    imgGIF.h imgJPEG.h imgPNG.h \
    macros.h madHeaders.h memFile.h \
@@ -112,4 +110,4 @@ install-headers:
 install: install-libs install-headers
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
+	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)

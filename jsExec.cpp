@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.7  2002-11-07 02:13:05  ericn
+ * Revision 1.8  2002-11-14 13:13:17  ericn
+ * -added volume module
+ *
+ * Revision 1.7  2002/11/07 02:13:05  ericn
  * -added audioQueue calls
  *
  * Revision 1.6  2002/11/05 15:13:46  ericn
@@ -59,6 +62,7 @@
 #include "jsTouch.h"
 #include "jsMP3.h"
 #include "audioQueue.h"
+#include "jsVolume.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -212,6 +216,7 @@ int main(int argc, char **argv)
                      initJSMP3( cx, glob );
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
+                     initJSVolume( cx, glob );
 
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
