@@ -13,8 +13,8 @@ endif
    
 curlCacheMain.o: curlCache.h curlCache.cpp Makefile
 	$(CC) -c -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
-curlCache: curlCacheMain.o dirByATime.o Makefile
-	$(CC) -o curlCache curlCacheMain.o dirByATime.o $(LIBS) -lcurl -lstdc++ 
+curlCache: curlCacheMain.o dirByATime.o memFile.o Makefile
+	$(CC) -o curlCache curlCacheMain.o dirByATime.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
 	$(CC) -c -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
@@ -25,8 +25,8 @@ dirTest: Makefile dirTest.o
 curlGetMain.o: curlCache.h curlGet.h curlGet.cpp Makefile
 	$(CC) -c -o curlGetMain.o -O2 -DSTANDALONE curlGet.cpp
 
-curlGet: curlGetMain.o curlCache.o dirByATime.o Makefile
-	$(CC) -o curlGet curlGetMain.o curlCache.o dirByATime.o $(LIBS) -lcurl -lstdc++ 
+curlGet: curlGetMain.o curlCache.o dirByATime.o memFile.o Makefile
+	$(CC) -o curlGet curlGetMain.o curlCache.o dirByATime.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
 
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -c -o urlTest.o -O2 -DSTANDALONE -I ../zlib urlFile.cpp
@@ -40,7 +40,12 @@ testJS.o: testJS.cpp Makefile
 testJS: testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o Makefile
 	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
 
-all: curlCache curlGet dirTest urlTest testJS
+ifneq (,$(findstring arm, $(CC)))
+   all: curlCache curlGet dirTest urlTest testJS
+else
+   all: curlCache curlGet dirTest urlTest
+endif
+
 
 clean:
 	rm -f *.o curlCache curlGet dirTest urlTest testJS
