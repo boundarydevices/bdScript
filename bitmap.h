@@ -1,5 +1,5 @@
 #ifndef __BITMAP_H__
-#define __BITMAP_H__ "$Id: bitmap.h,v 1.3 2004-09-25 21:49:07 ericn Exp $"
+#define __BITMAP_H__ "$Id: bitmap.h,v 1.4 2004-10-28 21:27:59 tkisky Exp $"
 
 /*
  * bitmap.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: bitmap.h,v $
- * Revision 1.3  2004-09-25 21:49:07  ericn
+ * Revision 1.4  2004-10-28 21:27:59  tkisky
+ * -ClearBox function added
+ *
+ * Revision 1.3  2004/09/25 21:49:07  ericn
  * -added getter methods
  *
  * Revision 1.2  2004/07/25 22:34:45  ericn
@@ -71,6 +74,8 @@ public:
                         unsigned char const *src,
                         unsigned             count,
                         unsigned             srcOffs = 0 );
+
+   static void ClearBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride );
 
    inline unsigned char const *getMem( void ) const { return bits_ ; }
 
