@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.8 2002-12-02 15:05:03 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.9 2003-08-03 19:27:36 ericn Exp $"
 
 /*
  * semClasses.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.8  2002-12-02 15:05:03  ericn
+ * Revision 1.9  2003-08-03 19:27:36  ericn
+ * -added convenience methods to lock and wait for condition
+ *
+ * Revision 1.8  2002/12/02 15:05:03  ericn
  * -added names to mutexes (for debug), moved stuff out-of-line
  *
  * Revision 1.7  2002/11/30 05:28:54  ericn
@@ -87,9 +90,15 @@ public:
    // Note that these expect a locked mutex on input, 
    // and have the mutex locked on return. (unlocked between)
    //
-   inline bool wait( mutexLock_t &mutex );
-   inline bool wait( mutexLock_t &mutex,
+   inline bool wait( mutexLock_t &lock );
+   inline bool wait( mutexLock_t &lock,
                      unsigned long milliseconds );
+
+   //
+   // These will grab a lock before waiting
+   //
+   inline bool wait( mutex_t &mutex );
+   inline bool wait( mutex_t &mutex, unsigned long milliseconds );
 
    //
    // set-side routines
@@ -144,6 +153,24 @@ inline bool condition_t :: wait
       return false ;
    }
 }
+
+//
+// These will grab a lock before waiting
+//
+bool condition_t :: wait( mutex_t &mutex )
+{
+   mutexLock_t lock( mutex );
+   if( lock.worked() )
+      return wait( lock );
+}
+
+bool condition_t :: wait( mutex_t &mutex, unsigned long milliseconds )
+{
+   mutexLock_t lock( mutex );
+   if( lock.worked() )
+      return wait( lock, milliseconds );
+}
+
 
 #endif
 
