@@ -1,2 +1,2 @@
 *.map fbDev curlGet curlCache dirTest urlTest testJS tsTest mp3Play childProcess testEvents mp3Echo jsExec
-build ftRender tsThread madHeaders madTest
+build ftRender tsThread madHeaders madTest imgJPEG imgPNG
