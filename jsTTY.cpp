@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTTY.cpp,v $
- * Revision 1.6  2003-12-28 23:51:03  ericn
+ * Revision 1.7  2004-04-20 15:17:45  ericn
+ * -flag ctrlc for menu loop
+ *
+ * Revision 1.6  2003/12/28 23:51:03  ericn
  * -use non-threaded queue for lines
  *
  * Revision 1.5  2003/12/28 20:54:59  ericn
@@ -76,6 +79,14 @@ void jsTTY_t :: onCtrlC( void )
    exitStatus_ = 3 ;
    exitRequested_ = true ;
    tcsetattr( getFd(), TCSANOW, &oldTermState_ );
+   
+   // flag <Ctrl-C> for menu code
+   FILE *fCtrlc = fopen( "/tmp/ctrlc", "wb" );
+   if( fCtrlc )
+   {
+      fprintf( fCtrlc, "<Ctrl-C> hit\n" );
+      fclose( fCtrlc );
+   }
 }
 
 static jsTTY_t *tty_ = 0 ;
