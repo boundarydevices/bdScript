@@ -20,6 +20,7 @@ MPEG2LIBS = -lmpeg2 -lvo
 OBJS = \
        barcodePoll.o \
        baudRate.o \
+       bitmap.o \
        box.o \
        ccActiveURL.o \
        ccDiskCache.o \
