@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.14  2003-07-06 01:21:41  ericn
+ * Revision 1.15  2003-09-05 13:04:44  ericn
+ * -made pollCodeQueue() return bool (not timed out), added exec and exit tests
+ *
+ * Revision 1.14  2003/07/06 01:21:41  ericn
  * -added method abortCodeQueue()
  *
  * Revision 1.13  2003/06/10 23:53:31  ericn
@@ -58,6 +61,7 @@
 #include "mtQueue.h"
 #include "jsGlobals.h"
 #include "jsHyperlink.h"
+#include "jsExit.h"
 #include <linux/stddef.h>
 
 #define MAXARGS 8
@@ -324,7 +328,7 @@ void codeFilter_t :: unlink( void )
 // returns true and a string full of bytecode if
 // successful, false on timeout
 //
-void pollCodeQueue( JSContext *cx,
+bool pollCodeQueue( JSContext *cx,
                     unsigned   milliseconds,
                     unsigned   iterations )
 {
@@ -340,12 +344,13 @@ void pollCodeQueue( JSContext *cx,
       {
          cbd.callback_( cbd.cbData_ );
 
-         if( gotoCalled_ )
+         if( gotoCalled_ || execCalled_ || exitRequested_ )
             break;
       }
       else
-         break;
+         return result ; // timed out
    }
+   return true ; // not timed out
 }
 
 void abortCodeQueue( void )
