@@ -1,5 +1,5 @@
 #ifndef __DNSPOLL_H__
-#define __DNSPOLL_H__ "$Id: dnsPoll.h,v 1.1 2004-12-13 05:14:10 ericn Exp $"
+#define __DNSPOLL_H__ "$Id: dnsPoll.h,v 1.2 2004-12-18 18:28:43 ericn Exp $"
 
 /*
  * dnsPoll.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: dnsPoll.h,v $
- * Revision 1.1  2004-12-13 05:14:10  ericn
+ * Revision 1.2  2004-12-18 18:28:43  ericn
+ * -include opaque ptr in callbacks
+ *
+ * Revision 1.1  2004/12/13 05:14:10  ericn
  * -Initial import
  *
  *
@@ -31,36 +34,39 @@
 #include "pollTimer.h"
 #endif 
 
-typedef void (*dnsCallback_t)( char const   *hostName,
+typedef void (*dnsCallback_t)( void         *opaque,
+                               char const   *hostName,
                                bool          worked, 
                                unsigned long address );
 
 class dnsPoll_t : public udpPoll_t {
 public:
    static dnsPoll_t &get( void ); // singleton getter
-   static dnsPoll_t &get( pollHandlerSet_t &set,
-                          unsigned long     dnsNetOrder ); // IP address of the name server
+   static dnsPoll_t &get( pollHandlerSet_t &set );
 
    //
-   // Note that callback will be called immediately if 
-   // the entry is cached
+   // Note that callback will be called immediately if the entry is cached
+   // Also note that the host name passed to the callback may be different
+   // from the name passed in (usually through the addition of a host name).
    //
    void getHostByName( char const   *hostName,
                        dnsCallback_t callback,
+                       void         *opaque,
                        unsigned long msTimeout );
 
    virtual void onMsg( void const        *msg,
                        unsigned           msgLen,
                        sockaddr_in const &sender );
 private:
-   dnsPoll_t( pollHandlerSet_t &set,
-              unsigned long     dnServer );
+   dnsPoll_t( pollHandlerSet_t &set );
    friend class dnsTimer_t ;
    
    struct request_t {
       request_t( list_head    &list,
                  char const   *name,
-                 dnsCallback_t callback );
+                 dnsCallback_t callback,
+                 void         *cbParam );
+
       ~request_t( void );
 
       list_head       list_ ;
@@ -68,6 +74,7 @@ private:
       unsigned short  id_ ;
       pollTimer_t    *timer_ ;
       dnsCallback_t   callback_ ;
+      void           *cbParam_ ;
    };
 
    struct entry_t {
@@ -77,19 +84,23 @@ private:
       entry_t       *next_ ;
    };
 
+   struct server_t {
+      unsigned long ipNetOrder_ ;
+      server_t     *next_ ;
+   };
+
    entry_t *find( char const *hostName );
    request_t *find( unsigned short idx );
    void     timeout( unsigned short idx );
    void     dumpRequests( void );
 
-   unsigned long     dnServer_ ;
    unsigned short    nextId_ ;
+   server_t         *servers_ ;
    list_head         requests_ ;
    entry_t          *entries_ ;
 };
 
-void dnsInit( pollHandlerSet_t &set,
-              unsigned long    &dnsNetOrder ); // IP address of the name server
+void dnsInit( pollHandlerSet_t &set );
 
 #endif
 

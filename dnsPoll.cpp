@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: dnsPoll.cpp,v $
- * Revision 1.1  2004-12-13 05:14:12  ericn
+ * Revision 1.2  2004-12-18 18:28:45  ericn
+ * -include opaque ptr in callbacks
+ *
+ * Revision 1.1  2004/12/13 05:14:12  ericn
  * -Initial import
  *
  *
@@ -26,6 +29,7 @@
 // #define DEBUGPRINT
 #include "debugPrint.h"
 #include "hexDump.h"
+#include "flashVar.h"
 
 typedef struct dnsMsg_t {
    unsigned short id_ ;
@@ -55,19 +59,43 @@ enum {
 static dnsPoll_t *dns_ = 0 ;
 
 dnsPoll_t :: dnsPoll_t
-   ( pollHandlerSet_t &set,
-     unsigned long     dnServer )
+   ( pollHandlerSet_t &set )
    : udpPoll_t( set, htons(53) )
-   , dnServer_( dnServer )
    , nextId_( 0x1234 )
+   , servers_( 0 )
    , requests_()
    , entries_( 0 )
 {
    INIT_LIST_HEAD(&requests_);
+   char *const dns = (char *)readFlashVar( "DNS" );
+   if( dns )
+   {
+      debugPrint( "DNS Server string <%s>\n", dns ); fflush( stdout );
+      char *tmp ;
+      char *tok = strtok_r( dns, " ", &tmp );
+      while( 0 != tok )
+      {
+         debugPrint( "DNS server <%s>\n", tok ); fflush( stdout );
+         struct in_addr in ;
+         if( inet_aton( tok, &in ) )
+         {
+            server_t *s = new server_t ;
+            s->ipNetOrder_ = in.s_addr ;
+            s->next_       = servers_ ;
+            servers_ = s ;
+         }
+         tok = strtok_r( 0, " ", &tmp );
+      }
+   }
 }
 
 dnsPoll_t &dnsPoll_t::get( void )
 {
+   if( 0 == dns_ )
+   {
+      fprintf( stderr, "Invalid dns initialization\n" );
+      exit(1);
+   }
    return *dns_ ;
 }
 
@@ -84,11 +112,10 @@ void dnsPoll_t::dumpRequests( void )
    }
 }
    
-dnsPoll_t &dnsPoll_t::get( pollHandlerSet_t &set,
-                           unsigned long     dnsNetOrder )
+dnsPoll_t &dnsPoll_t::get( pollHandlerSet_t &set )
 {
    if( 0 == dns_ )
-      dns_ = new dnsPoll_t( set, dnsNetOrder );
+      dns_ = new dnsPoll_t( set );
 }
 
 
@@ -293,7 +320,7 @@ void dnsPoll_t::onMsg
       entry->next_     = entries_ ;
       entries_ = entry ;
 
-      req->callback_( entry->name_, found, addr );
+      req->callback_( req->cbParam_, entry->name_, found, addr );
 
       delete req ;
    }
@@ -302,6 +329,7 @@ void dnsPoll_t::onMsg
 void dnsPoll_t::getHostByName
    ( char const   *hostName,
      dnsCallback_t callback,
+     void         *opaque,
      unsigned long msTimeout )
 {
    entry_t *entry = find( hostName );
@@ -310,63 +338,74 @@ void dnsPoll_t::getHostByName
       in_addr_t addr = inet_addr( hostName );
       if( INADDR_NONE == addr )
       {
-         dnsPoll_t::request_t *req = new dnsPoll_t::request_t( requests_, hostName, callback );
-         req->id_    = nextId_++ ;
-         
-         dnsMsg_t msg ;
-         msg.id_        = req->id_ ;
-         msg.flags_     = htons( recursDes );
-         msg.numQ_      = htons( 1 );
-         msg.numAnsRR_  = 0 ;
-         msg.numAuthRR_ = 0 ;
-         msg.numAddRR_  = 0 ;
-         char *nextOut = msg.questions_ ;
-         char const *prev = hostName ;
-         char const *next ;
-         while( 0 != ( next = strchr( prev, '.' ) ) )
+         if( servers_ )
          {
-            char const len = (char)( next-prev );
+            dnsPoll_t::request_t *req = new dnsPoll_t::request_t( requests_, hostName, callback, opaque );
+            req->id_    = nextId_++ ;
+            
+            dnsMsg_t msg ;
+            msg.id_        = req->id_ ;
+            msg.flags_     = htons( recursDes );
+            msg.numQ_      = htons( 1 );
+            msg.numAnsRR_  = 0 ;
+            msg.numAuthRR_ = 0 ;
+            msg.numAddRR_  = 0 ;
+            char *nextOut = msg.questions_ ;
+            char const *prev = hostName ;
+            char const *next ;
+            while( 0 != ( next = strchr( prev, '.' ) ) )
+            {
+               char const len = (char)( next-prev );
+               *nextOut++ = len ;
+               memcpy( nextOut, prev, len );
+               nextOut += len ;
+               prev = next + 1 ;
+            }
+            char const len = (char)strlen( prev );
             *nextOut++ = len ;
             memcpy( nextOut, prev, len );
             nextOut += len ;
-            prev = next + 1 ;
-         }
-         char const len = (char)strlen( prev );
-         *nextOut++ = len ;
-         memcpy( nextOut, prev, len );
-         nextOut += len ;
-         *nextOut++ = 0 ;
-         unsigned const shortOne = htons(1);
-         memcpy( nextOut, &shortOne, 2 );
-         nextOut += 2 ;
-
-         memcpy( nextOut, &shortOne, 2 );
-         nextOut += 2 ;
-
-         int const msgLen = nextOut - (char *)&msg ;
-
-         sockaddr_in remote ;
-         remote.sin_family       = AF_INET ;
-         remote.sin_addr.s_addr  = dnServer_ ;
-         remote.sin_port         = htons(53) ;
-
+            *nextOut++ = 0 ;
+            unsigned const shortOne = htons(1);
+            memcpy( nextOut, &shortOne, 2 );
+            nextOut += 2 ;
+   
+            memcpy( nextOut, &shortOne, 2 );
+            nextOut += 2 ;
+   
+            int const msgLen = nextOut - (char *)&msg ;
+   
 #ifdef DEBUGPRINT
 hexDumper_t dump( &msg, msgLen );
 while( dump.nextLine() )
    debugPrint( "%s\n", dump.getLine() );
 #endif 
-         int const numSent = sendto( getFd(), &msg, msgLen, 0, 
-                                     (struct sockaddr *)&remote, sizeof( remote ) );
-         if( numSent != msgLen )
-            fprintf( stderr, "dnsSend: %m\n" );
+            
+            sockaddr_in remote ;
+            remote.sin_family       = AF_INET ;
+            remote.sin_addr.s_addr  = 0 ;
+            remote.sin_port         = htons(53) ;
+            server_t *s = servers_ ;
+            while( s )
+            {
+               remote.sin_addr.s_addr = s->ipNetOrder_ ;
+               int const numSent = sendto( getFd(), &msg, msgLen, 0, 
+                                           (struct sockaddr *)&remote, sizeof( remote ) );
+               if( numSent != msgLen )
+                  fprintf( stderr, "dnsSend: %m\n" );
+               s = s->next_ ;
+            }
    
-         req->timer_ = new dnsTimer_t( req->id_, msTimeout );
+            req->timer_ = new dnsTimer_t( req->id_, msTimeout );
+         }
+         else
+            callback( opaque, hostName, false, 0 );
       }
       else
-         callback( hostName, true, addr );
+         callback( opaque, hostName, true, addr );
    }
    else
-      callback( hostName, entry->resolved_, entry->addr_ );
+      callback( opaque, hostName, entry->resolved_, entry->addr_ );
 }
 
 
@@ -389,7 +428,7 @@ void dnsPoll_t::timeout( unsigned short idx )
          entry->next_     = entries_ ;
          entries_ = entry ;
 
-         req->callback_( entry->name_, false, 0 );
+         req->callback_( req->cbParam_, entry->name_, false, 0 );
          
          debugPrint( "dns Timeout %s\n", entry->name_ );
 
@@ -402,17 +441,15 @@ void dnsPoll_t::timeout( unsigned short idx )
 dnsPoll_t::request_t::request_t
    ( list_head    &list,
      char const   *name,
-     dnsCallback_t callback )
+     dnsCallback_t callback,
+     void         *cbParam )
+   : name_( strdup( name ) )
+   , id_( 0 )
+   , timer_( 0 )
+   , callback_( callback )
+   , cbParam_( cbParam )
 {
    list_add( &list_, &list );
-   name_ = strdup( name );
-   callback_ = callback ;
-   
-   //
-   // filled in by parent
-   //
-   id_ = 0 ; 
-   timer_ = 0 ;
 }
 
 dnsPoll_t::request_t :: ~request_t( void )
@@ -424,12 +461,18 @@ dnsPoll_t::request_t :: ~request_t( void )
    list_del( &list_ );
 }
 
+void dnsInit( pollHandlerSet_t &set )
+{
+   getTimerPoll( set );
+   dnsPoll_t &dns = dnsPoll_t::get( set );
+}
+
 
 #ifdef __MODULETEST__
 #include <stdio.h>
 
 
-static void dnsCallback( char const *hostName, bool resolved, unsigned long addr )
+static void dnsCallback( void *opaque, char const *hostName, bool resolved, unsigned long addr )
 {
    struct in_addr in ;
    in.s_addr = addr ;
@@ -443,10 +486,10 @@ int main( int argc, char const *const argv[] )
    {
       pollHandlerSet_t handlers ;
       getTimerPoll( handlers );
-      dnsPoll_t &dns = dnsPoll_t::get( handlers, inet_addr( "192.168.0.1" ) );
+      dnsPoll_t &dns = dnsPoll_t::get( handlers );
    
       for( int arg = 1 ; arg < argc ; arg++ )
-         dns.getHostByName( argv[arg], dnsCallback, 2000 );
+         dns.getHostByName( argv[arg], dnsCallback, 0, 2000 );
    
       while( 1 )
       {
