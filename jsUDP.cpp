@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUDP.cpp,v $
- * Revision 1.2  2003-11-04 00:41:24  tkisky
+ * Revision 1.3  2003-12-28 20:55:49  ericn
+ * -get rid of secondary thread
+ *
+ * Revision 1.2  2003/11/04 00:41:24  tkisky
  * -htons
  *
  * Revision 1.1  2003/09/10 04:56:30  ericn
@@ -28,11 +31,25 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdio.h>
 #include "jsGlobals.h"
+#include "udpPoll.h"
 
-struct udpSocket_t {
-   int            fd_ ;
-   unsigned short port_ ;
+static JSObject *udpProto = 0 ;
+
+class udpSocket_t : public udpPoll_t {
+public:
+   udpSocket_t( pollHandlerSet_t &set,
+                unsigned short    port, // network byte-order
+                JSContext        *cx,
+                JSObject         *scope,
+                jsval             handler );
+   ~udpSocket_t( void );
+
+   virtual void onMsg( void const        *msg,
+                       unsigned           msgLen,
+                       sockaddr_in const &sender );
+protected:
    jsval          object_ ;
    jsval          handler_ ;
    jsval          msg_ ;
@@ -40,23 +57,54 @@ struct udpSocket_t {
    jsval          senderPort_ ;
    JSObject      *handlerObj_ ;
    JSContext     *cx_ ;
-   pthread_t      tHandle_ ;
-
-   void cleanup( JSContext *cx );
 };
 
-
-void udpSocket_t::cleanup( JSContext *cx )
+udpSocket_t :: udpSocket_t
+   ( pollHandlerSet_t &set,
+     unsigned short    port, // network byte-order
+     JSContext        *cx,
+     JSObject         *scope,
+     jsval             handler )
+   : udpPoll_t( set, port )
+   , object_( OBJECT_TO_JSVAL( scope ) )
+   , handler_( handler )
+   , msg_( JSVAL_VOID )
+   , senderIp_( JSVAL_VOID )
+   , senderPort_( JSVAL_VOID )
+   , handlerObj_( scope )
+   , cx_( cx )
 {
-   if( 0 <= fd_ )
-      close( fd_ );
+   JS_AddRoot( cx, &object_ );
+   JS_AddRoot( cx, &handler_ );
+   JS_AddRoot( cx, &msg_ );
+   JS_AddRoot( cx, &senderIp_ );
+   JS_AddRoot( cx, &senderPort_ );
+}
+   
+udpSocket_t :: ~udpSocket_t( void )
+{
+   JS_RemoveRoot( cx_, &object_ );
+   JS_RemoveRoot( cx_, &handler_ );
+   JS_RemoveRoot( cx_, &msg_ );
+   JS_RemoveRoot( cx_, &senderIp_ );
+   JS_RemoveRoot( cx_, &senderPort_ );
+}
 
-   pthread_cancel( tHandle_ );
-   void *exitStat ;
-   pthread_join( tHandle_, &exitStat );
+void udpSocket_t :: onMsg
+   ( void const        *msg,
+     unsigned           msgLen,
+     sockaddr_in const &sender )
+{
+   msg_ = STRING_TO_JSVAL( JS_NewStringCopyN( cx_, (char const *)msg, msgLen ) );
+   senderIp_ = STRING_TO_JSVAL( JS_NewStringCopyZ( cx_, inet_ntoa( sender.sin_addr ) ) );
+   senderPort_ = INT_TO_JSVAL( ntohs(sender.sin_port) );
+   jsval args[3] = {
+      msg_,
+      senderIp_,
+      senderPort_
+   };
+   executeCode( handlerObj_, handler_, "udpSocket_t::recvfrom", 3, args );
 
-   JS_RemoveRoot( cx, &object_ );
-   JS_RemoveRoot( cx, &handler_ );
 }
 
 extern JSClass jsUDPClass_ ;
@@ -101,7 +149,7 @@ static JSBool jsUDPSendTo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
             JSString *const sData = JSVAL_TO_STRING( argv[2] );
             char const     *data = JS_GetStringBytes( sData );
             unsigned const  dataLen = JS_GetStringLength( sData );
-            int const numSent = sendto( udpSocket->fd_, data, dataLen, 0, (struct sockaddr *)&remote, sizeof( remote ) );
+            int const numSent = sendto( udpSocket->getFd(), data, dataLen, 0, (struct sockaddr *)&remote, sizeof( remote ) );
 printf( "sent %d bytes to ip 0x%08lx, port 0x%04x\n", numSent, targetIP, targetPort );
             *rval = JSVAL_TRUE ;
          }
@@ -127,11 +175,11 @@ static void jsUDPFinalize(JSContext *cx, JSObject *obj)
    if( 0 != udpSocket )
    {
       JS_SetPrivate( cx, obj, 0 );
-      udpSocket->cleanup( cx );
       delete udpSocket ;
    }
 }
 
+/*
 #define MAXRX 4096
 static void *recvThread( void *arg )
 {
@@ -164,6 +212,11 @@ static void *recvThread( void *arg )
          printf( "0 UDP bytes\n" );
    }
 }
+*/
+
+static char const usage[] = {
+   "Usage: new udpSocket( {[port:NNNN] [,onMsg:handler[,onMsgObj:object]]} );\n"
+};
 
 static JSBool jsUDP( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -172,103 +225,64 @@ static JSBool jsUDP( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
-      JSObject *thisObj = JS_NewObject( cx, &jsUDPClass_, NULL, NULL );
-
-      if( thisObj )
+      JSObject *rhObj = JSVAL_TO_OBJECT( argv[0] );
+      if( rhObj )
       {
-         *rval = OBJECT_TO_JSVAL( thisObj ); // root
-
-         udpSocket_t *const sockInfo = new udpSocket_t ;
-
-         sockInfo->fd_ = socket( AF_INET, SOCK_DGRAM, 0 );
-         if( 0 <= sockInfo->fd_ )
+         int port = 0 ;
+         jsval jsv ;
+         if( JS_GetProperty( cx, rhObj, "port", &jsv )
+             &&
+             JSVAL_IS_INT( jsv ) )
          {
+            port = htons( (unsigned short)JSVAL_TO_INT( jsv ) );
+         }
+
+         JSObject *scope = obj; // default to global scope
+         jsval     handler = JSVAL_VOID ;
+
+         if( JS_GetProperty( cx, rhObj, "onMsg", &handler )
+             &&
+             ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, handler ) ) )
+         {
+            jsval jsv ;
+            if( JS_GetProperty( cx, rhObj, "onMsgObj", &jsv )
+                &&
+                JSVAL_IS_OBJECT( jsv ) )
+            {
+               scope = JSVAL_TO_OBJECT( jsv );
+            }
+         } 
+
+         
+         JSObject *thisObj = JS_NewObject( cx, &jsUDPClass_, udpProto, NULL );
+         if( thisObj )
+         {
+            udpSocket_t *const sockInfo = new udpSocket_t( pollHandlers_, port, cx, scope, handler );
             JS_SetPrivate( cx, thisObj, sockInfo ); // root?
-
-            sockInfo->port_       = 0 ;
-            sockInfo->object_     = JSVAL_VOID ;
-            sockInfo->handlerObj_ = obj ;
-            sockInfo->handler_    = JSVAL_VOID ;
-            sockInfo->msg_        = JSVAL_VOID ;
-            sockInfo->senderIp_   = JSVAL_VOID ;
-            sockInfo->senderPort_ = JSVAL_VOID ;
-            sockInfo->cx_         = cx ;
-
-            JSObject *rhObj = JSVAL_TO_OBJECT( argv[0] );
-            if( rhObj )
-            {
-               jsval jsv ;
-               if( JS_GetProperty( cx, rhObj, "port", &jsv )
-                   &&
-                   JSVAL_IS_INT( jsv ) )
-               {
-                  sockInfo->port_ = JSVAL_TO_INT( jsv );
-                  sockaddr_in myAddress ;
-
-                  memset( &myAddress, 0, sizeof( myAddress ) );
-
-                  myAddress.sin_family      = AF_INET;
-                  myAddress.sin_addr.s_addr = 0 ; // local
-                  myAddress.sin_port        = htons( sockInfo->port_ );
-            
-                  if( 0 == bind( sockInfo->fd_, (struct sockaddr *) &myAddress, sizeof( myAddress ) ) )
-                  {
-                  }
-                  else
-                  {
-                     JS_ReportError( cx, "%m binding to port %u\n", sockInfo->port_ );
-                  }
-               }
-               
-               if( JS_GetProperty( cx, rhObj, "onMsg", &jsv )
-                   &&
-                   ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, jsv ) ) )
-               {
-                  sockInfo->handler_ = jsv ;
-                  if( JS_GetProperty( cx, rhObj, "onMsgObj", &jsv )
-                      &&
-                      JSVAL_IS_OBJECT( jsv ) )
-                  {
-                     sockInfo->object_        = jsv ;
-                     sockInfo->handlerObj_ = JSVAL_TO_OBJECT( jsv );
-                  }
-               }
-            }
-
-            JS_AddRoot( cx, &sockInfo->object_ );
-            JS_AddRoot( cx, &sockInfo->handler_ );
-            JS_AddRoot( cx, &sockInfo->msg_ );
-            JS_AddRoot( cx, &sockInfo->senderIp_ );
-            JS_AddRoot( cx, &sockInfo->senderPort_ );
-
-            int const create = pthread_create( &sockInfo->tHandle_, 0, recvThread, sockInfo );
-            if( 0 == create )
-            {
-            }
-            else
-               JS_ReportError( cx, "%m:displayThread" );
+            *rval = OBJECT_TO_JSVAL( thisObj ); // root
          }
          else
-            JS_ReportError( cx, "creating socket %m" );
+            JS_ReportError( cx, "Error allocating udpSocket" );
       }
       else
-         JS_ReportError( cx, "Error allocating udpSocket" );
+         JS_ReportError( cx, usage );
    }
    else
-      JS_ReportError( cx, "Usage: new udpSocket( {[port:NNNN] [,onMsg:handler[,onMsgObj:object]]} );\n" );
+      JS_ReportError( cx, usage );
    
    return JS_TRUE ;
 }
 
 bool initJSUDP( JSContext *cx, JSObject *glob )
 {
-   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsUDPClass_,
-                                  jsUDP, 1,
-                                  udpSocketProperties_, 
-                                  udpSocketMethods_, 
-                                  0, 0 );
-   if( rval )
+   udpProto = JS_InitClass( cx, glob, NULL, &jsUDPClass_,
+                            jsUDP, 1,
+                            udpSocketProperties_, 
+                            udpSocketMethods_, 
+                            0, 0 );
+   if( udpProto )
    {
+      JS_AddRoot( cx, &udpProto );
       return true ;
    }
    else
