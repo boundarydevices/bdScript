@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.21  2002-12-12 15:41:34  ericn
+ * Revision 1.22  2002-12-15 00:07:58  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.21  2002/12/12 15:41:34  ericn
  * -added environment routines
  *
  * Revision 1.20  2002/12/10 04:48:30  ericn
@@ -301,10 +304,8 @@ int prMain(int argc, char **argv)
                                     }
                                     else 
                                     {
-                                       printf( "collectin' garbage\n" );
                                        mutexLock_t lock( execMutex_ );
                                        JS_GC( cx );
-                                       printf( "done\n" );
                                     }
                                  }
                               }
