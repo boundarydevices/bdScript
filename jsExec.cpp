@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.53  2003-08-24 17:30:31  ericn
+ * Revision 1.54  2003-08-24 22:02:13  ericn
+ * -added shutdown routine for jsProcess.cpp
+ *
+ * Revision 1.53  2003/08/24 17:30:31  ericn
  * -added child process control (sort of)
  *
  * Revision 1.52  2003/08/23 02:50:26  ericn
@@ -437,9 +440,9 @@ int prMain(int argc, char **argv)
                      shutdownTTY();
                      shutdownGpio();
 
+                     shutdownJSProcesses();
                      shutdownCurlWorkers();
                      shutdownCCDiskCache();
-
                      audioQueue_t::shutdown();
 
                      if( tsThread )
