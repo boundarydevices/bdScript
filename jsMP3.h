@@ -1,5 +1,5 @@
 #ifndef __JSMP3_H__
-#define __JSMP3_H__ "$Id: jsMP3.h,v 1.6 2002-11-30 00:31:39 ericn Exp $"
+#define __JSMP3_H__ "$Id: jsMP3.h,v 1.7 2003-07-30 20:25:13 ericn Exp $"
 
 /*
  * jsMP3.h
@@ -22,6 +22,7 @@
  *    frameCount  - number of MP3 frames
  *    sampleRate  - output playback rate
  *    numChannels - number of output channels
+ *    duration    - total seconds of audio
  *
  * Methods of mp3File objects include:
  *
@@ -34,7 +35,10 @@
  * Change History : 
  *
  * $Log: jsMP3.h,v $
- * Revision 1.6  2002-11-30 00:31:39  ericn
+ * Revision 1.7  2003-07-30 20:25:13  ericn
+ * -added comment
+ *
+ * Revision 1.6  2002/11/30 00:31:39  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.5  2002/11/14 14:24:17  ericn
