@@ -39,10 +39,10 @@ int main( int argc, char const * const argv[] )
                      socklen_t   remSize = sizeof( remote );
                      int const numRx = recvfrom( sFd, rxBuf, RXSIZE, 0, 
                                                  (struct sockaddr *)&remote, &remSize );
-                     if( numRx == RXSIZE )
+                     if( 0 < numRx  )
                      {
-//                        printf( "%u\n", numRx );
-                        printf( "%c", rxBuf[0] ); fflush( stdout );
+                        printf( "%u\n", numRx );
+//                        printf( "%c", rxBuf[0] ); fflush( stdout );
                      }
                      else
                      {
