@@ -1,5 +1,5 @@
 #ifndef __FLASHTHREAD_H__
-#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.1 2003-11-22 18:30:04 ericn Exp $"
+#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.2 2003-11-22 19:51:24 ericn Exp $"
 
 /*
  * flashThread.h
@@ -31,7 +31,10 @@
  * Change History : 
  *
  * $Log: flashThread.h,v $
- * Revision 1.1  2003-11-22 18:30:04  ericn
+ * Revision 1.2  2003-11-22 19:51:24  ericn
+ * -fixed sound support (pause,stop)
+ *
+ * Revision 1.1  2003/11/22 18:30:04  ericn
  * -Initial import
  *
  *
@@ -116,8 +119,12 @@ private:
    int                  fdWriteCtrl_ ;
    int                  fdReadEvents_ ;
    int                  fdWriteEvents_ ;
+   unsigned volatile    soundsQueued_ ;
+   unsigned volatile    soundsCompleted_ ;
    friend void *flashThread( void *params );
    friend int main( int argc, char const * const argv[] );
+   friend void flashSoundComplete( void *param );
+   friend class flashSoundMixer ;
 };
 
 #endif

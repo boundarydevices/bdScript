@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.1  2003-11-22 18:30:08  ericn
+ * Revision 1.2  2003-11-22 19:51:27  ericn
+ * -fixed sound support (pause,stop)
+ *
+ * Revision 1.1  2003/11/22 18:30:08  ericn
  * -Initial import
  *
  *
@@ -42,15 +45,17 @@ getSwf(char *url, int level, void *client_data)
 
 class flashSoundMixer : public SoundMixer {
 public:
-	flashSoundMixer( void );
+	flashSoundMixer( flashThread_t *parent );
 	~flashSoundMixer();
 
 	void		 startSound(Sound *sound);	// Register a sound to be played
 	void		 stopSounds();		// Stop every current sounds in the instance
+        flashThread_t *const parent_ ;
 };
 
-flashSoundMixer :: flashSoundMixer( void )
+flashSoundMixer :: flashSoundMixer( flashThread_t *parent )
    : SoundMixer( "" )  // keep it happy
+   , parent_( parent )
 {
 }
 
@@ -60,13 +65,16 @@ flashSoundMixer :: ~flashSoundMixer()
 
 #include "hexDump.h"
 
-static void flashSoundComplete( void *param )
+void flashSoundComplete( void *param )
 {
+   ((flashThread_t *)param )->soundsCompleted_++ ;
+
    printf( "flashSoundComplete:%p\n", param );
 }
 
 void flashSoundMixer :: startSound(Sound *sound)
 {
+   parent_->soundsQueued_++ ;
    getAudioQueue().queuePlayback( (unsigned char *)sound->getSamples(), 
                                   sound->getSampleSize()*sound->getNbSamples(),
                                   sound,
@@ -95,12 +103,14 @@ flashThread_t :: flashThread_t
    , bgColor_( bgColor )
    , loop_( loop )
    , fbMem_( 0 )
-   , mixer_( new flashSoundMixer() )
+   , mixer_( new flashSoundMixer( this ) )
    , threadHandle_( (pthread_t)-1 )
    , fdReadCtrl_( -1 )
    , fdWriteCtrl_( -1 )
    , fdReadEvents_( -1 )
    , fdWriteEvents_( -1 )
+   , soundsQueued_( 0 )
+   , soundsCompleted_( 0 )
 {
    memset( &display_, 0, sizeof( display_ ) );
    int fdCtrl[2];
@@ -205,6 +215,13 @@ printf( "closing\n" );
    }
 
    ( (FlashMovie *)hFlash_ )->sm = 0 ;
+
+   if( soundsQueued_ != soundsCompleted_ )
+   {
+      unsigned numCancelled ;
+      getAudioQueue().clear( numCancelled );
+   }
+
    if( mixer_ )
       delete mixer_ ;
 printf( "destructor done\n" ); fflush( stdout );
@@ -272,6 +289,11 @@ void *flashThread( void *param )
                }
                case flashThread_t::pause_e :
                {
+                  if( tObj.soundsQueued_ != tObj.soundsCompleted_ )
+                  {
+                     unsigned numCancelled ;
+                     getAudioQueue().clear( numCancelled );
+                  }
                   prog->pauseMovie();
                   running = false ;
                   break;
@@ -284,6 +306,11 @@ void *flashThread( void *param )
                }
                case flashThread_t::stop_e :
                {
+                  if( tObj.soundsQueued_ != tObj.soundsCompleted_ )
+                  {
+                     unsigned numCancelled ;
+                     getAudioQueue().clear( numCancelled );
+                  }
                   prog->pauseMovie();
                   prog->rewindMovie();
                   running = false ;
@@ -402,10 +429,23 @@ int main( int argc, char const * const argv[] )
                     "   height %lu\n"
                     "   version %lu\n", 
                     fi.frameRate, fi.frameCount, fi.frameWidth, fi.frameHeight, fi.version );
-            
-/*            
-*/
-            flashThread_t flash( hFlash, 0, 0, 222, 239, 0xFFFF, true );
+            fbDevice_t &fb = getFB();
+            unsigned long const widthMult = fi.frameWidth/fb.getWidth();
+            unsigned long const heightMult = fi.frameHeight/fb.getHeight();
+            unsigned flashWidth, flashHeight ;
+            if( widthMult > heightMult )
+            {
+               flashWidth  = fi.frameWidth/widthMult ;
+               flashHeight = fi.frameHeight/widthMult ;
+            }
+            else
+            {
+               flashWidth  = fi.frameWidth/heightMult ;
+               flashHeight = fi.frameHeight/heightMult ;
+            }
+            printf( "display at %ux%u\n", flashWidth, flashHeight );
+
+            flashThread_t flash( hFlash, 0, 0, flashWidth, flashHeight, 0xFFFFFF, true );
             while( 1 )
             {
                pollfd filedes[2];
