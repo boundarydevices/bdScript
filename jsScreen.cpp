@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.11  2002-12-27 23:30:54  ericn
+ * Revision 1.12  2003-02-08 14:56:27  ericn
+ * -removed redundant declaration
+ *
+ * Revision 1.11  2002/12/27 23:30:54  ericn
  * -made global screen
  *
  * Revision 1.10  2002/12/15 20:01:16  ericn
@@ -436,8 +439,6 @@ enum jsScreen_tinyId {
    SCREEN_HEIGHT, 
    SCREEN_PIXBUF,
 };
-
-extern JSClass jsScreenClass_ ;
 
 JSClass jsScreenClass_ = {
   "Screen",
