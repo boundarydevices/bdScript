@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.15  2004-03-27 20:23:10  ericn
+ * Revision 1.16  2004-05-05 03:18:34  ericn
+ * -updated to work with jsPrinter base class
+ *
+ * Revision 1.15  2004/03/27 20:23:10  ericn
  * -added ioctl calls
  *
  * Revision 1.14  2003/07/08 13:15:17  ericn
@@ -424,16 +427,16 @@ jsCBM1284Stat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
 }
 
 
-static JSFunctionSpec cbm_methods[] = {
-   { "print",        jsCBMPrint,      0,0,0 },
-   { "cut",          jsCBMCut,        0,0,0 },
-   { "close",        jsCBMClose,      0,0,0 },
-   { "flush",        jsCBMFlush,      0,0,0 },
-   { "reset",        jsCBMReset,      0,0,0 },
-   { "getStatus",    jsCBMGetStatus,  0,0,0 },
-   { "chipVer",      jsCBMChipVer,    0,0,0 },
-   { "ctrlReg",      jsCBMCtrlReg,    0,0,0 },
-   { "ieeeStat",     jsCBM1284Stat,   0,0,0 },
+JSFunctionSpec cbm_methods[10] = {
+   { "imageToString",   jsCBMPrint,      0,0,0 },
+   { "cut",             jsCBMCut,        0,0,0 },
+   { "close",           jsCBMClose,      0,0,0 },
+   { "flush",           jsCBMFlush,      0,0,0 },
+   { "reset",           jsCBMReset,      0,0,0 },
+   { "getStatus",       jsCBMGetStatus,  0,0,0 },
+   { "chipVer",         jsCBMChipVer,    0,0,0 },
+   { "ctrlReg",         jsCBMCtrlReg,    0,0,0 },
+   { "ieeeStat",        jsCBM1284Stat,   0,0,0 },
    { 0 }
 };
 
@@ -529,5 +532,16 @@ bool initJSCBM( JSContext *cx, JSObject *glob )
       JS_ReportError( cx, "initializing CBM printer class\n" );
    
    return false ;
+}
+
+void CBMPrinterFixup( JSContext *cx, 
+                      JSObject  *obj )
+{
+   JS_DefineProperty( cx, obj, "width", 
+                      INT_TO_JSVAL( maxWidthBits ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
 }
 
