@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.3  2003-07-31 03:49:43  ericn
+ * Revision 1.4  2003-08-01 14:31:28  ericn
+ * -use mmap from disk cache, not JS data RAM
+ *
+ * Revision 1.3  2003/07/31 03:49:43  ericn
  * -removed debug msgs
  *
  * Revision 1.2  2003/07/30 20:28:10  ericn
@@ -37,88 +40,110 @@
 #include "mpDemux.h"
 #include "mpegDecode.h"
 #include <zlib.h>
+#include "ccActiveURL.h"
+
+extern JSClass jsMpegClass_ ;
 
 static JSBool
 jsMPEGPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "Playing video\n" ); fflush( stdout ); sleep( 2 );
-
-   jsval                dataVal ;
-   JSString            *dataStr ;
-   unsigned char const *data ;
-   if( JS_GetProperty( cx, obj, "data", &dataVal ) 
-       &&
-       JSVAL_IS_STRING( dataVal ) 
-       &&
-       ( 0 != ( dataStr = JSVAL_TO_STRING( dataVal ) ) ) 
-       &&
-       ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
+   unsigned long const handle = (unsigned long)JS_GetInstancePrivate( cx, obj, &jsMpegClass_, NULL );
+   if( 0 != handle )
    {
-      unsigned const length = JS_GetStringLength( dataStr );
-
-      jsval onComplete = JSVAL_VOID ;
-      jsval onCancel = JSVAL_VOID ;
-      
-      unsigned xPos = 0 ;
-      unsigned yPos = 0 ;
-
-      JSObject *rhObj ;
-      if( ( 1 <= argc )
-          &&
-          JSVAL_IS_OBJECT( argv[0] ) 
-          &&
-          ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
+      void const *data ;
+      unsigned long length ;
+      if( getCurlCache().deref( handle, data, length ) )
       {
-         jsval     val ;
-         JSString *sHandler ;
+         jsval onComplete = JSVAL_VOID ;
+         jsval onCancel = JSVAL_VOID ;
          
-         if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
+         unsigned xPos = 0 ;
+         unsigned yPos = 0 ;
+   
+         JSObject *rhObj ;
+         if( ( 1 <= argc )
              &&
-             JSVAL_IS_STRING( val ) )
-         {
-            onComplete = val ;
-         } // have onComplete handler
-         
-         if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
+             JSVAL_IS_OBJECT( argv[0] ) 
              &&
-             JSVAL_IS_STRING( val ) )
+             ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
          {
-            onCancel = val ;
-         } // have onComplete handler
-         
-         if( JS_GetProperty( cx, rhObj, "x", &val ) 
-             &&
-             JSVAL_IS_INT( val ) )
+            jsval     val ;
+            JSString *sHandler ;
+            
+            if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
+                &&
+                JSVAL_IS_STRING( val ) )
+            {
+               onComplete = val ;
+            } // have onComplete handler
+            
+            if( JS_GetProperty( cx, rhObj, "onCancel", &val ) 
+                &&
+                JSVAL_IS_STRING( val ) )
+            {
+               onCancel = val ;
+            } // have onComplete handler
+            
+            if( JS_GetProperty( cx, rhObj, "x", &val ) 
+                &&
+                JSVAL_IS_INT( val ) )
+            {
+               xPos = JSVAL_TO_INT( val );
+            } // have x position
+            
+            if( JS_GetProperty( cx, rhObj, "y", &val ) 
+                &&
+                JSVAL_IS_INT( val ) )
+            {
+               yPos = JSVAL_TO_INT( val );
+            } // have y position
+         } // have right-hand object
+   
+         if( getAudioQueue().queueMPEG( obj, (unsigned char const *)data, length, onComplete, onCancel, xPos, yPos ) )
          {
-            xPos = JSVAL_TO_INT( val );
-         } // have x position
-         
-         if( JS_GetProperty( cx, rhObj, "y", &val ) 
-             &&
-             JSVAL_IS_INT( val ) )
+   //         JS_ReportError( cx, "queued MPEG for playback" );
+         }
+         else
          {
-            yPos = JSVAL_TO_INT( val );
-         } // have y position
-      } // have right-hand object
-
-      if( getAudioQueue().queueMPEG( obj, data, length, onComplete, onCancel, xPos, yPos ) )
-      {
-//         JS_ReportError( cx, "queued MPEG for playback" );
+            JS_ReportError( cx, "Error queueing MPEG for playback" );
+         }
       }
       else
-      {
-         JS_ReportError( cx, "Error queueing MPEG for playback" );
-      }
+         JS_ReportError( cx, "Error dereferencing MPEG data\n" );
    }
    else
-      JS_ReportError( cx, "Invalid MPEG data" );
+      JS_ReportError( cx, "Invalid MPEG handle\n" );
 
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
 }
 
+static JSBool
+jsMPEGRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( obj )
+   {
+      unsigned long const handle = (unsigned long)JS_GetInstancePrivate( cx, obj, &jsMpegClass_, NULL );
+      if( 0 != handle )
+      {
+         JS_SetPrivate( cx, obj, 0 );
+         printf( "deallocate handle %lu\n", handle );
+         getCurlCache().closeHandle( handle );
+         JS_DefineProperty( cx,
+                            obj,
+                            "isLoaded",
+                            JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+      }
+   }
+}
+
 static JSFunctionSpec mpegMethods_[] = {
     {"play",         jsMPEGPlay,           0 },
+    {"release",      jsMPEGRelease,        0 },
     {0}
 };
 
@@ -138,13 +163,13 @@ enum jsMpeg_tinyid {
    MPEGFILE_HEIGHT
 };
 
-extern JSClass jsMpegClass_ ;
+static void jsMPEGFinalize(JSContext *cx, JSObject *obj);
 
 JSClass jsMpegClass_ = {
   "mpegFile",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
-   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsMPEGFinalize,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
@@ -166,120 +191,123 @@ static char const * const numFrameIndeces[] = {
 
 static void mpegOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)data, size );
-   if( sData )
+
+printf( "mpegData %p/%lu\n", data, size ); fflush( stdout );
+
+   mpegDemux_t demux( data, size );
+   mpegDemux_t::bulkInfo_t const *bi = demux.getFrames();
+
+   if( 0 != bi )
    {
       JS_DefineProperty( req.cx_, 
                          req.lhObj_, 
-                         "data",
-                         STRING_TO_JSVAL( sData ),
+                         "duration",
+                         INT_TO_JSVAL( bi->msTotal_ ),
                          0, 0, 
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      data = JS_GetStringBytes( sData );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "streamCount",
+                         INT_TO_JSVAL( bi->count_ ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
       
-      mpegDemux_t demux( data, size );
-      mpegDemux_t::bulkInfo_t const *bi = demux.getFrames();
-   
-      if( 0 != bi )
+      unsigned width = 0, height = 0 ;
+      
+      JSObject *const numFramesObj = JS_NewObject( req.cx_, 0, 0, 0 );
+      if( numFramesObj )
       {
          JS_DefineProperty( req.cx_, 
                             req.lhObj_, 
-                            "duration",
-                            INT_TO_JSVAL( bi->msTotal_ ),
+                            "numFrames",
+                            OBJECT_TO_JSVAL( numFramesObj ),
                             0, 0, 
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "streamCount",
-                            INT_TO_JSVAL( bi->count_ ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         
-         unsigned width = 0, height = 0 ;
-         
-         JSObject *const numFramesObj = JS_NewObject( req.cx_, 0, 0, 0 );
-         if( numFramesObj )
+         unsigned totalFrames = 0 ;
+         for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
          {
-            JS_DefineProperty( req.cx_, 
-                               req.lhObj_, 
-                               "numFrames",
-                               OBJECT_TO_JSVAL( numFramesObj ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            unsigned totalFrames = 0 ;
-            for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
+            mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[sIdx];
+
+            if( mpegDemux_t::videoFrame_e == sAndF.sInfo_.type )
             {
-               mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[sIdx];
-   
-               if( mpegDemux_t::videoFrame_e == sAndF.sInfo_.type )
+               mpegDecoder_t decoder ;
+               for( unsigned i = 0 ; ( 0 == width ) && ( i < sAndF.numFrames_ ); i++ )
                {
-                  mpegDecoder_t decoder ;
-                  for( unsigned i = 0 ; ( 0 == width ) && ( i < sAndF.numFrames_ ); i++ )
-                  {
-                     mpegDemux_t::frame_t const &frame = sAndF.frames_[i];
-                     decoder.feed( frame.data_, frame.length_ );
-                     void const *picture ;
-                     mpegDecoder_t::picType_e type ;
+                  mpegDemux_t::frame_t const &frame = sAndF.frames_[i];
+                  decoder.feed( frame.data_, frame.length_ );
+                  void const *picture ;
+                  mpegDecoder_t::picType_e type ;
 // if( 10 < i ){ printf( "getPicture %u\n", i ); fflush( stdout ); sleep( 1 ); }
-                     while( decoder.getPicture( picture, type, 0 ) )
+                  while( decoder.getPicture( picture, type, 0 ) )
+                  {
+                     if( decoder.haveHeader() )
                      {
-                        if( decoder.haveHeader() )
-                        {
-                           width = decoder.width();
-                           height = decoder.height();
-                           break;
-                        }
+                        width = decoder.width();
+                        height = decoder.height();
+                        break;
                      }
-                  } // keep passin frames til we have video size               
-                  printf( "width %u, height %u\n", width, height );
-               } // video stream
-   
-               
-               JS_DefineProperty( req.cx_, numFramesObj, numFrameIndeces[sAndF.sInfo_.type], 
-                                  INT_TO_JSVAL( sAndF.numFrames_ ),
-                                  0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               totalFrames += sAndF.numFrames_ ;
-            }
+                  }
+               } // keep passin frames til we have video size               
+               printf( "width %u, height %u\n", width, height );
+            } // video stream
+
             
-            JS_DefineProperty( req.cx_, numFramesObj, "total", 
-                               INT_TO_JSVAL( totalFrames ),
+            JS_DefineProperty( req.cx_, numFramesObj, numFrameIndeces[sAndF.sInfo_.type], 
+                               INT_TO_JSVAL( sAndF.numFrames_ ),
                                0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+            totalFrames += sAndF.numFrames_ ;
          }
-   
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "width",
-                            INT_TO_JSVAL( width ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-   
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "height",
-                            INT_TO_JSVAL( height ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
+         
+         JS_DefineProperty( req.cx_, numFramesObj, "total", 
+                            INT_TO_JSVAL( totalFrames ),
+                            0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
       }
-      else
-      {
-         JS_ReportError( req.cx_, "parsing MPEG headers\n" );
-      }
+
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "width",
+                         INT_TO_JSVAL( width ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "height",
+                         INT_TO_JSVAL( height ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      printf( "cc handle %lu\n", req.handle_ );
+      getCurlCache().addRef( req.handle_ );
+      JS_SetPrivate( req.cx_, req.lhObj_, (void *)req.handle_ );
    }
    else
-      JS_ReportError( req.cx_, "Error copying MPEG data\n" );
-   
+   {
+      JS_ReportError( req.cx_, "parsing MPEG headers\n" );
+   }   
+}
+
+static void jsMPEGFinalize(JSContext *cx, JSObject *obj)
+{
+   if( obj )
+   {
+      unsigned long const handle = (unsigned long)JS_GetInstancePrivate( cx, obj, &jsMpegClass_, NULL );
+      if( 0 != handle )
+      {
+         JS_SetPrivate( cx, obj, 0 );
+         printf( "deallocate handle %lu\n", handle );
+         getCurlCache().closeHandle( handle );
+      }
+   }
 }
 
 static JSBool mpegFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -293,6 +321,8 @@ static JSBool mpegFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
+         JS_SetPrivate( cx, thisObj, 0 );
+
          if( queueCurlRequest( thisObj, argv[0], cx, mpegOnComplete ) )
          {
             return JS_TRUE ;
