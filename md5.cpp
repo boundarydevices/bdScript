@@ -1,13 +1,17 @@
 /*
  * Module md5.cpp
  *
- * This module defines ...
+ * This module defines the getMD5() routine as
+ * declared in md5.h
  *
  *
  * Change History : 
  *
  * $Log: md5.cpp,v $
- * Revision 1.1  2003-09-06 18:57:43  ericn
+ * Revision 1.2  2003-09-06 19:50:28  ericn
+ * -added commentary
+ *
+ * Revision 1.1  2003/09/06 18:57:43  ericn
  * -initial import
  *
  *
