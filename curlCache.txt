@@ -57,6 +57,12 @@ pulls requests and posts status values.
    openFile
       add a reference to a file (retrieving ptr/length)
 
+   addRef
+      add a reference to a file which is already open 
+
+   closeHandle
+      decrement the use count for the file and delete if unused
+
    worker thread entry points
    --------------------------
    getRequest                 - called from reader thread
