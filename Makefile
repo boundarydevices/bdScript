@@ -10,6 +10,9 @@ endif
 
 %.o : %.cpp
 	$(CC) -c -DXP_UNIX=1 -O2 $<
+
+%.o : ../boundary1/%.cpp
+	$(CC) -c -DXP_UNIX=1 -O2 $<
    
 curlCacheMain.o: curlCache.h curlCache.cpp Makefile
 	$(CC) -c -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
@@ -37,8 +40,8 @@ urlTest: urlTest.o curlCache.o dirByATime.o
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lpng -lm
+testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o fbDev.o hexDump.o Makefile
+	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o fbDev.o hexDump.o $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lm -lz
 
 ifneq (,$(findstring arm, $(CC)))
    all: curlCache curlGet dirTest urlTest testJS
