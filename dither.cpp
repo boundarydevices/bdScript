@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: dither.cpp,v $
- * Revision 1.2  2004-05-08 19:21:02  ericn
+ * Revision 1.3  2005-01-01 18:28:04  ericn
+ * -fixed luminance
+ *
+ * Revision 1.2  2004/05/08 19:21:02  ericn
  * -fixed rounding, tried to speed it up
  *
  * Revision 1.1  2004/03/17 04:56:19  ericn
@@ -140,8 +143,8 @@ dither_t :: dither_t
             colors[c] += useDown[errPos+c] + rightErrors[c];
 
 /* 100 ms in luminance */
-//         int const l = luminance( colors[0], colors[1], colors[2] );
-         int const l = colors[1];
+         int const l = luminance( colors[0], colors[1], colors[2] );
+//         int const l = colors[1];
          int actual[3];
          int actualRed, actualGreen, actualBlue ;
          unsigned char const mask = ( 1 << (bitOffset&7) );
