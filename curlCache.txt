@@ -46,7 +46,8 @@ pulls requests and posts status values.
          onfailure callback
 
    cancelLoad  - cancel a pending transfer
-      all instances or just this request?
+      cancel operates on the entire URL, not just one request.
+      This simplifies bookkeeping of the request.
 
    deleteFile
       details of request
@@ -98,7 +99,7 @@ Data structure notes
             delete some space to make room for incoming data
             store content of file
 
-      2. Curl Active Entity cache
+      2. Curl Active URL cache
          Consists of an array of 'active' cache entries. These
          entries may not yet have a disk/ram cache entry (not until
          a successful retrieval), but have at least one of the following:
@@ -110,6 +111,10 @@ Data structure notes
          Active cache entries are removed when the last reference to
          them is invalidated from the list above. Their disk/ram entry 
          may remain (until a 'delete' call is made)
+
+         The corresponding object (ccActiveURL.h/.cpp:curlCache_t) contains 
+         the primary mutex used to coordinate accesses from the application 
+         and worker threads.
 
       3. Worker request queue
 
@@ -133,7 +138,7 @@ Data structure notes
 
          These objects don't really live in the cache domain, but they are
          used to control reference counting to open file handles (and mmaps).
-         Each of them has a pointer back to the Active Entity Cache
+         Each of them has a pointer back to the Active URL Cache
 
 Use/case analysis
 
@@ -158,7 +163,7 @@ Data structure linkages:
 
 
                               0/N:1      Active 
-   app request             <---------> entity cache   <---->   worker request
+   app request             <---------> URL cache   <---->   worker request
          ^                         /        |          1:0/1
          |                       /          |
          V                   ----           |
@@ -173,9 +178,9 @@ Data structure linkages:
 
 
 I'm tempted to have file handles talk directly to the disk cache, but deferred
-delete makes this more appropriate for the Active entity cache. Deferred delete
+delete makes this more appropriate for the Active URL cache. Deferred delete
 requires an application request entry, and if the file handle points to the 
-disk cache, either the disk cache needs to point back to the active entity cache
+disk cache, either the disk cache needs to point back to the active URL cache
 or to a list of app requests, making life messy(er).
 
 The reason I'm tempted to have the file handle point to the disk cache is because
@@ -183,11 +188,11 @@ the disk cache needs to know the reference count status (0/1-N) of each file whe
 determining what it can throw out. I can accomplish the same thing by just keeping 
 the reference count in the disk cache data structure.
 
-But wait, I also need a reference count in the active entity cache for use by 
+But wait, I also need a reference count in the active URL cache for use by 
 objects with protocol file://.
 
 So, I'll just place a flag (inUse/not) in the disk cache and keep the reference
-count in the active entity cache.
+count in the active URL cache.
 
 Actually, I'll also put the file open/mmap calls into the disk cache to mask the
 fact that there's header information in the cache'd files.
@@ -227,7 +232,7 @@ says 'abort'.
 
 At startup, a number of callbacks are installed for use by all worker threads. 
 
-No references are made in the ccWorker module to the active entity or disk caches.
+No references are made in the ccWorker module to the active URL or disk caches.
 This should happen inside the callbacks passed to the curl worker thread initialization
 routine.
 
@@ -235,14 +240,14 @@ All of this allows the module to be developed and tested outside of the greater 
 structure.
 
 
-Active Entity Cache
+Active URL Cache
 -------------------
-In general, active entity cache entries serve as glue between the curl worker
+In general, active URL cache entries serve as glue between the curl worker
 threads, the disk cache, and the application request list. 
 
-Each object in the active entity cache corresponds to a single URL.
+Each object in the active URL cache corresponds to a single URL.
 
-More specifically, each entry in the active entity cache connects one or more
+More specifically, each entry in the active URL cache connects one or more
 application requests or file handles to either the curl worker module or the 
 disk cache. 
 
@@ -257,9 +262,9 @@ The data structure consists of
             pointer and length of data
             non-zero reference count
 
-Location of an entity from a URL is performed by a hash table lookup and
+Location of an URL from a URL is performed by a hash table lookup and
 linear search. Note that a couple of things (file handles, get/post identifiers)
-use pointers to active entity cache entries, so we need to firmly plant 
+use pointers to active URL cache entries, so we need to firmly plant 
 these in memory (no STL here!).
 
 Application Request List
@@ -267,7 +272,7 @@ Application Request List
 The application request list is a set of unfulfilled requests from the application. 
 
 The data is kept as a doubly-linked list of objects, pointed to from the application
-entity cache (URL).
+URL cache (URL).
 
 Each request contains a type (get,post) and a set of zero or more callbacks:
    onprogress callback
@@ -276,14 +281,10 @@ Each request contains a type (get,post) and a set of zero or more callbacks:
    oncancel callback
    onfailure callback
 
-Note that get and post calls return references (pointers) to their requests for use
-in 'cancel' and 'delete' calls.
-
-
 Application File Handles
 ------------------------
-File handles are returned to an application as pointers into the active entity cache.
-The active entity cache contains a reference count so that it knows the total number
+File handles are returned to an application as pointers into the active URL cache.
+The active URL cache contains a reference count so that it knows the total number
 outstanding, and can tell when it's okay to invalidate the entry (and possibly delete)
 the file.
 
@@ -292,7 +293,7 @@ the file.
                         --------------------------
 
 Because of the large number of combinations and events involved in the lifetime of an
-active curl entity, I'm going to try and describe the behavior as a state machine.
+active curl URL, I'm going to try and describe the behavior as a state machine.
 
 States:
    Initial        - invalid object, no request URL
@@ -312,7 +313,6 @@ Events:
 I  a - Get request
 I  a - Post request
    a - Open request
-   a - Cancel request
    a - Cancel all request
    a - Delete request
    a - Close file handle
@@ -324,34 +324,21 @@ I  a - Post request
 
 Actions: Rather than exhaustively list the 55 event/state combinations, I'll describe 
 the actions by event since that's the primary thing we have coming in, and some
-events do the same thing for entities in multiple states.
+events do the same thing for URLs in multiple states.
 
    Get/Post requests
       Get requests in the initial state first check the cache (depending on app flag)
          and jump right to the 'open' state if the URL is found.
       Post requests always act like 'no cache' gets
 
-      If the entity state is 'initial', the request is queued to a worker thread
+      If the URL state is 'initial', the request is queued to a worker thread
       and a transition is made to the 'retrieving' state.
 
-      If the entity is in the 'pending cancel' or 'pending delete' state, the 
-      request is fulfilled immediately as 'cancelled'.
+      If the URL is in the 'pending cancel' state, the request is fulfilled 
+      immediately as 'cancelled'.
 
-      If the entity state is 'Open', it remains 'Open', and the request is fulfilled
-      as 'Completed'.
-
-   Cancel requests
-      If a matching, unfulfilled request is found, it is cancelled (with call-backs) and
-      removed from the 'unfulfilled' request list. If all unfulfilled requests for the
-      URL have been cancelled, an attempt is made to notify the worker thread of this
-      and the state is set to 'Pending Cancel'.
-
-      The only way that the request could have been unfulfilled is if the state of the
-      entity was 'retrieving' or 'pending cancel'. Initial, Open or Pending Delete 
-      states can't have unfulfilled requests.
-
-      'Cancel' is not an initiating app event, so it never adds a request to the 
-      application request list.
+      If the URL state is 'Open' or 'pending delete', it remains in the same state and
+      the request is fulfilled as 'Completed'.
 
    Open requests
       This should only occur when the file is in the 'open' state, generally during an
@@ -395,6 +382,12 @@ events do the same thing for entities in multiple states.
       count (and causes an mmap in the disk cache). If this URL was 'posted', the 
       state is changed to 'pending delete', otherwise the state is changed to 'Open'.
 
+   Transfer progress event
+   Have file size event
+      
+      These two events should only occur in the retrieving state, and simply pass
+      the callback to the application.
+      
    Transfer cancelled event
       (Should only occur in state 'Pending Cancel')
       This routine fulfills all get or post requests with status 'cancelled'. 
@@ -410,4 +403,14 @@ events do the same thing for entities in multiple states.
       status 'failed'.
       
       The state returns to 'Initial'.
+
+
+                        File Layout
+                        -----------
+
+ccDiskCache.h/.cpp         declare and define the disk cache
+ccWorker.h/.cpp            declare and define the curl worker thread interfaces
+
+ccActiveURL.h/.cpp         declare and define the active url cache (curlCache_t)
+                           and associated classes
 
