@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
- * Revision 1.3  2003-08-31 16:52:46  ericn
+ * Revision 1.4  2004-04-20 15:18:10  ericn
+ * -Added file class (for devices)
+ *
+ * Revision 1.3  2003/08/31 16:52:46  ericn
  * -added optional timestamp to writeFile, added touch() routine
  *
  * Revision 1.2  2003/08/31 15:06:32  ericn
@@ -32,13 +35,14 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <utime.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include "pollHandler.h"
+#include "stringList.h"
+#include "jsGlobals.h"
 
-/*    readFile( filename );   - returns string with file content
- *    writeFile( filename, data ); - writes data to filename, returns bool or errorMsg
- *    unlink( filename );
- *    copyFile( srcfile, destfile );
- *    renameFile( srcfile, destfile );
- */
+static JSObject *fileProto = NULL ;
 
 static JSBool
 jsReadFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -309,9 +313,433 @@ static JSFunctionSpec _functions[] = {
 };
 
  
-bool initJSFileIO( JSContext *cx, JSObject *glob )
+class filePollHandler_t : public pollHandler_t {
+public:
+   filePollHandler_t( int               fd, 
+                      pollHandlerSet_t &set,
+                      JSContext        *cx );
+   ~filePollHandler_t( void );
+
+   void setCharIn( jsval handler, jsval scope );
+   void setLineIn( jsval handler, jsval scope );
+
+
+   virtual void onDataAvail( void );     // POLLIN
+   virtual void onLineIn( void );
+   virtual void onCharIn( void );
+
+   inline char const *getLine( void ) const { return dataBuf_ ; }
+   inline char getTerm( void ) const { return terminator_ ; }
+
+protected:
+   char           dataBuf_[512];
+   unsigned       numRead_ ;
+   char           terminator_ ;
+   jsval          onLineInCode_ ;
+   jsval          onLineInScope_ ;
+   jsval          onCharInCode_ ;
+   jsval          onCharInScope_ ;
+   JSContext *    cx_ ;
+};
+
+filePollHandler_t :: filePollHandler_t
+   ( int               fd, 
+     pollHandlerSet_t &set,
+     JSContext        *cx )
+   : pollHandler_t( fd, set )
+   , numRead_( 0 )
+   , terminator_( 0 )
+   , onLineInCode_( JSVAL_VOID )
+   , onLineInScope_( JSVAL_VOID )
+   , onCharInCode_( JSVAL_VOID )
+   , onCharInScope_( JSVAL_VOID )
+   , cx_( cx )
 {
-   return JS_DefineFunctions( cx, glob, _functions);
+   JS_AddRoot( cx, &onLineInCode_ );
+   JS_AddRoot( cx, &onLineInScope_ );
+   JS_AddRoot( cx, &onCharInCode_ );
+   JS_AddRoot( cx, &onCharInScope_ );
+   
+   dataBuf_[0] = '\0' ;
+   fcntl( getFd(), F_SETFD, FD_CLOEXEC );
+   setMask( 0 );
+   set.add( *this );
+}
+
+filePollHandler_t :: ~filePollHandler_t( void )
+{
+   JS_RemoveRoot( cx_, &onLineInCode_ );
+   JS_RemoveRoot( cx_, &onLineInScope_ );
+   JS_RemoveRoot( cx_, &onCharInCode_ );
+   JS_RemoveRoot( cx_, &onCharInScope_ );
+}
+
+void filePollHandler_t :: setCharIn( jsval handler, jsval scope )
+{
+   onCharInCode_  = handler ;
+   onCharInScope_ = scope ;
+   if( ( JSVAL_FALSE != onCharInCode_ ) || ( JSVAL_FALSE != onLineInCode_ ) )
+      setMask( POLLIN );
+   else
+      setMask( 0 );
+}
+
+void filePollHandler_t :: setLineIn( jsval handler, jsval scope )
+{
+   onLineInCode_  = handler ;
+   onLineInScope_ = scope ;
+   if( ( JSVAL_FALSE != onCharInCode_ ) || ( JSVAL_FALSE != onLineInCode_ ) )
+      setMask( POLLIN );
+   else
+      setMask( 0 );
+}
+
+void filePollHandler_t :: onDataAvail( void )
+{
+
+   int numAvail = 32 ;
+   if( 0 == ioctl( getFd(), FIONREAD, &numAvail ) )
+   {
+      for( int i = 0 ; i < numAvail ; i++ )
+      {
+         char c ;
+         if( 1 == read( getFd(), &c, 1 ) )
+         {
+            if( ( '\r' == c ) 
+                || 
+                ( '\n' == c ) )
+            {
+               terminator_ = c ;
+               onLineIn();
+               numRead_ = 0 ;
+               dataBuf_[numRead_] = '\0' ;
+            }
+            else if( ( '\x1b' == c )
+                     || 
+                     ( '\x03' == c ) )
+            {
+               terminator_ = c ;
+               numRead_ = 0 ;
+               dataBuf_[numRead_] = '\0' ;
+               onLineIn();
+            }
+            else if( '\x15' == c )     // ctrl-u
+            {
+               numRead_ = 0 ;
+               dataBuf_[numRead_] = '\0' ;
+            }
+            else if( '\b' == c )
+            {
+               if( 0 < numRead_ )
+               {
+                  dataBuf_[--numRead_] = '\0' ;
+               }
+            }
+            else if( numRead_ < ( sizeof( dataBuf_ ) - 1 ) )
+            {
+               dataBuf_[numRead_++] = c ;
+               dataBuf_[numRead_] = '\0' ;
+            }
+         }
+         else
+            break;
+      }
+      
+      if( ( 0 < numRead_ ) && ( JSVAL_VOID != onCharInCode_ ) )
+      {
+         onCharIn();
+         numRead_ = 0 ;
+         dataBuf_[numRead_] = '\0' ;
+      } // have charIn handler
+/*
+*/   
+   }
+   else
+   {
+      perror( "FIONREAD" );
+      setMask( 0 );
+   }
+/*
+*/   
+}
+
+void filePollHandler_t :: onLineIn( void )
+{
+   printf( "linein<%s>, length %u, terminator <%02x>\n", getLine(), strlen( getLine() ), getTerm() );
+}
+
+void filePollHandler_t :: onCharIn( void )
+{
+   printf( "charin<%s>, length %u, terminator <%02x>\n", getLine(), strlen( getLine() ), getTerm() );
+}
+
+static void jsFileFinalize(JSContext *cx, JSObject *obj);
+
+JSClass jsFileClass_ = {
+  "file",
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsFileFinalize,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSPropertySpec fileProperties_[] = {
+  {0,0,0}
+};
+
+static void jsFileFinalize(JSContext *cx, JSObject *obj)
+{
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( 0 != handler )
+   {
+      JS_SetPrivate( cx, obj, 0 );
+      handler->close();
+      delete handler ;
+   }
+}
+
+static int modeFromString( char const *sMode )
+{
+   char const *startMode = sMode ;
+   
+   bool read = false ; bool write = false ;
+   while( *sMode )
+   {
+      char const c = tolower( *sMode );
+      sMode++ ;
+      switch( c )
+      {
+         case 'r' :  read = true ; break ;
+         case 'w' :  write = true ; break ;
+         default:
+            printf( "unknown mode string char : %c\n", c );
+      }
+   }
+   int mode = -1 ;
+   if( read )
+   {
+      if( write )
+         mode = O_RDWR ;
+      else
+         mode = O_RDONLY ;
+   }
+   else if( write )
+   {
+      mode = O_WRONLY ;
+   }
+   else
+      printf( "Invalid mode string %s for file\n", startMode );
+
+   mode |= O_NONBLOCK ;
+
+   return mode ;
+}
+
+static JSBool jsFileIsOpen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( ( 0 != handler ) && handler->isOpen() )
+      *rval = JSVAL_TRUE ;
+
+   return JS_TRUE ;
+}
+
+static JSBool jsFileClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( ( 0 != handler ) && handler->isOpen() )
+   {
+      handler->close();
+      *rval = JSVAL_TRUE ;
+   }
+
+   return JS_TRUE ;
+}
+
+static JSBool jsFileOnCharIn( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   jsval vobj = JSVAL_FALSE ;
+   jsval vhandler = JSVAL_FALSE ;
+   
+   if( ( 1 <= argc )
+       &&
+       ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, argv[0] ) ) )
+   {
+      vhandler = argv[0];
+      if( ( 2 == argc )
+          &&
+          JSVAL_IS_OBJECT( argv[1] ) ) 
+         vobj = argv[1];
+   }
+   else if( 0 == argc )
+   {
+   }  // clearing handler
+   else
+      JS_ReportError( cx, "Usage: file.onCharIn( function, obj ) or file.onCharIn()\n" );
+
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( handler )
+   {
+      handler->setCharIn( vhandler, vobj );
+      *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "file is uninitialized\n" );
+   
+   return JS_TRUE ;
+}
+
+static JSBool jsFileOnLineIn( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   jsval vobj = JSVAL_FALSE ;
+   jsval vhandler = JSVAL_FALSE ;
+   
+   if( ( 1 <= argc )
+       &&
+       ( JSTYPE_FUNCTION == JS_TypeOfValue( cx, argv[0] ) ) )
+   {
+      vhandler = argv[0];
+      if( ( 2 == argc )
+          &&
+          JSVAL_IS_OBJECT( argv[1] ) ) 
+         vobj = argv[1];
+   }
+   else if( 0 == argc )
+   {
+   }  // clearing handler
+   else
+      JS_ReportError( cx, "Usage: file.onLineIn( function, obj ) or file.onLineIn()\n" );
+
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( handler )
+   {
+      handler->setLineIn( vhandler, vobj );
+      *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "file is uninitialized\n" );
+   
+   return JS_TRUE ;
+}
+
+static JSBool jsFileRead( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( 0 == argc )
+   {
+      filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+      if( handler )
+      {
+         char const *data = handler->getLine();
+         unsigned const len = strlen( data );
+         JSString *sData = JS_NewStringCopyN( cx, data, len );
+         *rval = STRING_TO_JSVAL( sData );
+      }
+      else
+         JS_ReportError( cx, "file is uninitialized\n" );
+   }
+   else
+      JS_ReportError( cx, "Usage: file.read();" );
+
+   return JS_TRUE ;
+}
+
+static JSBool jsFileWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
+   {
+      JSString *sParam = JSVAL_TO_STRING( argv[0] );
+      char const *param = JS_GetStringBytes( sParam );
+      unsigned const len = JS_GetStringLength( sParam );
+      filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+      if( handler && handler->isOpen() )
+      {
+         int const numWritten = write( handler->getFd(), param, len );
+         *rval = INT_TO_JSVAL( numWritten );
+      }
+      else
+         JS_ReportError( cx, "file is uninitialized\n" );
+   }
+   else
+      JS_ReportError( cx, "Usage: file.write( string );" );
+
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec fileMethods_[] = {
+    {"isOpen",    jsFileIsOpen,   0 },
+    {"close",     jsFileClose,    0 },
+    {"onCharIn",  jsFileOnCharIn, 0 },
+    {"onLineIn",  jsFileOnLineIn, 0 },
+    {"read",      jsFileRead,     0 },
+    {"write",     jsFileWrite,    0 },
+    {0}
+};
+
+//
+// constructor for the screen object
+//
+static JSBool jsFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] )
+       &&
+       JSVAL_IS_STRING( argv[1] ) )
+   {
+      JSString *jsPath = JSVAL_TO_STRING( argv[0] );
+      char const *fileName = JS_GetStringBytes( jsPath );
+      JSString *jsMode = JSVAL_TO_STRING( argv[1] );
+      int const mode = modeFromString( JS_GetStringBytes( jsMode ) );
+      int const fd = open( fileName, mode );
+      if( 0 <= fd )
+      {
+         obj = JS_NewObject( cx, &jsFileClass_, NULL, NULL );
+   
+         if( obj )
+         {
+            filePollHandler_t *handler = new filePollHandler_t( fd, pollHandlers_, cx );
+            JS_SetPrivate( cx, obj, handler );
+            JS_DefineProperty( cx, obj, "path", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, obj, "mode", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+            *rval = OBJECT_TO_JSVAL(obj);
+         }
+         else
+         {
+            JS_ReportError( cx, "Allocating file %s\n", fileName );   
+            close( fd );
+         }
+      }
+      else
+         JS_ReportError( cx, "%s opening file %s\n", strerror( errno ), fileName );
+   }
+   else
+      JS_ReportError( cx, "Usage: var f = new file( 'path', 'r|w|rw' );" );
+
+   return JS_TRUE;
 }
 
 
+bool initJSFileIO( JSContext *cx, JSObject *glob )
+{
+   fileProto = JS_InitClass( cx, glob, NULL, &jsFileClass_,
+                            jsFile, 1,
+                            fileProperties_, 
+                            fileMethods_,
+                            0, 0 );
+   if( fileProto )
+   {
+      JS_AddRoot( cx, &fileProto );
+      return JS_DefineFunctions( cx, glob, _functions);
+   }
+   else
+      JS_ReportError( cx, "Initializing file class\n" );
+   
+   return false ;
+}
