@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.5  2002-11-24 19:06:58  ericn
+ * Revision 1.6  2002-12-15 00:13:02  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.5  2002/11/24 19:06:58  ericn
  * -modified to use milliseconds, not seconds for output length
  *
  * Revision 1.4  2002/11/14 13:12:44  ericn
@@ -105,7 +108,6 @@ madHeaders_t :: madHeaders_t
                int tagsize = id3_tag_query (stream.this_frame, stream.bufend - stream.this_frame);
                if (tagsize > 0)
                {
-                  printf( "ID3 tag of size %d\n", tagsize );
                   mad_stream_skip (&stream, tagsize);
                   continue;
                }

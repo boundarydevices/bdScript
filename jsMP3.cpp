@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.16  2002-12-03 13:36:13  ericn
+ * Revision 1.17  2002-12-15 00:07:58  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.16  2002/12/03 13:36:13  ericn
  * -collapsed code and objects for curl transfers
  *
  * Revision 1.15  2002/11/30 18:52:57  ericn
@@ -170,7 +173,6 @@ static JSPropertySpec mp3FileProperties_[] = {
 
 static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   printf( "mp3OnComplete\n" );
    //
    // MP3 data is loaded in data[], validate and parse headers
    //

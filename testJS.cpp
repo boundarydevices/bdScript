@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.19  2002-11-30 18:52:57  ericn
+ * Revision 1.20  2002-12-15 00:08:46  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.19  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.18  2002/11/30 16:28:32  ericn
@@ -353,7 +356,6 @@ int main( int argc, char *argv[] )
    int result = PR_Initialize( prMain, argc, argv, 0 );
    if( gotoCalled_ )
    {
-      printf( "executing %s\n", gotoURL_.c_str() );
       argv[1] = (char *)gotoURL_.c_str();
       execv( argv[0], argv ); // start next
    }

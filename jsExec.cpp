@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.22  2002-12-15 00:07:58  ericn
+ * Revision 1.23  2002-12-15 00:08:46  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.22  2002/12/15 00:07:58  ericn
  * -removed debug msgs
  *
  * Revision 1.21  2002/12/12 15:41:34  ericn
@@ -299,7 +302,6 @@ int prMain(int argc, char **argv)
                                     pollCodeQueue( cx, 5000, 10 );
                                     if( gotoCalled_ )
                                     {
-                                       printf( "executing %s\n", gotoURL_.c_str() );
                                        break;
                                     }
                                     else 
