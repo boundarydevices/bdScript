@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.1 2002-09-28 16:50:46 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.2 2002-10-06 14:52:02 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,8 +12,11 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.1  2002-09-28 16:50:46  ericn
- * Initial revision
+ * Revision 1.2  2002-10-06 14:52:02  ericn
+ * -made getCachedName() public
+ *
+ * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
+ * -Initial import
  *
  *
  *
@@ -81,6 +84,8 @@ public:
    //
    curlFile_t get( char const url[] );
 
+   std::string getCachedName( char const url[] );
+
 private:
    curlCache_t( curlCache_t const & ); // no copies
    curlCache_t( char const    *dirName,
@@ -89,7 +94,6 @@ private:
    ~curlCache_t( void );
 
    friend curlCache_t &getCurlCache( void );
-   std::string getCachedName( char const url[] );
    void makeSpace( unsigned numFiles, unsigned long bytes );
 
    //
