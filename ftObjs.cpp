@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.11  2004-07-25 23:56:25  ericn
+ * Revision 1.12  2004-07-28 14:26:59  ericn
+ * -range check penX
+ *
+ * Revision 1.11  2004/07/25 23:56:25  ericn
  * -allow rotation
  *
  * Revision 1.10  2004/07/04 21:30:35  ericn
@@ -50,9 +53,6 @@
 #define obstack_chunk_free free
 #include <obstack.h>
 #include "bitmap.h"
-
-//#define DEBUGPRINT 1
-#include "debugPrint.h"
 
 #define XRES 80
 #define YRES 80
@@ -785,7 +785,8 @@ debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
                    &&
                    ( 0 < inPix ) )
                {
-                  bitmap_t::bltFrom( nextOut, penX, nextIn, inPix, inOffs );
+                  if( 0 <= penX )
+                     bitmap_t::bltFrom( nextOut, penX, nextIn, inPix, inOffs );
                } // row is in range
                nextIn += slot->bitmap.pitch ;
                nextOut += bmpStride ;
