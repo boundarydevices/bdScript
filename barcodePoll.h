@@ -1,5 +1,5 @@
 #ifndef __BARCODEPOLL_H__
-#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.2 2003-10-31 13:31:18 ericn Exp $"
+#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.3 2003-12-27 22:58:49 ericn Exp $"
 
 /*
  * barcodePoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.h,v $
- * Revision 1.2  2003-10-31 13:31:18  ericn
+ * Revision 1.3  2003-12-27 22:58:49  ericn
+ * -added terminator, timeout support
+ *
+ * Revision 1.2  2003/10/31 13:31:18  ericn
  * -added terminator and support for partial reads
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -24,6 +27,9 @@
  */
 
 #include "pollHandler.h"
+#include "pollTimer.h"
+
+class bcPollTimer_t ;
 
 class barcodePoll_t : public pollHandler_t {
 public:
@@ -48,11 +54,14 @@ public:
    virtual void onDataAvail( void );
    void         timeout( void );
    bool         haveTerminator( void ) const { return '\0' != terminator_ ; }
+   int          write( void const *data, int length ) const ;
 
 protected:
-   bool complete_ ;
-   char barcode_[256];
-   char terminator_ ;
+   bcPollTimer_t *timer_ ;
+   int  const     outDelay_ ;
+   bool           complete_ ;
+   char           barcode_[256];
+   char           terminator_ ;
 };
 
 #endif

@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.cpp,v $
- * Revision 1.2  2003-10-31 13:31:21  ericn
+ * Revision 1.3  2003-12-27 22:58:51  ericn
+ * -added terminator, timeout support
+ *
+ * Revision 1.2  2003/10/31 13:31:21  ericn
  * -added terminator and support for partial reads
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -24,6 +27,17 @@
 #include <fcntl.h>
 #include <termios.h>
 
+class bcPollTimer_t : public pollTimer_t {
+public:
+   bcPollTimer_t( barcodePoll_t &bcp )
+      : bcp_( bcp ){}
+
+   virtual void fire( void ){ bcp_.timeout(); }
+
+private:
+   barcodePoll_t &bcp_ ;
+};
+
 barcodePoll_t :: barcodePoll_t
    ( pollHandlerSet_t &set,
      char const      *devName,          // normally /dev/ttyS2
@@ -33,6 +47,8 @@ barcodePoll_t :: barcodePoll_t
      int              outDelay,
      char             terminator )      // end-of-barcode char
    : pollHandler_t( open( devName, O_RDWR ), set ),
+     timer_( ('\0' == terminator ) ? new bcPollTimer_t( *this ) : 0 ),
+     outDelay_( outDelay ),
      complete_( false ),
      terminator_( terminator )
 {
@@ -107,6 +123,10 @@ void barcodePoll_t :: onDataAvail( void )
          complete_ = false ;
          barcode_[0] = '\0' ;
       }
+      else if( 0 != timer_ )
+      {
+         timer_->set( 10 );
+      }
    }
 }
 
@@ -121,13 +141,30 @@ void barcodePoll_t :: timeout( void )
    }
 }
 
+int barcodePoll_t :: write( void const *data, int length ) const 
+{
+   if( 0 == outDelay_ )
+      return ::write( fd_, data, length );
+   else {
+      int numWritten = 0 ;
+      while( 0 < length ) {
+         if( 0 < numWritten )
+            usleep( outDelay_ );
+         numWritten += ::write( fd_, data, 1 );
+         data = (char *)data + 1 ;
+         length--;
+      }
+      return numWritten ;
+   }
+}
 
 #ifdef STANDALONE
 
 int main( void )
 {
    pollHandlerSet_t handlers ;
-   barcodePoll_t    bcPoll( handlers, "/dev/ttyS2" );
+   getTimerPoll( handlers );
+   barcodePoll_t  bcPoll( handlers, "/dev/ttyS2" );
    if( bcPoll.isOpen() )
    {
       printf( "opened bcPoll: fd %d, mask %x\n", bcPoll.getFd(), bcPoll.getMask() );
