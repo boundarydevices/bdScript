@@ -1,5 +1,5 @@
 #ifndef __CURLTHREAD_H__
-#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.1 2002-10-31 02:13:08 ericn Exp $"
+#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.2 2002-11-02 04:12:20 ericn Exp $"
 
 /*
  * curlThread.h
@@ -89,14 +89,19 @@
  *
  *    grab the next item off of the request queue and process the request
  *    when complete:
- *       check the completion status and call either 
- *       request::onComplete()
- *       request::onError()
+ *       if successful
+ *          set the isLoaded flag to true 
+ *          request::onComplete()
+ *       else
+ *          request::onError()
  *
  * Change History : 
  *
  * $Log: curlThread.h,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-02 04:12:20  ericn
+ * -fixed commentary
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
