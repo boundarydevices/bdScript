@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.8  2002-11-14 13:13:17  ericn
+ * Revision 1.9  2002-11-17 00:51:34  ericn
+ * -Added Javascript barcode support
+ *
+ * Revision 1.8  2002/11/14 13:13:17  ericn
  * -added volume module
  *
  * Revision 1.7  2002/11/07 02:13:05  ericn
@@ -63,6 +66,7 @@
 #include "jsMP3.h"
 #include "audioQueue.h"
 #include "jsVolume.h"
+#include "jsBarcode.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -217,6 +221,7 @@ int main(int argc, char **argv)
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
                      initJSVolume( cx, glob );
+                     initJSBarcode( cx, glob );
 
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
@@ -288,6 +293,8 @@ int main(int argc, char **argv)
                      }
                      else
                         fprintf( stderr, "Error opening url %s\n", argv[1] );
+
+                     stopBarcodeThread();
 
                      stopCurlThreads();
 
