@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.10  2003-06-10 23:54:08  ericn
+ * Revision 1.11  2003-07-03 13:59:21  ericn
+ * -modified to close bc handle on exec
+ *
+ * Revision 1.10  2003/06/10 23:54:08  ericn
  * -added check on typeof( onData )
  *
  * Revision 1.9  2003/06/08 15:19:07  ericn
@@ -308,6 +311,7 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
          int const fd = open( deviceName, O_RDWR | O_NOCTTY );
          if( 0 <= fd )
          {
+            fcntl( fd, F_SETFD, FD_CLOEXEC );
             bcrParams_t *params = new bcrParams_t ;
 
             params->object_       = *rval ;
