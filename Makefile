@@ -84,7 +84,7 @@ testJS: testJS.cpp $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH)
-	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lmpeg2 -lvo -lCurlCache -lmpeg2 -lts -lpthread -lm -lz
+	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lmpeg2 -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
