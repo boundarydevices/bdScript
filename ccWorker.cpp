@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.3  2002-11-30 05:24:32  ericn
+ * Revision 1.4  2002-11-30 16:23:59  ericn
+ * -made urls char arrays instead of strings
+ *
+ * Revision 1.3  2002/11/30 05:24:32  ericn
  * -removed debug stuff
  *
  * Revision 1.2  2002/11/29 16:42:55  ericn
@@ -58,8 +61,9 @@ struct progressData_t {
 
 static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
 {
+   printf( "writeData:%u\n", size*nmemb );
    unsigned const total = size*nmemb;
-   
+
    progressData_t *pd = (progressData_t *)userp ;
    if( !*(pd->request_->cancel_) )
    {
@@ -115,7 +119,7 @@ static void *readerThread( void *arg )
 
             if( 0 == result )
             {
-               result = curl_easy_setopt( cHandle, CURLOPT_URL, request.url_.c_str() );
+               result = curl_easy_setopt( cHandle, CURLOPT_URL, request.url_ );
    
                if( 0 == result )
                {
@@ -176,6 +180,7 @@ static void *readerThread( void *arg )
 
          if( ( 0 == errorMsg.size() ) && ( !(*request.cancel_) ) )
          {
+printf( "completed %s\n", request.url_ );
             onComplete_( request, data.c_str(), data.size() );
          }
          else if( (*request.cancel_) )
@@ -248,31 +253,31 @@ static void onCurlComplete( curlTransferRequest_t  &request,
                             void const             *data,
                             unsigned long           numRead )
 {
-   printf( "url %s complete: %lu bytes\n", request.url_.c_str(), numRead );
+   printf( "url %s complete: %lu bytes\n", request.url_, numRead );
 }
 
 static void onCurlFailure( curlTransferRequest_t &request,
                            std::string const     &errorMsg )
 {
-   printf( "url %s failed: %s\n", request.url_.c_str(), errorMsg.c_str() );
+   printf( "url %s failed: %s\n", request.url_, errorMsg.c_str() );
 }
 
 static void onCurlCancel( curlTransferRequest_t &request )
 {
-   printf( "url %s cancelled\n", request.url_.c_str() );
+   printf( "url %s cancelled\n", request.url_ );
 }
 
 
 static void onCurlSize( curlTransferRequest_t &request,
                         unsigned long          size )
 {
-   printf( "url %s: expecting %lu bytes\n", request.url_.c_str(), size );
+   printf( "url %s: expecting %lu bytes\n", request.url_, size );
 }
 
 static void onCurlProgress( curlTransferRequest_t &request,
                             unsigned long          totalReadSoFar )
 {
-   printf( "url %s: %lu bytes so far\n", request.url_.c_str(), totalReadSoFar );
+   printf( "url %s: %lu bytes so far\n", request.url_, totalReadSoFar );
 }
 
 int main( void )
@@ -288,7 +293,7 @@ int main( void )
          curlTransferRequest_t request ;
          
          request.opaque_ = 0 ;
-         request.url_ = inBuf ;
+         strcpy( request.url_, inBuf );
          request.postHead_ = 0 ;
          bool volatile cancel = false ;
          request.cancel_ = &cancel ;

@@ -1,5 +1,5 @@
 #ifndef __CCWORKER_H__
-#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.2 2002-11-29 16:42:44 ericn Exp $"
+#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.3 2002-11-30 16:22:41 ericn Exp $"
 
 /*
  * ccWorker.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: ccWorker.h,v $
- * Revision 1.2  2002-11-29 16:42:44  ericn
+ * Revision 1.3  2002-11-30 16:22:41  ericn
+ * -made urls char arrays instead of strings
+ *
+ * Revision 1.2  2002/11/29 16:42:44  ericn
  * -changed function typedefs
  *
  * Revision 1.1  2002/11/27 18:35:41  ericn
@@ -28,12 +31,12 @@
 
 
 #include <curl/curl.h>
-#include <string>
 #include "mtQueue.h"
+#include <string>
 
 struct curlTransferRequest_t {
    void              *opaque_ ;     // app-specific data
-   std::string        url_ ;        // url to request, should be absolute
+   char              url_[256];     // url to request, should be absolute
    struct HttpPost   *postHead_ ;   // post with parameters or NULL. Deallocated by curl thread.
    bool volatile     *cancel_ ;     // used to tell curl thread to abort
 };
