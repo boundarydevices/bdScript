@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: madTest.cpp,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-11-24 19:07:34  ericn
+ * -modified to use madDecoder_t
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -30,11 +33,13 @@
 #include <unistd.h>
 #include <sys/soundcard.h>
 #include <sys/ioctl.h>
-#include "madHeaders.h"
+#include "madDecode.h"
 
 struct item_t {
-   unsigned char *data_ ;
-   unsigned       length_ ;
+   int                   sampleRate_ ;
+   unsigned short const *data_ ;
+   unsigned              length_ ; // num samples
+   unsigned char         numChannels_ ;
 };
 
 typedef       mtQueue_t<item_t> queue_t ;
@@ -78,117 +83,60 @@ printf( "opened dsp device\n" );
          item_t item ;
          if( queue_.pull( item ) )
          {
-            madHeaders_t headers( item.data_, item.length_ );
-            if( headers.worked() )
-            {
-/*               printf( "playback %lu bytes (%lu seconds) from %p here\n", 
-                       item.length_, 
-                       headers.lengthSeconds(),
-                       item.data_ );
-*/
-               struct mad_stream stream;
-               struct mad_frame	frame;
-               struct mad_synth	synth;
-               mad_stream_init(&stream);
-               mad_stream_buffer(&stream, (unsigned char const *)item.data_, item.length_ );
-               mad_frame_init(&frame);
-               mad_synth_init(&synth);
-
-               bool eof = false ;
-               unsigned short nChannels = 0 ;               
-               
-               unsigned frameId = 0 ;
-
-               if( 0 != ioctl(dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
-                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
-
-               do {
-                  if( -1 != mad_frame_decode(&frame, &stream ) )
-                  {
-                     if( 0 == frameId++ )
-                     {
-                        int sampleRate = frame.header.samplerate ;
-                        if( sampleRate != lastSampleRate )
-                        {   
-                           lastSampleRate = sampleRate ;
+            if( 0 != ioctl(dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+               fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+            if( item.sampleRate_ != lastSampleRate )
+            {   
+               lastSampleRate = item.sampleRate_ ;
 printf( "changing sample rate\n" );
-                           if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &sampleRate ) )
-                           {
-                              fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
-                              break;
-                           }
-                        }
-
-                        nChannels = MAD_NCHANNELS(&frame.header) ;
-
-                     } // first frame... check sample rate
-                     else
-                     {
-                     } // not first frame
-         
-                     mad_synth_frame( &synth, &frame );
-                     if( 1 == nChannels )
-                     {
-                        mad_fixed_t const *left = synth.pcm.samples[0];
-                        for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
-                        {
-                           unsigned short const sample = scale( *left++ );
-                           *nextOut++ = sample ;
-                           *nextOut++ = sample ;
-                           spaceLeft -= 2 ;
-                           if( 0 == spaceLeft )
-                           {
-                              write( dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
-                              nextOut = outBuffer ;
-                              spaceLeft = OUTBUFSIZE ;
-                           }
-                        }
-                     } // mono
-                     else
-                     {
-                        mad_fixed_t const *left  = synth.pcm.samples[0];
-                        mad_fixed_t const *right = synth.pcm.samples[1];
-                        for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
-                        {
-                           *nextOut++ = scale( *left++ );
-                           *nextOut++ = scale( *right++ );
-                           spaceLeft -= 2 ;
-                           if( 0 == spaceLeft )
-                           {
-                              write( dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
-                              nextOut = outBuffer ;
-                              spaceLeft = OUTBUFSIZE ;
-                           }
-                        }
-                     } // stereo
-                  } // frame decoded
-                  else
-                  {
-                     if( !MAD_RECOVERABLE( stream.error ) )
-                        break;
-                  }
-               } while( !( eof || shutdown_ ) );
-   
-               if( eof )
+               if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &item.sampleRate_ ) )
                {
-                  if( OUTBUFSIZE != spaceLeft )
-                  {
-                     write( dspFd_, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
-                     spaceLeft = OUTBUFSIZE ;
-                     nextOut = outBuffer ;
-                  } // flush tail end of output
-                  
-                  if( 0 != ioctl(dspFd_, SNDCTL_DSP_POST, 0 ) ) 
-                     fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
+                  fprintf( stderr, "Error setting sampling rate to %d:%m\n", item.sampleRate_ );
+                  break;
                }
-               /* close input file */
-               
-               mad_stream_finish(&stream);
             }
+            
+            if( 1 == item.numChannels_ )
+            {
+               unsigned short const *left = (unsigned short const *)item.data_ ;
+               for( unsigned i = 0 ; i < item.length_ ; i++ )
+               {
+                  unsigned short const sample = *left++ ;
+                  *nextOut++ = sample ;
+                  *nextOut++ = sample ;
+                  spaceLeft -= 2 ;
+                  if( 0 == spaceLeft )
+                  {
+                     write( dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                     nextOut = outBuffer ;
+                     spaceLeft = OUTBUFSIZE ;
+                  }
+               }
+            } // mono
             else
             {
-               fprintf( stderr, "Error parsing MP3 headers\n" );
-            }
+               unsigned short const *left  = (unsigned short const *)item.data_ ;
+               unsigned short const *right = (unsigned short const *)item.data_ + 1 ;
+               for( unsigned i = 0 ; i < item.length_ ; i++ )
+               {
+                  *nextOut++ = *left++ ;
+                  *nextOut++ = *right++ ;
+                  spaceLeft -= 2 ;
+                  if( 0 == spaceLeft )
+                  {
+                     write( dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                     nextOut = outBuffer ;
+                     spaceLeft = OUTBUFSIZE ;
+                  }
+               }
+            } // stereo
+
+            if( OUTBUFSIZE != spaceLeft )
+            {
+               write( dspFd_, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
+               spaceLeft = OUTBUFSIZE ;
+               nextOut = outBuffer ;
+            } // flush tail end of output
          }
       }
       
@@ -210,7 +158,7 @@ printf( "changing sample rate\n" );
 #include "curlCache.h"
 #include <unistd.h>
 
-int main( void )
+int main( int argc, char const *const argv[] )
 {
    curlCache_t &cache = getCurlCache();
 
@@ -228,21 +176,40 @@ int main( void )
          tsParam.__sched_priority = 1 ;
          pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
          threadHandle_ = (void *)tHandle ;
-         item_t item1 ;
-         item1.data_    = (unsigned char *)malloc( f1.getSize() );
-         memcpy( item1.data_, f1.getData(), f1.getSize() );
-         item1.length_  = f1.getSize();
-         item_t item2 ;
-         item2.data_    = (unsigned char *)malloc( f2.getSize() );
-         memcpy( (unsigned char *)item2.data_, f2.getData(), f2.getSize() );
-         item2.length_  = f2.getSize();
-         while( 1 )
+
+         madDecoder_t decode1( f1.getData(), f1.getSize() );
+         if( decode1.worked() )
          {
-            printf( "playback\n" );
-            queue_.push( item1 );
-            queue_.push( item2 );
-            sleep( 5 );
+            madDecoder_t decode2( f2.getData(), f2.getSize() );
+            if( decode2.worked() )
+            {
+               item_t item1 ;
+               item1.sampleRate_  = decode1.headers().playbackRate();
+               item1.numChannels_ = decode1.headers().numChannels();
+               item1.data_        = decode1.getSamples();
+               item1.length_      = decode1.numSamples();
+               item_t item2 ;
+               item2.sampleRate_ = decode2.headers().playbackRate();
+               item2.numChannels_ = decode2.headers().numChannels();
+               item2.data_        = decode2.getSamples();
+               item2.length_      = decode2.numSamples();
+
+               int uS = ( 2 == argc ) ? atoi( argv[1] ) : 20000 ;
+
+               while( 1 )
+               {
+                  printf( "playback\n" );
+                  queue_.push( item1 );
+                  usleep( uS );
+                  queue_.push( item2 );
+                  sleep( 5 );
+               }
+            }
+            else
+               fprintf( stderr, "Error decoding file2\n" );
          }
+         else
+            fprintf( stderr, "Error decoding file1\n" );
       }
       else
          fprintf( stderr, "Error %m creating curl-reader thread\n" );
