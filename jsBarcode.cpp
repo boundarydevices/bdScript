@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.14  2004-05-07 13:32:34  ericn
+ * Revision 1.15  2004-05-23 21:25:59  ericn
+ * -make symbol names work off of barcodeReader class
+ *
+ * Revision 1.14  2004/05/07 13:32:34  ericn
  * -made internals external (and shareable)
  *
  * Revision 1.13  2003/12/28 00:36:03  ericn
@@ -646,9 +649,33 @@ char const *const bcrSymNames_[BCR_NUMSYMBOLOGIES] = {
    "pharmacode"
 };
 
-static JSPropertySpec bcReaderProperties_[] = {
-  {0,0,0}
+enum {
+   sym_unknownSym,    
+   sym_upc,           
+   sym_i2of5,         
+   sym_code39,            
+   sym_code128,           
+   sym_ean,               
+   sym_ean128,            
+   sym_codabar,           
+   sym_code93,            
+   sym_pharmacode         
 };
+
+static JSPropertySpec bcReaderProperties_[] = {
+   {bcrSymNames_[0], sym_unknownSym,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[1], sym_upc,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[2], sym_i2of5,         JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[3], sym_code39,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[4], sym_code128,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[5], sym_ean,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[6], sym_ean128,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[7], sym_codabar,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[8], sym_code93,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {bcrSymNames_[9], sym_pharmacode,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT, 0, 0 },
+   {0,0,0,0,0}
+};
+
 
 bool initJSBarcode( JSContext *cx, JSObject *glob )
 {
@@ -656,40 +683,48 @@ bool initJSBarcode( JSContext *cx, JSObject *glob )
                                  jsBarcodeReader, 1,
                                  bcReaderProperties_, 
                                  barcodeReader_methods,
-                                 0, 0 );
+                                 bcReaderProperties_, 0 );
    if( bcReaderProto )
    {
       JS_AddRoot( cx, &bcReaderProto );
 
-      JSObject *symTable = JS_NewArrayObject( cx, 0, NULL );
-
-      // root it
-      if( JS_DefineProperty( cx, bcReaderProto, "symbologyNames", OBJECT_TO_JSVAL( symTable ),
-                             NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
+      JSObject *ctor = JS_GetConstructor( cx, bcReaderProto );
+      if( 0 != ctor )
       {
-         for( unsigned i = BCR_NOSYM ; i < BCR_NUMSYMBOLOGIES ; i++ )
+         JSObject *symTable = JS_NewArrayObject( cx, 0, NULL );
+   
+         // root it
+         if( JS_DefineProperty( cx, ctor, "symbologyNames", OBJECT_TO_JSVAL( symTable ),
+                                NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
          {
-            if( !JS_DefinePropertyWithTinyId( cx, bcReaderProto, bcrSymNames_[i], i, INT_TO_JSVAL( i ), 
-                                              NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
+            for( unsigned i = BCR_NOSYM ; i < BCR_NUMSYMBOLOGIES ; i++ )
             {
-               JS_ReportError( cx, "Defining barcodeReader.%s", bcrSymNames_[i] );
+               if( !JS_DefinePropertyWithTinyId( cx, ctor, bcrSymNames_[i], i, INT_TO_JSVAL( i ), 
+                                                 NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
+               {
+                  JS_ReportError( cx, "Defining barcodeReader.%s", bcrSymNames_[i] );
+               }
+               
+               JSString *sName = JS_NewStringCopyZ( cx, bcrSymNames_[i] );
+               if( sName )
+               {
+                  if( !JS_DefineElement( cx, symTable, i, STRING_TO_JSVAL( sName ), NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
+                     JS_ReportError( cx, "defining symbologyNames[%d]:%s\n", i, bcrSymNames_[i] );
+               }
             }
-            
-            JSString *sName = JS_NewStringCopyZ( cx, bcrSymNames_[i] );
-            if( sName )
-            {
-               if( !JS_DefineElement( cx, symTable, i, STRING_TO_JSVAL( sName ), NULL, NULL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT ) )
-                  JS_ReportError( cx, "defining symbologyNames[%d]:%s\n", i, bcrSymNames_[i] );
-            }
+            return true ;
          }
+         else
+            JS_ReportError( cx, "defining symbology names" );
       }
       else
-         JS_ReportError( cx, "defining symbology names" );
+         JS_ReportError( cx, "getting barcodeReader constructor" );
 
-      return true ;
    }
    else
+   {
       JS_ReportError( cx, "initializing scanner class" );
+   }
 
    return false ;
 }
