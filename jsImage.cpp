@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.4  2002-10-25 04:50:58  ericn
+ * Revision 1.5  2002-10-25 13:47:28  ericn
+ * -fixed memory leak, removed debug code
+ *
+ * Revision 1.4  2002/10/25 04:50:58  ericn
  * -removed debug statements
  *
  * Revision 1.3  2002/10/16 02:03:19  ericn
@@ -318,42 +321,34 @@ imageJPEG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
      
          jpeg_read_header(&cinfo, TRUE);
          cinfo.out_color_space = JCS_RGB ;
-         jpeg_start_decompress(&cinfo);
-/*
-         printf( "started decompress\n" );
-         printf( "width %u, height %u\n", cinfo.output_width, cinfo.output_height );
-         printf( "output components %u\n", cinfo.output_components );
-*/
+         
+         //
+         // per documentation, sample array should be allocated before
+         // start_decompress() call. In order to get the image dimensions,
+         // we need to call calc_output_dimensions().
+         //
+         jpeg_calc_output_dimensions(&cinfo);
+         
          int row_stride = cinfo.output_width * cinfo.output_components;
-//         printf( "row stride %d\n", row_stride );
-
+         unsigned imageWidth  = cinfo.output_width;
+         unsigned imageHeight = cinfo.output_height;
          JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)( (j_common_ptr)&cinfo,
                                                          JPOOL_IMAGE,
                                                          row_stride, 1);
-      
+         jpeg_start_decompress(&cinfo);
+
          // allocate image
-         unsigned imageWidth  = cinfo.output_width;
-         unsigned imageHeight = cinfo.output_height;
-         JSAMPLE * pixels = new JSAMPLE[imageWidth * imageHeight * 3 * sizeof( JSAMPLE )];
       
          unsigned drawWidth  = imageWidth ;
          unsigned drawHeight = imageHeight ;
 
          fbDevice_t &fb = getFB();
          if( startY + drawHeight > fb.getHeight() )
-         {
-//            printf( "truncate to screen drawHeight %u\n", fb.getHeight() );
             drawHeight = fb.getHeight() - startY ;
-         }
 
          if( startX + drawWidth > fb.getWidth() )
-         {
-//            printf( "truncate to screen drawWidth %u\n", fb.getWidth() );
             drawWidth = fb.getWidth() - startX ;
-         }
-//                              printf( "writing %u x %u pixels\n", imageWidth, imageHeight );
 
-//         printf( "image %u x %u, %u x %u\n", imageWidth, imageHeight, drawWidth, drawHeight );
          // read the scanlines
          for( unsigned row = 0 ; row < imageHeight ; row++ )
          {
