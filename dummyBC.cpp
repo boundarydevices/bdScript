@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dummyBC.cpp,v $
- * Revision 1.5  2003-07-04 04:26:18  ericn
+ * Revision 1.6  2003-08-24 22:06:52  ericn
+ * -no linger, reuse address, signal handler\n
+ *
+ * Revision 1.5  2003/07/04 04:26:18  ericn
  * -no, really. Host IP, then port
  *
  * Revision 1.4  2003/07/04 02:42:04  ericn
@@ -44,6 +47,8 @@
 #include <string.h>
 #include <string>
 #include <sys/time.h>
+#include <fcntl.h>
+#include <signal.h>
 
 static unsigned const maxRxSize = 0x200 ;
 
@@ -173,15 +178,58 @@ static void process( int fd )
    }
 }
 
+int tcpFd = -1 ;
+
+static void closeHandle( void )
+{
+   printf( "closing TCP socket\n" ); fflush( stdout );
+   if( 0 <= tcpFd )
+      close( tcpFd );
+   printf( "done closing TCP socket\n" ); fflush( stdout );
+}
+
+static struct sigaction sa;
+
+static void closeOnSignal( int sig )
+{
+   printf( "signal %d\n", sig );
+   closeHandle();
+}
+
 int main( int argc, char const *const argv[] )
 {
    if( 3 == argc )
    {
-      int tcpFd = socket( AF_INET, SOCK_STREAM, 0 );
+      atexit( closeHandle );
+      tcpFd = socket( AF_INET, SOCK_STREAM, 0 );
       if( 0 <= tcpFd )
       {
+         // Initialize the sa structure
+         sa.sa_handler = closeOnSignal ;
+         sigemptyset(&sa.sa_mask);
+         sa.sa_flags = 0;
+
+         // Set up the signal handler
+         sigaction(SIGHUP, &sa, NULL);
+         sigaction(SIGABRT, &sa, NULL);
+         sigaction(SIGSEGV, &sa, NULL);
+         sigaction(SIGKILL, &sa, NULL);
+
+         int doit = 1 ;
+         int result = setsockopt( tcpFd, SOL_SOCKET, SO_REUSEADDR, &doit, sizeof( doit ) );
+         if( 0 != result )
+            fprintf( stderr, "SO_REUSEADDR:%d:%m\n", result );
+         
+         struct linger linger; /* allow a lingering, graceful close; */ 
+         linger.l_onoff  = 0 ; 
+         linger.l_linger = 0 ; 
+         result = setsockopt( tcpFd, SOL_SOCKET, SO_LINGER, &linger, sizeof( linger ) );
+         if( 0 != result )
+            fprintf( stderr, "SO_REUSEADDR:%d:%m\n", result );
+
+         fcntl( tcpFd, F_SETFD, FD_CLOEXEC );
          sockaddr_in myAddress ;
-   
+
          memset( &myAddress, 0, sizeof( myAddress ) );
    
          myAddress.sin_family      = AF_INET;
@@ -200,6 +248,8 @@ int main( int argc, char const *const argv[] )
                   int newFd = ::accept( tcpFd, (struct sockaddr *)&clientAddr, &sockAddrSize );
                   if( 0 <= newFd )
                   {
+                     doit = 1 ;
+                     fcntl( newFd, F_SETFD, FD_CLOEXEC );
                      process( newFd );
                      close( newFd );
                   }
