@@ -1,15 +1,18 @@
 /*
- * Program testEvents.cpp
+ * Program jsExec.cpp
  *
- * This program is a minimal test program for testing 
- * the event-handling and code-queueing facilities of the
- * Mozilla Javascript interpreter
+ * This program is a Javascript shell of sorts, 
+ * which executes the URL specified on the command
+ * line.
  *
  *
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.13  2002-11-17 22:24:45  ericn
+ * Revision 1.14  2002-11-17 23:08:50  ericn
+ * -changed the name
+ *
+ * Revision 1.13  2002/11/17 22:24:45  ericn
  * -reworked goto, added jsShell
  *
  * Revision 1.12  2002/11/17 16:08:33  ericn
