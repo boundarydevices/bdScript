@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.3  2002-11-21 14:09:30  ericn
+ * Revision 1.4  2002-11-30 17:32:47  ericn
+ * -added support for touch-by-move
+ *
+ * Revision 1.3  2002/11/21 14:09:30  ericn
  * -preliminary button support
  *
  * Revision 1.2  2002/11/08 13:57:35  ericn
@@ -211,8 +214,12 @@ void jsTouchScreenThread_t :: onMove
    lastX_ = x ;
    lastY_ = y ;
 
-   if( 0 != onMoveCode_.size() )
-      queueSource( scope_, onMoveCode_, "onMove" );
+   printf( "move %u/%u\n", x, y );
+   if( 0 == curBox_ )
+      onTouch( x, y );
+
+//   if( 0 != onMoveCode_.size() )
+//      queueSource( scope_, onMoveCode_, "onMove" );
 }
 
 static JSFunctionSpec touch_functions[] = {
