@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.16 2004-09-25 21:48:44 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.17 2004-11-16 07:31:11 tkisky Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.16  2004-09-25 21:48:44  ericn
+ * Revision 1.17  2004-11-16 07:31:11  tkisky
+ * -add ConvertRgb24LineTo16
+ *
+ * Revision 1.16  2004/09/25 21:48:44  ericn
  * -added render(bitmap) method
  *
  * Revision 1.15  2004/05/08 14:23:02  ericn
@@ -84,6 +87,7 @@ public:
 
    inline static unsigned short get16( unsigned long rgb );
 
+   static void ConvertRgb24LineTo16(unsigned short* fbMem, unsigned char const *video,int cnt);
    static unsigned short get16( unsigned char red, unsigned char green, unsigned char blue );
 
    //

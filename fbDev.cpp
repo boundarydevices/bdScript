@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.26  2004-11-08 06:56:44  tkisky
+ * Revision 1.27  2004-11-16 07:31:01  tkisky
+ * -add ConvertRgb24LineTo16
+ *
+ * Revision 1.26  2004/11/08 06:56:44  tkisky
  * -640x240 comment
  *
  * Revision 1.25  2004/09/25 21:48:46  ericn
@@ -168,11 +171,16 @@ static void InitBoundaryReordering(void)
 
 unsigned short fbDevice_t :: get16( unsigned char red, unsigned char green, unsigned char blue )
 {
-   return rTable[red>>3]
-        | gTable[green>>2]
-        | bTable[blue>>3];
+   return rTable[red>>3] | gTable[green>>2] | bTable[blue>>3];
 }
 
+void fbDevice_t :: ConvertRgb24LineTo16(unsigned short* fbMem, unsigned char const *video,int cnt)
+{
+	do {
+		*fbMem++ = rTable[video[0]>>3] | gTable[video[1]>>2] | bTable[video[2]>>3];
+		video += 3;
+	} while ((--cnt)>0);
+}
 
 
 
@@ -1001,7 +1009,7 @@ void fbDevice_t :: antialias
                   } // not entirely background, need to mix
                } // not entirely foreground, need to mix
                else
-                  *screenPix = fullColor ;                     
+                  *screenPix = fullColor ;
             }
             else
                break;
