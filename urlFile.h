@@ -1,5 +1,5 @@
 #ifndef __URLFILE_H__
-#define __URLFILE_H__ "$Id: urlFile.h,v 1.1 2002-09-28 16:50:46 ericn Exp $"
+#define __URLFILE_H__ "$Id: urlFile.h,v 1.2 2002-11-30 00:30:12 ericn Exp $"
 
 /*
  * urlFile.h
@@ -19,29 +19,32 @@
  * Change History : 
  *
  * $Log: urlFile.h,v $
- * Revision 1.1  2002-09-28 16:50:46  ericn
- * Initial revision
+ * Revision 1.2  2002-11-30 00:30:12  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
+ * -Initial import
  *
  *
  *
  * Copyright Boundary Devices, Inc. 2002
  */
 
+#include <string>
+
 class urlFile_t {
 public:
    urlFile_t( char const url[] );
    ~urlFile_t( void );
 
-   inline bool          isOpen( void ) const { return 0 <= fd_ ; }
+   inline bool          isOpen( void ) const { return 0 != data_ ; }
    inline unsigned long getSize( void ) const { return size_ ; }
    inline void const   *getData( void ) const { return data_ ; }
 
-private:
-   int           fd_ ;
-   unsigned long size_ ;
-   void const   *data_ ;
-   unsigned long mappedSize_ ; // for curlFile_t's
-   void const   *mapPtr_ ; // for curlFile_t's
+   std::string const url_ ;
+   void const       *data_ ;
+   unsigned long     size_ ;
+   unsigned long     handle_ ;
 };
 
 

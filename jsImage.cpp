@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.16  2002-11-23 16:29:15  ericn
+ * Revision 1.17  2002-11-30 00:31:24  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.16  2002/11/23 16:29:15  ericn
  * -added alpha channel support for PNG and GIF
  *
  * Revision 1.15  2002/11/22 21:31:43  tkisky
@@ -69,7 +72,7 @@
 #include "imgGIF.h"
 #include "imgPNG.h"
 #include "imgJPEG.h"
-#include "curlThread.h"
+#include "jsCurl.h"
 #include "jsGlobals.h"
 
 JSBool
@@ -159,42 +162,36 @@ static JSPropertySpec imageProperties_[] = {
   {0,0,0}
 };
 
-static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+static void imageOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   char const *cMime = f.getMimeType();
-   char const *cData = (char const *)f.getData();
-   unsigned    size  = f.getSize();
-
    bool            worked = false ;
    void const     *pixMap = 0 ;
    void const     *alpha = 0 ;
    unsigned short  width ;
    unsigned short  height ;
    std::string     sError ;
-   if( ( 0 == strcmp( cMime, "image/png" ) )
-       ||
-       ( 0 == strcmp( cMime, "image/x-png" ) ) )
+   char const *cData = (char const *)data ;
+   if( ( 'P' == cData[1] ) && ( 'N' == cData[2] ) && ( 'G' == cData[3] ) )
    {
       worked = imagePNG( cData, size, pixMap, width, height, alpha );
       if( !worked )
          sError = "error converting PNG" ;
    }
-   else if( 0 == strcmp( cMime, "image/jpeg" ) )
+   else if( ('\xff' == cData[0] ) && ( '\xd8' == cData[1] ) && ( '\xff' == cData[2] ) && ( '\xe0' == cData[3] ) )
    {
       worked = imageJPEG( cData, size, pixMap, width, height );
       if( !worked )
-         sError = "error converting PNG" ;
+         sError = "error converting JPEG" ;
    }
-   else if( 0 == strcmp( cMime, "image/gif" ) )
+   else if( 0 == memcmp( data, "GIF8", 4 ) )
    {
       worked = imageGIF( cData, size, pixMap, width, height, alpha );
       if( !worked )
-         sError = "error converting PNG" ;
+         sError = "error converting GIF" ;
    }
    else
    {
-      sError = "unknown mime type: " ;
-      sError += cMime ;
+      sError = "unknown image type: " ;
    }
 
    if( worked )
@@ -228,20 +225,11 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
       }
-      jsCurlOnComplete( req, f );
+      jsCurlOnComplete( req, data, size );
    }
    else
    {   
-      JSString *errorStr = JS_NewStringCopyN( req.cx_, sError.c_str(), sError.size() );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "loadErrorMsg",
-                         STRING_TO_JSVAL( errorStr ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      jsCurlOnError( req, f );
+      jsCurlOnFailure( req, sError );
    }
 
    if( alpha )
@@ -281,8 +269,11 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          request.lhObj_      = thisObj ;
          request.rhObj_      = rhObj ;
          request.cx_         = cx ;
-         request.onComplete  = imageOnComplete ;
-         request.onError     = jsCurlOnError ;
+         request.onComplete_ = imageOnComplete ;
+         request.onFailure_  = jsCurlOnFailure ;
+         request.onCancel_   = jsCurlOnCancel ;
+         request.onSize_     = jsCurlOnSize ; 
+         request.onProgress_ = jsCurlOnProgress ;
          
          if( queueCurlRequest( request, 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
          {

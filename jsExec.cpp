@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.15  2002-11-21 14:04:27  ericn
+ * Revision 1.16  2002-11-30 00:31:48  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.15  2002/11/21 14:04:27  ericn
  * -preliminary button code
  *
  * Revision 1.14  2002/11/17 23:08:50  ericn
@@ -68,13 +71,11 @@
 /* include the JS engine API header */
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
-#include "curlCache.h"
 #include "relativeURL.h"
 #include "jsHyperlink.h"
 #include "codeQueue.h"
 #include "jsTimer.h"
 #include "jsCurl.h"
-#include "curlThread.h"
 #include "jsImage.h"
 #include "jsGlobals.h"
 #include "jsScreen.h"
@@ -87,6 +88,10 @@
 #include "jsBarcode.h"
 #include "jsShell.h"
 #include "jsButton.h"
+#include "ccActiveURL.h"
+#include "ccDiskCache.h"
+#include "ccWorker.h"
+#include "urlFile.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -245,22 +250,21 @@ int prMain(int argc, char **argv)
                      initJSShell( cx, glob );
                      initJSButton( cx, glob );
 
+                     getCurlCache();
+
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
                         tsThread = 0 ;
                      
-                     startCurlThreads();
-
                      //
                      // start up audio output 
                      //
                      audioQueue_t &audioOut = getAudioQueue(); 
 
-                     curlCache_t &cache = getCurlCache();
-                     curlFile_t f( cache.get( argv[1], false ) );
+                     urlFile_t f( argv[1] );
                      if( f.isOpen() )
                      {
-                        pushURL( f.getEffectiveURL() );
+                        pushURL( argv[1] );
          
                         JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
 
@@ -314,10 +318,10 @@ int prMain(int argc, char **argv)
                               }
                            }
                            else
-                              fprintf( stderr, "exec error %s\n", f.getEffectiveURL() );
+                              fprintf( stderr, "exec error %s\n", argv[1] );
                         }
                         else
-                           fprintf( stderr, "Error compiling script %s\n", f.getEffectiveURL() );
+                           fprintf( stderr, "Error compiling script %s\n", argv[1] );
                            
                         popURL();
                      }
@@ -326,7 +330,8 @@ int prMain(int argc, char **argv)
 
                      stopBarcodeThread();
 
-                     stopCurlThreads();
+                     shutdownCurlWorkers();
+                     shutdownCCDiskCache();
 
                      audioQueue_t::shutdown();
 

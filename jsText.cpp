@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.7  2002-11-05 05:40:55  ericn
+ * Revision 1.8  2002-11-30 00:31:29  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.7  2002/11/05 05:40:55  ericn
  * -pre-declare font::isLoaded()
  *
  * Revision 1.6  2002/11/03 17:55:51  ericn
@@ -43,7 +46,7 @@
 #include "jsCurl.h"
 #include "js/jscntxt.h"
 #include "jsGlobals.h"
-#include "curlThread.h"
+#include "jsCurl.h"
 #include "jsAlphaMap.h"
 
 /*
@@ -735,14 +738,14 @@ static JSPropertySpec fontProperties_[] = {
   {0,0,0}
 };
 
-static void fontOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+static void fontOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
    freeTypeLibrary_t library ;
    std::string sError ;
-   freeTypeFont_t font( library, f.getData(), f.getSize() );
+   freeTypeFont_t font( library, data, size );
    if( font.worked() )
    {
-      JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+      JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)data, size );
       if( fontString )
       {
          JS_DefineProperty( req.cx_, req.lhObj_, "data",
@@ -751,7 +754,7 @@ static void fontOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
-         jsCurlOnComplete( req, f );
+         jsCurlOnComplete( req, data, size );
       }
       else
          sError = "Error allocating font string" ;
@@ -761,24 +764,7 @@ static void fontOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
          
    if( 0 < sError.size() )
    {
-      JSString *errorStr = JS_NewStringCopyN( req.cx_, sError.c_str(), sError.size() );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "loadErrorMsg",
-                         STRING_TO_JSVAL( errorStr ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "false",
-                         JSVAL_TRUE,
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      jsCurlOnError( req, f );
+      jsCurlOnFailure( req, sError );
    }
 }
 
@@ -809,11 +795,14 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
          jsCurlRequest_t request ;
-         request.onComplete = fontOnComplete ;
-         request.onError    = jsCurlOnError ;
-         request.lhObj_     = thisObj ;
-         request.rhObj_     = rhObj ;
-         request.cx_        = cx ;
+         request.onComplete_ = fontOnComplete ;
+         request.onFailure_  = jsCurlOnFailure ;
+         request.onCancel_   = jsCurlOnCancel ;
+         request.onSize_     = jsCurlOnSize ; 
+         request.onProgress_ = jsCurlOnProgress ;
+         request.lhObj_      = thisObj ;
+         request.rhObj_      = rhObj ;
+         request.cx_         = cx ;
          
          if( queueCurlRequest( request, 0 != ( cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
          {

@@ -1,5 +1,5 @@
 #ifndef __JSMP3_H__
-#define __JSMP3_H__ "$Id: jsMP3.h,v 1.5 2002-11-14 14:24:17 ericn Exp $"
+#define __JSMP3_H__ "$Id: jsMP3.h,v 1.6 2002-11-30 00:31:39 ericn Exp $"
 
 /*
  * jsMP3.h
@@ -9,7 +9,7 @@
  *
  * When called as a function, mp3File() will download
  * an MP3 file synchronously and try parse the headers. 
- * (See curlThread.h for right-hand object specs).
+ * (See jsCurl.h for right-hand object specs).
  *
  * When used as a constructor, mp3File() queues a download
  * request, and the application can use the onLoad and onLoadError
@@ -34,7 +34,10 @@
  * Change History : 
  *
  * $Log: jsMP3.h,v $
- * Revision 1.5  2002-11-14 14:24:17  ericn
+ * Revision 1.6  2002-11-30 00:31:39  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.5  2002/11/14 14:24:17  ericn
  * -added mp3Cancel() routine
  *
  * Revision 1.4  2002/11/07 02:14:18  ericn

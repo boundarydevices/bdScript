@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.11  2002-11-14 14:24:19  ericn
+ * Revision 1.12  2002-11-30 00:31:37  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.11  2002/11/14 14:24:19  ericn
  * -added mp3Cancel() routine
  *
  * Revision 1.10  2002/11/07 14:51:07  ericn
@@ -49,11 +52,10 @@
 
 #include "jsMP3.h"
 #include "relativeURL.h"
-#include "curlCache.h"
 #include <unistd.h>
 #include <list>
 #include "js/jscntxt.h"
-#include "curlThread.h"
+#include "jsCurl.h"
 #include "mad.h"
 #include "madHeaders.h"
 #include "audioQueue.h"
@@ -158,15 +160,15 @@ static JSPropertySpec mp3FileProperties_[] = {
   {0,0,0}
 };
 
-static void mp3OnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
    //
-   // MP3 data is loaded in f.getData(), validate and parse headers
+   // MP3 data is loaded in data[], validate and parse headers
    //
-   madHeaders_t headers( f.getData(), f.getSize() );
+   madHeaders_t headers( data, size );
    if( headers.worked() )
    {
-      JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+      JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)data, size );
       JS_DefineProperty( req.cx_, 
                          req.lhObj_, 
                          "data",
@@ -207,20 +209,11 @@ static void mp3OnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      jsCurlOnComplete( req, f );
+      jsCurlOnComplete( req, data, size );
    }
    else
    {
-      JSString *errorStr = JS_NewStringCopyZ( req.cx_, "Invalid MP3 file" );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "loadErrorMsg",
-                         STRING_TO_JSVAL( errorStr ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      jsCurlOnError( req, f );
+      jsCurlOnFailure( req, "Invalid MP3 file" );
    }
 }
 
@@ -251,11 +244,14 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
          jsCurlRequest_t request ;
-         request.onComplete = mp3OnComplete ;
-         request.onError    = jsCurlOnError ;
-         request.lhObj_     = thisObj ;
-         request.rhObj_     = rhObj ;
-         request.cx_        = cx ;
+         request.onComplete_ = mp3OnComplete ;
+         request.onFailure_  = jsCurlOnFailure ;
+         request.onCancel_   = jsCurlOnCancel ;
+         request.onSize_     = jsCurlOnSize ; 
+         request.onProgress_ = jsCurlOnProgress ;
+         request.lhObj_      = thisObj ;
+         request.rhObj_      = rhObj ;
+         request.cx_         = cx ;
 
          if( queueCurlRequest( request, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) ) )
          {

@@ -8,8 +8,11 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.1  2002-09-28 16:50:46  ericn
- * Initial revision
+ * Revision 1.2  2002-11-30 00:30:15  ericn
+ * -implemented in terms of ccActiveURL module
+ *
+ * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
+ * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2002
@@ -17,80 +20,74 @@
 
 
 #include "urlFile.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
+#include "ccActiveURL.h"
 #include <string.h>
-#include "curlCache.h"
+
+static semaphore_t sem_ ;
+
+static void onComplete( void         *opaque,
+                        void const   *data,
+                        unsigned long numRead )
+{
+   urlFile_t *f = (urlFile_t *)opaque ;
+   unsigned long identifier ;
+   getCurlCache().openHandle( f->url_, f->data_, f->size_, f->handle_ );
+   printf( "signalling...\n" );
+   if( sem_.signal() )
+      printf( "done\n" );
+   else
+      fprintf( stderr, "Error %m signalling completion\n" );
+}
+
+static void onFailure( void              *opaque,
+                       std::string const &errorMsg )
+{
+   printf( "failed:%s\n", errorMsg.c_str() );
+   sem_.signal();
+}
+
+static void onCancel( void *opaque )
+{
+   printf( "cancelled\n" );
+   sem_.signal();
+}
+
+static void onSize( void         *opaque,
+                    unsigned long size )
+{
+}
+
+static void onProgress( void         *opaque,
+                        unsigned long totalReadSoFar )
+{
+}
+
+static curlCallbacks_t const callbacks_ = {
+   onComplete,
+   onFailure,
+   onCancel,
+   onSize,
+   onProgress
+};
 
 urlFile_t :: urlFile_t( char const url[] )
-   : fd_( -1 ),
+   : url_( url ),
      size_( 0 ),
-     data_( 0 ),
-     mappedSize_( 0 ),
-     mapPtr_( 0 )
+     data_( 0 )
 {
-   char const *const protoEnd = strchr( url, ':' );
-   if( protoEnd )
-   {
-      unsigned protoL = protoEnd-url ;
-      if( ( 4 == protoL ) && ( 0 == strncasecmp( "file", url, protoL ) ) )
-      {
-         fd_ = open( url+7, O_RDONLY );
-         if( 0 <= fd_ )
-         {
-            int eof = lseek( fd_, 0, SEEK_END );
-            if( 0 <= eof )
-            {
-               mappedSize_ = size_ = (unsigned)eof ;
-               mapPtr_ = mmap( 0, size_, PROT_READ, MAP_PRIVATE, fd_, 0 );
-               if( mapPtr_ )
-               {
-                  data_ = mapPtr_ ;
-                  return ;
-               } // worked
-            }
-
-            close( fd_ );
-            fd_ = -1 ;
-         }
-      } // local
-      else if( ( ( 4 == protoL ) && ( 0 == strncasecmp( "http", url, protoL ) ) )
-               ||
-               ( ( 5 == protoL ) && ( 0 == strncasecmp( "https", url, protoL ) ) ) )
-      {
-         curlFile_t f( getCurlCache().get( url ) );
-         if( f.isOpen() )
-         {
-            fd_ = dup( f.fd_ );
-            if( 0 <= fd_ )
-            {
-               mapPtr_ = mmap( 0, f.fileSize_, PROT_READ, MAP_PRIVATE, fd_, 0 );
-               if( mapPtr_ )
-               {
-                  size_ = f.getSize();
-                  mappedSize_ = f.fileSize_ ;
-                  data_ = (char *)mapPtr_ + sizeof( curlFile_t::header_t );
-                  return ;
-               }
-            }
-            
-            close( fd_ );
-         
-         }
-      } // web url 
-   }
+   getCurlCache().get( url, this, callbacks_ );
+   printf( "locking...\n" );
+   printf( "waiting...\n" );
+   if( sem_.wait() )
+      printf( "done...\n" );
+   else
+      printf( "abort...\n" );
 }
 
 urlFile_t :: ~urlFile_t( void )
 {
-   if( 0 != mapPtr_ )
-      munmap( (void *)mapPtr_, mappedSize_ );
-
-   if( 0 <= fd_ )
-      close( fd_ );
+   if( isOpen() )
+      getCurlCache().closeHandle( handle_ );
 }
 
 
@@ -102,6 +99,7 @@ int main( int argc, char const * const argv[] )
 {
    if( 1 < argc ) 
    {
+      getCurlCache();
       for( int arg = 1 ; arg < argc ; arg++ )
       {
          urlFile_t f( argv[arg] );
