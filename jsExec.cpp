@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.34  2003-03-12 02:56:56  ericn
+ * Revision 1.35  2003-03-22 03:33:45  ericn
+ * -added initialization for JPEG compression
+ *
+ * Revision 1.34  2003/03/12 02:56:56  ericn
  * -added module jsTransitions
  *
  * Revision 1.33  2003/03/04 14:45:18  ericn
@@ -131,6 +134,7 @@
 #include "jsTimer.h"
 #include "jsCurl.h"
 #include "jsImage.h"
+#include "jsJPEG.h"
 #include "jsTransitions.h"
 #include "jsGlobals.h"
 #include "jsScreen.h"
@@ -273,6 +277,7 @@ int prMain(int argc, char **argv)
                      initializeCodeQueue( cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
+                     initJSJPEG( cx, glob );
                      initJSTransitions( cx, glob );
                      initJSMP3( cx, glob );
                      initJSAlphaMap( cx, glob );
