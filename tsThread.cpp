@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.4  2002-11-29 16:41:54  ericn
+ * Revision 1.5  2002-11-30 17:32:58  ericn
+ * -added support for move
+ *
+ * Revision 1.4  2002/11/29 16:41:54  ericn
  * -added return value from reader thread
  *
  * Revision 1.3  2002/11/21 14:08:13  ericn
@@ -49,25 +52,25 @@ static void *tsThread( void *arg )
    unsigned const height = fb.getHeight();
 
    int numRead ;
-//   while( sizeof( event ) == ( numRead = read( obj->fdDevice_, &event, sizeof( event ) ) ) )
    while( 0 <= ( numRead = ts_read( obj->tsDevice_, &sample, 1 ) ) )
    {
       if( 1 == numRead )
       {
-//         fprintf( stderr, "touch event %u, x %u, y %u\n", sample.pressure, sample.x, sample.y );
+         //
+         // normalize
+         //
+         if( 0 > sample.x )
+            sample.x = 0 ;
+         else if( width <= sample.x )
+            sample.x = width - 1 ;
+         if( 0 > sample.y )
+            sample.y = 0 ; 
+         else if( height <= sample.y )
+            sample.y = height - 1 ;
+
          bool const down = ( 0 != sample.pressure );
          if( down != wasDown )
          {
-// fprintf( stderr, ", %s", down ? "down" : "up" );
-            if( 0 > sample.x )
-               sample.x = 0 ;
-            else if( width <= sample.x )
-               sample.x = width - 1 ;
-            if( 0 > sample.y )
-               sample.y = 0 ; 
-            else if( height <= sample.y )
-               sample.y = height - 1 ;
-
             if( down )
                obj->onTouch( sample.x, sample.y );
             else
@@ -75,53 +78,11 @@ static void *tsThread( void *arg )
 
             wasDown = down ;
          }
-         else
+         else if( down )
          {
-// fprintf( stderr, ", same %s", down ? "down" : "up" );
+            obj->onMove( sample.x, sample.y );
          }
       } // translated value
-/*
-      if( EV_ABS == event.type )
-      {
-// fprintf( stderr, "touch event %u, code %u, value %u", event.type, event.code, event.value );
-         switch( event.code )
-         {
-            case ABS_X :
-               {
-                  x = event.value ;
-                  break;
-               }
-
-            case ABS_Y :
-               {
-                  y = event.value ;
-                  break;
-               }
-            
-            case ABS_PRESSURE :
-               {
-                  bool const down = ( 0 != event.value );
-                  if( down != wasDown )
-                  {
-// fprintf( stderr, ", %s", down ? "down" : "up" );
-                     if( down )
-                        obj->onTouch( x, y );
-                     else
-                        obj->onRelease();
-
-                     wasDown = down ;
-                  }
-                  else
-                  {
-// fprintf( stderr, ", same %s", down ? "down" : "up" );
-                  }
-                  
-                  break;
-               }
-         }
-//         fprintf( stderr, "\n" );
-      }
-*/      
    }
    
    fprintf( stderr, "touch screen thread shutting down due to error %m\n" );
