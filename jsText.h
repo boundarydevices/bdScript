@@ -1,5 +1,5 @@
 #ifndef __JSTEXT_H__
-#define __JSTEXT_H__ "$Id: jsText.h,v 1.1 2002-10-18 01:18:25 ericn Exp $"
+#define __JSTEXT_H__ "$Id: jsText.h,v 1.2 2002-10-20 16:29:44 ericn Exp $"
 
 /*
  * jsText.h
@@ -11,14 +11,16 @@
  *              pointSize, 
  *              x, y, 
  *              string, 
- *              [fgColor=(RGB)( > 0xFFFFFF == default invert) ], 
- *              [bgColor=(RGB)( > 0xFFFFFF == default transparent) ], 
- *              [orientation( string: 'normal', 'inverted', 'down', 'up' )] );
+ *              [fgColor=(RGB)( > 0xFFFFFF == default white) ], 
+ *              [bgColor=(RGB)( > 0xFFFFFF == default black) ] );
  *
  * Change History : 
  *
  * $Log: jsText.h,v $
- * Revision 1.1  2002-10-18 01:18:25  ericn
+ * Revision 1.2  2002-10-20 16:29:44  ericn
+ * -fixed comment
+ *
+ * Revision 1.1  2002/10/18 01:18:25  ericn
  * -Initial import
  *
  *
