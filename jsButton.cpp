@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.12  2002-12-15 20:01:44  ericn
+ * Revision 1.13  2002-12-16 14:25:41  ericn
+ * -removed warning messages
+ *
+ * Revision 1.12  2002/12/15 20:01:44  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.11  2002/12/11 04:04:48  ericn
@@ -114,8 +117,10 @@ void jsButtonFinalize(JSContext *cx, JSObject *obj)
          delete [] (char *)button->msgString_ ;
       delete button ;
    } // have button data
-   else
-      printf( "no button data\n" );
+//      else
+//         printf( "no button data\n" );
+// this seems to be normal, and unrelated to finalization of a button object
+//
 }
 
 enum jsImage_tinyId {

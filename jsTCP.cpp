@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.2  2002-12-16 14:20:14  ericn
+ * Revision 1.3  2002-12-16 14:25:41  ericn
+ * -removed warning messages
+ *
+ * Revision 1.2  2002/12/16 14:20:14  ericn
  * -added mutex, fixed AddRoot, removed debug msgs
  *
  * Revision 1.1  2002/12/15 20:02:58  ericn
@@ -227,7 +230,6 @@ printf( "TCPClientClose\n" );
 
 void jsTCPClientFinalize(JSContext *cx, JSObject *obj)
 {
-printf( "tcpClientFinalize %p\n", obj );
    if( obj )
    {
       socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
@@ -238,8 +240,10 @@ printf( "tcpClientFinalize %p\n", obj );
             close( socketData->fd_ );
          delete socketData ;
       } // have socket data
-      else
-         printf( "no socket data\n" );
+//      else
+//         printf( "no socket data\n" );
+// this seems to be normal, and unrelated to finalization of a TCP client object
+//
    }
    else
       printf( "TCP finalize NULL object\n" );
