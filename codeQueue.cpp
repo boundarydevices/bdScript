@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.5  2002-12-01 02:42:08  ericn
+ * Revision 1.6  2002-12-01 03:14:42  ericn
+ * -added executeCode() method for handlers
+ *
+ * Revision 1.5  2002/12/01 02:42:08  ericn
  * -added queueCallback() and queueUnrootedSource(), changed dequeueByteCode() to pollCodeQueue()
  *
  * Revision 1.4  2002/11/30 18:52:57  ericn
@@ -76,33 +79,38 @@ bool queueSource( JSObject   *scope,
    return false ;
 }
 
-static void runAndUnlock( void *scriptAndScope )
+void executeCode( JSObject   *scope,
+                  jsval       sourceCode,
+                  char const *sourceFile )
 {
-   scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
-   
    JSString *sVal ;
-   if( JSVAL_IS_STRING( ss->script_ ) 
+   if( JSVAL_IS_STRING( sourceCode ) 
        &&
-       ( 0 != ( sVal = JSVAL_TO_STRING( ss->script_ ) ) ) )
+       ( 0 != ( sVal = JSVAL_TO_STRING( sourceCode ) ) ) )
    {
-      JSScript *scr = JS_CompileScript( context_, ss->scope_, 
+      JSScript *scr = JS_CompileScript( context_, scope, 
                                         JS_GetStringBytes( sVal ), 
                                         JS_GetStringLength( sVal ), 
-                                        ss->source_, 1 );
+                                        sourceFile, 1 );
       if( scr )
       {
          jsval rval; 
-         JSBool const exec = JS_ExecuteScript( context_, ss->scope_, scr, &rval );
+         JSBool const exec = JS_ExecuteScript( context_, scope, scr, &rval );
          JS_DestroyScript( context_, scr );
          if( !exec )
             fprintf( stderr, "error executing code\n" );
       }
       else
-         JS_ReportError( context_, "compiling script from %s", ss->source_ );
+         JS_ReportError( context_, "compiling script from %s", sourceFile );
    }
    else
-      JS_ReportError( context_, "reading script from %s", ss->source_ );
+      JS_ReportError( context_, "reading script from %s", sourceFile );
+}
 
+static void runAndUnlock( void *scriptAndScope )
+{
+   scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
+   executeCode( ss->scope_, ss->script_, ss->source_ );
    JS_RemoveRoot( context_, &ss->script_ );
 
    delete ss ;

@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.4 2002-12-01 02:42:04 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.5 2002-12-01 03:14:21 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.4  2002-12-01 02:42:04  ericn
+ * Revision 1.5  2002-12-01 03:14:21  ericn
+ * -added executeCode() method for handlers
+ *
+ * Revision 1.4  2002/12/01 02:42:04  ericn
  * -added queueCallback() and queueUnrootedSource(), changed dequeueByteCode() to pollCodeQueue()
  *
  * Revision 1.3  2002/11/30 18:52:57  ericn
@@ -58,6 +61,13 @@ typedef void (*callback_t)( void *cbData );
 
 bool queueCallback( callback_t callback,
                     void      *cbData );
+
+//
+// use this to simplify callbacks
+//
+void executeCode( JSObject   *scope,
+                  jsval       sourceCode,
+                  char const *sourceFile );
 
 //
 // returns when idle for specified time in milliseconds,
