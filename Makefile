@@ -72,7 +72,7 @@ dirTest.o: dirByATime.cpp dirByATime.h Makefile
 	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
 
 dirTest: Makefile dirTest.o
-	$(CC) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl
+	$(CC) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl -lz
 
 curlGet: curlGet.cpp $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm
@@ -136,14 +136,6 @@ recordTest: recordTest.o $(LIB)
 	arm-linux-nm recordTest >recordTest.map
 	$(STRIP) recordTest
 
-tsThreadMain.o: tsThread.h tsThread.cpp Makefile
-	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
-
-tsThread: tsThreadMain.o Makefile $(LIB)
-	$(CC) -D_REENTRANT=1 -o tsThread tsThreadMain.o $(LIBS) -lCurlCache -lstdc++ -lts -lpthread -lm
-	arm-linux-nm tsThread >tsThread.map
-	$(STRIP) tsThread
-
 madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
 	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o madHeadersMain.o -O2 -D__STANDALONE__ $(IFLAGS) madHeaders.cpp
 
@@ -174,13 +166,10 @@ ccDiskCache: ccDiskCache.cpp memFile.o Makefile
 	$(CC) -D_REENTRANT=1 -D__STANDALONE__ -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
 
 ccWorker: ccWorker.cpp memFile.o Makefile
-	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread
+	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread -lz -lm
 
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
-
-tsTest: tsTest.cpp
-	$(CC) $(IFLAGS) -o tsTest tsTest.cpp $(LIBS) -lts
 
 testffFormat: testffFormat.cpp
 	$(CC) $(IFLAGS) -o testffFormat testffFormat.cpp $(LIBS) -lavformat -lavcodec -lm -lz
@@ -270,7 +259,7 @@ progFlash: start.o progFlash.o
 	$(LD) -o $@ start.o progFlash.o -L../install/lib/gcc-lib/arm-linux/2.95.3 -lgcc
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview progFlash
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc ffPlay cbmGraph cbmStat jpegview progFlash
 
 .PHONY: install-libs install-headers
 
@@ -291,7 +280,7 @@ install: install-bin install-headers
 
 clean:
 	rm -f *.o *.a *.map *.lst *.sym bc curlGet dirTest urlTest \
-         jsExec testJS ftRender tsTest tsThread madHeaders backtrace \
+         jsExec testJS ftRender madHeaders backtrace \
          cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
          mpeg2mp3 \
          $(LIB)
