@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.35  2003-03-22 03:33:45  ericn
+ * Revision 1.36  2003-04-21 00:24:19  ericn
+ * -added camera initialization
+ *
+ * Revision 1.35  2003/03/22 03:33:45  ericn
  * -added initialization for JPEG compression
  *
  * Revision 1.34  2003/03/12 02:56:56  ericn
@@ -159,6 +162,7 @@
 #include "jsUse.h"
 #include "jsURL.h"
 #include "jsFileIO.h"
+#include "jsCamera.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -294,6 +298,7 @@ int prMain(int argc, char **argv)
                      initJSUse( cx, glob );
                      initJSURL( cx, glob );
                      initJSFileIO( cx, glob );
+                     initJSCamera( cx, glob );
 
                      getCurlCache();
 

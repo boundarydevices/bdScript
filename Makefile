@@ -4,7 +4,7 @@
 OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o jsJPEG.o \
-       jsAlphaMap.o jsBarcode.o jsButton.o jsCurl.o jsGlobals.o \
+       jsAlphaMap.o jsBarcode.o jsButton.o jsCamera.o jsCurl.o jsGlobals.o \
        jsHyperlink.o jsImage.o jsMP3.o jsScreen.o jsShell.o \
        jsText.o jsTimer.o jsTouch.o jsTransitions.o jsURL.o jsVolume.o \
        jsGpio.o madDecode.o madHeaders.o memFile.o parsedURL.o \
