@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: box.cpp,v $
- * Revision 1.2  2002-12-26 19:26:59  ericn
+ * Revision 1.3  2003-01-31 13:27:16  ericn
+ * -fixed touch position for move
+ *
+ * Revision 1.2  2002/12/26 19:26:59  ericn
  * -added onMoveOff support
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -44,6 +47,8 @@ void defaultTouchMoveOff( box_t         &box,
                           unsigned short x,
                           unsigned short y )
 {
+   box.lastTouchX_ = x ;
+   box.lastTouchY_ = y ;
    box.state_ = box.notPressed_ ;
 }
 
