@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.8  2003-06-04 14:38:33  ericn
+ * Revision 1.9  2003-06-05 14:35:17  ericn
+ * -modified error messages to use strerror
+ *
+ * Revision 1.8  2003/06/04 14:38:33  ericn
  * -added deviceId member
  *
  * Revision 1.7  2003/06/04 02:56:45  ericn
@@ -157,7 +160,7 @@ fprintf( stderr, "--> Printing something\n" );
                   *rval = JSVAL_TRUE ;
                }
                else
-                  JS_ReportError( cx, "%m sending print data" );
+                  JS_ReportError( cx, "%s sending print data", strerror( errno ) );
             }
             else
                JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
@@ -289,7 +292,7 @@ fprintf( stderr, "printer port opened: handle %d\n", fd );
                   perror( "getDeviceId" );
             }
             else
-               JS_ReportError( cx, "Error %m opening printer handle" );
+               JS_ReportError( cx, "%s sending print data", strerror( errno ) );
          
             return true ;
          }
