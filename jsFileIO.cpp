@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
- * Revision 1.4  2004-04-20 15:18:10  ericn
+ * Revision 1.5  2004-04-20 15:30:20  ericn
+ * -implemented onLineIn, onCharIn callbacks
+ *
+ * Revision 1.4  2004/04/20 15:18:10  ericn
  * -Added file class (for devices)
  *
  * Revision 1.3  2003/08/31 16:52:46  ericn
@@ -41,6 +44,7 @@
 #include "pollHandler.h"
 #include "stringList.h"
 #include "jsGlobals.h"
+#include "codeQueue.h"
 
 static JSObject *fileProto = NULL ;
 
@@ -317,7 +321,8 @@ class filePollHandler_t : public pollHandler_t {
 public:
    filePollHandler_t( int               fd, 
                       pollHandlerSet_t &set,
-                      JSContext        *cx );
+                      JSContext        *cx,
+                      JSObject         *obj );
    ~filePollHandler_t( void );
 
    void setCharIn( jsval handler, jsval scope );
@@ -335,6 +340,7 @@ protected:
    char           dataBuf_[512];
    unsigned       numRead_ ;
    char           terminator_ ;
+   jsval          vObj_ ;
    jsval          onLineInCode_ ;
    jsval          onLineInScope_ ;
    jsval          onCharInCode_ ;
@@ -345,16 +351,19 @@ protected:
 filePollHandler_t :: filePollHandler_t
    ( int               fd, 
      pollHandlerSet_t &set,
-     JSContext        *cx )
+     JSContext        *cx,
+     JSObject         *obj )
    : pollHandler_t( fd, set )
    , numRead_( 0 )
    , terminator_( 0 )
+   , vObj_( OBJECT_TO_JSVAL( obj ) )
    , onLineInCode_( JSVAL_VOID )
    , onLineInScope_( JSVAL_VOID )
    , onCharInCode_( JSVAL_VOID )
    , onCharInScope_( JSVAL_VOID )
    , cx_( cx )
 {
+   JS_AddRoot( cx, &vObj_ );
    JS_AddRoot( cx, &onLineInCode_ );
    JS_AddRoot( cx, &onLineInScope_ );
    JS_AddRoot( cx, &onCharInCode_ );
@@ -368,6 +377,7 @@ filePollHandler_t :: filePollHandler_t
 
 filePollHandler_t :: ~filePollHandler_t( void )
 {
+   JS_RemoveRoot( cx_, &vObj_ );
    JS_RemoveRoot( cx_, &onLineInCode_ );
    JS_RemoveRoot( cx_, &onLineInScope_ );
    JS_RemoveRoot( cx_, &onCharInCode_ );
@@ -465,12 +475,14 @@ void filePollHandler_t :: onDataAvail( void )
 
 void filePollHandler_t :: onLineIn( void )
 {
-   printf( "linein<%s>, length %u, terminator <%02x>\n", getLine(), strlen( getLine() ), getTerm() );
+   if( JSVAL_VOID != onLineInCode_ )
+      executeCode( JSVAL_TO_OBJECT( onLineInScope_ ), onLineInCode_, "file.onLineIn", 1, &vObj_ );
 }
 
 void filePollHandler_t :: onCharIn( void )
 {
-   printf( "charin<%s>, length %u, terminator <%02x>\n", getLine(), strlen( getLine() ), getTerm() );
+   if( JSVAL_VOID != onCharInCode_ )
+      executeCode( JSVAL_TO_OBJECT( onCharInScope_ ), onCharInCode_, "file.onCharIn", 1, &vObj_ );
 }
 
 static void jsFileFinalize(JSContext *cx, JSObject *obj);
@@ -704,7 +716,7 @@ static JSBool jsFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
    
          if( obj )
          {
-            filePollHandler_t *handler = new filePollHandler_t( fd, pollHandlers_, cx );
+            filePollHandler_t *handler = new filePollHandler_t( fd, pollHandlers_, cx, obj );
             JS_SetPrivate( cx, obj, handler );
             JS_DefineProperty( cx, obj, "path", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
             JS_DefineProperty( cx, obj, "mode", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
