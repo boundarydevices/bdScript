@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsNewTouch.cpp,v $
- * Revision 1.4  2004-01-02 23:36:07  ericn
+ * Revision 1.5  2004-02-04 21:26:13  ericn
+ * -updated to use flashVar for touch settings
+ *
+ * Revision 1.4  2004/01/02 23:36:07  ericn
  * -debugPrint()
  *
  * Revision 1.3  2003/12/03 12:53:08  ericn
@@ -82,6 +85,7 @@
 #include "jsGlobals.h"
 #include "touchPoll.h"
 #include "debugPrint.h"
+#include "flashVar.h"
 
 class jsTouchPoll_t : public touchPoll_t {
 public:
@@ -138,35 +142,30 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
    , xSum_( 0 )
    , ySum_( 0 )
 {
-   static char const calibrateFile[] = {
-      "/etc/jsts.calibrate"
+   static char const calibrateVar[] = {
+      "tsCalibrate"
    };
 
-   FILE *fCal = fopen( calibrateFile, "rt" );
-   if( fCal )
+   char const *flashVar = readFlashVar( calibrateVar );
+   if( flashVar )
    {
-      char inBuf[256];
-      if( fgets( inBuf, sizeof( inBuf ), fCal ) )
+      debugPrint( "<%s>\n", flashVar );
+      long scaleX, scaleY, originX, originY, rangeX, rangeY ;
+      unsigned swap ;
+      if( 7 == sscanf( flashVar, "%ld,%ld,%ld,%ld,%ld,%ld,%u", &scaleX, &scaleY, &originX, &originY, &rangeX, &rangeY, &swap ) )
       {
-         debugPrint( "<%s>\n", inBuf );
-         long scaleX, scaleY, originX, originY, rangeX, rangeY ;
-         unsigned swap ;
-         if( 7 == sscanf( inBuf, "%ld,%ld,%ld,%ld,%ld,%ld,%u", &scaleX, &scaleY, &originX, &originY, &rangeX, &rangeY, &swap ) )
-         {
-            swapXY_  = ( 0 != swap );
-            scaleX_  = scaleX ;
-            scaleY_  = scaleY ;
-            originX_ = originX ;
-            originY_ = originY ;
-            touchPoll_t::setRange( rangeX, rangeY );
-         }
-         else
-            fprintf( stderr, "Invalid calibration settings\n" );
+         swapXY_  = ( 0 != swap );
+         scaleX_  = scaleX ;
+         scaleY_  = scaleY ;
+         originX_ = originX ;
+         originY_ = originY ;
+         touchPoll_t::setRange( rangeX, rangeY );
       }
-      fclose( fCal );
+      else
+         fprintf( stderr, "Invalid calibration settings\n" );
    }
    else
-      perror( calibrateFile );
+      fprintf( stderr, "No touch screen settings, using raw input\n" );
 }
 
 void jsTouchPoll_t :: translate( int &x, int &y ) const 
