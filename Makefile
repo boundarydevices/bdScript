@@ -211,6 +211,10 @@ cbmImage: cbmImage.cpp
 	$(CC) $(IFLAGS) -DMODULETEST=1 -o cbmImage -Xlinker -Map -Xlinker cbmImage.map cbmImage.cpp hexDump.cpp $(LIBS)
 	$(STRIP) $@
 
+pcapTest: pcapTest.cpp $(LIB)
+	$(CC) $(IFLAGS) -o pcapTest -Xlinker -Map -Xlinker pcapTest.map pcapTest.cpp $(LIBS)
+	$(STRIP) $@
+
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
 
 .PHONY: install-libs install-headers
