@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.7  2003-06-04 02:56:45  ericn
+ * Revision 1.8  2003-06-04 14:38:33  ericn
+ * -added deviceId member
+ *
+ * Revision 1.7  2003/06/04 02:56:45  ericn
  * -modified to allocate printer object even if unplugged
  *
  * Revision 1.6  2003/05/26 22:06:15  ericn
@@ -49,10 +52,34 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
+/* ioctls: */
+#define LPGETSTATUS		0x060b		/* same as in drivers/char/lp.c */
+#define IOCNR_GET_DEVICE_ID		1
+#define IOCNR_GET_PROTOCOLS		2
+#define IOCNR_SET_PROTOCOL		3
+#define IOCNR_HP_SET_CHANNEL		4
+#define IOCNR_GET_BUS_ADDRESS		5
+#define IOCNR_GET_VID_PID		6
+/* Get device_id string: */
+#define LPIOC_GET_DEVICE_ID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_DEVICE_ID, len)
+/* The following ioctls were added for http://hpoj.sourceforge.net: */
+/* Get two-int array:
+ * [0]=current protocol (1=7/1/1, 2=7/1/2, 3=7/1/3),
+ * [1]=supported protocol mask (mask&(1<<n)!=0 means 7/1/n supported): */
+#define LPIOC_GET_PROTOCOLS(len) _IOC(_IOC_READ, 'P', IOCNR_GET_PROTOCOLS, len)
+/* Set protocol (arg: 1=7/1/1, 2=7/1/2, 3=7/1/3): */
+#define LPIOC_SET_PROTOCOL _IOC(_IOC_WRITE, 'P', IOCNR_SET_PROTOCOL, 0)
+/* Set channel number (HP Vendor-specific command): */
+#define LPIOC_HP_SET_CHANNEL _IOC(_IOC_WRITE, 'P', IOCNR_HP_SET_CHANNEL, 0)
+/* Get two-int array: [0]=bus number, [1]=device address: */
+#define LPIOC_GET_BUS_ADDRESS(len) _IOC(_IOC_READ, 'P', IOCNR_GET_BUS_ADDRESS, len)
+/* Get two-int array: [0]=vendor ID, [1]=product ID: */
+#define LPIOC_GET_VID_PID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_VID_PID, len)
+
+#define MAXDEVICE 1024
+
 enum jsCBM_tinyId {
-   CBM_WIDTH, 
-   CBM_HEIGHT, 
-   CBM_PIXBUF,
+   CBM_DEVICEID,
 };
 
 JSClass jsCBMClass_ = {
@@ -64,6 +91,7 @@ JSClass jsCBMClass_ = {
 };
 
 static JSPropertySpec cbmProperties_[] = {
+  {"deviceId",        CBM_DEVICEID,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -211,15 +239,6 @@ bool initJSCBM( JSContext *cx, JSObject *glob )
 {
 fprintf( stderr, "--> CBM...CBM...\n" );
 
-   int const fd = open( "/dev/usb/lp0", O_WRONLY );
-   if( 0 <= fd )
-   {
-fprintf( stderr, "printer port opened: handle %d\n", fd );
-      printerFd_ = fd ;
-   }
-   else
-      JS_ReportError( cx, "Error %m opening printer handle" );
-
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCBMClass_,
                                   jsCBM, 1,
                                   cbmProperties_, 
@@ -238,6 +257,40 @@ fprintf( stderr, "printer port opened: handle %d\n", fd );
                                |JSPROP_READONLY ) )
          {
 fprintf( stderr, "--> Defined printer object\n" );
+            int const fd = open( "/dev/usb/lp0", O_WRONLY );
+            if( 0 <= fd )
+            {
+fprintf( stderr, "printer port opened: handle %d\n", fd );
+               printerFd_ = fd ;
+               
+               char * const device_id = new char[MAXDEVICE];	// Device ID string
+         
+               if (ioctl(fd, LPIOC_GET_DEVICE_ID(MAXDEVICE), device_id) == 0)
+               {
+                  unsigned length = (((unsigned)device_id[0] & 255) << 8) +
+                                    ((unsigned)device_id[1] & 255);
+                  memcpy(device_id, device_id + 2, length);
+                  device_id[length] = '\0';
+                  printf( "device id:%s\n", device_id );
+                  JSString *sDeviceId = JS_NewStringCopyN( cx, (char *)device_id, length );
+                  if( sDeviceId )
+                  {
+                     JS_DefineProperty( cx, obj, "deviceId", 
+                                        STRING_TO_JSVAL( sDeviceId ),
+                                        0, 0, 
+                                        JSPROP_ENUMERATE
+                                        |JSPROP_PERMANENT
+                                        |JSPROP_READONLY );
+                  }
+                  else
+                     JS_ReportError( cx, "Error allocating deviceId" );
+               }
+               else
+                  perror( "getDeviceId" );
+            }
+            else
+               JS_ReportError( cx, "Error %m opening printer handle" );
+         
             return true ;
          }
          else
