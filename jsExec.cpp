@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.30  2003-01-20 06:24:12  ericn
+ * Revision 1.31  2003-01-31 13:29:43  ericn
+ * -added module jsURL
+ *
+ * Revision 1.30  2003/01/20 06:24:12  ericn
  * -Added module jsUse
  *
  * Revision 1.29  2003/01/06 04:30:53  ericn
@@ -140,6 +143,7 @@
 #include "jsTCP.h"
 #include "jsTTY.h"
 #include "jsUse.h"
+#include "jsURL.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -271,6 +275,7 @@ int prMain(int argc, char **argv)
                      initJSTCP( cx, glob );
                      initJSTTY( cx, glob );
                      initJSUse( cx, glob );
+                     initJSURL( cx, glob );
 
                      getCurlCache();
 
