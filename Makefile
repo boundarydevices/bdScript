@@ -11,7 +11,8 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        relativeURL.o tsThread.o ultoa.o \
        ultodd.o box.o urlFile.o zOrder.o \
        ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
-       popen.o jsPopen.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o
+       popen.o jsPopen.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
+       voQueue.o
 
 
 ifneq (,$(findstring arm, $(CC)))
@@ -19,7 +20,8 @@ ifneq (,$(findstring arm, $(CC)))
    AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L./ -L../install/arm-linux/lib
-   IFLAGS=-I../install/arm-linux/include/nspr -I../install/arm-linux/include/freetype2 -I../linux-2.4.19/include
+   IFLAGS=-I../install/arm-linux/include/nspr -I../install/arm-linux/include/freetype2 \
+          -I../linux-2.4.19/include -I../ffmpeg-0.4.6/libavformat -I../ffmpeg-0.4.6/libavcodec
    LIB = ../install/arm-linux/lib/libCurlCache.a
 else
 #   CC=g++
@@ -140,6 +142,18 @@ ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 
 tsTest: tsTest.cpp
 	$(CC) $(IFLAGS) -o tsTest tsTest.cpp $(LIBS) -lts
+
+testffFormat: testffFormat.cpp
+	$(CC) $(IFLAGS) -o testffFormat testffFormat.cpp $(LIBS) -lavformat -lavcodec -lm -lz
+	$(STRIP) $@
+
+ffFormat: ffFormat.cpp
+	$(CC) $(IFLAGS) -o ffFormat ffFormat.cpp $(LIBS) -lavformat -lavcodec -lm -lz
+	$(STRIP) $@
+
+ffFrames: ffFrames.cpp $(LIB)
+	$(CC) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
+	$(STRIP) $@
 
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc
 
