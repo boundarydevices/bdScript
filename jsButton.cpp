@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.22  2003-08-26 00:33:13  ericn
+ * Revision 1.23  2003-11-25 00:13:17  ericn
+ * -no need to lock from button handlers
+ *
+ * Revision 1.22  2003/08/26 00:33:13  ericn
  * -added deactivate() method
  *
  * Revision 1.21  2003/08/23 21:36:37  ericn
@@ -202,8 +205,6 @@ static void doit( box_t         &box,
                   touchHandler_t defHandler,
                   char const    *method )
 {
-   mutexLock_t lock( execMutex_ );
-
    buttonData_t *const button = (buttonData_t *)box.objectData_ ;
    assert( 0 != button );
    assert( button->box_ == &box );
