@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.8  2003-06-16 12:54:59  ericn
+ * Revision 1.9  2003-06-22 23:03:42  ericn
+ * -removed debug msg
+ *
+ * Revision 1.8  2003/06/16 12:54:59  ericn
  * -modified to clean up timer threads
  *
  * Revision 1.7  2003/01/05 01:58:15  ericn
@@ -85,7 +88,6 @@ printf( "timer %p (id %x)\n", &arg, pthread_self() );
 
 static void *oneShot( void *arg )
 {
-printf( "oneShot %p (id %x)\n", &arg, pthread_self() );   
    timerParam_t *param = (timerParam_t *)arg ;
 
    unsigned long const ms = param->milliseconds_ ;
