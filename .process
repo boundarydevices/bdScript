@@ -1,8 +1,0 @@
-Microsoft Windows XP [Version 5.1.2600]
-(C) Copyright 1985-2001 Microsoft Corp.
-
-n:\curlCache>makeModule urlFile.cpp
-Include file urlFile.h created
-Module urlFile.cpp created
-
-n:\curlCache>
