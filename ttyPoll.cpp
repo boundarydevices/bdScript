@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ttyPoll.cpp,v $
- * Revision 1.2  2003-12-28 20:54:25  ericn
+ * Revision 1.3  2004-10-28 21:34:56  tkisky
+ * -only add device to list if FIONREAD supported
+ *
+ * Revision 1.2  2003/12/28 20:54:25  ericn
  * -restore on <ctrl-c>
  *
  * Revision 1.1  2003/12/28 15:25:49  ericn
@@ -30,7 +33,7 @@
 ttyPollHandler_t :: ttyPollHandler_t
    ( pollHandlerSet_t &set,
      char const       *devName )
-   : pollHandler_t( ( 0 == devName ) 
+   : pollHandler_t( ( 0 == devName )
                        ? 0
                        : open( devName, O_RDWR ),
                     set )
@@ -38,6 +41,7 @@ ttyPollHandler_t :: ttyPollHandler_t
    , terminator_( 0 )
    , ctrlcHit_( 0 )
 {
+   int numAvail ;
    dataBuf_[0] = '\0' ;
    if( 0 != devName )
       fcntl( getFd(), F_SETFD, FD_CLOEXEC );
@@ -46,8 +50,12 @@ ttyPollHandler_t :: ttyPollHandler_t
    struct termios raw = oldTermState_ ;
    raw.c_lflag &=~ (ICANON | ECHO | ISIG );
    tcsetattr( getFd(), TCSANOW, &raw );
-   setMask( POLLIN );
-   set.add( *this );
+   if( 0 == ioctl( getFd(), FIONREAD, &numAvail ) ) {
+	   setMask( POLLIN );
+	   set.add( *this );
+   } else {
+      perror( "ttyPoll FIONREAD" );
+   }
 }
 /*
 static int signalled;
@@ -66,7 +74,7 @@ main()
     for (i = SIGHUP; i <= SIGPOLL; i++)
 	(void) signal(c, catcher);
 
-    // Get the state of the tty 
+    // Get the state of the tty
     (void) tcgetattr(0, &cooked);
     // Make a copy we can mess with
     (void) memcpy(&raw, &cooked, sizeof(struct termios));
@@ -93,8 +101,8 @@ void ttyPollHandler_t :: onDataAvail( void )
          char c ;
          if( 1 == read( getFd(), &c, 1 ) )
          {
-            if( ( '\r' == c ) 
-                || 
+            if( ( '\r' == c )
+                ||
                 ( '\n' == c ) )
             {
                terminator_ = c ;
