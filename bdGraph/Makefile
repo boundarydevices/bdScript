@@ -10,15 +10,24 @@ OBJS = Scale.o Scale16.o SImageData16.o ScaleUpObj.o ScaleYCbCrf1.o ScaleYf1.o S
 CC=arm-linux-gcc
 LIB = libbdGraph.a
 
-CC_BFLAGS=-D_REENTRANT=1 -c -DXP_UNIX=1 $(IFLAGS) -O2
+ifndef INSTALL_ROOT
+   INSTALL_ROOT = ../../install/arm-linux
+endif
+
+ifndef KERNEL_DIR
+   KERNEL_DIR = ../../linux-2.4.19
+endif
+
+CC_BFLAGS=-c $(IFLAGS) -O2
 CCC_FLAGS1=$(CC_BFLAGS) -DX386
+
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    LD=arm-linux-ld
    STRIP=arm-linux-strip
-   LIBS=-L./ -L../../install/arm-linux/lib
-   IFLAGS= -I../../linux-2.4.19/include
+   LIBS=-L./ -L$(INSTALL_ROOT)lib
+   IFLAGS= -I$(KERNEL_DIR)/include
    CCAS=arm-linux-gcc
    CCC_FLAGS=$(CC_BFLAGS) -mcpu=strongarm -DARM
 else
@@ -31,7 +40,6 @@ else
    STRIP=strip
    CCC_FLAGS=$(CC_BFLAGS) -DX86
 endif
-
 
 CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
 
@@ -99,7 +107,7 @@ all: $(LIB) buildSinTable mic mic-x86 fftTest fftTest-x86
 
 
 install-lib:
-	cp -f -v $(LIB) ../../install/arm-linux/lib/$(LIB)
+	cp -f -v $(LIB) $(INSTALL_ROOT)lib/$(LIB)
 
 install:  install-lib
 
