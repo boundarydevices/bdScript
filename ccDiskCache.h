@@ -1,5 +1,5 @@
 #ifndef __CCDISKCACHE_H__
-#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.2 2002-11-30 05:24:18 ericn Exp $"
+#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.3 2003-08-01 14:28:35 ericn Exp $"
 
 /*
  * ccDiskCache.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.h,v $
- * Revision 1.2  2002-11-30 05:24:18  ericn
+ * Revision 1.3  2003-08-01 14:28:35  ericn
+ * -modified to return status of storeData
+ *
+ * Revision 1.2  2002/11/30 05:24:18  ericn
  * -modified to prevent copies of header_t
  *
  * Revision 1.1  2002/11/26 23:28:06  ericn
@@ -84,7 +87,7 @@ public:
    //
    // commit the temporary item, writing it to disk
    //
-   void storeData( unsigned    sequence,        // input : returned from allocateInitial
+   bool storeData( unsigned    sequence,        // input : returned from allocateInitial
                    unsigned    size,            // input : how much data to store. Must be less than allocation
                    void const *data,            // input : data to write
                    bool        temporary );
