@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.59  2003-09-06 19:50:13  ericn
+ * Revision 1.60  2003-09-09 03:58:34  ericn
+ * -modified to supply default environment variables
+ *
+ * Revision 1.59  2003/09/06 19:50:13  ericn
  * -added md5 routine
  *
  * Revision 1.58  2003/09/05 13:07:34  ericn
@@ -625,6 +628,21 @@ void handler(int sig)
    exit( 1 );
 }
 
+static char const *const requiredEnvVars[] = {
+   "TSLIB_CONFFILE",
+   "TSLIB_PLUGINDIR",
+   "TSLIB_CALIBFILE",
+   "CURLTMPSIZE",
+};
+
+static char const *const defaultEnvVars[] = {
+   "/etc/ts.conf",
+   "/share/ts/plugins",
+   "/etc/ts.calibrate",
+   "4000000"
+};
+
+#include "macros.h"
 
 int main( int argc, char *argv[] )
 {
@@ -636,6 +654,14 @@ int main( int argc, char *argv[] )
    // Set up the signal handler
    sigaction(SIGSEGV, &sa, NULL);
 
+   for( unsigned i = 0 ; i < dim( requiredEnvVars ); i++ )
+   {
+      char const *env = getenv( requiredEnvVars[i] );
+      if( 0 == env )
+      {
+         setenv( requiredEnvVars[i], defaultEnvVars[i], 0 );
+      }
+   }
    char *exePath = argv[0];
    
    {
