@@ -481,8 +481,6 @@ static void *outThread( void *param )
                   if( first || ( ai.fragments < ai.fragstotal ) )
                   {
                      first = false ;
-                     write( queue.dspFd_, aFrame->data_, aFrame->length_ );
-
                      if( ( 0 != aFrame->when_ )
                          &&
                          ( prevPTS != aFrame->when_ ) )
@@ -503,6 +501,8 @@ static void *outThread( void *param )
                               fprintf( stderr, ":SNDCTL_DSP_GETODELAY:%m\n" );
                         }
                      }
+
+                     write( queue.dspFd_, aFrame->data_, aFrame->length_ );
 
                      queue.releaseAudioFrame();
                      if( queue.pullAudio( aFrame ) )
