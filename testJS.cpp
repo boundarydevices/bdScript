@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.12  2002-10-26 14:13:54  ericn
+ * Revision 1.13  2002-10-27 17:38:40  ericn
+ * -added hyperlink and process calls
+ *
+ * Revision 1.12  2002/10/26 14:13:54  ericn
  * -removed debug stmt
  *
  * Revision 1.11  2002/10/25 04:48:39  ericn
@@ -52,6 +55,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* include the JS engine API header */
 #include "js/jsstddef.h"
@@ -65,6 +69,8 @@
 #include "curlCache.h"
 #include "relativeURL.h"
 #include "childProcess.h"
+#include "jsProc.h"
+#include "jsHyperlink.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -211,6 +217,8 @@ int main(int argc, char **argv)
                initJSScreen( cx, glob );
                initJSURL( cx, glob );
                initJSMP3( cx, glob );
+               initJSProc( cx, glob );
+               initJSHyperlink( cx, glob );
                startChildMonitor();
 
                curlCache_t &cache = getCurlCache();
@@ -219,7 +227,7 @@ int main(int argc, char **argv)
                {
                   char const *url = argv[arg];
 //                  printf( "evaluating %s\n", url );
-                  curlFile_t f( cache.get( url, false ) );
+                  curlFile_t f( cache.get( url, true ) );
                   if( f.isOpen() )
                   {
                      pushURL( f.getEffectiveURL() );
@@ -234,6 +242,12 @@ int main(int argc, char **argv)
                         JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
                         if( exec )
                         {
+                           if( gotoCalled_ )
+                           {
+                              argv[2] = (char *)gotoURL_.c_str();
+                              argv[3] = 0 ;
+                              execv( argv[0], argv ); // start next
+                           }
 //                           printf( "executed\n" );
                         }
                         else
