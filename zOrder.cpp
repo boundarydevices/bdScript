@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: zOrder.cpp,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-12-07 23:19:07  ericn
+ * -removed debug msg
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -36,7 +39,6 @@ zOrderMap_t :: ~zOrderMap_t( void )
    
 void zOrderMap_t :: addBox( box_t const &b )
 {
-   printf( "adding box %u, %u/%u, %u/%u\n", b.id_, b.xLeft_, b.xRight_, b.yTop_, b.yBottom_ );
    for( unsigned y = b.yTop_ ; ( y < height_ ) && ( y < b.yBottom_ ); y++ )
    {
       for( unsigned x = b.xLeft_ ; ( x < width_ ) && ( x < b.xRight_ ); x++ )
