@@ -30,89 +30,89 @@ else
 endif
 
 %.o : %.cpp Makefile
-	$(CC) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -D_REENTRANT=1 -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
-	$(CC) -c $(IFLAGS) -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
 
 dirTest: Makefile dirTest.o
-	$(CC) -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl
+	$(CC) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl
 
 curlGet: curlGet.cpp $(LIB) Makefile
-	$(CC) -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm
+	$(CC) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm
 
 urlTest.o: urlFile.cpp urlFile.h Makefile
-	$(CC) -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
 urlTest: urlTest.o $(LIB) 
-	$(CC) -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread
+	$(CC) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread
 
 mp3Play: mp3Play.o $(LIB) 
-	$(CC) -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
+	$(CC) -D_REENTRANT=1 -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
 	$(STRIP) mp3Play
 
-testJS: $(LIB) Makefile
-	$(CC) -ggdb -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+testJS: testJS.cpp $(LIB) Makefile
+	$(CC) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile
-	$(CC) -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
 	$(STRIP) jsExec
 
 madTest: madTest.o $(LIB)
-	$(CC) -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	$(CC) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm madTest >madTest.map
 	$(STRIP) madTest
 
 ftRender.o: ftObjs.h ftObjs.cpp Makefile
-	$(CC) -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
 
 ftRender: ftRender.o $(LIB)
-	$(CC) -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	$(CC) -D_REENTRANT=1 -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
 tsThreadMain.o: tsThread.h tsThread.cpp Makefile
-	$(CC) -c $(IFLAGS) -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
 
 tsThread: tsThreadMain.o Makefile $(LIB)
-	$(CC) -o tsThread tsThreadMain.o $(LIBS) -lCurlCache -lstdc++ -lts -lpthread -lm
+	$(CC) -D_REENTRANT=1 -o tsThread tsThreadMain.o $(LIBS) -lCurlCache -lstdc++ -lts -lpthread -lm
 	arm-linux-nm tsThread >tsThread.map
 	$(STRIP) tsThread
 
 madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
-	$(CC) -c $(IFLAGS) -o madHeadersMain.o -O2 -D__STANDALONE__ $(IFLAGS) madHeaders.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o madHeadersMain.o -O2 -D__STANDALONE__ $(IFLAGS) madHeaders.cpp
 
 madHeaders: madHeadersMain.o Makefile $(LIB)
-	$(CC) -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz 
+	$(CC) -D_REENTRANT=1 -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz 
 	arm-linux-nm madHeaders >madHeaders.map
 	$(STRIP) madHeaders
 
 imgJPEGMain.o : imgJPEG.cpp Makefile
-	$(CC) -c $(IFLAGS) -o imgJPEGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgJPEG.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o imgJPEGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgJPEG.cpp
 
 imgJPEG : imgJPEGMain.o memFile.o hexDump.o fbDev.o
-	$(CC) -o imgJPEG imgJPEGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -ljpeg
+	$(CC) -D_REENTRANT=1 -o imgJPEG imgJPEGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -ljpeg
 	$(STRIP) imgJPEG
 
 imgPNGMain.o : imgPNG.cpp Makefile
-	$(CC) -c $(IFLAGS) -o imgPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgPNG.cpp
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o imgPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgPNG.cpp
 
 imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
-	$(CC) -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
+	$(CC) -D_REENTRANT=1 -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
 	$(STRIP) imgPNG
 
 ccDiskCache: ccDiskCache.cpp memFile.o Makefile
-	$(CC) -D__STANDALONE__ -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
+	$(CC) -D_REENTRANT=1 -D__STANDALONE__ -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
 
 ccWorker: ccWorker.cpp memFile.o Makefile
-	$(CC) -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread
+	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread
 
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
-	$(CC) -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
+	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
 
 all: curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
