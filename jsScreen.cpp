@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.1  2002-10-18 01:18:25  ericn
+ * Revision 1.2  2002-10-20 16:30:49  ericn
+ * -modified to allow clear to specified color
+ *
+ * Revision 1.1  2002/10/18 01:18:25  ericn
  * -Initial import
  *
  *
@@ -24,9 +27,25 @@ static JSBool
 jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    fbDevice_t &fb = getFB();
-   memset( fb.getMem(), 0, fb.getMemSize() );
+   
+   if( 0 == argc )
+   {
+      memset( fb.getMem(), 0, fb.getMemSize() );
+   } // clear to black
+   else
+   {
+      unsigned long const rgb = (unsigned long)JSVAL_TO_INT( argv[0] );
+      unsigned char red   = (rgb>>16) & 0xFF ;
+      unsigned char green = (rgb>>8) & 0xFF ;
+      unsigned char blue  = rgb & 0xFF ;
+      unsigned short color16 = fb.get16( red, green, blue );
+      unsigned short *start = (unsigned short *)fb.getMem();
+      unsigned short *end   = start + fb.getHeight() * fb.getWidth();
+      while( start < end )
+         *start++ = color16 ;
+   } // clear to specified color
          
-   *rval = JSVAL_FALSE ;
+   *rval = JSVAL_TRUE ;
    return JS_TRUE ;
 }
 
