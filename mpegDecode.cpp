@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.4  2004-05-23 21:25:21  ericn
+ * Revision 1.5  2004-06-28 02:56:43  ericn
+ * -use new tags
+ *
+ * Revision 1.4  2004/05/23 21:25:21  ericn
  * -updated to work with either new or old mpeg2dec library
  *
  * Revision 1.3  2003/07/28 13:36:08  ericn
@@ -34,7 +37,7 @@ extern "C" {
 #include "config.h"
 #include <mpeg2dec/mpeg2.h>
 
-#ifdef LIBMPEG2_OLD 
+#ifdef CONFIG_LIBMPEG2_OLD 
    #include "mpeg2dec/video_out.h"
    #include "mpeg2dec/convert.h"
    #define mpeg2_sequence_t sequence_t
