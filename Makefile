@@ -78,7 +78,7 @@ ftRender: ftRender.o $(LIB)
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
-all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play
+all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play
+	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender
