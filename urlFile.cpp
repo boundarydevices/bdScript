@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.4  2002-11-30 17:32:17  ericn
+ * Revision 1.5  2002-12-02 15:02:03  ericn
+ * -added param to callback, name for mutex
+ *
+ * Revision 1.4  2002/11/30 17:32:17  ericn
  * -modified to allow synchronous callbacks
  *
  * Revision 1.3  2002/11/30 05:29:45  ericn
@@ -29,16 +32,18 @@
 #include "ccActiveURL.h"
 #include <string.h>
 
-static mutex_t     mutex_ ;
+static mutex_t     mutex_( "urlFileMutex_" );
 static condition_t cond_ ;
 
 static void onComplete( void         *opaque,
                         void const   *data,
-                        unsigned long numRead )
+                        unsigned long numRead,
+                        unsigned long handle )
 {
    urlFile_t *f = (urlFile_t *)opaque ;
-   unsigned long identifier ;
-   getCurlCache().openHandle( f->url_, f->data_, f->size_, f->handle_ );
+   f->data_   = data ;
+   f->size_   = numRead ;
+   f->handle_ = handle ;
    if( f->callingThread_ != pthread_self() )
    {
       mutexLock_t lock( mutex_ );
