@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-11-23 16:14:10  ericn
+ * -added touch and release sounds, alpha support
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
@@ -19,29 +22,35 @@
 #include "fbDev.h"
 #include "hexDump.h"
 #include "js/jscntxt.h"
-#include "imgGIF.h"
-#include "imgPNG.h"
-#include "imgJPEG.h"
 #include "curlThread.h"
 #include "jsGlobals.h"
 #include "box.h"
 #include "zOrder.h"
 #include <assert.h>
 #include "codeQueue.h"
+#include "jsImage.h"
+#include "audioQueue.h"
 
 typedef struct buttonData_t {
-   enum fileFlags_e {
-      haveTouchImage_   = 1,
-      haveTouchSound_   = 2,
-      haveReleaseSound_ = 4,
-   };
-
-   unsigned char  desiredComponents_ ;
-   unsigned char  componentsPresent_ ;
-   fileFlags_e    downloading_ ;
-   box_t         *box_ ;
-   JSObject      *jsObj_ ;
-   JSContext     *cx_ ;
+   box_t          *box_ ;
+   JSObject       *jsObj_ ;
+   JSContext      *cx_ ;
+   unsigned short *img_ ;
+   unsigned char  *imgAlpha_ ;
+   unsigned short  imgWidth_ ;
+   unsigned short  imgHeight_ ;
+   unsigned short *moveImg_ ;
+   unsigned char  *moveImgAlpha_ ;
+   unsigned short  moveImgWidth_ ;
+   unsigned short  moveImgHeight_ ;
+   unsigned short *touchImg_ ;
+   unsigned char  *touchImgAlpha_ ;
+   unsigned short  touchImgWidth_ ;
+   unsigned short  touchImgHeight_ ;
+   unsigned char  *touchSoundData_ ;
+   unsigned long   touchSoundLength_ ;
+   unsigned char  *releaseSoundData_ ;
+   unsigned long   releaseSoundLength_ ;
 };
 
 void jsButtonFinalize(JSContext *cx, JSObject *obj)
@@ -82,10 +91,6 @@ enum jsImage_tinyId {
    BUTTON_TOUCHIMAGE,
    BUTTON_TOUCHSOUND,
    BUTTON_RELEASESOUND,
-   BUTTON_IMAGEURL,
-   BUTTON_TOUCHIMAGEURL,
-   BUTTON_TOUCHSOUNDURL,
-   BUTTON_RELEASESOUNDURL,
    BUTTON_TOUCHCODE,
    BUTTON_MOVECODE,
    BUTTON_RELEASECODE,
@@ -110,10 +115,6 @@ static JSPropertySpec buttonProperties_[] = {
   {"touchImage",        BUTTON_TOUCHIMAGE,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"touchSound",        BUTTON_TOUCHSOUND,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"releaseSound",      BUTTON_RELEASESOUND,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"imageURL",          BUTTON_IMAGEURL,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"touchImageURL",     BUTTON_TOUCHIMAGEURL,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"touchSoundURL",     BUTTON_TOUCHSOUNDURL,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"releaseSoundURL",   BUTTON_RELEASESOUNDURL, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onTouch",           BUTTON_TOUCHCODE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onMove",            BUTTON_MOVECODE,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onRelease",         BUTTON_RELEASECODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
@@ -141,10 +142,35 @@ static void doit( box_t         &box,
    }
 }
 
+static void display( unsigned short  xLeft,
+                     unsigned short  yTop,
+                     unsigned short *img,
+                     unsigned char  *alpha,
+                     unsigned short  imgWidth,
+                     unsigned short  imgHeight )
+{
+   if( 0 != img )
+   {
+      getFB().render( xLeft, yTop, imgWidth, imgHeight, img, alpha );
+   }
+}
+
+
 static void buttonTouch( box_t         &box, 
                          unsigned short x, 
                          unsigned short y )
 {
+   buttonData_t *const button = (buttonData_t *)box.objectData_ ;
+   assert( 0 != button );
+   assert( button->box_ == &box );
+
+   display( box.xLeft_, box.yTop_, button->touchImg_, button->touchImgAlpha_, button->touchImgWidth_, button->touchImgHeight_ );
+
+   if( ( 0 != button->touchSoundData_ ) && ( 0 != button->touchSoundLength_ ) )
+   {
+      getAudioQueue().insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_, "", "" );
+   }
+
    doit( box, x, y, defaultTouch, "onTouch" );
 }
 
@@ -152,6 +178,10 @@ static void buttonMove( box_t         &box,
                         unsigned short x, 
                         unsigned short y )
 {
+   buttonData_t *const button = (buttonData_t *)box.objectData_ ;
+   assert( 0 != button );
+   assert( button->box_ == &box );
+   display( box.xLeft_, box.yTop_, button->moveImg_, button->moveImgAlpha_, button->moveImgWidth_, button->moveImgHeight_ );
    doit( box, x, y, defaultTouchMove, "onMove" );
 }
 
@@ -159,6 +189,11 @@ static void buttonRelease( box_t         &box,
                            unsigned short x, 
                            unsigned short y )
 {
+   buttonData_t *const button = (buttonData_t *)box.objectData_ ;
+   assert( 0 != button );
+   assert( button->box_ == &box );
+   
+   display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
    doit( box, x, y, defaultRelease, "onRelease" );
 }
 
@@ -190,7 +225,7 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
             jsval     vW ;
             jsval     vH ;
             jsval     vImage ;
-            JSString *sImageURL ;
+            JSObject *oImage ;
 
             if( JS_GetProperty( cx, rhObj, "x", &vX ) && JSVAL_IS_INT( vX )
                 &&
@@ -200,15 +235,22 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                 &&
                 JS_GetProperty( cx, rhObj, "height", &vH ) && JSVAL_IS_INT( vH )
                 &&
-                JS_GetProperty( cx, rhObj, "img", &vImage ) && JSVAL_IS_STRING( vImage ) 
+                JS_GetProperty( cx, rhObj, "img", &vImage ) && JSVAL_IS_OBJECT( vImage ) 
                 &&
-                ( 0 != ( sImageURL = JSVAL_TO_STRING( vImage ) ) ) )
+                ( 0 != ( oImage = JSVAL_TO_OBJECT( vImage ) ) ) )
             {
                JS_DefineProperty( cx, thisObj, "x", vX, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "y", vY, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "width", vW, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "height", vH, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               JS_DefineProperty( cx, thisObj, "imageURL", vImage, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+               JS_DefineProperty( cx, thisObj, "image", vImage, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+               jsval drawParams[2] = {
+                  vX, vY
+               };
+
+               jsval drawResult ;
+               jsImageDraw( cx, oImage, 2, drawParams, &drawResult );
 
                buttonData_t *const buttonData = new buttonData_t ;
                printf( "new buttonData %p\n", buttonData );
@@ -244,19 +286,64 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
 
                JS_SetPrivate( cx, thisObj, buttonData );
 
-               jsval jsv ;
-               if( JS_GetProperty( cx, rhObj, "touchImg", &jsv ) && JSVAL_IS_STRING( jsv ) )
+               jsval     jsv ;
+               JSObject *jsO ;
+               int       iVal ;
+               if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
                {
-                  JS_DefineProperty( cx, thisObj, "touchImageURL", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  buttonData->imgWidth_ = JSVAL_TO_INT( jsv );
+                  if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
+                  {
+                     buttonData->imgHeight_ = JSVAL_TO_INT( jsv );
+                     if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                     {
+                        buttonData->img_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                        if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                           buttonData->imgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                     }
+                  }
                }
-               if( JS_GetProperty( cx, rhObj, "touchSound", &jsv ) && JSVAL_IS_STRING( jsv ) )
+               
+               if( JS_GetProperty( cx, rhObj, "touchImg", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( oImage = JSVAL_TO_OBJECT( jsv ) ) ) )
                {
-                  JS_DefineProperty( cx, thisObj, "touchSoundURL", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  JS_DefineProperty( cx, thisObj, "touchImage", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
+                  {
+                     buttonData->touchImgWidth_ = JSVAL_TO_INT( jsv );
+                     if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->touchImgHeight_ = JSVAL_TO_INT( jsv );
+                        if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                        {
+                           buttonData->touchImg_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                           if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                              buttonData->touchImgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                        }
+                     }
+                  }
                }
-               if( JS_GetProperty( cx, rhObj, "releaseSound", &jsv ) && JSVAL_IS_STRING( jsv ) )
+               
+               if( JS_GetProperty( cx, rhObj, "touchSound", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( jsO = JSVAL_TO_OBJECT( jsv ) ) ) )
                {
-                  JS_DefineProperty( cx, thisObj, "releaseSoundURL", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  JS_DefineProperty( cx, thisObj, "touchSound", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  if( JS_GetProperty( cx, jsO, "data", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                  {
+                     JSString *sVal = JSVAL_TO_STRING(jsv);
+                     buttonData->touchSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
+                     buttonData->touchSoundLength_ = JS_GetStringLength( sVal );
+                  }
                }
+               if( JS_GetProperty( cx, rhObj, "releaseSound", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( jsO = JSVAL_TO_OBJECT( jsv ) ) ) )
+               {
+                  JS_DefineProperty( cx, thisObj, "releaseSound", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  if( JS_GetProperty( cx, jsO, "data", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                  {
+                     JSString *sVal = JSVAL_TO_STRING(jsv);
+                     buttonData->releaseSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
+                     buttonData->releaseSoundLength_ = JS_GetStringLength( sVal );
+                  }
+               }
+
                if( JS_GetProperty( cx, rhObj, "onTouch", &jsv ) && JSVAL_IS_STRING( jsv ) )
                   JS_DefineProperty( cx, thisObj, "onTouch", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                if( JS_GetProperty( cx, rhObj, "onMove", &jsv ) && JSVAL_IS_STRING( jsv ) )
@@ -265,7 +352,6 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   JS_DefineProperty( cx, thisObj, "onRelease", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                
                getZMap().addBox( *box );
-printf( "added box %u to zMap\n", box->id_ );
             }
             else
                JS_ReportError( cx, "Missing required params" );
