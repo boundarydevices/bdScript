@@ -174,7 +174,7 @@ ffFrames: ffFrames.cpp $(LIB)
 	$(STRIP) $@
 
 ffPlay: ffPlay.cpp $(LIB)
-	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
+	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lvo -lmpeg2 -lmad -lm -lz -lpthread 
 	$(STRIP) $@
 
 ffTest: ffTest.cpp $(LIB)
