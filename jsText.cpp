@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.13  2003-01-03 16:57:00  ericn
+ * Revision 1.14  2003-01-31 13:29:07  ericn
+ * -added getLineGap(), getHeight(), getBaseline()
+ *
+ * Revision 1.13  2003/01/03 16:57:00  ericn
  * -removed jsText function
  *
  * Revision 1.13  2003/01/03 16:56:41  ericn
@@ -253,6 +256,7 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          // the following are only relevant to scalable outlines
          //    FT_BBox           bbox;
 
+         printf( "bbox           %d/%d, %d/%d\n", face->bbox.xMin, face->bbox.xMax, face->bbox.yMin, face->bbox.yMax );
          printf( "units_per_EM   %d\n", face->units_per_EM );
          printf( "ascender;      %d\n", face->ascender );
          printf( "descender      %d\n", face->descender );
@@ -427,6 +431,135 @@ jsFontCharCodes( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 }
 
 static JSBool
+jsFontGetBaseline( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int pointSize ;
+   if( ( 1 == argc )
+       &&
+       ( 0 < ( pointSize = JSVAL_TO_INT( argv[0] ) ) ) )
+   {
+      jsval     dataVal ;
+      JSString *fontString ; 
+   
+      if( JS_GetProperty( cx, obj, "data", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal )
+          &&
+          ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
+      {
+         freeTypeLibrary_t library ;
+         freeTypeFont_t    font( library, 
+                                 JS_GetStringBytes( fontString ),
+                                 JS_GetStringLength( fontString ) );
+         if( font.worked() )
+         {
+            if( 0 != font.face_->units_per_EM )
+               *rval = INT_TO_JSVAL( (pointSize * font.face_->ascender)/font.face_->units_per_EM );
+            else
+               *rval = INT_TO_JSVAL( (pointSize * font.face_->ascender) );
+         }
+         else
+            JS_ReportError( cx, "invalid font data" );
+      }
+      else
+         JS_ReportError( cx, "no font data" );
+   }
+   else
+      JS_ReportError( cx, "usage: font.getBaseline( pointSize )" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsFontGetHeight( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int pointSize ;
+   if( ( 1 == argc )
+       &&
+       ( 0 < ( pointSize = JSVAL_TO_INT( argv[0] ) ) ) )
+   {
+      jsval     dataVal ;
+      JSString *fontString ; 
+   
+      if( JS_GetProperty( cx, obj, "data", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal )
+          &&
+          ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
+      {
+         freeTypeLibrary_t library ;
+         freeTypeFont_t    font( library, 
+                                 JS_GetStringBytes( fontString ),
+                                 JS_GetStringLength( fontString ) );
+         if( font.worked() )
+         {
+            if( 0 != font.face_->units_per_EM )
+               *rval = INT_TO_JSVAL( (pointSize * font.face_->height)/font.face_->units_per_EM );
+            else
+               *rval = INT_TO_JSVAL( (pointSize * font.face_->height) );
+         }
+         else
+            JS_ReportError( cx, "invalid font data" );
+      }
+      else
+         JS_ReportError( cx, "no font data" );
+   }
+   else
+      JS_ReportError( cx, "usage: font.getHeight( pointSize )" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsFontGetLinegap( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int pointSize ;
+   if( ( 1 == argc )
+       &&
+       ( 0 < ( pointSize = JSVAL_TO_INT( argv[0] ) ) ) )
+   {
+      jsval     dataVal ;
+      JSString *fontString ; 
+   
+      if( JS_GetProperty( cx, obj, "data", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal )
+          &&
+          ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
+      {
+         freeTypeLibrary_t library ;
+         freeTypeFont_t    font( library, 
+                                 JS_GetStringBytes( fontString ),
+                                 JS_GetStringLength( fontString ) );
+         if( font.worked() )
+         {
+            if( 0 != font.face_->units_per_EM )
+               *rval = INT_TO_JSVAL( (pointSize * 
+                                       (  font.face_->height
+                                        - font.face_->ascender
+                                        + font.face_->descender ) ) / font.face_->units_per_EM );
+            else
+               *rval = INT_TO_JSVAL( (pointSize * 
+                                       (  font.face_->height
+                                        - font.face_->ascender
+                                        + font.face_->descender ) ) );
+         }
+         else
+            JS_ReportError( cx, "invalid font data" );
+      }
+      else
+         JS_ReportError( cx, "no font data" );
+   }
+   else
+      JS_ReportError( cx, "usage: font.getLineGap( pointSize )" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
 jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
@@ -493,9 +626,12 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 }
 
 static JSFunctionSpec fontMethods[] = {
-    {"dump",       jsFontDump,              0 },
-    {"charCodes",  jsFontCharCodes,         0 },
-    {"render",     jsFontRender,            0 },
+    {"dump",         jsFontDump,              0 },
+    {"charCodes",    jsFontCharCodes,         0 },
+    {"getBaseline",  jsFontGetBaseline,       0 },
+    {"getHeight",    jsFontGetHeight,         0 },
+    {"getLinegap",   jsFontGetLinegap,        0 },
+    {"render",       jsFontRender,            0 },
     {0}
 };
 
