@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: relativeURL.cpp,v $
- * Revision 1.4  2002-11-30 05:28:37  ericn
+ * Revision 1.5  2003-03-22 15:30:54  ericn
+ * -added printURLStack(), fixed currentURL
+ *
+ * Revision 1.4  2002/11/30 05:28:37  ericn
  * -removed debug msg
  *
  * Revision 1.3  2002/11/29 18:37:28  ericn
@@ -40,7 +43,7 @@ static urlStack_t urlStack_ ;
 //
 bool currentURL( std::string &url )
 {
-   parsedURL_t parsed( url );
+   parsedURL_t parsed( urlStack_.back() );
 
    if( ( 0 < urlStack_.size() ) || !parsed.isRelative() )
    {
@@ -106,3 +109,11 @@ void popURL( void )
       urlStack_.pop_back();
 }
 
+void printURLStack( void )
+{
+   for( unsigned i = 0 ; i < urlStack_.size(); i++ )
+   {
+      printf( "---> url[%u]\n", i );
+      printURL( urlStack_[i] );
+   }
+}
