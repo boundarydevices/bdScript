@@ -1,13 +1,18 @@
 /*
  * Module jsCurl.cpp
  *
- * This module defines ...
+ * This module defines the curl classes and routines, and
+ * the initialization routine as declared and described in
+ * jsCurl.h
  *
  *
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.2  2002-10-06 14:54:10  ericn
+ * Revision 1.3  2002-10-13 13:50:57  ericn
+ * -merged curlGet() and curlPost() with curlFile object
+ *
+ * Revision 1.2  2002/10/06 14:54:10  ericn
  * -added Finalize, removed debug statements
  *
  * Revision 1.1  2002/09/29 17:36:23  ericn
@@ -25,6 +30,7 @@
 #include "js/jslock.h"
 #include "urlFile.h"
 #include <stdio.h>
+#include "curlCache.h"
 
 enum jsCurl_tinyid {
    CURLFILE_ISOPEN, 
@@ -178,7 +184,99 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
    return JS_FALSE ;
 }
 
-void initJSCurl( JSContext *cx, JSObject *glob )
+static JSBool
+curlGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   //
+   // need at least 
+   //    url
+   //    cacheFlag
+   //
+   if( ( 2 <= argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) 
+       &&
+       JSVAL_IS_BOOLEAN( argv[1] ) )
+   {
+      printf( "have url and cache parameter\n" );
+
+      JSString *str = JS_ValueToString(cx, argv[0]);
+      if( str )
+      {
+         char const *cURL = JS_GetStringBytes( str );
+         curlCache_t &cache = getCurlCache();
+         curlFile_t f( cache.get( cURL ) );
+         if( f.isOpen() )
+         {
+            bool worked = false ;
+         
+            JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
+            if( sReturn )
+            {
+               *rval = STRING_TO_JSVAL( sReturn );
+               return JS_TRUE ;
+            }
+         }
+      }
+
+      *rval = JSVAL_FALSE ;
+      return JS_TRUE ;
+
+   } // need at least two params
+
+   return JS_FALSE ;
+}
+
+static JSBool
+curlPost(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   //
+   // need at least 
+   //    url
+   //    cacheFlag
+   //
+   if( ( 2 <= argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) 
+       &&
+       JSVAL_IS_BOOLEAN( argv[1] ) )
+   {
+      printf( "have url and cache parameter\n" );
+
+      JSString *str = JS_ValueToString(cx, argv[0]);
+      if( str )
+      {
+         char const *cURL = JS_GetStringBytes( str );
+         curlCache_t &cache = getCurlCache();
+         curlFile_t f( cache.get( cURL ) );
+         if( f.isOpen() )
+         {
+            bool worked = false ;
+         
+            JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
+            if( sReturn )
+            {
+               *rval = STRING_TO_JSVAL( sReturn );
+               return JS_TRUE ;
+            }
+         }
+      }
+
+      *rval = JSVAL_FALSE ;
+      return JS_TRUE ;
+
+   } // need at least two params
+
+   return JS_FALSE ;
+}
+
+static JSFunctionSpec curl_functions[] = {
+    {"curlGet",         curlGet,        0},
+    {"curlPost",        curlPost,       0},
+    {0}
+};
+
+bool initJSCurl( JSContext *cx, JSObject *glob )
 {
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCurlClass_,
                        /* native constructor function and min arg count */
@@ -186,9 +284,11 @@ void initJSCurl( JSContext *cx, JSObject *glob )
                        curlFileProperties_, 0,
                        0, 0 );
    if( rval )
-      printf( "initialized jsCurlClass successfully\n" );
-   else
-      printf( "error initializing jsCurlClass\n" );
+   {
+      return JS_DefineFunctions( cx, glob, curl_functions);
+   }
+   
+   return false ;
 }
 
 
