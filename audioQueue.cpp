@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.10  2002-11-30 18:52:57  ericn
+ * Revision 1.11  2002-12-01 03:13:52  ericn
+ * -modified to root objects through audio queue
+ *
+ * Revision 1.10  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.9  2002/11/30 00:53:43  ericn
@@ -53,6 +56,7 @@
 #include <sys/soundcard.h>
 #include <sys/ioctl.h>
 #include "madHeaders.h"
+#include "jsGlobals.h"
 
 static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
@@ -70,13 +74,27 @@ int getDspFd( void )
    return getAudioQueue().dspFd_ ;
 }
 
+static void audioHandlerCallback( void *cbParam )
+{
+   audioQueue_t::item_t *item = (audioQueue_t::item_t *)cbParam ;
+   jsval handler = item->isComplete_ ? item->onComplete_ : item->onCancel_ ;
+
+   if( JSVAL_VOID != handler )
+      executeCode( item->obj_, handler, "audioQueue" );
+
+   JS_RemoveRoot( execContext_, &item->obj_ );
+   JS_RemoveRoot( execContext_, &item->onComplete_ );
+   JS_RemoveRoot( execContext_, &item->onCancel_ );
+
+   delete item ;
+}
+
 void *audioOutputThread( void *arg )
 {
    audioQueue_t *queue = (audioQueue_t *)arg ;
    queue->dspFd_ = open( "/dev/dsp", O_WRONLY );
    if( 0 <= queue->dspFd_ )
    {
-printf( "opened dsp device\n" );
       if( 0 != ioctl(queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
             
@@ -96,26 +114,26 @@ printf( "opened dsp device\n" );
 
       while( !queue->shutdown_ )
       {
-         audioQueue_t :: item_t item ;
+         audioQueue_t :: item_t *item ;
          if( queue->pull( item ) )
          {
             unsigned long numWritten = 0 ;
             _playing = true ;
 
-            madHeaders_t headers( item.data_, item.length_ );
+            madHeaders_t headers( item->data_, item->length_ );
             if( headers.worked() )
             {
 /*
                printf( "playback %lu bytes (%lu seconds) from %p here\n", 
-                       item.length_, 
+                       item->length_, 
                        headers.lengthSeconds(),
-                       item.data_ );
+                       item->data_ );
 */
                struct mad_stream stream;
                struct mad_frame	frame;
                struct mad_synth	synth;
                mad_stream_init(&stream);
-               mad_stream_buffer(&stream, (unsigned char const *)item.data_, item.length_ );
+               mad_stream_buffer(&stream, (unsigned char const *)item->data_, item->length_ );
                mad_frame_init(&frame);
                mad_synth_init(&synth);
 
@@ -228,15 +246,16 @@ printf( "opened dsp device\n" );
                if( _cancel )
                {
                   _cancel = false ;
-                  if( JSVAL_VOID != item.onCancel_ )
-                     queueSource( item.obj_, item.onCancel_, "audioComplete" );
+                  queueCallback( audioHandlerCallback, item );
+
                   if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_RESET, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                }
                else
                {
-                  if( JSVAL_VOID != item.onComplete_ )
-                     queueSource( item.obj_, item.onComplete_, "audioComplete" );
+                  item->isComplete_ = true ;
+                  queueCallback( audioHandlerCallback, item );
+
                   if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
                      fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                }
@@ -293,12 +312,16 @@ bool audioQueue_t :: insert
      jsval                onComplete,
      jsval                onCancel )
 {
-   item_t item ;
-   item.obj_        = mp3Obj ;
-   item.data_       = data ;
-   item.length_     = length ;
-   item.onComplete_ = onComplete ;
-   item.onCancel_   = onCancel ;
+   item_t *item = new item_t ;
+   item->obj_        = mp3Obj ;
+   item->data_       = data ;
+   item->length_     = length ;
+   item->onComplete_ = onComplete ;
+   item->onCancel_   = onCancel ;
+   item->isComplete_ = false ;
+   JS_AddRoot( execContext_, &item->obj_ );
+   JS_AddRoot( execContext_, &item->onComplete_ );
+   JS_AddRoot( execContext_, &item->onCancel_ );
    return queue_.push( item );
 }
    
@@ -316,9 +339,10 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       mutexLock_t lock( queue_.mutex_ );
       while( !queue_.list_.empty() )
       {
-         item_t item = queue_.list_.front();
+         item_t *item = queue_.list_.front();
          queue_.list_.pop_front();
-         queueSource( item.obj_, item.onCancel_, "audioComplete" );
+         item->isComplete_ = false ;
+         queueCallback( audioHandlerCallback, item );
          ++numCancelled ;
       }
    
@@ -362,7 +386,7 @@ void audioQueue_t :: shutdown( void )
    }
 }
 
-bool audioQueue_t :: pull( item_t &item )
+bool audioQueue_t :: pull( item_t *&item )
 {
    return queue_.pull( item );
 }

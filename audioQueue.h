@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.3 2002-11-30 18:52:57 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.4 2002-12-01 03:13:54 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.3  2002-11-30 18:52:57  ericn
+ * Revision 1.4  2002-12-01 03:13:54  ericn
+ * -modified to root objects through audio queue
+ *
+ * Revision 1.3  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.2  2002/11/14 13:14:03  ericn
@@ -45,6 +48,7 @@ public:
       unsigned             length_ ;
       jsval                onComplete_ ;
       jsval                onCancel_ ;
+      bool                 isComplete_ ;
    };
 
    //
@@ -55,7 +59,7 @@ public:
                 unsigned             length,
                 jsval                onComplete = JSVAL_VOID,
                 jsval                onCancel = JSVAL_VOID );
-   
+
    //
    // flush all outbound audio
    //
@@ -81,11 +85,11 @@ private:
    //
    
    // returns false if thread should shutdown
-   bool pull( item_t & );
+   bool pull( item_t *& );
 
    friend void *audioOutputThread( void *arg );
 
-   typedef       mtQueue_t<item_t> queue_t ;
+   typedef       mtQueue_t<item_t *> queue_t ;
    queue_t       queue_ ;
    void         *threadHandle_ ;
    bool volatile shutdown_ ;
