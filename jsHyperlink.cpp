@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsHyperlink.cpp,v $
- * Revision 1.5  2003-02-27 03:51:02  ericn
+ * Revision 1.6  2003-07-06 01:27:10  ericn
+ * -modified to wake code puller thread
+ *
+ * Revision 1.5  2003/02/27 03:51:02  ericn
  * -added exec routine
  *
  * Revision 1.4  2003/01/31 13:29:28  ericn
@@ -29,6 +32,7 @@
 
 #include "jsHyperlink.h"
 #include "relativeURL.h"
+#include "codeQueue.h"
 
 bool volatile gotoCalled_ = false ;
 bool volatile execCalled_ = false ;
@@ -43,6 +47,7 @@ jsGoto( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        JSVAL_IS_STRING( argv[0] ) )
    {
       gotoCalled_ = true ;
+      abortCodeQueue();
       absoluteURL( JS_GetStringBytes( JS_ValueToString( cx, argv[0] ) ), gotoURL_ );
    }
 
@@ -59,6 +64,7 @@ jsExec( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        JSVAL_IS_STRING( argv[0] ) )
    {
       execCalled_ = true ;
+      abortCodeQueue();
       execCmd_ = JS_GetStringBytes( JS_ValueToString( cx, argv[0] ) );
    }
 
