@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.3  2004-07-25 22:33:42  ericn
+ * Revision 1.4  2004-07-28 14:27:13  ericn
+ * -fixed usage statement
+ *
+ * Revision 1.3  2004/07/25 22:33:42  ericn
  * -added support for rotation
  *
  * Revision 1.2  2004/07/04 21:34:58  ericn
@@ -242,8 +245,8 @@ static JSBool
 jsTextBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    static char const usage_[] = {
-      //                    0        1      2  3  4  5      6         7
-      "Usage: bmp.textBox( font, pointSize, x, y, w, h, alignment, 'string' )"
+      //                    0        1      2  3  4  5      6         7          8
+      "Usage: bmp.textBox( font, pointSize, x, y, w, h, alignment, 'string' [,rotation] )"
    };
 
    JSObject *fontObj ;
