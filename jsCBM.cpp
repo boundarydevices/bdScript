@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.5  2003-05-24 15:03:35  ericn
+ * Revision 1.6  2003-05-26 22:06:15  ericn
+ * -modified to use cbmImage
+ *
+ * Revision 1.5  2003/05/24 15:03:35  ericn
  * -updated to slice images to fit printer RAM
  *
  * Revision 1.4  2003/05/18 21:52:26  ericn
@@ -35,6 +38,7 @@
 #include "js/jsapi.h"
 #include "js/jslock.h"
 #include "jsAlphaMap.h"
+#include "cbmImage.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -103,85 +107,29 @@ fprintf( stderr, "--> Printing something\n" );
          unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
          if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight )
          {
-            unsigned char const * const alphaData = (unsigned char const *)JS_GetStringBytes( sPixMap );
+            unsigned char const *alphaData = (unsigned char const *)JS_GetStringBytes( sPixMap );
 
             if( 0 <= printerFd_ )
             {
-               unsigned const width = bmWidth ;
-               unsigned const wBytes = ((width+7)/8);
-               unsigned const wBits = wBytes*8 ;
-               if( wBits <= maxWidthBits )
+               cbmImage_t image( bmWidth, bmHeight );
+               for( unsigned y = 0 ; y < bmHeight ; y++ )
                {
-                  unsigned const headerLen = 4 ;
-                  unsigned const trailerLen = 3 ;
-                  char * const outBuf = new char [ headerLen+trailerLen + maxN1xN2*8 ];
-                  
-                  unsigned char const *alphaSeg = alphaData ;
-
-                  while( 0 < bmHeight )
+                  for( unsigned x = 0 ; x < bmWidth; x++ )
                   {
-                     unsigned height = bmHeight ;
-                     unsigned maxN2 = maxN1xN2/wBytes ;
-                     unsigned maxHeight = maxN2*8 ;
-                     if( height > maxHeight )
-                     {
-                        height = maxHeight ;
-//                        JS_ReportError( cx, "clipping to %u pixels high", height );
-                     }
-   
-                     unsigned hBytes = (height+7)/8 ;
-                     char *nextOut = outBuf ;
-               
-                     nextOut += sprintf( outBuf, "\x1d*%c%c", wBits/8, hBytes );
-               
-                     for( unsigned x = 0 ; x < wBits ; x++ )
-                     {
-                        if( x < bmWidth )
-                        {
-                           for( unsigned y = 0 ; y < hBytes ; y++ )
-                           {
-                              unsigned yPixel = 8*y ;
-                              unsigned char outMask = 0 ;
-                              unsigned const maxY = yPixel + 8 ;
-                              for( ; yPixel < maxY ; yPixel++ )
-                              {
-                                 outMask <<= 1 ;
-                                 if( ( yPixel < bmHeight ) && ( x < bmWidth ) )
-                                 {
-                                    if( 0 == alphaSeg[ yPixel*bmWidth+x ] )
-                                       outMask |= 1 ;
-                                 }
-                              }
-                              *nextOut++ = outMask ;
-                           }
-                        }
-                        else
-                        {
-                           memset( nextOut, 0, hBytes );
-                           nextOut += hBytes ;
-                        }
-                     }
-      
-                     nextOut += sprintf( nextOut, "\x1d/%c", 0 );
-      
-                     int const numWritten = write( printerFd_, outBuf, nextOut-outBuf );
-                     printf( "wrote %d bytes\n", numWritten );
-                     bmHeight -= height ;
-                     alphaSeg += height * bmWidth ;
-//                     if( 0 < bmHeight )
-//                        sleep( 2 );
+                     if( 0 == *alphaData++ )
+                        image.setPixel( x, y );
                   }
-                  
-                  delete [] outBuf ;
-   
+               }
+               int const numWritten = write( printerFd_, image.getData(), image.getLength() );
+               if( numWritten == image.getLength() )
+               {
                   *rval = JSVAL_TRUE ;
                }
                else
-                  JS_ReportError( cx, "print image too wide! max is %u", maxWidthBits );
+                  JS_ReportError( cx, "%m sending print data" );
             }
             else
                JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
-            
          }
          else
             JS_ReportError( cx, "Invalid pixMap" );
@@ -223,7 +171,7 @@ fprintf( stderr, "--> CUT\n" );
    {
       printf( "printer port opened\n" );
          
-      write( printerFd_, "\n\n\n\n\x1dV", 7 );
+      write( printerFd_, "\n\n\x1dV", 5 );
       
       *rval = JSVAL_TRUE ;
    }
