@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.4  2004-07-28 14:27:13  ericn
+ * Revision 1.5  2004-09-25 21:50:07  ericn
+ * -added draw to screen method for BD2004
+ *
+ * Revision 1.4  2004/07/28 14:27:13  ericn
  * -fixed usage statement
  *
  * Revision 1.3  2004/07/25 22:33:42  ericn
@@ -47,6 +50,7 @@ jsBitmapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 {
    *rval = JSVAL_FALSE ;
 
+#ifdef CONFIG_BD2003
    if( ( 3 == argc )
        &&
        JSVAL_IS_INT( argv[0] )
@@ -82,6 +86,7 @@ jsBitmapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
       {
          unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
          unsigned const bmHeight   = JSVAL_TO_INT( vHeight );
+
 /*
          printf( "string gets drawn here\n"
                  "x        %u\n"
@@ -147,6 +152,49 @@ jsBitmapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    }
    else
       JS_ReportError( cx, "Usage: bitmap.draw( x, y, RGB );" );
+#elif defined( CONFIG_PXA_GAME_CONTROLLER )
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      int const specX  = JSVAL_TO_INT( argv[0] );
+      int const specY  = JSVAL_TO_INT( argv[1] );
+      jsval     vPixMap ;
+      jsval     vWidth ;
+      jsval     vHeight ;
+      JSString *sPixMap ;
+
+      if( JS_GetProperty( cx, obj, "pixBuf", &vPixMap )
+          &&
+          JSVAL_IS_STRING( vPixMap )
+          &&
+          ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
+          &&
+          JS_GetProperty( cx, obj, "width", &vWidth )
+          &&
+          JSVAL_IS_INT( vWidth )
+          &&
+          JS_GetProperty( cx, obj, "height", &vHeight )
+          &&
+          JSVAL_IS_INT( vHeight ) )
+      {
+         unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+         unsigned const bmHeight   = JSVAL_TO_INT( vHeight );
+         fbDevice_t &fb = getFB();
+         fb.render( bitmap_t( (unsigned char *)
+                              JS_GetStringBytes( sPixMap ), bmWidth, bmHeight ),
+                              specX, specY );
+      }
+      else
+         JS_ReportError( cx, "Error retrieving bitmap fields" );
+   }
+   else
+      JS_ReportError( cx, "Usage: bitmap.draw( x, y );" );
+#else
+#error undefined arch
+#endif 
 
    return JS_TRUE ;
 
