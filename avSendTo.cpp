@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.9  2003-10-18 16:37:03  ericn
+ * Revision 1.10  2003-10-18 19:15:28  ericn
+ * -made udp rx handler polled
+ *
+ * Revision 1.9  2003/10/18 16:37:03  ericn
  * -added logo
  *
  * Revision 1.8  2003/10/17 05:59:04  ericn
@@ -70,6 +73,7 @@
 #include <errno.h>
 #include "imgJPEG.h"
 #include "memFile.h"
+#include "imgFile.h"
 
 extern "C" {
 #include <jpeglib.h>
@@ -671,6 +675,184 @@ void udpGPIO_t :: onLow( void )
 }
 
 
+struct deviceMsg_t {
+   enum type_e {
+      audio_e  = 0,
+      unlock_e = 1,
+      lock_e   = 2,
+      reject_e = 3
+   };
+
+   enum {
+      MAXSAMPLES = 0x2000
+   };
+   type_e         type_ ;
+   unsigned long  length_ ; // in bytes
+   unsigned short data_[MAXSAMPLES];
+};
+
+
+class udpRxPoll_t : public pollHandler_t {
+public:
+   udpRxPoll_t( int               fdUDP,
+                pollHandlerSet_t &set,
+                int               fdAudio );
+
+   bool isOpen( void ) const { return 0 <= getFd(); }
+   
+   //
+   // This is where the handling of incoming messages happens.
+   //
+   virtual void onMsg( deviceMsg_t const & );
+
+   //
+   // This is the routine that actually reads and
+   // validates the message
+   //
+   virtual void onDataAvail( void );
+
+protected:
+   int const fdAudio_ ;
+   int const fdLock_ ;
+   image_t   welcomeImage_ ;
+   image_t   unlockImage_ ;
+   image_t   openImage_ ;
+};
+
+
+udpRxPoll_t :: udpRxPoll_t
+   ( int               fdUDP,
+     pollHandlerSet_t &set,
+     int               fdAudio )
+      : pollHandler_t( fdUDP, set )
+      , fdAudio_( fdAudio )
+      , fdLock_( open( "/dev/Turnstile", O_WRONLY ) )
+{
+   fbDevice_t &fb = getFB();
+   if( imageFromFile( "logo.jpg", welcomeImage_ ) )
+   {
+      unsigned logoX, logoY ;
+      if( fb.getWidth() > welcomeImage_.width_ )
+         logoX = (fb.getWidth()-welcomeImage_.width_)/2 ;
+      else
+         logoX = 0 ;
+      if( fb.getHeight() > welcomeImage_.height_ )
+         logoY = (fb.getHeight()-welcomeImage_.height_)/2 ;
+      else
+         logoY = 0 ;
+
+      fb.rect( 0, 0, fb.getWidth()-1, fb.getHeight()-1, 0xFF, 0xFF, 0xFF );
+      fb.render( logoX, logoY, 
+                 welcomeImage_.width_, 
+                 welcomeImage_.height_, 
+                 (unsigned short *)welcomeImage_.pixData_ );
+
+      printf( "welcome image: %u x %u pixels\n"
+              "display at %u/%u\n",                  
+              welcomeImage_.width_, 
+              welcomeImage_.height_, 
+              logoX, logoY );
+      printf( "welcome image: %u x %u pixels\n"
+              "display at %u/%u\n",                  
+              welcomeImage_.width_, 
+              welcomeImage_.height_, 
+              logoX, logoY );
+      printf( "welcome image: %u x %u pixels\n"
+              "display at %u/%u\n",                  
+              welcomeImage_.width_, 
+              welcomeImage_.height_, 
+              logoX, logoY );
+
+   }
+   else
+      fprintf( stderr, "Error reading welcome logo\n" );
+   if( !imageFromFile( "unlocked.jpg", welcomeImage_ ) )
+      fprintf( stderr, "Error reading unlocked image\n" );
+   if( !imageFromFile( "open.jpg", welcomeImage_ ) )
+      fprintf( stderr, "Error reading open image\n" );
+
+   setMask( POLLIN );
+   set.add( *this );
+}
+
+void udpRxPoll_t :: onMsg( deviceMsg_t const &msg )
+{
+   if( deviceMsg_t :: audio_e == msg.type_ )
+   {
+      playingSomething = true ;
+      int numWritten = write( fdAudio_, msg.data_, msg.length_ );
+      if( numWritten == msg.length_ )
+      {
+         printf( "%lu bytes of audio\n", msg.length_ );
+      }
+      else
+         fprintf( stderr, "Error %m sending audio output\n" );
+   }
+   else if( deviceMsg_t :: unlock_e == msg.type_ )
+   {
+      if( -1 != fdLock_ )
+      {
+         char const cOut = '\1' ;
+         write( fdLock_, &cOut, 1 );
+      }
+      else
+         perror( "/dev/Turnstile" );
+   }
+   else if( deviceMsg_t :: lock_e == msg.type_ )
+   {
+      if( -1 != fdLock_ )
+      {
+         char const cOut = '\0' ;
+         write( fdLock_, &cOut, 1 );
+      }
+      else
+         perror( "/dev/Turnstile" );
+   }
+   else
+      printf( "unknown msgtype %d\n", msg.type_ );
+}
+
+void udpRxPoll_t :: onDataAvail( void )
+{
+   sockaddr_in fromAddr ;
+   deviceMsg_t msg ;
+   socklen_t   fromSize = sizeof( fromAddr );
+   int numRead = recvfrom( getFd(), 
+                           (char *)&msg, sizeof( msg ), 0,
+                           (struct sockaddr *)&fromAddr, 
+                           &fromSize );
+   if( offsetof( deviceMsg_t, data_ ) <= numRead )
+   {
+      // check message lengths
+      if( deviceMsg_t :: audio_e == msg.type_ )
+      {
+         unsigned const expected = sizeof( msg )-sizeof( msg.data_ )+msg.length_ ;
+         if( expected != numRead )
+         {
+            fprintf( stderr, "Weird size : len %lu, expected %lu, read %u\n", msg.length_, expected, numRead );
+            return ;
+         }
+      }
+      else if( deviceMsg_t :: unlock_e == msg.type_ )
+      {
+      }
+      else if( deviceMsg_t :: lock_e == msg.type_ )
+      {
+      }
+      else
+      {
+         printf( "unknown msgtype %d\n", msg.type_ );
+         return ;
+      }
+      
+      onMsg( msg );
+   }
+   else
+   {
+      fprintf( stderr, "udpRecvfrom:%d:%d:%m\n", numRead, errno );
+   }
+}
+
 struct pinData_t {
    char const     *name_ ;
    unsigned short  mask_ ;
@@ -711,11 +893,14 @@ static void *pollThread( void *arg )
                printf( "opened %s: fd %d, mask %x\n", devName, pollPins[p]->getFd(), pollPins[p]->getMask() );
          }
 
+         udpRxPoll_t udpPoll( params.udpSock_,
+                              handlers,
+                              params.mediaFd_ );
+
          int iterations = 0 ;
          while( 1 )
          {
             handlers.poll( -1 );
-            printf( "poll %d\r", ++iterations );
          }
       }
       else
@@ -723,118 +908,6 @@ static void *pollThread( void *arg )
    }
    else
       perror( "/dev/ttyS2" );
-}
-
-struct deviceMsg_t {
-   enum type_e {
-      audio_e  = 0,
-      unlock_e = 1,
-      lock_e   = 2,
-      reject_e = 3
-   };
-
-   enum {
-      MAXSAMPLES = 0x2000
-   };
-   type_e         type_ ;
-   unsigned long  length_ ; // in bytes
-   unsigned short data_[MAXSAMPLES];
-};
-
-
-static void *udpRxThread( void *arg )
-{
-   threadParam_t const &params = *( threadParam_t const *)arg ;
-   int const fdAudio = params.mediaFd_ ;
-   int fdLock = open( "/dev/Turnstile", O_WRONLY );
-   
-   fbDevice_t &fb = getFB();
-   unsigned short logoX = 0 ;
-   unsigned short logoY = 0 ;
-   unsigned short logoWidth = 0 ;
-   unsigned short logoHeight = 0 ;
-   void const    *logoData = 0 ;
-   {
-      memFile_t fIn( "logo.jpg" );
-      if( fIn.worked() )
-      {
-         if( imageJPEG( fIn.getData(), fIn.getLength(),
-                        logoData, logoWidth, logoHeight ) )
-         {
-            if( fb.getWidth() > logoWidth )
-               logoX = (fb.getWidth()-logoWidth)/2 ;
-            if( fb.getHeight() > logoHeight )
-               logoY = (fb.getHeight()-logoHeight)/2 ;
-
-            fb.rect( 0, 0, fb.getWidth()-1, fb.getHeight()-1, 0xFF, 0xFF, 0xFF );
-            fb.render( logoX, logoY, logoWidth, logoHeight, (unsigned short *)logoData );
-            printf( "logo is %u x %u pixels\n", logoWidth, logoHeight );
-         }
-         else
-            fprintf( stderr, "error %m reading logo\n" );
-      }
-      else
-         fprintf( stderr, "error %m reading logo\n" );
-   }
-   
-
-   while( 1 )
-   {
-      sockaddr_in fromAddr ;
-      deviceMsg_t msg ;
-      socklen_t   fromSize = sizeof( fromAddr );
-      int numRead = recvfrom( params.udpSock_, 
-                              (char *)&msg, sizeof( msg ), 0,
-                              (struct sockaddr *)&fromAddr, 
-                              &fromSize );
-      if( 0 < numRead )
-      {
-         if( deviceMsg_t :: audio_e == msg.type_ )
-         {
-            unsigned const expected = sizeof( msg )-sizeof( msg.data_ )+msg.length_ ;
-            if( expected == numRead )
-            {
-               playingSomething = true ;
-               int numWritten = write( fdAudio, msg.data_, msg.length_ );
-               if( numWritten == msg.length_ )
-               {
-                  printf( "%lu bytes of audio\n", msg.length_ );
-               }
-               else
-                  fprintf( stderr, "Error %m sending audio output\n" );
-            }
-            else
-               fprintf( stderr, "Weird size : len %lu, expected %lu, read %u\n", msg.length_, expected, numRead );
-         }
-         else if( deviceMsg_t :: unlock_e == msg.type_ )
-         {
-            if( -1 != fdLock )
-            {
-               char const cOut = '\1' ;
-               write( fdLock, &cOut, 1 );
-            }
-            else
-               perror( "/dev/Turnstile" );
-         }
-         else if( deviceMsg_t :: lock_e == msg.type_ )
-         {
-            if( -1 != fdLock )
-            {
-               char const cOut = '\0' ;
-               write( fdLock, &cOut, 1 );
-            }
-            else
-               perror( "/dev/Turnstile" );
-         }
-         else
-            printf( "unknown msgtype %d\n", msg.type_ );
-      }
-      else
-      {
-         perror( "recvfrom" );
-         break;
-      }
-   }
 }
 
 static void ctrlcHandler( int signo )
@@ -911,7 +984,7 @@ int main( int argc, char const * const argv[] )
                   if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
                      perror( "STEREO" );
 
-                  int const vol = 0x4646 ;
+                  int const vol = 0x5050 ;
                   if( 0 > ioctl( fdAudio, SOUND_MIXER_WRITE_VOLUME, &vol)) 
                      perror( "Error setting volume" );
 
@@ -943,10 +1016,10 @@ int main( int argc, char const * const argv[] )
                            {
                               threadParam_t audioOutParams = audioParams ;
                               audioOutParams.mediaFd_ = fdAudioWrite ;
-                              pthread_t udpHandle ;
-                              create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
-                              if( 0 == create )
-                              {
+//                              pthread_t udpHandle ;
+//                              create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
+//                              if( 0 == create )
+//                              {
                                  pthread_t pollHandle ;
                                  create = pthread_create( &pollHandle, 0, pollThread, &audioOutParams );
                                  if( 0 == create )
@@ -983,6 +1056,7 @@ int main( int argc, char const * const argv[] )
                                  else
                                     perror( "pollThreadCreate" );
                               
+/*
                                  pthread_cancel( udpHandle );
                                  void *exitStat ;
                                  pthread_join( udpHandle, &exitStat );
@@ -992,7 +1066,7 @@ int main( int argc, char const * const argv[] )
                                  printf( "error %mstarting udp thread\n" );
                                  pause();
                               }
-
+*/
                               void *exitStat ;
                               pthread_cancel( audioHandle );
                               pthread_join( audioHandle, &exitStat );
