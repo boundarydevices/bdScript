@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.2  2003-08-04 12:39:01  ericn
+ * Revision 1.3  2003-08-06 13:23:56  ericn
+ * -fixed sound cancellation
+ *
+ * Revision 1.2  2003/08/04 12:39:01  ericn
  * -added sound support
  *
  * Revision 1.1  2003/08/03 19:27:56  ericn
@@ -73,6 +76,7 @@ public:
    unsigned      height_ ;
    unsigned      bgColor_ ;
    bool volatile cancelled_ ;
+   unsigned volatile numSoundsPlaying_ ;
 private:
    flashPrivate_t( flashPrivate_t const & );
 };
@@ -90,27 +94,18 @@ getSwf(char *url, int level, void *client_data)
 }
 
 class flashSoundMixer : public SoundMixer {
-// Class variables
-static  long		 dsp;		// Descriptor for /dev/dsp
-static  char *		 buffer;	// DMA buffer
-static	long		 blockSize;
-static	long		 nbInst;	// Number of instances
-
-	// Sound Device Capabilities
-static	long		 soundRate;	// In hz
-static	long		 stereo;	// True if stereo sound
-static	long		 sampleSize;	// 1 or 2 bytes
-
 public:
-	flashSoundMixer();
+	flashSoundMixer( flashPrivate_t &parent );
 	~flashSoundMixer();
 
 	void		 startSound(Sound *sound);	// Register a sound to be played
 	void		 stopSounds();		// Stop every current sounds in the instance
+        flashPrivate_t  &parent_ ;
 };
 
-flashSoundMixer :: flashSoundMixer()
-   : SoundMixer( "" ) // keep it happy
+flashSoundMixer :: flashSoundMixer( flashPrivate_t &parent )
+   : SoundMixer( "" ), // keep it happy
+     parent_( parent )
 {
 }
 
@@ -131,12 +126,16 @@ void flashSoundMixer :: startSound(Sound *sound)
                                   sound->getSampleSize()*sound->getNbSamples(),
                                   sound,
                                   flashSoundComplete );
+   mutexLock_t lock( parent_.dieMutex_ );
+   ++parent_.numSoundsPlaying_ ;
 }
 
 void flashSoundMixer :: stopSounds()
 {
    unsigned numCancelled ;
    getAudioQueue().clear( numCancelled );
+   mutexLock_t lock( parent_.dieMutex_ );
+   --parent_.numSoundsPlaying_ ;
 }
 
 static void *flashThreadRoutine( void *param )
@@ -147,7 +146,7 @@ static void *flashThreadRoutine( void *param )
    
    FlashMovie *fh = (FlashMovie *)priv.flashHandle_ ;
 
-   fh->sm = new flashSoundMixer();
+   fh->sm = new flashSoundMixer( priv );
 
 //   FlashSoundInit( priv.flashHandle_, "/dev/dsp");
    
@@ -256,6 +255,13 @@ static void *flashThreadRoutine( void *param )
       }
    } while( !( completed || priv.cancelled_ ) );
 
+   if( 0 != priv.numSoundsPlaying_ )
+   {
+      unsigned numCancelled;
+      getAudioQueue().clear( numCancelled );
+      priv.numSoundsPlaying_ = 0 ;
+   }
+
    jsval const handler = completed ? priv.onComplete_ : priv.onCancel_ ;
    if( JSVAL_VOID != handler )
    {
@@ -289,7 +295,9 @@ flashPrivate_t::flashPrivate_t
      yPos_( 0 ),
      width_( 0 ),
      height_( 0 ),
-     bgColor_( 0 )
+     bgColor_( 0 ),
+     cancelled_( false ),
+     numSoundsPlaying_( 0 )
 {
    getCurlCache().addRef( cacheHandle_ );
    JS_AddRoot( cx, &onComplete_ );
