@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.10  2003-06-06 01:48:46  ericn
+ * Revision 1.11  2003-06-22 23:04:49  ericn
+ * -modified to use constructor for initialization, private data for fd
+ *
+ * Revision 1.10  2003/06/06 01:48:46  ericn
  * -added include
  *
  * Revision 1.9  2003/06/05 14:35:17  ericn
@@ -89,11 +92,13 @@ enum jsCBM_tinyId {
    CBM_DEVICEID,
 };
 
+static void jsCBMFinalize(JSContext *cx, JSObject *obj);
+
 JSClass jsCBMClass_ = {
   "CBM",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
-   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsCBMFinalize,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
@@ -102,7 +107,6 @@ static JSPropertySpec cbmProperties_[] = {
   {0,0,0}
 };
 
-static int printerFd_ = -1 ;
 static unsigned const maxWidthBits  = 432 ;
 static unsigned const maxWidthBytes = maxWidthBits/8 ;
 static unsigned const maxN1xN2      = 1536 ;
@@ -111,44 +115,44 @@ static unsigned const maxN1xN2      = 1536 ;
 static JSBool
 jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-fprintf( stderr, "--> Printing something\n" );
    *rval = JSVAL_FALSE ;
 
    JSObject *rhObj ;
    JSString *sArg ;
-   if( ( 1 == argc )
-       &&
-       JSVAL_IS_OBJECT( argv[0] ) 
-       &&
-       ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
+   int const *pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
    {
-      jsval     vPixMap ;
-      jsval     vWidth ;
-      jsval     vHeight ;
-      JSString *sPixMap ;
-   
-      if( JS_GetProperty( cx, rhObj, "pixBuf", &vPixMap )
+      if( ( 1 == argc )
           &&
-          JSVAL_IS_STRING( vPixMap )
+          JSVAL_IS_OBJECT( argv[0] ) 
           &&
-          ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
-          &&
-          JS_GetProperty( cx, rhObj, "width", &vWidth )
-          &&
-          JSVAL_IS_INT( vWidth )
-          &&
-          JS_GetProperty( cx, rhObj, "height", &vHeight )
-          &&
-          JSVAL_IS_INT( vHeight ) )
+          ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
       {
-         unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
-         unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
-         if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight )
+         jsval     vPixMap ;
+         jsval     vWidth ;
+         jsval     vHeight ;
+         JSString *sPixMap ;
+      
+         if( JS_GetProperty( cx, rhObj, "pixBuf", &vPixMap )
+             &&
+             JSVAL_IS_STRING( vPixMap )
+             &&
+             ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
+             &&
+             JS_GetProperty( cx, rhObj, "width", &vWidth )
+             &&
+             JSVAL_IS_INT( vWidth )
+             &&
+             JS_GetProperty( cx, rhObj, "height", &vHeight )
+             &&
+             JSVAL_IS_INT( vHeight ) )
          {
-            unsigned char const *alphaData = (unsigned char const *)JS_GetStringBytes( sPixMap );
-
-            if( 0 <= printerFd_ )
+            unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+            unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
+            if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight )
             {
+               unsigned char const *alphaData = (unsigned char const *)JS_GetStringBytes( sPixMap );
+   
                cbmImage_t image( bmWidth, bmHeight );
                for( unsigned y = 0 ; y < bmHeight ; y++ )
                {
@@ -158,7 +162,7 @@ fprintf( stderr, "--> Printing something\n" );
                         image.setPixel( x, y );
                   }
                }
-               int const numWritten = write( printerFd_, image.getData(), image.getLength() );
+               int const numWritten = write( *pfd, image.getData(), image.getLength() );
                if( numWritten == image.getLength() )
                {
                   *rval = JSVAL_TRUE ;
@@ -167,23 +171,18 @@ fprintf( stderr, "--> Printing something\n" );
                   JS_ReportError( cx, "%s sending print data", strerror( errno ) );
             }
             else
-               JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
+               JS_ReportError( cx, "Invalid pixMap" );
          }
          else
-            JS_ReportError( cx, "Invalid pixMap" );
+            JS_ReportError( cx, "Error retrieving alphaMap fields" );
       }
-      else
-         JS_ReportError( cx, "Error retrieving alphaMap fields" );
-   }
-   else if( ( 1 == argc )
-            &&
-            JSVAL_IS_STRING( argv[0] )
-            &&
-            ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) )
-   {
-      if( 0 <= printerFd_ )
+      else if( ( 1 == argc )
+               &&
+               JSVAL_IS_STRING( argv[0] )
+               &&
+               ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) )
       {
-         int const numWritten = write( printerFd_, 
+         int const numWritten = write( *pfd, 
                                        JS_GetStringBytes( sArg ), 
                                        JS_GetStringLength( sArg ) );
          printf( "wrote %d string bytes\n", numWritten );
@@ -191,10 +190,10 @@ fprintf( stderr, "--> Printing something\n" );
          *rval = JSVAL_TRUE ;
       }
       else
-         JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
+         JS_ReportError( cx, "Usage: printer.print( alphaMap|string )" );
    }
    else
-      JS_ReportError( cx, "Usage: printer.print( alphaMap|string )" );
+      JS_ReportError( cx, "Invalid printer fd\n" );
    
    return JS_TRUE ;
 }
@@ -202,15 +201,32 @@ fprintf( stderr, "--> Printing something\n" );
 static JSBool
 jsCBMCut( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-fprintf( stderr, "--> CUT\n" );
    *rval = JSVAL_FALSE ;
-
-   if( 0 <= printerFd_ )
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
    {
-      printf( "printer port opened\n" );
-         
-      write( printerFd_, "\n\n\x1dV", 5 );
+      write( *pfd, "\n\n\x1dV", 5 );
       
+      *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   
+   return JS_TRUE ;
+}
+
+static JSBool
+jsCBMClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+fprintf( stderr, "---> closing printer:fd %d\n", *pfd );
+      close( *pfd );
+      *pfd = -1 ;
+      JS_SetPrivate( cx, obj, pfd );
+
       *rval = JSVAL_TRUE ;
    }
    else
@@ -222,20 +238,77 @@ fprintf( stderr, "--> CUT\n" );
 static JSFunctionSpec cbm_methods[] = {
    { "print",        jsCBMPrint,      0,0,0 },
    { "cut",          jsCBMCut,        0,0,0 },
+   { "close",        jsCBMClose,      0,0,0 },
    { 0 }
 };
+
+static void jsCBMFinalize(JSContext *cx, JSObject *obj)
+{
+   if( obj )
+   {
+      int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+      if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+      {
+fprintf( stderr, "---> closing printer:fd %d\n", *pfd );
+         close( *pfd );
+         *pfd = -1 ;
+         JS_SetPrivate( cx, obj, pfd );
+      } // have button data
+   }
+}
 
 static JSBool jsCBM( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   obj = JS_NewObject( cx, &jsCBMClass_, NULL, NULL );
-
-   if( obj )
+   if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
    {
-      *rval = OBJECT_TO_JSVAL(obj);
+      JSObject *obj = JS_NewObject( cx, &jsCBMClass_, NULL, NULL );
+      if( obj )
+      {
+         *rval = OBJECT_TO_JSVAL(obj); // root
+         JSString *sDevice = JSVAL_TO_STRING( argv[0] );
+         int *pfd = (int *)JS_malloc( cx, sizeof(*pfd) );
+         *pfd = -1 ;
+         JS_SetPrivate( cx, obj, pfd );
+         int const fd = open( JS_GetStringBytes( sDevice ), O_WRONLY );
+         if( 0 <= fd )
+         {
+fprintf( stderr, "-----> opened printer: fd == %d\n", fd );
+            *pfd = fd ;
+
+            char * const device_id = new char[MAXDEVICE];	// Device ID string
+      
+            if (ioctl(fd, LPIOC_GET_DEVICE_ID(MAXDEVICE), device_id) == 0)
+            {
+               unsigned length = (((unsigned)device_id[0] & 255) << 8) +
+                                 ((unsigned)device_id[1] & 255);
+               memcpy(device_id, device_id + 2, length);
+               device_id[length] = '\0';
+               printf( "device id:%s\n", device_id );
+               JSString *sDeviceId = JS_NewStringCopyN( cx, (char *)device_id, length );
+               if( sDeviceId )
+               {
+                  JS_DefineProperty( cx, obj, "deviceId", 
+                                     STRING_TO_JSVAL( sDeviceId ),
+                                     0, 0, 
+                                     JSPROP_ENUMERATE
+                                     |JSPROP_PERMANENT
+                                     |JSPROP_READONLY );
+               }
+               else
+                  JS_ReportError( cx, "Error allocating deviceId" );
+            }
+            else
+               perror( "getDeviceId" );
+         }
+         else
+            JS_ReportError( cx, "%s opening printer fd", strerror( errno ) );
+      }
+      else
+         JS_ReportError( cx, "Error allocating CBM printer" );
    }
    else
-      JS_ReportError( cx, "Error allocating printer" );
+      JS_ReportError( cx, "Usage: var printer = new CBM( '/dev/usb/lp0' );" );
 
    return JS_TRUE;
 }
@@ -244,8 +317,6 @@ static JSBool jsCBM( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 
 bool initJSCBM( JSContext *cx, JSObject *glob )
 {
-fprintf( stderr, "--> CBM...CBM...\n" );
-
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCBMClass_,
                                   jsCBM, 1,
                                   cbmProperties_, 
@@ -253,83 +324,11 @@ fprintf( stderr, "--> CBM...CBM...\n" );
                                   0, 0 );
    if( rval )
    {
-      JSObject *obj = JS_NewObject( cx, &jsCBMClass_, NULL, NULL );
-      if( obj )
-      {
-         if( JS_DefineProperty( cx, glob, "printer", 
-                                OBJECT_TO_JSVAL( obj ),
-                                0, 0, 
-                                JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY ) )
-         {
-fprintf( stderr, "--> Defined printer object\n" );
-            int const fd = open( "/dev/usb/lp0", O_WRONLY );
-            if( 0 <= fd )
-            {
-fprintf( stderr, "printer port opened: handle %d\n", fd );
-               printerFd_ = fd ;
-               
-               char * const device_id = new char[MAXDEVICE];	// Device ID string
-         
-               if (ioctl(fd, LPIOC_GET_DEVICE_ID(MAXDEVICE), device_id) == 0)
-               {
-                  unsigned length = (((unsigned)device_id[0] & 255) << 8) +
-                                    ((unsigned)device_id[1] & 255);
-                  memcpy(device_id, device_id + 2, length);
-                  device_id[length] = '\0';
-                  printf( "device id:%s\n", device_id );
-                  JSString *sDeviceId = JS_NewStringCopyN( cx, (char *)device_id, length );
-                  if( sDeviceId )
-                  {
-                     JS_DefineProperty( cx, obj, "deviceId", 
-                                        STRING_TO_JSVAL( sDeviceId ),
-                                        0, 0, 
-                                        JSPROP_ENUMERATE
-                                        |JSPROP_PERMANENT
-                                        |JSPROP_READONLY );
-                  }
-                  else
-                     JS_ReportError( cx, "Error allocating deviceId" );
-               }
-               else
-                  perror( "getDeviceId" );
-            }
-            else
-               JS_ReportError( cx, "%s sending print data", strerror( errno ) );
-         
-            return true ;
-         }
-         else
-            fprintf( stderr, "Error defining printer object\n" );
-      }
-      else
-         fprintf( stderr, "Error allocating CBM printer" );
+      return true ;
    }
    else
-      fprintf( stderr, "Error initializing CBM printer class\n" );
+      JS_ReportError( cx, "initializing CBM printer class\n" );
    
    return false ;
-}
-
-bool closeCBM( JSContext *cx, JSObject *glob )
-{
-JS_ReportError( cx, "closing printer" );
-   jsval vPrinter ;
-   if( JS_GetProperty( cx, glob, "printer", &vPrinter ) 
-       &&
-       JSVAL_IS_OBJECT( vPrinter ) )
-   {
-      JSObject *rhObj = JSVAL_TO_OBJECT( vPrinter );
-      if( 0 <= printerFd_ )
-      {
-         close( printerFd_ );
-         return true ;
-      }
-      else
-         JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
-   }
-   else
-      JS_ReportError( cx, "Error getting printer object" );
 }
 
