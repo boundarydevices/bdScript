@@ -7,5 +7,5 @@ testquickcam
 mpeg2mp3
 jpegview
 backtrace
-ffTest
+ffTest videoQueue mpDemux mpDecode
 *.sym
