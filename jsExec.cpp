@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.3  2002-11-02 04:10:43  ericn
+ * Revision 1.4  2002-11-02 18:36:09  ericn
+ * -added alphaMap support
+ *
+ * Revision 1.3  2002/11/02 04:10:43  ericn
  * -added jsText initialization
  *
  * Revision 1.2  2002/10/31 02:04:17  ericn
@@ -43,6 +46,7 @@
 #include "jsGlobals.h"
 #include "jsScreen.h"
 #include "jsText.h"
+#include "jsAlphaMap.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -136,7 +140,7 @@ jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    }
    else
    {
-      JS_ReportError( cx, "Usage : nanosleep( ns )\n" );
+      JS_ReportError( cx, "Usage : nanosleep( seconds )\n" );
       *rval = JSVAL_FALSE ;
    }
 
@@ -193,6 +197,8 @@ int main(int argc, char **argv)
                      initializeCodeQueue( cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
+                     initJSAlphaMap( cx, glob );
+
                      startCurlThreads();
 
                      curlCache_t &cache = getCurlCache();
