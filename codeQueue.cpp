@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.18  2003-11-24 19:42:05  ericn
+ * Revision 1.19  2004-01-01 16:02:39  ericn
+ * -added error message
+ *
+ * Revision 1.18  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.17  2003/11/22 21:02:37  ericn
@@ -229,6 +232,7 @@ bool queueCallback( callback_t callback,
    }
    else
    {
+      perror( "queueCallback" );
       JS_ReportError( context_, "queueing callback" );
       return false ;
    }
