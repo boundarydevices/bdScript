@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.9  2002-12-02 15:16:10  ericn
+ * Revision 1.10  2002-12-15 20:02:22  ericn
+ * -made error message more specific
+ *
+ * Revision 1.9  2002/12/02 15:16:10  ericn
  * -removed use of codeQueue's mutex and event by filter chain
  *
  * Revision 1.8  2002/12/01 15:56:51  ericn
@@ -86,7 +89,11 @@ void executeCode( JSObject   *scope,
          JSBool const exec = JS_ExecuteScript( context_, scope, scr, &rval );
          JS_DestroyScript( context_, scr );
          if( !exec )
-            fprintf( stderr, "error executing code\n" );
+         {
+            fprintf( stderr, "error executing code<" );
+            fwrite( JS_GetStringBytes( sVal ), JS_GetStringLength( sVal ), 1, stderr );
+            fprintf( stderr, ">\n" );
+         }
       }
       else
          JS_ReportError( context_, "compiling script from %s", sourceFile );
