@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.6 2002-11-30 01:41:46 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.7 2002-11-30 05:28:54 ericn Exp $"
 
 /*
  * semClasses.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.6  2002-11-30 01:41:46  ericn
+ * Revision 1.7  2002-11-30 05:28:54  ericn
+ * -removed semaphore_t
+ *
+ * Revision 1.6  2002/11/30 01:41:46  ericn
  * -modified to prevent copies
  *
  * Revision 1.5  2002/11/30 00:52:51  ericn
@@ -34,7 +37,6 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-#include <semaphore.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <stdio.h>
@@ -88,8 +90,8 @@ public:
    //
    // set-side routines
    //
-   bool signal( void ){ return 0 == pthread_cond_signal( &handle_ ); }
-   bool broadcast( void ){ return 0 == pthread_cond_broadcast( &handle_ ); }
+   inline bool signal( void ){ return 0 == pthread_cond_signal( &handle_ ); }
+   inline bool broadcast( void ){ return 0 == pthread_cond_broadcast( &handle_ ); }
 
    pthread_cond_t handle_ ;
 
@@ -98,18 +100,6 @@ private:
 };
 
 
-class semaphore_t {
-public:
-   semaphore_t( void ){ printf( "seminit:%d\n", sem_init( &sem_, 0, 0 ) ); }
-   ~semaphore_t( void ){ sem_destroy( &sem_ ); }
-
-   inline bool wait( void ){ return 0 == sem_wait( &sem_ ); }
-   inline bool signal( void ){ return 0 == sem_post( &sem_ ); }
-
-   sem_t sem_ ;
-private:
-   semaphore_t( semaphore_t const & );
-};
 
 mutexLock_t :: ~mutexLock_t( void )
 { 
@@ -161,7 +151,6 @@ inline bool condition_t :: wait
       return false ;
    }
 }
-
 
 #endif
 
