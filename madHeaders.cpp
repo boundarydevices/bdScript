@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.2  2002-11-05 15:14:04  ericn
+ * Revision 1.3  2002-11-07 02:13:55  ericn
+ * -modified to check length, frequency, and channels
+ *
+ * Revision 1.2  2002/11/05 15:14:04  ericn
  * -changed name of method
  *
  * Revision 1.1  2002/11/05 05:42:20  ericn
@@ -122,7 +125,7 @@ madHeaders_t :: madHeaders_t
    /* close input file */
    
    mad_stream_finish(&stream);
-   worked_ = eof ;
+   worked_ = eof && ( 0 < stats.length.seconds ) && ( 0 < stats.freq ) && ( 0 < stats.channels );
    if( worked_ )
    {
       numSeconds_   = stats.length.seconds ;
