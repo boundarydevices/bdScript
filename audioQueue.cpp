@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.14  2003-01-05 01:46:27  ericn
+ * Revision 1.15  2003-01-12 03:04:26  ericn
+ * -put sync back
+ *
+ * Revision 1.14  2003/01/05 01:46:27  ericn
  * -removed SYNC call on completion
  *
  * Revision 1.13  2002/12/15 00:07:58  ericn
@@ -265,6 +268,8 @@ printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
                }
                else
                {
+                  if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+                     fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                   item->isComplete_ = true ;
                   queueCallback( audioHandlerCallback, item );
                }
