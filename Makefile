@@ -43,7 +43,7 @@ testJS: testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o Makefile
 ifneq (,$(findstring arm, $(CC)))
    all: curlCache curlGet dirTest urlTest testJS
 else
-   all: curlCache curlGet dirTest urlTest
+   all: curlCache curlGet dirTest urlTest testJS
 endif
 
 
