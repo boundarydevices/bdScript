@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.5  2003-10-04 18:31:43  ericn
+ * Revision 1.6  2003-10-05 04:34:06  ericn
+ * -modified to force Mono output
+ *
+ * Revision 1.5  2003/10/04 18:31:43  ericn
  * -removed comments
  *
  * Revision 1.4  2003/10/01 05:04:24  ericn
@@ -545,6 +548,10 @@ int main( int argc, char const * const argv[] )
                      speed /= 2 ;
                   }
                
+                  int not = 0 ;
+                  if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
+                     perror( "STEREO" );
+
                   if( 0 < speed )
                   {
                      int fdCamera = open( "/dev/video0", O_RDONLY );
