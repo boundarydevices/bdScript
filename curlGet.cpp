@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlGet.cpp,v $
- * Revision 1.1  2002-10-06 16:52:32  ericn
+ * Revision 1.2  2002-11-27 18:31:11  ericn
+ * -removed use of curlCache module
+ *
+ * Revision 1.1  2002/10/06 16:52:32  ericn
  * -Initial import
  *
  *
@@ -20,39 +23,97 @@
 #include "curlCache.h"
 #include <string.h>
 #include <stdio.h>
+#include <curl/curl.h>
+#include <string>
+#include <vector>
+#include <math.h>
+
+static unsigned long totalBytes = 0 ;
+
+static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
+{
+   unsigned const total = size*nmemb;
+   printf( "%p:%lu bytes\n", buffer, total );
+   totalBytes += total ;
+   std::string *pS = (std::string *)userp ;
+   pS->append( (char *)buffer, total );
+   return total ;
+}
+
+static int progress_callback
+   ( void *clientp,
+     double dltotal,
+     double dlnow,
+     double ultotal,
+     double ulnow)
+{
+   printf( "dlt %lu\n"
+           "dln %lu\n"
+           "ult %lu\n"
+           "uln %lu\n", 
+           (unsigned long)floor( dltotal ), 
+           (unsigned long)floor( dlnow ), 
+           (unsigned long)floor( ultotal ), 
+           (unsigned long)floor( ulnow ) );
+   return 0 ;
+}
 
 bool curlGet( char const *url,
               char const *saveAs )
 {
-   curlCache_t &cache = getCurlCache();
-
-   curlFile_t f( cache.get( url ) );
-
    bool worked = false ;
 
-   if( f.isOpen() )
+
+   CURL *cHandle = curl_easy_init();
+   if( 0 != cHandle )
    {
-      if( 0 == saveAs )
+      std::string data ;
+      CURLcode result = curl_easy_setopt( cHandle, CURLOPT_URL, url );
+
+      if( 0 == result )
       {
-         char const *tail = url + strlen( url );
-         while( tail > url )
+         result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
+         if( 0 == result )
          {
-            char const c = *(--tail);
-            if( ( '\\' == c ) || ( '/' == c ) )
+            result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &data );
+            if( 0 == result )
             {
-               tail++ ;
-               break;
+               result = curl_easy_setopt( cHandle, CURLOPT_FILETIME, (void *)1 );
+               if( 0 == result )
+               {
+                  result = curl_easy_setopt( cHandle, CURLOPT_NOPROGRESS, 0 );
+                  if( 0 == result )
+                  {
+                     result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSFUNCTION, progress_callback );
+                     if( 0 == result )
+                     {
+                        CURLcode result = curl_easy_perform( cHandle );
+                        if( 0 == result )
+                        {
+                           worked = true ;
+                        }
+                     }
+                  }
+               }
             }
          }
-         saveAs = tail ;
       }
-      FILE *fOut = fopen( saveAs, "wb" );
-      if( fOut )
+      curl_easy_cleanup( cHandle );
+
+      if( ( 0 < data.size() ) && ( 0 != saveAs ) )
       {
-         worked = ( f.getSize() == fwrite( f.getData(), 1, f.getSize(), fOut ) );
-         worked = ( 0 == fclose( fOut ) ) && worked ;
-      } // opened target file
+         FILE *f = fopen( saveAs, "wb" );
+         if( f )
+         {
+            fwrite( data.c_str(), data.size(), 1, f );
+            fclose( f );
+         }
+         else
+            perror( saveAs );
+      }
    }
+   else
+      fprintf( stderr, "Error allocating curl handle\n" );
    
    return worked ;
 }
@@ -74,6 +135,7 @@ int main( int argc, char const * const argv[] )
       {
          char path[256];
          printf( "%s -> %s\n", argv[1], ( 0 == target ) ? getcwd( path, sizeof( path )) : target );
+         printf( "%lu bytes received\n", totalBytes );
          returnVal = 0 ;
       }
       else
