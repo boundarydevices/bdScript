@@ -1,5 +1,5 @@
 #ifndef __TSTHREAD_H__
-#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.2 2002-11-08 13:56:59 ericn Exp $"
+#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.3 2003-01-04 23:10:41 ericn Exp $"
 
 /*
  * tsThread.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: tsThread.h,v $
- * Revision 1.2  2002-11-08 13:56:59  ericn
+ * Revision 1.3  2003-01-04 23:10:41  ericn
+ * -added close() method to shut down before deallocation
+ *
+ * Revision 1.2  2002/11/08 13:56:59  ericn
  * -modified to use tslib
  *
  * Revision 1.1  2002/11/03 15:39:36  ericn
@@ -42,6 +45,8 @@ public:
    bool begin( void );
 
    bool isRunning( void ) const { return 0 <= threadHandle_ ; }
+
+   void close( void );
 
    int            threadHandle_ ;
    tsdev *        tsDevice_ ;
