@@ -17,7 +17,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o \
        pollHandler.o barcodePoll.o touchPoll.o gpioPoll.o image.o imgFile.o \
        flashThread.o parsedFlash.o jsKernel.o pollTimer.o ttyPoll.o udpPoll.o \
-       flashVar.o jsFlashVar.o
+       flashVar.o jsFlashVar.o tcpPoll.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
@@ -252,6 +252,10 @@ touchPoll: touchPoll.cpp $(LIB)
 
 urlPoll: urlPoll.cpp Makefile $(LIB)
 	$(CC) $(IFLAGS) -fno-rtti -o urlPoll -D__MODULETEST__ -Xlinker -Map -Xlinker urlPoll.map urlPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+tcpPoll: tcpPoll.cpp Makefile $(LIB)
+	$(CC) $(IFLAGS) -fno-rtti -o tcpPoll -D__MODULETEST__ -Xlinker -Map -Xlinker tcpPoll.map tcpPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
 	$(STRIP) $@
 
 flashVar: flashVar.cpp Makefile $(LIB)
