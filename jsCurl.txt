@@ -1,0 +1,20 @@
+------------- Notes on Javascript wrappers for cURL ---------------------
+There are a variety of cURL functions available to Javascript:
+   curlGet()      - grabs a URL using http GET and returns the content
+   curlPost()     - grabs a URL using http POST and returns the content
+
+
+Each of these takes one or more parameters:
+   url         - relative or absolute (http://) URL
+   variables   - Any variables to be posted. Variable
+                 names will be used as form variable names
+                 for POSTs, or as part of the query string
+                 for GETs
+
+and each returns an object (array) with the following
+members:
+   worked   - boolean : meaning is obvious
+   status   - HTTP status
+   mimeType - mime type of retrieved file
+   content  - String with the content of the URL
+
