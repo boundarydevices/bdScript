@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.9  2003-01-06 04:28:44  ericn
+ * Revision 1.10  2003-02-01 18:13:19  ericn
+ * -added touchReset_ flag for testing
+ *
+ * Revision 1.9  2003/01/06 04:28:44  ericn
  * -made callbacks return bool (false if system shutting down)
  *
  * Revision 1.8  2003/01/05 01:55:34  ericn
@@ -56,6 +59,7 @@
 #define TSDEVICE "/dev/touchscreen/ucb1x00"
 #endif
 static bool volatile shutdown = false ;
+bool volatile touchReset_ = false ;
 
 static void *tsThread( void *arg )
 {
@@ -104,6 +108,25 @@ printf( "ts thread %p (id %x)\n", &arg, pthread_self() );
          if( !worked )
             break;
       } // translated value
+
+      if( touchReset_ )
+      {
+         printf( "closing touch screen\n" );
+         int const rval = ts_close(obj->tsDevice_);
+         printf( "ts_close:%d\n", rval );
+         obj->tsDevice_ = ts_open( TSDEVICE, 0 );
+         printf( "re-opened, %p\n", obj->tsDevice_ );
+         if( 0 == ts_config( obj->tsDevice_ ) ) 
+         {
+            printf( "reconfigured\n" );
+            touchReset_ = false ;
+         }
+         else
+         {
+            perror( "ts_config" );
+            break;
+         }
+      }
    }
    
    ts_close( obj->tsDevice_ );

@@ -1,5 +1,5 @@
 #ifndef __TSTHREAD_H__
-#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.4 2003-01-06 04:28:30 ericn Exp $"
+#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.5 2003-02-01 18:13:12 ericn Exp $"
 
 /*
  * tsThread.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: tsThread.h,v $
- * Revision 1.4  2003-01-06 04:28:30  ericn
+ * Revision 1.5  2003-02-01 18:13:12  ericn
+ * -added touchReset_ flag for testing
+ *
+ * Revision 1.4  2003/01/06 04:28:30  ericn
  * -made callbacks return bool (false if system shutting down)
  *
  * Revision 1.3  2003/01/04 23:10:41  ericn
@@ -31,6 +34,8 @@
 
 #include <sys/time.h>
 #include <tslib.h>
+
+extern bool volatile touchReset_ ;
 
 class touchScreenThread_t {
 public:
