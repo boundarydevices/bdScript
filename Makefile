@@ -41,11 +41,13 @@ OBJS = \
        ddtoul.o \
        dirByATime.o \
        dither.o \
+       dnsPoll.o \
        dumpCPP.o \
        fbDev.o \
        ftObjs.o \
        gpioPoll.o \
        hexDump.o \
+       httpPoll.o \
        image.o \
        imgFile.o \
        imgGIF.o \
@@ -400,6 +402,14 @@ urlPoll: urlPoll.cpp Makefile $(LIB)
 
 tcpPoll: tcpPoll.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o tcpPoll -D__MODULETEST__ -Xlinker -Map -Xlinker tcpPoll.map tcpPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread
+	$(STRIP) $@
+
+httpPoll: httpPoll.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o httpPoll -D__MODULETEST__ -Xlinker -Map -Xlinker httpPoll.map httpPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+dnsPoll: dnsPoll.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o dnsPoll -D__MODULETEST__ -Xlinker -Map -Xlinker dnsPoll.map dnsPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 flashVar: flashVar.cpp Makefile $(LIB)
