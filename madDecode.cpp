@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.3  2003-07-27 15:14:28  ericn
+ * Revision 1.4  2003-08-02 19:28:57  ericn
+ * -remove debug statement
+ *
+ * Revision 1.3  2003/07/27 15:14:28  ericn
  * -modified to keep track of unread samples
  *
  * Revision 1.2  2003/07/20 15:42:32  ericn
@@ -82,7 +85,6 @@ bool madDecoder_t :: getData( void )
          haveHeader_ = true ;
          mad_frame_init(&mp3Frame_);
          mad_synth_init(&mp3Synth_);
-printf( "-> decode channels %u, sample rate %u\n", numChannels_, sampleRate_ );
       }
       else
       {
