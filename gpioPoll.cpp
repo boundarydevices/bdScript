@@ -1,13 +1,17 @@
 /*
  * Module gpioPoll.cpp
  *
- * This module defines ...
+ * This module defines the methods of the gpioPoll_t 
+ * class as declared in gpioPoll.h
  *
  *
  * Change History : 
  *
  * $Log: gpioPoll.cpp,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-10-18 19:15:06  ericn
+ * -added comment
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
