@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.1  2002-10-15 05:01:47  ericn
+ * Revision 1.2  2002-10-24 13:17:56  ericn
+ * -modified to prevent pxafb complaints
+ *
+ * Revision 1.1  2002/10/15 05:01:47  ericn
  * -Initial import
  *
  *
@@ -142,16 +145,16 @@ fbDevice_t :: fbDevice_t( char const *name )
 */
             if( ( 16 != variable_info.bits_per_pixel )
                 ||
-                ( 0 != variable_info.left_margin )
+                ( 1 != variable_info.left_margin )
                 ||
-                ( 0 != variable_info.right_margin )
+                ( 1 != variable_info.right_margin )
                 ||
                 ( 5 != variable_info.upper_margin )
                 ||
                 ( 5 != variable_info.lower_margin ) )
             {
-               variable_info.left_margin     = 0 ;
-               variable_info.right_margin    = 0 ;
+               variable_info.left_margin     = 1 ;
+               variable_info.right_margin    = 1 ;
                variable_info.upper_margin    = 5 ;
                variable_info.lower_margin    = 5 ;
                variable_info.bits_per_pixel  = 16 ;
