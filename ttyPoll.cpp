@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ttyPoll.cpp,v $
- * Revision 1.1  2003-12-28 15:25:49  ericn
+ * Revision 1.2  2003-12-28 20:54:25  ericn
+ * -restore on <ctrl-c>
+ *
+ * Revision 1.1  2003/12/28 15:25:49  ericn
  * -Initial import
  *
  *
@@ -156,6 +159,7 @@ void ttyPollHandler_t :: onLineIn( void )
 void ttyPollHandler_t :: onCtrlC( void )
 {
    write( getFd(), "<ctrl-c>\r\n", 10 );
+   tcsetattr( getFd(), TCSANOW, &oldTermState_ );
    kill( getpid(), SIGINT);
 }
 

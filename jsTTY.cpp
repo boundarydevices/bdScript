@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTTY.cpp,v $
- * Revision 1.4  2003-12-28 16:00:04  ericn
+ * Revision 1.5  2003-12-28 20:54:59  ericn
+ * -restore on <ctrl-c>
+ *
+ * Revision 1.4  2003/12/28 16:00:04  ericn
  * -got rid of secondary thread
  *
  * Revision 1.3  2003/01/05 01:58:15  ericn
@@ -69,6 +72,7 @@ void jsTTY_t :: onCtrlC( void )
 {
    exitStatus_ = 3 ;
    exitRequested_ = true ;
+   tcsetattr( getFd(), TCSANOW, &oldTermState_ );
 }
 
 static jsTTY_t *tty_ = 0 ;
@@ -236,5 +240,6 @@ bool initJSTTY( JSContext *cx, JSObject *glob )
 void shutdownTTY( void )
 {
    delete tty_ ;
+   tty_ = 0 ;
 }
 
