@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.5  2003-01-05 01:58:15  ericn
+ * Revision 1.6  2003-07-03 13:36:38  ericn
+ * -misc multi-tasking and multi-threading fixes
+ *
+ * Revision 1.5  2003/01/05 01:58:15  ericn
  * -added identification of threads
  *
  * Revision 1.4  2002/12/17 15:03:37  ericn
@@ -33,18 +36,19 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <fcntl.h>
 #include "codeQueue.h"
 #include "ddtoul.h"
 #include "stringList.h"
 #include "semClasses.h"
-
-static mutex_t mutex_ ;
+#include "jsGlobals.h"
 
 struct socketData_t {
    int          fd_ ;      // socket file descriptor
    stringList_t lines_ ;   // list of input strings
    JSContext   *cx_ ;
    JSObject    *obj_ ;
+   pthread_t    thread_ ;
 };
 
 enum {
@@ -58,7 +62,11 @@ printf( "socketReader %p (id %x)\n", &arg, pthread_self() );
    socketData_t *const sd = (socketData_t *)arg ;
    jsval jsv ;
 
-   if( !( JS_GetProperty( sd->cx_, sd->obj_, "onLineIn", &jsv ) && JSVAL_IS_STRING( jsv ) ) )
+   if( JS_GetProperty( sd->cx_, sd->obj_, "onLineIn", &jsv ) && JSVAL_IS_STRING( jsv ) )
+   {
+      JS_AddRoot( sd->cx_, &jsv );
+   }
+   else
       jsv = JSVAL_VOID ;
 
    unsigned char terminators = 0 ;
@@ -86,7 +94,7 @@ printf( "socketReader %p (id %x)\n", &arg, pthread_self() );
                    ( 0 != ( mask & terminators ) ) )
                {
                   terminators = mask ;
-                  mutexLock_t lock( mutex_ );
+                  mutexLock_t lock( execMutex_ );
                   sd->lines_.push_back( curLine );
                   curLine = "" ;
                   if( JSVAL_VOID != jsv )
@@ -110,12 +118,15 @@ printf( "socketReader %p (id %x)\n", &arg, pthread_self() );
 
    if( 0 != curLine.size() )
    {
-      mutexLock_t lock( mutex_ );
+      mutexLock_t lock( execMutex_ );
       sd->lines_.push_back( curLine );
       curLine = "" ;
       if( JSVAL_VOID != jsv )
          queueUnrootedSource( sd->obj_, jsv, "tcpClientRead" );
    }
+
+   if( JSVAL_VOID != jsv )
+      JS_RemoveRoot( sd->cx_, &jsv );
 
    JS_RemoveRoot( sd->cx_, sd->obj_ );
 
@@ -181,11 +192,11 @@ jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
       socketData_t *const socketData = (socketData_t *)JS_GetPrivate( cx, obj );
       if( socketData )
       {
-         mutexLock_t lock( mutex_ );
          if( !socketData->lines_.empty() )
          {
             std::string const s( socketData->lines_.front() );
             socketData->lines_.pop_front();
+fprintf( stderr, "---> host data %s\n", s.c_str() );
             *rval = STRING_TO_JSVAL( JS_NewStringCopyN( cx, s.c_str(), s.size() ) );
          }
       }
@@ -334,6 +345,7 @@ static JSBool tcpClient( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
                int sFd = socket( AF_INET, SOCK_STREAM, 0 );
                if( 0 <= sFd )
                {
+                  fcntl( sFd, F_SETFD, FD_CLOEXEC );
                   socketData->fd_ = sFd ;
                   sockaddr_in serverAddr ;
 
@@ -348,8 +360,8 @@ static JSBool tcpClient( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
                      int doit = 1 ;
                      setsockopt( sFd, IPPROTO_TCP, TCP_NODELAY, &doit, sizeof( doit ) );
                      JS_AddRoot( cx, &socketData->obj_ );
-                     pthread_t thread ;
-                     int create = pthread_create( &thread, 0, readerThread, socketData );
+                     int create = pthread_create( &socketData->thread_, 0, readerThread, socketData );
+                     pthread_detach( socketData->thread_ );
 
                      jsval jsv = JSVAL_TRUE ;
                      JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
