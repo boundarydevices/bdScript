@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.66  2003-12-27 18:38:31  ericn
+ * Revision 1.67  2004-01-01 20:31:44  ericn
+ * -no wait for goto in main body
+ *
+ * Revision 1.66  2003/12/27 18:38:31  ericn
  * -added pollTimer reference
  *
  * Revision 1.65  2003/11/30 16:45:53  ericn
@@ -341,12 +344,15 @@ jsMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static bool mainLoop( pollHandlerSet_t &polls,
                       JSContext        *cx )
 {
-   static unsigned iterations = 0 ;
-   if( !polls.poll( 5000 ) || ( 15 == ( iterations++ & 15 ) ) )
-//   if( !polls.poll( 50 ) || ( 1 == ( iterations++ & 1 ) ) )
+   if( !( gotoCalled_ || execCalled_ || exitRequested_ ) )
    {
-      mutexLock_t lock( execMutex_ );
-      JS_GC( cx );
+      static unsigned iterations = 0 ;
+      if( !polls.poll( 5000 ) || ( 15 == ( iterations++ & 15 ) ) )
+//   if( !polls.poll( 50 ) || ( 1 == ( iterations++ & 1 ) ) )
+      {
+         mutexLock_t lock( execMutex_ );
+         JS_GC( cx );
+      }
    }
    return !( gotoCalled_ || execCalled_ || exitRequested_ );
 }
