@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dummyBC.cpp,v $
- * Revision 1.2  2003-02-10 01:17:38  ericn
+ * Revision 1.3  2003-03-19 21:59:07  ericn
+ * -removed hardcoded port
+ *
+ * Revision 1.2  2003/02/10 01:17:38  ericn
  * -modified to support retrieval
  *
  * Revision 1.1  2003/02/09 02:25:07  ericn
@@ -36,7 +39,6 @@
 #include <string>
 #include <sys/time.h>
 
-static unsigned short port = htons( 0xEFD1 );
 static unsigned const maxRxSize = 0x200 ;
 
 static char const usage[] = {
@@ -209,7 +211,7 @@ int main( int argc, char const *const argv[] )
             }
          }
          else
-            fprintf( stderr, ":bind 0x%x:%m\n", ntohs( port ) );
+            fprintf( stderr, ":bind %s:%m\n", argv[1] );
       }
       else
          fprintf( stderr, ":socket:%m\n" );
