@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.10  2002-12-15 20:02:22  ericn
+ * Revision 1.11  2003-01-06 04:30:29  ericn
+ * -modified to allow unlink() of filter before destruction
+ *
+ * Revision 1.10  2002/12/15 20:02:22  ericn
  * -made error message more specific
  *
  * Revision 1.9  2002/12/02 15:16:10  ericn
@@ -192,6 +195,7 @@ codeFilter_t :: codeFilter_t( void )
 {
    if( 0 == pthread_mutex_lock( &filterMutex_ ) )
    {
+      assert( list_empty( &filters_ ) ); // only JS thread can install a filter, and only one
       list_add( &chain_, &filters_ );
       pthread_mutex_unlock( &filterMutex_ );
    }
@@ -201,13 +205,7 @@ codeFilter_t :: codeFilter_t( void )
 
 codeFilter_t :: ~codeFilter_t( void )
 {
-   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
-   {
-      list_del( &chain_ );
-      pthread_mutex_unlock( &filterMutex_ );
-   }
-   else
-      fprintf( stderr, "Error locking filter mutex\n" );
+   unlink();
 }
 
 bool codeFilter_t :: isHandled
@@ -223,9 +221,7 @@ void codeFilter_t :: wait( void )
    {
       while( !isDone() )
       {
-         bool ready = ( 0 == pthread_cond_wait( &filterCond_, &filterMutex_ ) );
-         if( !ready )
-            break;
+         pthread_cond_wait( &filterCond_, &filterMutex_ );
       } // until app says done
 
       pthread_mutex_unlock( &filterMutex_ );
@@ -237,6 +233,21 @@ void codeFilter_t :: wait( void )
 bool codeFilter_t :: isDone( void )
 {
    return false ;
+}
+
+void codeFilter_t :: unlink( void )
+{
+   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
+   {
+      if( !list_empty( &chain_ ) )
+      {
+         list_del( &chain_ );
+         INIT_LIST_HEAD( &chain_ );
+      }
+      pthread_mutex_unlock( &filterMutex_ );
+   }
+   else
+      fprintf( stderr, "Error locking filter mutex\n" );
 }
 
 //

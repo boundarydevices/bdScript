@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.18  2002-12-15 20:01:52  ericn
+ * Revision 1.19  2003-01-06 04:30:00  ericn
+ * -modified to allow unlink() of filter before destruction
+ *
+ * Revision 1.18  2002/12/15 20:01:52  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.17  2002/12/03 13:36:13  ericn
@@ -409,7 +412,7 @@ public:
    curlCodeFilter_t( jsCurlRequest_t &req )
       : req_( req ){}
 
-   ~curlCodeFilter_t( void ){}
+   ~curlCodeFilter_t( void ){ unlink(); } // unlink before destructor 
 
    virtual bool isHandled( callback_t cb, void *cbParam )
    {

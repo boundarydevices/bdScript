@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.6 2002-12-01 15:56:48 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.7 2003-01-06 04:29:49 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.6  2002-12-01 15:56:48  ericn
+ * Revision 1.7  2003-01-06 04:29:49  ericn
+ * -modified to allow unlink() of filter before destruction
+ *
+ * Revision 1.6  2002/12/01 15:56:48  ericn
  * -added filter support
  *
  * Revision 1.5  2002/12/01 03:14:21  ericn
@@ -104,8 +107,9 @@ public:
    //
    virtual bool isDone( void );
 
+   void unlink( void );
 private:
-   codeFilter_t( codeFilter_t const & );
+   codeFilter_t( codeFilter_t const & ); // no copies
 
    friend bool queueCallback( callback_t callback,
                               void      *cbData );
