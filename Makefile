@@ -6,7 +6,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsBarcode.o jsButton.o jsCurl.o jsGlobals.o \
        jsHyperlink.o jsImage.o jsMP3.o jsScreen.o jsShell.o \
-       jsText.o jsTimer.o jsTouch.o jsURL.o jsVolume.o \
+       jsText.o jsTimer.o jsTouch.o jsURL.o jsVolume.o jsGpio.o\
        madDecode.o madHeaders.o memFile.o parsedURL.o \
        relativeURL.o tsThread.o ultoa.o \
        ultodd.o box.o urlFile.o zOrder.o \

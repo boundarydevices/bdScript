@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.25  2002-12-15 20:01:37  ericn
+ * Revision 1.26  2002-12-16 19:44:26  tkisky
+ * -leds and feedback
+ *
+ * Revision 1.25  2002/12/15 20:01:37  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.24  2002/12/15 00:10:10  ericn
@@ -113,6 +116,7 @@
 #include "audioQueue.h"
 #include "jsVolume.h"
 #include "jsBarcode.h"
+#include "jsGpio.h"
 #include "jsShell.h"
 #include "jsButton.h"
 #include "ccActiveURL.h"
@@ -267,6 +271,7 @@ int prMain(int argc, char **argv)
                      initJSShell( cx, glob );
                      initJSButton( cx, glob );
                      initJSPopen( cx, glob );
+                     initJSGpio( cx, glob );
                      initJSEnv( cx, glob );
                      initJSTCP( cx, glob );
 
@@ -275,7 +280,7 @@ int prMain(int argc, char **argv)
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
                         tsThread = 0 ;
-                     
+
                      //
                      // start up audio output 
                      //
@@ -286,19 +291,19 @@ int prMain(int argc, char **argv)
                         if( f.isOpen() )
                         {
                            pushURL( argv[1] );
-            
+
                            JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
-   
+
                            JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
                            if( script )
                            {
-                              jsval rval; 
+                              jsval rval;
                               JSBool exec ;
                               {
                                  mutexLock_t lock( execMutex_ );
                                  exec = JS_ExecuteScript( cx, glob, script, &rval );
                                  JS_DestroyScript( cx, script );
-                              } // limit 
+                              } // limit
    
    
                               if( exec )
@@ -331,6 +336,7 @@ int prMain(int argc, char **argv)
                            fprintf( stderr, "Error opening url %s\n", argv[1] );
                      } // limit scope of urlFile
 
+                     shutdownGpio();
                      stopBarcodeThread();
 
                      shutdownCurlWorkers();
