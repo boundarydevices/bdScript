@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.22  2003-03-13 14:46:51  ericn
+ * Revision 1.23  2003-04-26 15:42:57  ericn
+ * -added method dither()
+ *
+ * Revision 1.22  2003/03/13 14:46:51  ericn
  * -added method dissolve()
  *
  * Revision 1.21  2002/12/15 20:01:30  ericn
@@ -89,6 +92,7 @@
 #include "imgJPEG.h"
 #include "jsCurl.h"
 #include "jsGlobals.h"
+#include "jsAlphaMap.h"
 
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -307,9 +311,174 @@ jsImageDissolve( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
    return JS_FALSE ;
 }
 
+static unsigned char const downDithers[] = {
+   3,5,1
+};
+
+static unsigned char const rightDither = 7 ;
+
+#define MAX( _first, _second ) ( ((_first) > (_second))?(_first):(_second) )
+#define MIN( _first, _second ) ( ((_first) < (_second))?(_first):(_second) )
+
+static int luminance( int const colors[3] )
+{
+   int max = MAX( colors[0], MAX( colors[1], colors[2] ) );
+   int min = MIN( colors[0], MIN( colors[1], colors[2] ) );
+   return (max+min)/2 ;
+}
+
+#define REDERROR(x)    ((x)*3)
+#define GREENERROR(x)  (((x)*3)+1)
+#define BLUEERROR(x)   (((x)*3)+2)
+
+static void ditherToBlackAndWhite( unsigned short const *in16,
+                                   unsigned char        *out8,
+                                   unsigned              width,
+                                   unsigned              height )
+{
+   // 
+   // need 1 forward error value and three downward errors for 
+   // Floyd-Steinberg dither. Allocate two rows for down-errors,
+   // since we'll be building one and using the other
+   //
+   // 	    X     7/16
+   //       3/16   5/16  1/16    
+   //
+   
+   unsigned const downErrorMax = 3*width ;
+   int *const downErrors[2] = {
+      new int[downErrorMax],
+      new int[downErrorMax]
+   };
+
+   memset( downErrors[0], 0, downErrorMax * sizeof( downErrors[0][0] ) );
+   memset( downErrors[1], 0, downErrorMax * sizeof( downErrors[1][0] ) );
+   
+   int rightErrors[3];
+   
+   fbDevice_t &fb = getFB();
+
+   for( int y = 0 ; y < height ; y++ )
+   {
+      // not carrying errors from right-edge to left
+      memset( rightErrors, 0, sizeof( rightErrors ) );
+
+      int * const useDown   = downErrors[ y & 1];
+      int * const buildDown = downErrors[ (~y) & 1 ];
+
+      for( int x = 0 ; x < width ; x++ )
+      {
+         unsigned short inPix = in16[y*width+x];
+         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
+         for( unsigned c = 0 ; c < 3 ; c++ )
+         {
+            colors[c] += useDown[(x*3)+c] + rightErrors[c];
+         }
+
+         int const l = luminance( colors );
+
+         int actual[3];
+         int actualRed, actualGreen, actualBlue ;
+         if( l > 0x80 )
+         {
+            out8[y*width+x] = 0xFF ;
+            actual[0] = actual[1] = actual[2] = 0xFF ;
+         } // output white
+         else
+         {
+            out8[y*width+x] = 0 ;
+            actual[0] = actual[1] = actual[2] = 0 ;
+         } // output black
+
+         //
+         // now calculate and store errors
+         //
+         int buildStart = 3*x ;
+         for( unsigned c = 0 ; c < 3 ; c++ )
+         {
+            int const diff = colors[c] - actual[c];
+            int const sixteenths = diff/16 ;
+            
+            rightErrors[c] = 7*sixteenths ;
+
+            if( 0 < x )
+               buildDown[buildStart-3+c] = 3*sixteenths ;
+            buildDown[buildStart+c] = 5*sixteenths ;
+            if( x < width - 1 )
+               buildDown[buildStart+3+c] = sixteenths ;
+         }
+
+/*
+if( ( 2 >= y ) && ( 5 > x ) )
+{
+   printf( "---------> x %d, y %d\n", x, y );
+   printf( "desired %d/%d/%d\n", red, green, blue );
+   printf( "actual  %d/%d/%d\n", actualRed, actualGreen, actualBlue );
+   printf( "errors  %d/%d/%d\n", rightErrors[0], rightErrors[1], rightErrors[2] );
+}
+*/
+      }
+   }
+
+   delete [] downErrors[0];
+   delete [] downErrors[1];
+}
+
+
+JSBool
+jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   jsval widthVal, heightVal, dataVal ;
+   if( JS_GetProperty( cx, obj, "width", &widthVal )
+       &&
+       JS_GetProperty( cx, obj, "height", &heightVal )
+       &&
+       JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+       &&
+       JSVAL_IS_STRING( dataVal ) )
+   {
+      int const width  = JSVAL_TO_INT( widthVal ); 
+      int const height = JSVAL_TO_INT( heightVal );
+      JSString *pixStr = JSVAL_TO_STRING( dataVal );
+      unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+      if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
+      {   
+         JSObject *returnObj = JS_NewObject( cx, &jsAlphaMapClass_, 0, 0 );
+         if( returnObj )
+         {
+            *rval = OBJECT_TO_JSVAL( returnObj ); // root
+            unsigned const pixBytes = width*height ;
+            void *const pixMem = JS_malloc( cx, pixBytes );
+            JSString *sAlphaMap = JS_NewString( cx, (char *)pixMem, pixBytes );
+            if( sAlphaMap )
+            {
+               JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               ditherToBlackAndWhite( pixMap, (unsigned char *)pixMem, width, height );
+            }
+            else
+               JS_ReportError( cx, "Error building alpha map string" );
+
+            JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(width), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(height), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+         }
+         else
+            JS_ReportError( cx, "allocating array" );
+      }
+      else
+         JS_ReportError( cx, "Invalid width or height" );
+   }
+   else
+      JS_ReportError( cx, "Invalid image" );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec imageMethods_[] = {
     {"draw",         jsImageDraw,           3 },
     {"dissolve",     jsImageDissolve,       3 },
+    {"dither",       jsImageDither,         3 },
     {0}
 };
 
