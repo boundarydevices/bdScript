@@ -105,9 +105,12 @@ shared-headers = ddtoul.h dirByATime.h hexDump.h  \
    ultoa.h ultodd.h urlFile.h
 
 install-headers:
-	cp $(shared-headers) $(INSTALL_ROOT)/include
+	cp -f -v $(shared-headers) $(INSTALL_ROOT)/include
 
-install: install-libs install-headers
+install-bin:
+	cp -f -v testEvents $(INSTALL_ROOT)/bin
+
+install: install-bin install-headers
 
 clean:
 	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
