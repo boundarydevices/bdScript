@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsNewTouch.cpp,v $
- * Revision 1.2  2003-11-25 00:07:49  ericn
+ * Revision 1.3  2003-12-03 12:53:08  ericn
+ * -added swapXY support
+ *
+ * Revision 1.2  2003/11/25 00:07:49  ericn
  * -modified so touchScreen.getX() works properly in handlers
  *
  * Revision 1.1  2003/11/24 19:42:42  ericn
@@ -98,6 +101,7 @@ public:
    jsval     onReleaseCode_ ;
    jsval     onMoveObject_ ;
    jsval     onMoveCode_ ;
+   bool      swapXY_ ;
    long      scaleX_ ;
    long      scaleY_ ;
    long      originX_ ;
@@ -121,6 +125,7 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
    , onReleaseCode_( JSVAL_VOID )
    , onMoveObject_( JSVAL_VOID )
    , onMoveCode_( JSVAL_VOID )
+   , swapXY_( false )
    , scaleX_( 256 )
    , scaleY_( 256 )
    , originX_( 0 )
@@ -141,8 +146,10 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
       {
          printf( "<%s>\n", inBuf );
          long scaleX, scaleY, originX, originY, rangeX, rangeY ;
-         if( 6 == sscanf( inBuf, "%ld,%ld,%ld,%ld,%ld,%ld", &scaleX, &scaleY, &originX, &originY, &rangeX, &rangeY ) )
+         unsigned swap ;
+         if( 7 == sscanf( inBuf, "%ld,%ld,%ld,%ld,%ld,%ld,%u", &scaleX, &scaleY, &originX, &originY, &rangeX, &rangeY, &swap ) )
          {
+            swapXY_  = ( 0 != swap );
             scaleX_  = scaleX ;
             scaleY_  = scaleY ;
             originX_ = originX ;
@@ -160,6 +167,12 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
 
 void jsTouchPoll_t :: translate( int &x, int &y ) const 
 {
+   if( swapXY_ )
+   {
+      int tmp = x ;
+      x = y ;
+      y = tmp ;
+   }
    x = ((x-originX_)*256)/scaleX_ ;
    y = ((y-originY_)*256)/scaleY_ ;
 }
@@ -342,6 +355,7 @@ jsIsRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsSetRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   touchPoll_->swapXY_  = 0 ;
    touchPoll_->scaleX_  = 256 ;
    touchPoll_->scaleY_  = 256 ;
    touchPoll_->originX_ = 0 ;
@@ -387,15 +401,20 @@ jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
                      {
                         int const rangeX = JSVAL_TO_INT( xval );
                         int const rangeY = JSVAL_TO_INT( yval );
-                        printf( "scale: %u/%u, %u/%u, %u/%u\n", scaleX, scaleY, originX, originY, rangeX, rangeY );
-                        touchPoll_->scaleX_  = scaleX ;
-                        touchPoll_->scaleY_  = scaleY ;
-                        touchPoll_->originX_ = originX ;
-                        touchPoll_->originY_ = originY ;
-                        touchPoll_->setRange( rangeX, rangeY );
-
-                        *rval = JSVAL_TRUE ;
-                        return JS_TRUE ;
+                        if( JS_GetProperty( cx, rhObj, "swapXY", &rhval ) && JSVAL_IS_BOOLEAN( rhval ) )
+                        {
+                           bool const swapXY = JSVAL_TO_BOOLEAN( rhval );
+                           printf( "scale: %u/%u, %u/%u, %u/%u\n", scaleX, scaleY, originX, originY, rangeX, rangeY );
+                           touchPoll_->scaleX_  = scaleX ;
+                           touchPoll_->scaleY_  = scaleY ;
+                           touchPoll_->originX_ = originX ;
+                           touchPoll_->originY_ = originY ;
+                           touchPoll_->setRange( rangeX, rangeY );
+                           touchPoll_->swapXY_  = swapXY ;
+   
+                           *rval = JSVAL_TRUE ;
+                           return JS_TRUE ;
+                        }
                      }
                   }
                }
@@ -404,7 +423,7 @@ jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       }
    }
 
-   JS_ReportError( cx, "Usage: touchScreen.setCooked( { scale:{ x:#, y:# }, origin:{ x:#, y:# } } )" );
+   JS_ReportError( cx, "Usage: touchScreen.setCooked( { scale:{ x:#, y:# }, origin:{ x:#, y:# }, range:{ x:#, y:# }, swapXY=bool } )" );
 
    *rval = JSVAL_VOID ;
    return JS_TRUE ;
