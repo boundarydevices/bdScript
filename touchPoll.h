@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.1 2003-10-05 19:15:44 ericn Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.2 2003-11-24 19:09:07 ericn Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-11-24 19:09:07  ericn
+ * -added deglitch
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -38,7 +41,14 @@ public:
 
    virtual void onDataAvail( void );
 
+   void setRange( unsigned x, unsigned y );
 protected:
+   int      prevX_ ;
+   unsigned xRange_ ;
+   long     xMotion_ ;
+   int      prevY_ ;
+   unsigned yRange_ ;
+   long     yMotion_ ;
 };
 
 #endif
