@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.6  2003-05-26 22:06:15  ericn
+ * Revision 1.7  2003-06-04 02:56:45  ericn
+ * -modified to allocate printer object even if unplugged
+ *
+ * Revision 1.6  2003/05/26 22:06:15  ericn
  * -modified to use cbmImage
  *
  * Revision 1.5  2003/05/24 15:03:35  ericn
@@ -213,38 +216,39 @@ fprintf( stderr, "--> CBM...CBM...\n" );
    {
 fprintf( stderr, "printer port opened: handle %d\n", fd );
       printerFd_ = fd ;
-      JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCBMClass_,
-                                     jsCBM, 1,
-                                     cbmProperties_, 
-                                     cbm_methods,
-                                     0, 0 );
-      if( rval )
-      {
-         JSObject *obj = JS_NewObject( cx, &jsCBMClass_, NULL, NULL );
-         if( obj )
-         {
-            if( JS_DefineProperty( cx, glob, "printer", 
-                                   OBJECT_TO_JSVAL( obj ),
-                                   0, 0, 
-                                   JSPROP_ENUMERATE
-                                  |JSPROP_PERMANENT
-                                  |JSPROP_READONLY ) )
-            {
-fprintf( stderr, "--> Defined printer object\n" );
-               return true ;
-            }
-            else
-               fprintf( stderr, "Error defining printer object\n" );
-         }
-         else
-            fprintf( stderr, "Error allocating CBM printer" );
-      }
-      else
-         fprintf( stderr, "Error initializing CBM printer class\n" );
    }
    else
       JS_ReportError( cx, "Error %m opening printer handle" );
 
+   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCBMClass_,
+                                  jsCBM, 1,
+                                  cbmProperties_, 
+                                  cbm_methods,
+                                  0, 0 );
+   if( rval )
+   {
+      JSObject *obj = JS_NewObject( cx, &jsCBMClass_, NULL, NULL );
+      if( obj )
+      {
+         if( JS_DefineProperty( cx, glob, "printer", 
+                                OBJECT_TO_JSVAL( obj ),
+                                0, 0, 
+                                JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY ) )
+         {
+fprintf( stderr, "--> Defined printer object\n" );
+            return true ;
+         }
+         else
+            fprintf( stderr, "Error defining printer object\n" );
+      }
+      else
+         fprintf( stderr, "Error allocating CBM printer" );
+   }
+   else
+      fprintf( stderr, "Error initializing CBM printer class\n" );
+   
    return false ;
 }
 
