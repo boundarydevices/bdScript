@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.10  2002-11-05 05:41:19  ericn
+ * Revision 1.11  2002-11-08 13:58:23  ericn
+ * -modified to handle negative screen positions
+ *
+ * Revision 1.10  2002/11/05 05:41:19  ericn
  * -pre-declare image::isLoaded
  *
  * Revision 1.9  2002/11/03 17:55:51  ericn
@@ -84,26 +87,34 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          fbDevice_t &fb = getFB();
          if( ( 0 < width ) && ( 0 < height ) && ( xPos < fb.getWidth() ) && ( yPos < fb.getHeight() ) )
          {
-            unsigned const left = xPos ;
+            int const left = xPos ;
 
             for( unsigned y = 0 ; y < height ; y++, yPos++ )
             {
-               if( yPos < fb.getHeight() )
+               if( 0 <= yPos )
                {
-                  unsigned short *pix = fb.getRow( yPos ) + left ;
-                  xPos = left ;
-                  for( unsigned x = 0 ; x < width ; x++, xPos++ )
+                  if( yPos < fb.getHeight() )
                   {
-                     if( xPos < fb.getWidth() )
+                     unsigned short *pix = fb.getRow( yPos ) + left ;
+                     xPos = left ;
+                     for( unsigned x = 0 ; x < width ; x++, xPos++ )
                      {
-                        *pix++ = pixMap[y*width+x];
+                        if( 0 <= xPos )
+                        {
+                           if( xPos < fb.getWidth() )
+                           {
+                              *pix++ = pixMap[y*width+x];
+                           }
+                           else
+                              break; // only going further off the screen
+                        }
+                        else
+                           pix++ ;
                      }
-                     else
-                        break;
                   }
+                  else
+                     break; // only going further off the screen
                }
-               else
-                  break;
             }
          }
 //         JS_ReportError( cx, "w:%d, h:%d", width, height );

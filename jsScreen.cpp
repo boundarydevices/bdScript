@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.4  2002-11-02 18:36:54  ericn
+ * Revision 1.5  2002-11-08 13:58:16  ericn
+ * -modified to handle negative screen positions
+ *
+ * Revision 1.4  2002/11/02 18:36:54  ericn
  * -added getPixel, setPixel, getRect
  *
  * Revision 1.3  2002/10/31 02:08:10  ericn
@@ -175,21 +178,26 @@ jsGetRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
                for( unsigned y = 0 ; y < height ; y++ )
                {
-                  if( startY + y < fb.getHeight() )
+                  int const screenY = startY + y ;
+                  if( ( 0 <= screenY ) 
+                      &&
+                      ( screenY < fb.getHeight() ) )
                   {
                      for( unsigned x = 0 ; x < width ; x++ )
                      {
-                        if( startX + x < fb.getWidth() )
+                        int const screenX = x + startX ;
+                        if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
                         {
-                           pixels[(y*width)+x] = fb.getPixel( startX + x, startY + y );
+                           pixels[(y*width)+x] = fb.getPixel( screenX, screenY );
                         }
                         else
                            pixels[(y*width)+x] = 0 ;
-                     }
+                     } // for each column
                   }
                   else
                      memset( pixels+(y*width), 0, width*sizeof(pixels[0]));
-               }
+               } // for each row requested
+
                JSString *sPix = JS_NewString( cx, (char *)pixels, pixBytes );
                if( sPix )
                {
