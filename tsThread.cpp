@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.5  2002-11-30 17:32:58  ericn
+ * Revision 1.6  2002-12-15 00:00:22  ericn
+ * -removed debug msg
+ *
+ * Revision 1.5  2002/11/30 17:32:58  ericn
  * -added support for move
  *
  * Revision 1.4  2002/11/29 16:41:54  ericn
@@ -40,8 +43,6 @@
 
 static void *tsThread( void *arg )
 {
-   fprintf( stderr, "touch screen thread starting...\n" );
-
    touchScreenThread_t *const obj = (touchScreenThread_t *)arg ;
 //   struct input_event event ;
    ts_sample sample ;
