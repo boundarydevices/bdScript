@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.6 2002-10-24 13:18:22 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.7 2002-10-31 02:08:55 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.6  2002-10-24 13:18:22  ericn
+ * Revision 1.7  2002-10-31 02:08:55  ericn
+ * -added default constructor for curlRequest_t
+ *
+ * Revision 1.6  2002/10/24 13:18:22  ericn
  * -modified for relative URLs
  *
  * Revision 1.5  2002/10/13 14:36:51  ericn
@@ -94,6 +97,7 @@ private:
 class curlRequest_t {
 public:
    curlRequest_t( char const url[] );
+   curlRequest_t( void );
    ~curlRequest_t( void );
 
    struct param_t {
