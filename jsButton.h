@@ -1,5 +1,5 @@
 #ifndef __JSBUTTON_H__
-#define __JSBUTTON_H__ "$Id: jsButton.h,v 1.3 2002-12-26 19:26:59 ericn Exp $"
+#define __JSBUTTON_H__ "$Id: jsButton.h,v 1.4 2003-08-26 00:31:56 ericn Exp $"
 
 /*
  * jsButton.h
@@ -40,7 +40,10 @@
  *
  * button methods include
  *
- *    isPressed()    - returns true if button is pressed
+ *    changeText(newText)  - use to change a text button's text
+ *    draw()               - force re-display of a button
+ *    deactivate()         - call to cause a button to stop responding
+ *                           prior to finalize (removes an unknown delay)
  *
  * Or, for those times when you just can't spend the time
  * making images, there's a text-mode version which is faster
@@ -70,7 +73,10 @@
  * Change History : 
  *
  * $Log: jsButton.h,v $
- * Revision 1.3  2002-12-26 19:26:59  ericn
+ * Revision 1.4  2003-08-26 00:31:56  ericn
+ * -fixed comments
+ *
+ * Revision 1.3  2002/12/26 19:26:59  ericn
  * -added onMoveOff support
  *
  * Revision 1.2  2002/12/07 21:01:40  ericn
