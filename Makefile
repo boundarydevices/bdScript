@@ -22,6 +22,12 @@ dirTest.o: dirByATime.cpp dirByATime.h Makefile
 dirTest: Makefile dirTest.o
 	$(CC) -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl
 
+curlGetMain.o: curlCache.h curlGet.h curlGet.cpp Makefile
+	$(CC) -c -o curlGetMain.o -O2 -DSTANDALONE curlGet.cpp
+
+curlGet: curlGetMain.o curlCache.o dirByATime.o Makefile
+	$(CC) -o curlGet curlGetMain.o curlCache.o dirByATime.o $(LIBS) -lcurl -lstdc++ 
+
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -c -o urlTest.o -O2 -DSTANDALONE -I ../zlib urlFile.cpp
 
@@ -34,7 +40,7 @@ testJS.o: testJS.cpp Makefile
 testJS: testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o Makefile
 	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
 
-all: curlCache dirTest urlTest testJS
+all: curlCache curlGet dirTest urlTest testJS
 
 clean:
-	rm -f *.o curlCache dirTest urlTest testJS
+	rm -f *.o curlCache curlGet dirTest urlTest testJS
