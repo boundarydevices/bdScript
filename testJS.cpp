@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.17  2002-11-30 05:29:21  ericn
+ * Revision 1.18  2002-11-30 16:28:32  ericn
+ * -added MP3 support
+ *
+ * Revision 1.17  2002/11/30 05:29:21  ericn
  * -moved shutdown of disk cache
  *
  * Revision 1.16  2002/11/30 02:01:14  ericn
@@ -83,6 +86,7 @@
 #include "jsText.h"
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
+#include "jsMP3.h"
 #include "jsVolume.h"
 #include "jsBarcode.h"
 #include "jsShell.h"
@@ -243,6 +247,7 @@ int prMain(int argc, char **argv)
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
                      initJSVolume( cx, glob );
+                     initJSMP3( cx, glob );
                      initJSBarcode( cx, glob );
                      initJSShell( cx, glob );
                      initJSButton( cx, glob );
