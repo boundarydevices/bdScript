@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTTY.cpp,v $
- * Revision 1.3  2003-01-05 01:58:15  ericn
+ * Revision 1.4  2003-12-28 16:00:04  ericn
+ * -got rid of secondary thread
+ *
+ * Revision 1.3  2003/01/05 01:58:15  ericn
  * -added identification of threads
  *
  * Revision 1.2  2003/01/03 16:54:30  ericn
@@ -32,16 +35,44 @@
 #include "jsImage.h"
 #include "mtQueue.h"
 #include <stdio.h>
-#include <pthread.h>
 #include <ctype.h>
 #include "codeQueue.h"
+#include "ttyPoll.h"
+#include "jsGlobals.h"
+#include "jsExit.h"
 
+static JSObject *ttyProto = NULL ;
 static std::string prompt( "js:" );
 static jsval onLineInCode_ = JSVAL_VOID ;
 static jsval onLineInScope_ = JSVAL_VOID ;
 static mtQueue_t<std::string> lineQueue_ ;
-static FILE *volatile fIn = 0 ;
-static pthread_t thread_ = (pthread_t)-1 ;
+
+class jsTTY_t : public ttyPollHandler_t {
+public:
+   jsTTY_t( void )
+      : ttyPollHandler_t( pollHandlers_, 0 ){}
+
+   virtual void onLineIn( void );
+   virtual void onCtrlC( void );
+};
+
+void jsTTY_t :: onLineIn( void )
+{
+   if( ( JSVAL_VOID != onLineInCode_ ) && ( JSVAL_VOID != onLineInScope_ ) )
+   {
+      lineQueue_.push( getLine() );
+      executeCode( JSVAL_TO_OBJECT( onLineInScope_ ), onLineInCode_, "tty.onLineIn" );
+   }
+}
+
+void jsTTY_t :: onCtrlC( void )
+{
+   exitStatus_ = 3 ;
+   exitRequested_ = true ;
+}
+
+static jsTTY_t *tty_ = 0 ;
+
 
 static JSBool
 jsPrompt( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -170,63 +201,31 @@ static JSBool jsTTY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
    return JS_TRUE;
 }
 
-static void *ttyThread( void *arg )
-{
-printf( "ttyReader %p (id %x)\n", &arg, pthread_self() );   
-   char inBuf[256];
-   do {
-      fwrite( prompt.c_str(), prompt.size(), 1, stdout );
-      if( fgets( inBuf, sizeof( inBuf ), fIn ) )
-      {
-         unsigned len = strlen( inBuf );
-         while( 0 < len )
-         {
-            if( iscntrl( inBuf[len-1] ) )
-               inBuf[--len] = '\0' ;
-            else
-               break;
-         }
-
-         lineQueue_.push( inBuf );
-         if( ( JSVAL_VOID != onLineInCode_ ) && ( JSVAL_VOID != onLineInScope_ ) )
-            queueSource( JSVAL_TO_OBJECT( onLineInScope_ ), onLineInCode_, "tty.onLineIn" );
-      }
-      else
-         break;
-   } while( 1 );
-
-   return 0 ;
-}
-
 bool initJSTTY( JSContext *cx, JSObject *glob )
 {
-   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsTTYClass_,
-                                  jsTTY, 1,
-                                  ttyProperties_, 
-                                  methods_,
-                                  0, 0 );
-   if( rval )
+   ttyProto = JS_InitClass( cx, glob, NULL, &jsTTYClass_,
+                            jsTTY, 1,
+                            ttyProperties_, 
+                            methods_,
+                            0, 0 );
+   if( ttyProto )
    {
+      JS_AddRoot( cx, &ttyProto );
+
       if( JS_DefineFunctions( cx, glob, functions_ ) )
       {
-         JSObject *obj = JS_NewObject( cx, &jsTTYClass_, NULL, NULL );
-         if( obj )
+         JSObject *console = JS_NewObject( cx, &jsTTYClass_, ttyProto, glob );
+         if( console )
          {
             JS_DefineProperty( cx, glob, "tty", 
-                               OBJECT_TO_JSVAL( obj ),
+                               OBJECT_TO_JSVAL( console ),
                                0, 0, 
                                JSPROP_ENUMERATE
                                |JSPROP_PERMANENT
                                |JSPROP_READONLY );
             JS_AddRoot( cx, &onLineInCode_ );
             JS_AddRoot( cx, &onLineInScope_ );
-            
-            fIn = stdin ;
-            int create = pthread_create( &thread_, 0, ttyThread, 0 );
-            if( 0 == create )
-            {
-               return true ;
-            }
+            tty_ = new jsTTY_t ;
          }
       }
    }
@@ -236,8 +235,6 @@ bool initJSTTY( JSContext *cx, JSObject *glob )
 
 void shutdownTTY( void )
 {
-   pthread_cancel( thread_ );
-   void *exitStat ;
-   pthread_join( thread_, &exitStat );
+   delete tty_ ;
 }
 
