@@ -1,7 +1,14 @@
 .global uDivRem
 .global uReciprocal
 .global uShiftRight
-
+.global reverseDec
+//extern "C" unsigned long reverseDec(unsigned long v);
+reverseDec:
+	clz		r1,r0
+	mov		r2,#0x80000000
+	eor		r0,r0,r2,ASR r1
+	mov		pc,lr
+	
 //extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 //In: r0 - value, r1 - divisor, r2 - @remainder
 //Out: r0 - value/divisor, @r2 - remainder
