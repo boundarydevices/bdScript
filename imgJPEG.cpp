@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-15 14:39:52  ericn
+ * -added dummy return value
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -73,6 +76,7 @@ static boolean jpg_resync_to_restart( j_decompress_ptr cinfo, int desired )
 //printf( "resync to restart\n" );
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    pSrc->numRead_ = 0 ;
+   return true ;
 }
 
 static void jpg_term_source( j_decompress_ptr cinfo )

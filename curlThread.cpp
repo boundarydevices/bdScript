@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlThread.cpp,v $
- * Revision 1.4  2002-11-11 04:29:06  ericn
+ * Revision 1.5  2002-11-15 14:39:24  ericn
+ * -added dummy return value
+ *
+ * Revision 1.4  2002/11/11 04:29:06  ericn
  * -moved headers
  *
  * Revision 1.3  2002/11/03 17:55:44  ericn
@@ -250,6 +253,8 @@ static void *readerThread( void *arg )
       else
          break;
    }
+
+   return 0 ;
 }
 
 void startCurlThreads( void )
