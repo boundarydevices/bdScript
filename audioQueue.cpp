@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.26  2003-08-02 16:13:08  ericn
+ * Revision 1.27  2003-08-02 19:30:03  ericn
+ * -modified to allow clipping of video
+ *
+ * Revision 1.26  2003/08/02 16:13:08  ericn
  * -fixed memory leak for audio samples
  *
  * Revision 1.25  2003/08/01 14:26:28  ericn
@@ -302,11 +305,7 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
-struct playbackArgs_t {
-   unsigned xPos_ ;
-   unsigned yPos_ ;
-   unsigned width_ ;
-   unsigned height_ ;
+struct playbackStreams_t {
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
 };
@@ -315,13 +314,15 @@ struct videoParams_t {
    videoFrames_t &frames_ ;
    unsigned       x_ ;
    unsigned       y_ ;
+   unsigned       width_ ;
+   unsigned       height_ ;
 };
 
 static void *videoThreadRtn( void *arg )
 {
    videoParams_t const &params = *(videoParams_t const *)arg ;
    videoFrames_t &frames = params.frames_ ;
-printf( "play video at %u:%u\n", params.x_, params.y_ );
+printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_, params.height_ );
    fbDevice_t    &fb = getFB();
    videoQueue_t :: entry_t *entry ;
    unsigned picCount = 0 ;
@@ -698,7 +699,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
-printf( "MPEG playback here at x:%u, y:%u\n", item->xPos_, item->yPos_ );
+printf( "MPEG playback here at x:%u, y:%u, w:%u, h:%u\n", item->xPos_, item->yPos_, item->width_, item->height_ );
                _playing = true ;
                
                mpegDemux_t demuxer( item->data_, item->length_ );
@@ -706,7 +707,7 @@ printf( "MPEG playback here at x:%u, y:%u\n", item->xPos_, item->yPos_ );
                mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
 
 printf( "have %u streams\n", bi->count_ ); fflush( stdout );
-               playbackArgs_t playbackArgs = { 0, 0, 0, 0, 0, 0 };
+               playbackStreams_t streams = { 0, 0 };
       
                for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
                {
@@ -716,21 +717,21 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                   {
                      case mpegDemux_t::videoFrame_e :
                      {
-                        playbackArgs.videoFrames_ = bi->streams_[sIdx];
+                        streams.videoFrames_ = bi->streams_[sIdx];
                         break;
                      }
       
                      case mpegDemux_t::audioFrame_e :
                      {
-                        playbackArgs.audioFrames_ = bi->streams_[sIdx];
+                        streams.audioFrames_ = bi->streams_[sIdx];
                         break;
                      }
                   }
                } // for each stream in the file
       
-               if( ( 0 != playbackArgs.audioFrames_ )
+               if( ( 0 != streams.audioFrames_ )
                    &&
-                   ( 0 != playbackArgs.videoFrames_ ) )
+                   ( 0 != streams.videoFrames_ ) )
                {
                   printf( "0x%llx milli-seconds total\n", bi->msTotal_ );
                   printf( "%llu.%03llu seconds total\n", bi->msTotal_ / 1000, bi->msTotal_ % 1000 );
@@ -739,7 +740,14 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                   if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
                   {
                      fbDevice_t    &fb = getFB();
-                     videoFrames_t vFrames( *playbackArgs.videoFrames_, fb.getWidth(), fb.getHeight() );
+                     unsigned width = ( 0 != item->width_ ) ? item->width_ : fb.getWidth();
+                     if( width > fb.getWidth() )
+                        width = fb.getWidth();
+                     unsigned height = ( 0 != item->height_ ) ? item->height_ : fb.getHeight();
+                     if( height > fb.getHeight() )
+                        height = fb.getHeight();
+
+                     videoFrames_t vFrames( *streams.videoFrames_, width, height );
                      if( vFrames.preload() )
                      {
                         unsigned picCount = 0 ;
@@ -776,7 +784,7 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                   
                         unsigned      frameIdx = 0 ;
                         long long     startPTS = 0 ;
-                        mpegDemux_t::streamAndFrames_t const &audioFrames = *playbackArgs.audioFrames_ ;
+                        mpegDemux_t::streamAndFrames_t const &audioFrames = *streams.audioFrames_ ;
                         unsigned char state = (frameIdx < audioFrames.numFrames_)
                                               ? MP3AVAIL   // this will force a check of the device (if data avail)
                                               : MP3DONE ;
@@ -787,7 +795,7 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                         unsigned         maxSamples = 0 ;
                         bool             firstFrame = true ;
                         pthread_t        videoThread = 0 ;
-                        videoParams_t    videoParams = { vFrames, item->xPos_, item->yPos_ };
+                        videoParams_t    videoParams = { vFrames, item->xPos_, item->yPos_, item->width_, item->height_ };
 
                         while( !( _cancel || queue->shutdown_ ) 
                                && 
@@ -1095,7 +1103,9 @@ bool audioQueue_t :: queueMPEG
      jsval                onComplete,
      jsval                onCancel,
      unsigned             xPos,
-     unsigned             yPos )
+     unsigned             yPos,
+     unsigned             width,
+     unsigned             height )
 {
    item_t *item = new item_t ;
    item->type_       = mpegPlay_ ;
@@ -1107,6 +1117,8 @@ bool audioQueue_t :: queueMPEG
    item->isComplete_ = false ;
    item->xPos_       = xPos ;
    item->yPos_       = yPos ;
+   item->width_      = width ;
+   item->height_     = height ;
    JS_AddRoot( execContext_, &item->obj_ );
    JS_AddRoot( execContext_, &item->onComplete_ );
    JS_AddRoot( execContext_, &item->onCancel_ );

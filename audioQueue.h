@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.9 2003-07-30 20:26:00 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.10 2003-08-02 19:30:00 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.9  2003-07-30 20:26:00  ericn
+ * Revision 1.10  2003-08-02 19:30:00  ericn
+ * -modified to allow clipping of video
+ *
+ * Revision 1.9  2003/07/30 20:26:00  ericn
  * -added MPEG support
  *
  * Revision 1.8  2003/04/24 11:16:44  tkisky
@@ -78,6 +81,8 @@ public:
       bool                 isComplete_ ;
       unsigned             xPos_ ;
       unsigned             yPos_ ;
+      unsigned             width_ ;
+      unsigned             height_ ;
    };
 
    //
@@ -108,7 +113,9 @@ public:
                    jsval                onComplete = JSVAL_VOID,
                    jsval                onCancel = JSVAL_VOID,
                    unsigned             xPos = 0,
-                   unsigned             yPos = 0 );
+                   unsigned             yPos = 0,
+                   unsigned             width = 0,    // 0 means use video size
+                   unsigned             height = 0 ); // 0 means use video size
 
    //
    // queue a wave file for playback
