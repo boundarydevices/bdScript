@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsPrinter.cpp,v $
- * Revision 1.1  2004-05-05 03:20:32  ericn
+ * Revision 1.2  2004-05-08 16:33:46  ericn
+ * -removed debug msg
+ *
+ * Revision 1.1  2004/05/05 03:20:32  ericn
  * -Initial import
  *
  *
@@ -118,12 +121,9 @@ jsPrinterPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
              &&
              ( 0 != ( sArg = JSVAL_TO_STRING( *rval ) ) ) )
          {
-            printf( "converted image to string!!!\n" );
          }
          else
-         {
             JS_ReportError( cx, "converting image to string\n" );
-         }
       }
       else if( ( 1 == argc )
                &&

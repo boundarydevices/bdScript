@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.28  2004-05-08 14:23:02  ericn
+ * Revision 1.29  2004-05-08 16:33:50  ericn
+ * -removed debug msg
+ *
+ * Revision 1.28  2004/05/08 14:23:02  ericn
  * -added drawing primitives to image object
  *
  * Revision 1.27  2004/05/05 03:19:37  ericn
@@ -190,7 +193,6 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
                   if( JS_GetStringLength( pixStr ) == destWidth * destHeight * sizeof( destPixels[0] ) )
                   {   
                      fbDevice_t::render( xPos, yPos, srcWidth, srcHeight, srcPixels, alpha, destPixels, destWidth, destHeight );
-                     printf( "draw image to image\n" );
                   }
                   else
                      JS_ReportError( cx, "Invalid destination pixels" );

@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: jsBCWidths.cpp,v $
- * Revision 1.1  2004-05-07 13:32:58  ericn
+ * Revision 1.2  2004-05-08 16:34:10  ericn
+ * -removed debug msg
+ *
+ * Revision 1.1  2004/05/07 13:32:58  ericn
  * -Initial import
  *
  *
@@ -89,8 +92,6 @@ static JSBool i2of5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
             unsigned const numNarrow = preambleNarrow + trailerNarrow + 3*inLength ;
             unsigned const numWide   = preambleWide + trailerWide + 2*inLength ;
 
-            printf( "%u widths for %u digits, %u narrow, %u wide\n", numWidths, inLength, numNarrow, numWide );
-
             unsigned const minPixels = 2*numWide + numNarrow ;
             if( minPixels <= desiredWidth )
             {
@@ -112,7 +113,6 @@ static JSBool i2of5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                unsigned mult12 = desiredWidth / minPixels ;
                unsigned const total12 = mult12*minPixels ;
                unsigned totalWidth = total12 ;
-               printf( "1:2 multiplier %u, total %u\n", mult12, total12 );
 
                unsigned wideWidth = 2*mult12 ;
                unsigned narrowWidth = mult12 ;
@@ -122,17 +122,13 @@ static JSBool i2of5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                {
                   unsigned mult25  = desiredWidth / min25 ;
                   unsigned total25 = mult25*min25 ;
-                  printf( "2:5 multiplier %u, total %u\n", mult25, total25 );
                   if( total25 >= total12 )
                   {
-                     printf( "Use 2:5 ratio %u >= %u >= %u\n", desiredWidth, total25, total12 );
                      wideWidth = 5*mult25 ;
                      narrowWidth = 2*mult25 ;
                      totalWidth = total25 ;
                   }
                }
-
-               printf( "using widths %u:%u, total %u\n", narrowWidth, wideWidth, totalWidth );
 
                char *const outWidths = (char *)JS_malloc( cx, numWidths+ 1 );
 
@@ -144,12 +140,10 @@ static JSBool i2of5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                {
                   if( preamble[pb] )
                   {
-printf( "W" );
                      *nextOut++ = wideWidth ;
                   }
                   else
                   {
-printf( "n" );
                      *nextOut++ = narrowWidth ;
                   }
                }
@@ -165,15 +159,9 @@ printf( "n" );
                      for( unsigned short m = 1 << 9 ; m > 0 ; m >>= 1 )
                      {
                         if( w10 & m )
-                        {
                            *nextOut++ = wideWidth ;
-                           printf( "W" );
-                        }
                         else
-                        {
                            *nextOut++ = narrowWidth ;
-                           printf( "n" );
-                        }
                      }
                   }
                   else
@@ -188,22 +176,18 @@ printf( "n" );
                   {
                      if( trailer[pt] )
                      {
-printf( "W" );
                         *nextOut++ = wideWidth ;
                      }
                      else
                      {
-printf( "n" );
                         *nextOut++ = narrowWidth ;
                      }
                   }
                      
                   JSObject *rObj = JS_NewObject( cx, &js_ObjectClass, 0, 0 );
-printf( "rObj: %p\n", rObj );
                   *rval = OBJECT_TO_JSVAL( rObj ); // root
 
                   JSString *sWidths = JS_NewString( cx, outWidths, nextOut-outWidths );
-printf( "sWidths: %p\n", sWidths );
                   JS_DefineProperty( cx, rObj, "widths", 
                                      STRING_TO_JSVAL( sWidths ), 
                                      0, 0, JSPROP_ENUMERATE );
@@ -212,7 +196,6 @@ printf( "sWidths: %p\n", sWidths );
                }
                else
                   *rval = JSVAL_FALSE ;
-printf( "\n" );
             }
             else
                JS_ReportError( cx, "Desired size is too small: minimum is %u", minPixels );
