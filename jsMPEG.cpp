@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.2  2003-07-30 20:28:10  ericn
+ * Revision 1.3  2003-07-31 03:49:43  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.2  2003/07/30 20:28:10  ericn
  * -removed decoder debug parameter
  *
  * Revision 1.1  2003/07/30 20:26:36  ericn
@@ -218,7 +221,6 @@ static void mpegOnComplete( jsCurlRequest_t &req, void const *data, unsigned lon
    
                if( mpegDemux_t::videoFrame_e == sAndF.sInfo_.type )
                {
-printf( "decoding video to find dimensions\n" ); fflush( stdout ); sleep( 1 );
                   mpegDecoder_t decoder ;
                   for( unsigned i = 0 ; ( 0 == width ) && ( i < sAndF.numFrames_ ); i++ )
                   {
@@ -233,7 +235,6 @@ printf( "decoding video to find dimensions\n" ); fflush( stdout ); sleep( 1 );
                         {
                            width = decoder.width();
                            height = decoder.height();
-printf( "have size %u x %u\n", width, height ); fflush( stdout ); sleep( 1 );
                            break;
                         }
                      }
