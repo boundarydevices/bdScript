@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.29  2004-05-08 16:33:50  ericn
+ * Revision 1.30  2004-07-04 21:32:25  ericn
+ * -added bitmap->bitmap construction
+ *
+ * Revision 1.29  2004/05/08 16:33:50  ericn
  * -removed debug msg
  *
  * Revision 1.28  2004/05/08 14:23:02  ericn
@@ -113,6 +116,7 @@
 #include "jsAlphaMap.h"
 #include "bdGraph/Scale16.h"
 #include "dither.h"
+#include "jsBitmap.h"
 
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -157,7 +161,7 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned short const *const srcPixels = (unsigned short *)JS_GetStringBytes( pixStr );
          if( JS_GetStringLength( pixStr ) == srcWidth * srcHeight * sizeof( srcPixels[0] ) )
-         {   
+         {
             jsval     alphaVal ;
             JSString *sAlpha ;
             unsigned char const *alpha = 0 ;
@@ -176,7 +180,7 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
             {
                fb.render(xPos,yPos,srcWidth,srcHeight,srcPixels, alpha );
             } // draw to screen
-            else
+            else if( JS_InstanceOf( cx, destObj, &jsImageClass_, NULL ) )
             {
                if( JS_GetProperty( cx, destObj, "width", &widthVal )
                    &&
@@ -200,6 +204,12 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
                else
                   JS_ReportError( cx, "Invalid destination image" );
             }
+            else if( JS_InstanceOf( cx, destObj, &jsBitmapClass_, NULL ) )
+            {
+               imageToBitmap( cx, obj, destObj, xPos, yPos );
+            }
+            else
+               JS_ReportError( cx, "Don't know how to draw into this object" );
             
             *rval = JSVAL_TRUE ;
       
