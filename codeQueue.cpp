@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.11  2003-01-06 04:30:29  ericn
+ * Revision 1.12  2003-06-08 15:20:02  ericn
+ * -added support for queued function call
+ *
+ * Revision 1.11  2003/01/06 04:30:29  ericn
  * -modified to allow unlink() of filter before destruction
  *
  * Revision 1.10  2002/12/15 20:02:22  ericn
@@ -51,10 +54,14 @@
 #include "jsHyperlink.h"
 #include <linux/stddef.h>
 
+#define MAXARGS 8
+
 struct scriptAndScope_t {
    JSObject   *scope_ ;
    jsval       script_ ;
    char const *source_ ;
+   unsigned    argc_ ;
+   jsval       argv_[MAXARGS];
 };
 
 struct callbackAndData_t {
@@ -75,41 +82,68 @@ LIST_HEAD(filters_);
 
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
-                  char const *sourceFile )
+                  char const *sourceFile,
+                  unsigned    argc,
+                  jsval      *argv )
 {
-   JSString *sVal ;
-   if( JSVAL_IS_STRING( sourceCode ) 
-       &&
-       ( 0 != ( sVal = JSVAL_TO_STRING( sourceCode ) ) ) )
+   JSType const jst = JS_TypeOfValue( context_, sourceCode );
+   switch( jst )
    {
-      JSScript *scr = JS_CompileScript( context_, scope, 
-                                        JS_GetStringBytes( sVal ), 
-                                        JS_GetStringLength( sVal ), 
-                                        sourceFile, 1 );
-      if( scr )
-      {
-         jsval rval; 
-         JSBool const exec = JS_ExecuteScript( context_, scope, scr, &rval );
-         JS_DestroyScript( context_, scr );
-         if( !exec )
+      case JSTYPE_STRING:
          {
-            fprintf( stderr, "error executing code<" );
-            fwrite( JS_GetStringBytes( sVal ), JS_GetStringLength( sVal ), 1, stderr );
-            fprintf( stderr, ">\n" );
+            JSString *sVal = JSVAL_TO_STRING( sourceCode );
+            if( 0 != sVal )
+            {
+               JSScript *scr = JS_CompileScript( context_, scope, 
+                                                 JS_GetStringBytes( sVal ), 
+                                                 JS_GetStringLength( sVal ), 
+                                                 sourceFile, 1 );
+               if( scr )
+               {
+                  jsval rval; 
+                  JSBool const exec = JS_ExecuteScript( context_, scope, scr, &rval );
+                  JS_DestroyScript( context_, scr );
+                  if( !exec )
+                  {
+                     fprintf( stderr, "error executing code<" );
+                     fwrite( JS_GetStringBytes( sVal ), JS_GetStringLength( sVal ), 1, stderr );
+                     fprintf( stderr, ">\n" );
+                  }
+               }
+               else
+                  JS_ReportError( context_, "compiling script from %s", sourceFile );
+            }
+            else
+               JS_ReportError( context_, "reading script from %s", sourceFile );
+            break;
          }
-      }
-      else
-         JS_ReportError( context_, "compiling script from %s", sourceFile );
+      case JSTYPE_FUNCTION:
+         {
+            JSFunction *func = JS_ValueToFunction( context_, sourceCode );
+            if( func )
+            {
+               jsval rval; 
+               if( !JS_CallFunction( context_, scope, func, argc, argv, &rval ) )
+                  JS_ReportError( context_, "calling function from %s\n", sourceFile );
+            }
+            else
+               JS_ReportError( context_, "getting function from %s\n", sourceFile );
+            break;
+         }
+      default:
+         {
+            JS_ReportError( context_, "Don't know how to execute type %d\n", jst );
+         }
    }
-   else
-      JS_ReportError( context_, "reading script from %s", sourceFile );
 }
 
 static void runUnrootAndFree( void *scriptAndScope )
 {
    scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
-   executeCode( ss->scope_, ss->script_, ss->source_ );
+   executeCode( ss->scope_, ss->script_, ss->source_, ss->argc_, ss->argv_ );
    JS_RemoveRoot( context_, &ss->script_ );
+   for( unsigned i = 0 ; i < ss->argc_ ; i++ )
+      JS_RemoveRoot( context_, &ss->argv_[i] );
 
    delete ss ;
 }
@@ -117,7 +151,9 @@ static void runUnrootAndFree( void *scriptAndScope )
 static void runAndFree( void *scriptAndScope )
 {
    scriptAndScope_t *const ss = ( scriptAndScope_t *)scriptAndScope ;
-   executeCode( ss->scope_, ss->script_, ss->source_ );
+   executeCode( ss->scope_, ss->script_, ss->source_, ss->argc_, ss->argv_ );
+   for( unsigned i = 0 ; i < ss->argc_ ; i++ )
+      JS_RemoveRoot( context_, &ss->argv_[i] );
 
    delete ss ;
 }
@@ -167,26 +203,41 @@ bool queueCallback( callback_t callback,
 
 bool queueUnrootedSource( JSObject   *scope,
                           jsval       sourceCode,
-                          char const *sourceFile )
+                          char const *sourceFile,
+                          unsigned    argc,
+                          jsval      *argv )
 {
    scriptAndScope_t *newSS = new scriptAndScope_t ;
    newSS->script_ = sourceCode ;
    newSS->scope_  = scope ;
    newSS->source_ = sourceFile ;
-
+   newSS->argc_   = argc ;
+   if( argc > MAXARGS )
+      argc = MAXARGS ;
+   memcpy( newSS->argv_, argv, argc*sizeof(argv[0]) );
    JS_AddRoot( context_, &newSS->script_ );
+   for( unsigned i = 0 ; i < argc ; i++ )
+      JS_AddRoot( context_, &newSS->argv_[i] );
    return queueCallback( runUnrootAndFree, newSS );
 }
 
 
 bool queueSource( JSObject   *scope,
                   jsval       sourceCode,
-                  char const *sourceFile )
+                  char const *sourceFile,
+                  unsigned    argc,
+                  jsval      *argv )
 {
    scriptAndScope_t *newSS = new scriptAndScope_t ;
    newSS->script_ = sourceCode ;
    newSS->scope_  = scope ;
    newSS->source_ = sourceFile ;
+   if( argc > MAXARGS )
+      argc = MAXARGS ;
+   newSS->argc_   = argc ;
+   memcpy( newSS->argv_, argv, argc*sizeof(argv[0]) );
+   for( unsigned i = 0 ; i < argc ; i++ )
+      JS_AddRoot( context_, &newSS->argv_[i] );
 
    return queueCallback( runAndFree, newSS );
 }

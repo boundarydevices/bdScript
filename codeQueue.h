@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.7 2003-01-06 04:29:49 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.8 2003-06-08 15:19:59 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.7  2003-01-06 04:29:49  ericn
+ * Revision 1.8  2003-06-08 15:19:59  ericn
+ * -added support for queued function call
+ *
+ * Revision 1.7  2003/01/06 04:29:49  ericn
  * -modified to allow unlink() of filter before destruction
  *
  * Revision 1.6  2002/12/01 15:56:48  ericn
@@ -56,13 +59,17 @@
 //
 bool queueSource( JSObject   *scope,
                   jsval       sourceCode,
-                  char const *sourceFile );
+                  char const *sourceFile,
+                  unsigned    argc = 0,
+                  jsval      *argv = 0 );
 //
 // same as queueSource for unrooted code.
 //
 bool queueUnrootedSource( JSObject   *scope,
                           jsval       sourceCode,
-                          char const *sourceFile );
+                          char const *sourceFile,
+                          unsigned    argc = 0,
+                          jsval      *argv = 0 );
 
 typedef void (*callback_t)( void *cbData );
 
@@ -74,7 +81,9 @@ bool queueCallback( callback_t callback,
 //
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
-                  char const *sourceFile );
+                  char const *sourceFile,
+                  unsigned    argc = 0,
+                  jsval      *argv = 0 );
 
 
 class codeFilter_t {
