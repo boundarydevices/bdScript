@@ -292,6 +292,14 @@ cbmGraph: cbmGraph.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmGraph -Xlinker -Map -Xlinker cbmGraph.map cbmGraph.cpp $(LIBS)
 	$(STRIP) $@
 
+starGraph: starGraph.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o starGraph -Xlinker -Map -Xlinker starGraph.map starGraph.cpp $(LIBS)
+	$(STRIP) $@
+
+starImage: starImage.cpp $(LIB) $(LIBBDGRAPH) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o starImage -Xlinker -Map -Xlinker starImage.map starImage.cpp $(LIBS) -L./bdGraph -lCurlCache -lbdGraph -lungif -lpng -ljpeg -lz -lm
+	$(STRIP) $@
+
 cbmStat: cbmStat.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS)
 	$(STRIP) $@
