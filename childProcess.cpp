@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: childProcess.cpp,v $
- * Revision 1.4  2003-08-24 15:51:11  ericn
+ * Revision 1.5  2003-08-24 17:31:17  ericn
+ * -added (optional) debug msgs
+ *
+ * Revision 1.4  2003/08/24 15:51:11  ericn
  * -modified to close all file handles before exec()
  *
  * Revision 1.3  2003/08/24 15:47:46  ericn
@@ -101,6 +104,11 @@ bool childProcess_t :: run
       openFds_t openFds ;
       for( unsigned i = 0 ; i < openFds.count(); i++ )
          close( openFds[i] );
+/*
+char **args = argv ;
+while( *args )
+   printf( "arg == %s\n", *args++ );
+*/
       execve( path, argv, envp );
       perror( path );
       exit(errno);
