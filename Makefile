@@ -3,9 +3,11 @@
 # 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
+   STRIP=arm-linux-strip
    LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib
 else
    CC=gcc
+   STRIP=strip
 endif
 
 %.o : %.cpp
@@ -39,6 +41,7 @@ urlTest: urlTest.o curlCache.o relativeURL.o ultoa.o dirByATime.o
 
 mp3Play: mp3Play.o curlCache.o dirByATime.o relativeURL.o ultoa.o 
 	$(CC) -o mp3Play mp3Play.o curlCache.o dirByATime.o relativeURL.o ultoa.o $(LIBS) -lstdc++ -lcurl -lz -lmad
+	$(STRIP) mp3Play
 
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
@@ -47,6 +50,7 @@ testJS: testJS.o childProcess.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImag
 	$(CC) -o testJS testJS.o childProcess.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o jsMP3.o jsURL.o relativeURL.o dirByATime.o fbDev.o \
       hexDump.o ultoa.o \
       $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lm -lz
+	$(STRIP) testJS
 
 ifneq (,$(findstring arm, $(CC)))
    all: curlGet dirTest urlTest testJS mp3Play
