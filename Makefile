@@ -30,8 +30,10 @@ else
    LIB = ./libCurlCache.a
 endif
 
+TSINPUTFLAG= $(TSINPUTAPI:y=1)
+
 %.o : %.cpp Makefile
-	$(CC) -D_REENTRANT=1 -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -D_REENTRANT=1 -DTSINPUTAPI='$(TSINPUTFLAG)' -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
@@ -114,6 +116,9 @@ ccWorker: ccWorker.cpp memFile.o Makefile
 
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
+
+tsTest: tsTest.cpp
+	$(CC) $(IFLAGS) -o tsTest tsTest.cpp $(LIBS) -lts
 
 all: curlGet dirTest urlTest jsExec ftRender tsTest tsThread madHeaders
 
