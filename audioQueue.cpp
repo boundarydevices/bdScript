@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.19  2003-02-02 23:30:46  ericn
+ * Revision 1.20  2003-02-08 14:56:42  ericn
+ * -added mixer fd (to no avail)
+ *
+ * Revision 1.19  2003/02/02 23:30:46  ericn
  * -added read setup ioctls
  *
  * Revision 1.18  2003/02/02 21:00:50  ericn
@@ -86,17 +89,99 @@ static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
 static bool volatile _recording = false ;
 static audioQueue_t *audioQueue_ = 0 ; 
+static mutex_t       openMutex_ ;
 
 #define OUTBUFSIZE 8192
 
-inline unsigned short scale( mad_fixed_t sample )
+static int readFd_ = -1 ;
+static int readFdRefs_ = 0 ;
+static int writeFd_ = -1 ;
+static int writeFdRefs_ = 0 ;
+
+static int openReadFd( void )
 {
-   return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
+   mutexLock_t lock( openMutex_ );
+
+   if( 0 > readFd_ )
+      readFd_ = open( "/dev/dsp", O_RDONLY );
+   
+   if( 0 <= readFd_ )
+      ++readFdRefs_ ;
+
+   return readFd_ ;
 }
 
-int getDspFd( void )
+static void closeReadFd( void )
 {
-   return getAudioQueue().readFd_ ;
+   mutexLock_t lock( openMutex_ );
+   assert( 0 < readFdRefs_ );
+   assert( 0 <= readFd_ );
+   --readFdRefs_ ;
+   if( 0 == readFdRefs_ )
+   {
+      close( readFd_ );
+      readFd_ = -1 ;
+   } // last close
+}
+
+static int openWriteFd( void )
+{
+   mutexLock_t lock( openMutex_ );
+
+   if( 0 > writeFd_ )
+      writeFd_ = open( "/dev/dsp", O_WRONLY );
+   
+   if( 0 <= writeFd_ )
+      ++writeFdRefs_ ;
+
+   return writeFd_ ;
+}
+
+static void closeWriteFd( void )
+{
+   mutexLock_t lock( openMutex_ );
+   assert( 0 < writeFdRefs_ );
+   assert( 0 <= writeFd_ );
+   --writeFdRefs_ ;
+   if( 0 == writeFdRefs_ )
+   {
+      close( writeFd_ );
+      writeFd_ = -1 ;
+   } // last close
+}
+
+unsigned char getVolume( void )
+{
+   int const dspFd = openWriteFd();
+   if( 0 <= dspFd )
+   {
+      int vol ;
+      if( 0 <= ioctl( dspFd, SOUND_MIXER_READ_VOLUME, &vol)) 
+      {
+         return (unsigned char)( vol & 0xFF );
+      }
+      else
+         perror( "SOUND_MIXER_READ_VOLUME" );
+      closeWriteFd();
+   }
+   else
+      perror( "audioWriteFd" );
+   
+   return 0 ;
+}
+
+void setVolume( unsigned char volParam )
+{
+   int const vol = (volParam << 8) | volParam ;
+   int const dspFd = openWriteFd();
+   if( 0 <= dspFd )
+   {
+      if( 0 > ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+         perror( "Error setting volume" );
+      closeWriteFd();
+   }
+   else
+      perror( "audioWriteFd" );
 }
 
 static void normalize( short int *samples,
@@ -173,37 +258,57 @@ static void audioCallback( void *cbParam )
    delete item ;
 }
 
+inline unsigned short scale( mad_fixed_t sample )
+{
+   return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
+}
+
 void *audioThread( void *arg )
 {
 printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
    audioQueue_t *queue = (audioQueue_t *)arg ;
-   if( 0 <= queue->writeFd_ )
+
+   int writeFd = openWriteFd();
+   if( 0 <= writeFd )
    {
-      if( 0 != ioctl(queue->writeFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+      if( 0 != ioctl(writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
             
       int const format = AFMT_S16_LE ;
-      if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_SETFMT, &format) ) 
+      if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
                
       int const channels = 2 ;
-      if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_CHANNELS, &channels ) )
+      if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+      
+      closeWriteFd();
+   }
+   else
+      fprintf( stderr, "Error %m opening audio device\n" );
 
-      int lastSampleRate = -1 ;
-      int lastRecordRate = -1 ;
+   int lastSampleRate = -1 ;
+   int lastRecordRate = -1 ;
 
-      unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
-      unsigned short *       nextOut = outBuffer ;
-      unsigned short         spaceLeft = OUTBUFSIZE ;
+   unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
+   unsigned short *       nextOut = outBuffer ;
+   unsigned short         spaceLeft = OUTBUFSIZE ;
 
-      while( !queue->shutdown_ )
+   while( !queue->shutdown_ )
+   {
+      audioQueue_t :: item_t *item ;
+      if( queue->pull( item ) )
       {
-         audioQueue_t :: item_t *item ;
-         if( queue->pull( item ) )
+         if( audioQueue_t :: mp3Play_ == item->type_ )
          {
-            if( audioQueue_t :: mp3Play_ == item->type_ )
+            writeFd = openWriteFd();
+            if( 0 < writeFd )
             {
+printf( "have write fd %d\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , writeFd
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
                unsigned long numWritten = 0 ;
                _playing = true ;
    
@@ -240,7 +345,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                            if( sampleRate != lastSampleRate )
                            {   
                               lastSampleRate = sampleRate ;
-                              if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_SPEED, &sampleRate ) )
+                              if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
                               {
                                  fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
                                  break;
@@ -266,7 +371,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                               spaceLeft -= 2 ;
                               if( 0 == spaceLeft )
                               {
-                                 write( queue->writeFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                                 write( writeFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                                  numWritten += OUTBUFSIZE ;
                                  nextOut = outBuffer ;
                                  spaceLeft = OUTBUFSIZE ;
@@ -284,7 +389,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                               spaceLeft -= 2 ;
                               if( 0 == spaceLeft )
                               {
-                                 write( queue->writeFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                                 write( writeFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                                  nextOut = outBuffer ;
                                  spaceLeft = OUTBUFSIZE ;
                                  numWritten += OUTBUFSIZE ;
@@ -311,11 +416,11 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   {
                      if( OUTBUFSIZE != spaceLeft )
                      {
-                        write( queue->writeFd_, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
+                        write( writeFd, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
                         numWritten += OUTBUFSIZE-spaceLeft ;
                      } // flush tail end of output
    //                  memset( outBuffer, 0, OUTBUFSIZE );
-   //                  write( queue->writeFd_, outBuffer, OUTBUFSIZE );
+   //                  write( writeFd, outBuffer, OUTBUFSIZE );
                   }
                   /* close input file */
                   
@@ -327,26 +432,61 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                {
                   fprintf( stderr, "Error parsing MP3 headers\n" );
                }
-   
-   //            printf( "wrote %lu samples\n", numWritten );
+               
+               if( !queue->shutdown_ )
+               {
+                  if( _cancel )
+                  {
+                     _cancel = false ;
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
+                  }
+                  else
+                  {
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+                     item->isComplete_ = true ;
+                  }
+                  queueCallback( audioCallback, item );
+               }
+               closeWriteFd();
+printf( "closed write fd\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
-            else if( audioQueue_t::wavPlay_ == item->type_ )
-            {
-               _playing = true ;
+            else
+               perror( "audioWriteFd" );
 
+//            printf( "wrote %lu samples\n", numWritten );
+         }
+         else if( audioQueue_t::wavPlay_ == item->type_ )
+         {
+            writeFd = openWriteFd();
+            if( 0 <= writeFd )
+            {
+printf( "have write fd %d\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , writeFd
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
+               _playing = true ;
+   
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
                bool eof = false ;
-
+   
                spaceLeft = OUTBUFSIZE ;
                nextOut = outBuffer ;
-
+   
                if( header.sampleRate_ != lastSampleRate )
                {   
                   lastSampleRate = header.sampleRate_ ;
-                  if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_SPEED, &lastSampleRate ) )
+                  if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastSampleRate );
                }
-
+   
                if( 1 == header.numChannels_ )
                {
                   unsigned short const *nextIn = header.samples_ ;
@@ -362,7 +502,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      if( 0 == spaceLeft )
                      {
                         int const outSize = OUTBUFSIZE*sizeof(outBuffer[0]);
-                        int numWritten = write( queue->writeFd_, outBuffer, outSize );
+                        int numWritten = write( writeFd, outBuffer, outSize );
                         if( numWritten == outSize )
                         {
                            numWritten += OUTBUFSIZE ;
@@ -382,34 +522,71 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   if( eof && ( spaceLeft != OUTBUFSIZE ) )
                   {
                      int const outSize = (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]);
-                     int const numWritten = write( queue->writeFd_, outBuffer, outSize );
+                     int const numWritten = write( writeFd, outBuffer, outSize );
                      eof = ( outSize == numWritten );
                   } // flush tail of buffer
                }
                else
                {
                   int const outSize = header.numSamples_*sizeof(header.samples_[0])*header.numChannels_ ;
-                  int const numWritten = write( queue->writeFd_, header.samples_, outSize );
+                  int const numWritten = write( writeFd, header.samples_, outSize );
                   eof = ( numWritten == outSize )
                         &&
                         ( !_cancel )
                         &&
                         ( !queue->shutdown_ );
                } // stereo, we can write directly
-
+   
                _playing = false ;
+               
+               if( !queue->shutdown_ )
+               {
+                  if( _cancel )
+                  {
+                     _cancel = false ;
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
+                  }
+                  else
+                  {
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+                     item->isComplete_ = true ;
+                  }
+                  queueCallback( audioCallback, item );
+               }
+               
+               closeWriteFd();
+
+printf( "closed write fd\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
-            else if( audioQueue_t::wavRecord_ == item->type_ )
+            else
+               perror( "audioWriteFd" );
+         }
+         else if( audioQueue_t::wavRecord_ == item->type_ )
+         {
+            int const readFd = openReadFd();
+            if( 0 <= readFd )
             {
+printf( "have read fd %d\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , readFd
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
                audioQueue_t :: waveHeader_t &header = *( audioQueue_t :: waveHeader_t * )item->data_ ;
                _recording = true ;
                if( header.sampleRate_ != lastRecordRate )
                {   
                   lastRecordRate = header.sampleRate_ ;
-                  if( 0 != ioctl( queue->readFd_, SNDCTL_DSP_SPEED, &lastRecordRate ) )
+                  if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
                }
-
+   
                unsigned char *nextSample = (unsigned char *)header.samples_ ;
                unsigned long const maxSamples = header.numSamples_ ;
                unsigned long bytesLeft = maxSamples * sizeof( header.samples_[0] );
@@ -419,7 +596,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                       ( 0 < bytesLeft ) )
                {
                   int const readSize = ( bytesLeft > maxRead ) ? maxRead : bytesLeft ;
-                  int numRead = read( queue->readFd_, nextSample, readSize );
+                  int numRead = read( readFd, nextSample, readSize );
                   if( 0 < numRead )
                   {
                      bytesLeft -= numRead ;
@@ -431,42 +608,37 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      break;
                   }
                }
-
+   
                header.numSamples_ = ( maxSamples*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
                header.numChannels_ = 1 ;
-
+   
                normalize( (short *)header.samples_, header.numSamples_ );
                _recording = false ;
+               
+               if( !queue->shutdown_ )
+               {
+                  if( _cancel )
+                     _cancel = false ;
+                  else
+                     item->isComplete_ = true ;
+                  queueCallback( audioCallback, item );
+               }
+               
+               closeReadFd();
+printf( "closed read fd\n"
+        "readCount %d, writeFdCount %d\n"
+        "readFd %d, writeFd %d\n"
+        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
             else
-               fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
-
-            if( !queue->shutdown_ )
-            {
-               if( _cancel )
-               {
-                  _cancel = false ;
-                  if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_RESET, 0 ) ) 
-                     fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
-               }
-               else
-               {
-                  if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_POST, 0 ) ) 
-                     fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
-                  if( 0 != ioctl( queue->writeFd_, SNDCTL_DSP_SYNC, 0 ) ) 
-                     fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
-                  item->isComplete_ = true ;
-               }
-               queueCallback( audioCallback, item );
-            }
+               perror( "audioReadFd" );
          }
+         else
+            fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
       }
-      
-      delete [] outBuffer ;
-
    }
-   else
-      fprintf( stderr, "Error %m opening audio device\n" );
+   
+   delete [] outBuffer ;
 
    return 0 ;
 }
@@ -474,50 +646,54 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
 audioQueue_t :: audioQueue_t( void )
    : queue_(),
      threadHandle_( (void *)-1 ),
-     shutdown_( false ),
-     readFd_( open( "/dev/dsp", O_RDONLY ) )
+     shutdown_( false )
 {
    assert( 0 == audioQueue_ );
    audioQueue_ = this ;
    pthread_t tHandle ;
 
-   if( 0 <= readFd_ )
+   numReadFrags_ = 16 ;
+   readFragSize_ = 8192 ;
+   maxReadBytes_ = numReadFrags_ * readFragSize_ ;
+   
+   int readFd = openReadFd();
+   if( 0 <= readFd )
    {
-      ioctl( readFd_, SNDCTL_DSP_SYNC, 0 );
+      ioctl( readFd, SNDCTL_DSP_SYNC, 0 );
 
       int const format = AFMT_S16_LE ;
-      if( 0 != ioctl( readFd_, SNDCTL_DSP_SETFMT, &format) ) 
+      if( 0 != ioctl( readFd, SNDCTL_DSP_SETFMT, &format) ) 
          perror( "set record format" );
       
       int const channels = 1 ;
-      if( 0 != ioctl( readFd_, SNDCTL_DSP_CHANNELS, &channels ) )
+      if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
 
       int speed = 44100 ;
-      if( 0 != ioctl( readFd_, SNDCTL_DSP_SPEED, &speed ) )
+      if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
 
       int recordLevel = 0 ;
-      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
          perror( "get record level" );
 
       recordLevel = 100 ;
-      if( 0 != ioctl( readFd_, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+      if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
          perror( "set record level" );
 
-      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
          perror( "get record level" );
 
       int recSrc ;
-      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_RECSRC ), &recSrc ) )
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_RECSRC ), &recSrc ) )
          perror( "get record srcs" );
       
       int recMask ;
-      if( 0 != ioctl( readFd_, MIXER_READ( SOUND_MIXER_RECMASK ), &recMask ) )
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_RECMASK ), &recMask ) )
          perror( "get record mask" );
 
       audio_buf_info bufInfo ;
-      int biResult = ioctl( readFd_, SNDCTL_DSP_GETISPACE, &bufInfo );
+      int biResult = ioctl( readFd, SNDCTL_DSP_GETISPACE, &bufInfo );
       if( 0 == biResult )
       {
          numReadFrags_ = bufInfo.fragstotal ;
@@ -527,30 +703,23 @@ audioQueue_t :: audioQueue_t( void )
       else
       {
          perror( "getISpace" );
-         numReadFrags_ = 16 ;
-         readFragSize_ = 8192 ;
-         maxReadBytes_ = numReadFrags_ * readFragSize_ ;
       }
-
-      writeFd_ = open( "/dev/dsp", O_WRONLY );
-      if( 0 <= writeFd_ )
-      {
-         int const create = pthread_create( &tHandle, 0, audioThread, this );
-         if( 0 == create )
-         {
-            struct sched_param tsParam ;
-            tsParam.__sched_priority = 90 ;
-            pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
-            threadHandle_ = (void *)tHandle ;
-         }
-         else
-            fprintf( stderr, "Error %m creating curl-reader thread\n" );
-      }
-      else
-         perror( "/dev/dsp" );
+      
+      closeReadFd();
    }
    else
-      perror( "/dev/dsp" );
+      perror( "/dev/dsp - read" );
+
+   int const create = pthread_create( &tHandle, 0, audioThread, this );
+   if( 0 == create )
+   {
+      struct sched_param tsParam ;
+      tsParam.__sched_priority = 90 ;
+      pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
+      threadHandle_ = (void *)tHandle ;
+   }
+   else
+      fprintf( stderr, "Error %m creating curl-reader thread\n" );
 }
 
 audioQueue_t :: ~audioQueue_t( void )
@@ -674,10 +843,13 @@ void audioQueue_t :: shutdown( void )
 
    if( old )
    {
-      if( 0 <= old->readFd_ )
-         close( old->readFd_ );
-      if( 0 <= old->writeFd_ )
-         close( old->writeFd_ );
+      {
+         mutexLock_t lock( openMutex_ );
+         if( 0 <= readFd_ )
+            close( readFd_ );
+         if( 0 <= writeFd_ )
+            close( writeFd_ );
+      }
       old->shutdown_ = true ;
       unsigned cancelled ;
       old->clear( cancelled );

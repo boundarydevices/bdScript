@@ -44,6 +44,69 @@ static void normalize( short int *samples,
 
 int main( int argc, char const *const argv[] )
 {
+   int mixerFd = open( "/dev/mixer", O_RDWR );
+   if( 0 <= mixerFd )
+   {
+      printf( "mixer opened\n" );
+
+      int recordLevel = 0 ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+         printf( "record level was %d\n", recordLevel );
+      else
+         perror( "get record level" );
+
+      recordLevel = 0x6464 ;
+      if( 0 == ioctl( mixerFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+         printf( "record level is now %d\n", recordLevel );
+      else
+         perror( "set record level" );
+      
+      recordLevel = 0xdeadbeef ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
+         printf( "record level is now %d\n", recordLevel );
+      else
+         perror( "get record level" );
+
+      recordLevel = 0xdeadbeef ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_IGAIN ), &recordLevel ) )
+         printf( "igain was %d\n", recordLevel );
+      else
+         perror( "get igain" );
+
+      recordLevel = 0x6464 ;
+      if( 0 == ioctl( mixerFd, MIXER_WRITE( SOUND_MIXER_IGAIN ), &recordLevel ) )
+         printf( "igain is now %d\n", recordLevel );
+      else
+         perror( "set igain" );
+      
+      recordLevel = 0xdeadbeef ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_IGAIN ), &recordLevel ) )
+         printf( "igain is now %d\n", recordLevel );
+      else
+         perror( "get igain" );
+
+      recordLevel = 0xdeadbeef ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_RECLEV ), &recordLevel ) )
+         printf( "reclev was %d\n", recordLevel );
+      else
+         perror( "get reclev" );
+
+      recordLevel = 0x6464 ;
+      if( 0 == ioctl( mixerFd, MIXER_WRITE( SOUND_MIXER_RECLEV ), &recordLevel ) )
+         printf( "reclev is now %d\n", recordLevel );
+      else
+         perror( "set reclev" );
+      
+      recordLevel = 0xdeadbeef ;
+      if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_RECLEV ), &recordLevel ) )
+         printf( "reclev is now %d\n", recordLevel );
+      else
+         perror( "get reclev" );
+
+   }
+   else
+      perror( "/dev/mixer" );
+
    int readFd = open( "/dev/dsp", O_RDONLY );
    if( 0 <= readFd )
    {
@@ -57,7 +120,7 @@ int main( int argc, char const *const argv[] )
             if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
                fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
 
-            int speed = 44100 ;
+            int speed = 11025 ;
             while( 0 < speed )
             {
                if( 0 == ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
@@ -69,23 +132,6 @@ int main( int argc, char const *const argv[] )
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
                speed /= 2 ;
             }
-            
-            int recordLevel = 0 ;
-            if( 0 == ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
-               printf( "record level was %d\n", recordLevel );
-            else
-               perror( "get record level" );
-
-            recordLevel = 10 ;
-            if( 0 == ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-               printf( "record level is now %d\n", recordLevel );
-            else
-               perror( "set record level" );
-
-            if( 0 == ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
-               printf( "record level was %d\n", recordLevel );
-            else
-               perror( "get record level" );
 
             int recSrc ;
             if( 0 == ioctl( readFd, MIXER_READ( SOUND_MIXER_RECSRC ), &recSrc ) )
@@ -123,7 +169,7 @@ int main( int argc, char const *const argv[] )
             while( dumpData.nextLine() )
                printf( "%s\n", dumpData.getLine() );
 
-            normalize( (short *)samples, numSamples );
+//            normalize( (short *)samples, numSamples );
 
             int const writeFd = open( "/dev/dsp", O_WRONLY );
             if( 0 <= writeFd )
@@ -175,6 +221,9 @@ int main( int argc, char const *const argv[] )
                ioctl( writeFd, SNDCTL_DSP_SYNC, 0 );
 
                close( writeFd );
+               FILE *fOut = fopen( "record.dat", "wb" );
+               fwrite( samples, numSamples*sizeof( samples[0] ), 1, fOut );
+               fclose( fOut );
             }
             else
                perror( "open2" );
@@ -185,10 +234,14 @@ int main( int argc, char const *const argv[] )
       else
          perror( "DSP_SYNC" );
 
+
       close( readFd );
    }
    else
       perror( "/dev/dsp" );
 
+   if( 0 <= mixerFd )
+      close( mixerFd );
+   
    return 0 ;
 }

@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.6 2003-02-02 13:46:17 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.7 2003-02-08 14:56:40 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.6  2003-02-02 13:46:17  ericn
+ * Revision 1.7  2003-02-08 14:56:40  ericn
+ * -added mixer fd (to no avail)
+ *
+ * Revision 1.6  2003/02/02 13:46:17  ericn
  * -added recordBuffer support
  *
  * Revision 1.5  2003/02/01 18:15:27  ericn
@@ -46,6 +49,9 @@
 #endif
 
 #include <string>
+
+extern unsigned char getVolume( void );
+extern void setVolume( unsigned char volume ); // range is 0-100
 
 class audioQueue_t {
 public:
@@ -127,7 +133,6 @@ private:
    ~audioQueue_t( void );
 
    friend audioQueue_t &getAudioQueue( void );
-   friend int getDspFd( void );
 
    //
    // read side interfaces
@@ -142,8 +147,6 @@ private:
    queue_t       queue_ ;
    void         *threadHandle_ ;
    bool volatile shutdown_ ;
-   int           readFd_ ;
-   int           writeFd_ ;
    unsigned      numReadFrags_ ;
    unsigned      readFragSize_ ;
    unsigned      maxReadBytes_ ;
