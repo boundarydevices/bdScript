@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.75  2004-05-07 13:32:17  ericn
+ * Revision 1.76  2004-05-22 18:02:14  ericn
+ * -removed reference to prinit.h
+ *
+ * Revision 1.75  2004/05/07 13:32:17  ericn
  * -added barcode generation module
  *
  * Revision 1.74  2004/05/05 03:19:20  ericn
@@ -692,7 +695,6 @@ int prMain(int argc, char **argv)
 
 }
 
-#include <prinit.h>
 #include <signal.h>
 #include "hexDump.h"
 #include <execinfo.h>
