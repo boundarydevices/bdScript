@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.5  2003-12-06 22:06:41  ericn
+ * Revision 1.6  2004-09-03 15:08:43  ericn
+ * -support useCache for http gets
+ *
+ * Revision 1.5  2003/12/06 22:06:41  ericn
  * -added support for temp file and offset
  *
  * Revision 1.4  2003/08/01 14:28:05  ericn
@@ -166,6 +169,7 @@ void ccDiskCache_t :: inUse
 
 bool ccDiskCache_t :: getDataOffset( unsigned sequence, unsigned &offset )
 {
+   offset = 0 ;
    bySequence_t :: const_iterator it = cacheEntries_.find( sequence );
    if( it != cacheEntries_.end() )
    {

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.6  2004-06-19 18:15:16  ericn
+ * Revision 1.7  2004-09-03 15:08:43  ericn
+ * -support useCache for http gets
+ *
+ * Revision 1.6  2004/06/19 18:15:16  ericn
  * -added failure flag
  *
  * Revision 1.5  2002/12/02 15:02:03  ericn
@@ -113,7 +116,7 @@ urlFile_t :: urlFile_t( char const url[] )
      callingThread_( pthread_self() ),
      failed_( false )
 {
-   getCurlCache().get( url, this, callbacks_ );
+   getCurlCache().get( url, this, callbacks_, true );
    mutexLock_t lock( mutex_ );
    if( 0 == data_ )
    {   

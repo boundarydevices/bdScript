@@ -2,6 +2,8 @@
 # Makefile for curlCache library and utility programs
 #
 
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
+
 -include config.mk
 
 ifeq ("BD2003",$(KERNEL_BOARDTYPE))

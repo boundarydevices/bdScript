@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.22  2003-12-06 22:07:12  ericn
+ * Revision 1.23  2004-09-03 15:08:43  ericn
+ * -support useCache for http gets
+ *
+ * Revision 1.22  2003/12/06 22:07:12  ericn
  * -added support for temp file and offset
  *
  * Revision 1.21  2003/11/28 14:09:56  ericn
@@ -141,17 +144,12 @@ static void curlFileOnComplete( jsCurlRequest_t &req, void const *data, unsigned
 
    unsigned dataOffs ;
    getCurlCache().getDataOffset( req.handle_, dataOffs );
-   if( ( 0 < dataOffs ) && ( dataOffs < size ) )
-   {
-      JS_DefineProperty( req.cx_, req.lhObj_, "tmpOffs",
-                         INT_TO_JSVAL( dataOffs ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-   }
-   else
-      JS_ReportError( req.cx_, "invalid tmp file offset: %u" );
+   JS_DefineProperty( req.cx_, req.lhObj_, "tmpOffs",
+                      INT_TO_JSVAL( dataOffs ),
+                      0, 0, 
+                      JSPROP_ENUMERATE
+                      |JSPROP_PERMANENT
+                      |JSPROP_READONLY );
 }
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -519,6 +517,7 @@ bool queueCurlRequest
              JS_ValueToBoolean( request.cx_, useCacheVal, &jsUseCache ) )
          {
             useCache = jsUseCache ;
+printf( "useCache: %s\n", useCache ? "true" : "false" );
          } // have optional useCache
 
          struct HttpPost *postHead = 0 ;
@@ -603,7 +602,7 @@ bool queueCurlRequest
          if( request.async_ )
          {
             if( 0 == postHead )
-               getCurlCache().get( absolute, &request, defaultCallbacks_ );
+               getCurlCache().get( absolute, &request, defaultCallbacks_, useCache );
             else
                getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
             return true ;
@@ -613,7 +612,7 @@ bool queueCurlRequest
             curlCodeFilter_t filter( request );
 
             if( 0 == postHead )
-               getCurlCache().get( absolute, &request, defaultCallbacks_ );
+               getCurlCache().get( absolute, &request, defaultCallbacks_, useCache );
             else
                getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
 

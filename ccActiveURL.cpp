@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.8  2003-12-06 22:06:24  ericn
+ * Revision 1.9  2004-09-03 15:08:43  ericn
+ * -support useCache for http gets
+ *
+ * Revision 1.8  2003/12/06 22:06:24  ericn
  * -added support for temp file and offset
  *
  * Revision 1.7  2003/08/01 14:27:01  ericn
@@ -53,20 +56,22 @@ static curlCache_t *cache_ = 0 ;
 void curlCache_t :: get
    ( std::string const     &url,              // input
      void                  *opaque,           // input
-     curlCallbacks_t const &callbacks )       // input
+     curlCallbacks_t const &callbacks,        // input
+     bool                   useCache )        // input
 {
    mutexLock_t lock( mutex_ );
    unsigned long const hash = hashURL( url );
    item_t *item = findItem( hash, url );
    if( 0 == item )
    {
-      item = newItem( hash, request_t::get_, url );
+      item = newItem( hash, request_t::get_, url, useCache );
 
       parsedURL_t parsed( url );
       if( 0 != parsed.getProtocol().compare( "file" ) )
       {
          ccDiskCache_t &diskCache = getDiskCache();
-         if( diskCache.find( url.c_str(), item->diskInfo_.sequence_ ) )
+         bool found = diskCache.find( url.c_str(), item->diskInfo_.sequence_ );
+         if( useCache && found )
          {
             item->state_ = open_ ;
             diskCache.inUse( item->diskInfo_.sequence_, item->diskInfo_.data_, item->diskInfo_.length_ );
@@ -75,8 +80,13 @@ void curlCache_t :: get
          } // found in cache... finished
          else
          {
+            if( found )
+            {
+               if( !diskCache.deleteFromCache( url.c_str() ) )
+                  printf( "Error deleting %s from cache\n", url.c_str() );
+            }
             request_t *const req = newRequest( *item, opaque, request_t::get_, callbacks );
-   
+
             curlTransferRequest_t workReq ;
             workReq.opaque_   = item ;
             strcpy( workReq.url_, url.c_str() );
@@ -162,7 +172,7 @@ void curlCache_t :: post
    item_t *item = findItem( hash, url );
    if( 0 == item )
    {
-      item = newItem( hash, request_t::post_, url );
+      item = newItem( hash, request_t::post_, url, false );
       request_t *const req = newRequest( *item, opaque, request_t::post_, callbacks );
 
       curlTransferRequest_t workReq ;
@@ -515,7 +525,8 @@ curlCache_t :: item_t *curlCache_t :: findItem
 curlCache_t :: item_t *curlCache_t :: newItem
    ( unsigned long          hash,
      request_t :: type_e    type,
-     std::string const     &url )
+     std::string const     &url,
+     bool                   useCache )
 {
    item_t * const newItem = new item_t ;
    INIT_LIST_HEAD( &newItem->chainHash_ );
@@ -523,7 +534,9 @@ curlCache_t :: item_t *curlCache_t :: newItem
    newItem->url_           = url ;
    newItem->state_         = retrieving_ ;
    newItem->cancel_        = false ;
-   newItem->deleteOnClose_ = (request_t::post_ == type );
+   newItem->deleteOnClose_ = (request_t::post_ == type )
+                             ||
+                             ( !useCache );
    INIT_LIST_HEAD( &newItem->requests_ );
    memset( &newItem->diskInfo_, 0, sizeof( newItem->diskInfo_ ) );
    list_add_tail( &newItem->chainHash_, &hash_[hash] );

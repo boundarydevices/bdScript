@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.6 2003-12-06 22:06:22 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.7 2004-09-03 15:08:43 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.6  2003-12-06 22:06:22  ericn
+ * Revision 1.7  2004-09-03 15:08:43  ericn
+ * -support useCache for http gets
+ *
+ * Revision 1.6  2003/12/06 22:06:22  ericn
  * -added support for temp file and offset
  *
  * Revision 1.5  2003/08/01 14:27:24  ericn
@@ -73,7 +76,8 @@ public:
    //
    void get( std::string const     &url,              // input
              void                  *opaque,           // input
-             curlCallbacks_t const &callbacks );      // input
+             curlCallbacks_t const &callbacks,        // input
+             bool                   useCache );       // input
 
    void post( std::string const     &url,             // input
               struct HttpPost       *postHead,        // input : deallocated by worker thread. trash app-side refs
@@ -163,7 +167,8 @@ private:
                      std::string const &url );
    item_t *newItem( unsigned long          hash,
                     request_t :: type_e    type,
-                    std::string const     &url );
+                    std::string const     &url,
+                    bool                   useCache );
    void removeItem( item_t *item );
 
    request_t *newRequest( item_t                &item,
