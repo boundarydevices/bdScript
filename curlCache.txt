@@ -414,3 +414,21 @@ ccWorker.h/.cpp            declare and define the curl worker thread interfaces
 ccActiveURL.h/.cpp         declare and define the active url cache (curlCache_t)
                            and associated classes
 
+
+
+                        Support for file:// protocol
+                        ----------------------------
+
+Okay, okay. Now that all of the above is complete, a few notes about support for the
+file://protocol.
+
+   1. We want the same use count tracking as in http:// entities
+      so that we don't waste file handles.
+   2. It makes absolutely no sense to cache file:// entities
+      to disk, because they're already there.
+   3. We don't want the application to care about the protocol.
+
+Since the use count tracking is in the active URL cache, that's where we'll put 
+file:// handling. What we need are a file handle and flag indicating that the 
+disk info isn't in the cache, but directly opened/mmap'd.
+
