@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.16  2002-11-30 02:01:14  ericn
+ * Revision 1.17  2002-11-30 05:29:21  ericn
+ * -moved shutdown of disk cache
+ *
+ * Revision 1.16  2002/11/30 02:01:14  ericn
  * -rewrote as jsExec minus touch and sound
  *
  * Revision 1.15  2002/11/30 00:30:49  ericn
@@ -147,7 +150,6 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                           std::string( JS_GetStringBytes( str ), JS_GetStringLength( str ) ), 
                           "queueCode" ) )
          {
-            printf( "code queued\n" );
          }
          else
          {
@@ -274,7 +276,6 @@ int prMain(int argc, char **argv)
                               {
                                  if( gotoCalled_ )
                                  {
-                                    printf( "executing %s\n", gotoURL_.c_str() );
                                     break;
                                  }
                                  else 
@@ -317,7 +318,6 @@ int prMain(int argc, char **argv)
                      stopBarcodeThread();
 
                      shutdownCurlWorkers();
-                     shutdownCCDiskCache();
                   }
                   else
                      fprintf( stderr, "Error defining Javascript shell functions\n" );
@@ -332,7 +332,9 @@ int prMain(int argc, char **argv)
                mutexLock_t lock( execMutex_ );
                JS_DestroyContext( cx );
             }
-   
+
+            shutdownCCDiskCache();
+
          }
          else
             fprintf( stderr, "Error initializing Javascript context\n" );
