@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.22  2003-02-24 03:37:49  ericn
+ * Revision 1.23  2003-07-29 20:03:56  tkisky
+ * -close dsp after successful getVolume call
+ *
+ * Revision 1.22  2003/02/24 03:37:49  ericn
  * -
  *
  * Revision 1.21  2003/02/08 19:52:43  ericn
@@ -139,6 +142,7 @@ static int openWriteFd( void )
    
    if( 0 <= writeFd_ )
       ++writeFdRefs_ ;
+//   fprintf( stderr, "Audio opened for write %d\n", writeFdRefs_ );
 
    return writeFd_ ;
 }
@@ -154,26 +158,23 @@ static void closeWriteFd( void )
       close( writeFd_ );
       writeFd_ = -1 ;
    } // last close
+//   fprintf( stderr, "Audio closed for write %d\n", writeFdRefs_ );
 }
 
 unsigned char getVolume( void )
 {
+   int vol = 0;
    int const dspFd = openWriteFd();
    if( 0 <= dspFd )
    {
-      int vol ;
-      if( 0 <= ioctl( dspFd, SOUND_MIXER_READ_VOLUME, &vol)) 
-      {
-         return (unsigned char)( vol & 0xFF );
-      }
-      else
-         perror( "SOUND_MIXER_READ_VOLUME" );
+      if( 0 <= ioctl( dspFd, SOUND_MIXER_READ_VOLUME, &vol)) vol &= 0xFF;
+      else perror( "SOUND_MIXER_READ_VOLUME" );
       closeWriteFd();
    }
    else
       perror( "audioWriteFd" );
    
-   return 0 ;
+   return vol ;
 }
 
 void setVolume( unsigned char volParam )
@@ -319,6 +320,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
       {
          if( audioQueue_t :: mp3Play_ == item->type_ )
          {
+//            fprintf( stderr, "mp3Play\n" );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
@@ -473,6 +475,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
          }
          else if( audioQueue_t::wavPlay_ == item->type_ )
          {
+//            fprintf( stderr, "wavPlay\n" );
             writeFd = openWriteFd();
             if( 0 <= writeFd )
             {
