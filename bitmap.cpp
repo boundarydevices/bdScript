@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: bitmap.cpp,v $
- * Revision 1.4  2004-10-28 21:27:40  tkisky
+ * Revision 1.5  2004-11-16 07:29:33  tkisky
+ * -add SetBox
+ *
+ * Revision 1.4  2004/10/28 21:27:40  tkisky
  * -ClearBox function added
  *
  * Revision 1.3  2004/08/01 18:00:59  ericn
@@ -40,107 +43,18 @@ bitmap_t :: bitmap_t
 {
 }
 
-void bitmap_t::setBits
-   ( unsigned char *bitStart,
-     unsigned       startOffs,
-     unsigned       count )
+void bitmap_t::rect( unsigned x, unsigned y, unsigned w, unsigned h, bool setNotClear )
 {
-   static unsigned char const startMasks[] = {
-      '\xff',
-      '\x7f',
-      '\x3f',
-      '\x1f',
-      '\x0f',
-      '\x07',
-      '\x03',
-      '\x01'
-   };
-//   debugPrint( "set: %p, %u, %u\n", bitStart, startOffs, count );
-//   dumpHex( "before set:", bitStart, (startOffs+count-1+7)/8 );
-   unsigned char *next = bitStart+(startOffs/8);
-   unsigned char *stop = bitStart+((startOffs+count-1)/8);
-   unsigned char const lead = ( startOffs & 7 );
-   unsigned char const tail = ( startOffs+count-1 ) & 7 ;
-   unsigned char mask = startMasks[lead];
-
-   while( next <= stop )
-   {
-      if( next == stop )
-         mask &= ~(startMasks[tail]);
-      *next++ |= mask ;
-      mask = '\xff' ;
-   }
-//   dumpHex( "after set:", bitStart, (startOffs+count-1+7)/8 );
-}
-
-void bitmap_t::clearBits
-   ( unsigned char *bitStart,
-     unsigned       startOffs,
-     unsigned       count )
-{
-   static unsigned char const startMasks[] = {
-      '\x00',
-      '\x80',
-      '\xc0',
-      '\xe0',
-      '\xf0',
-      '\xf8',
-      '\xfc',
-      '\xfe'
-   };
-
-//   debugPrint( "clear: %p, %u, %u\n", bitStart, startOffs, count );
-//   dumpHex( "before clear:", bitStart, (startOffs+count-1+7)/8 );
-   unsigned char *next = bitStart+(startOffs/8);
-   unsigned char *stop = bitStart+((startOffs+count-1)/8);
-   unsigned char const lead = ( startOffs & 7 );
-   unsigned char const tail = ( startOffs+count-1 ) & 7 ;
-   unsigned char mask = startMasks[lead];
-
-   while( next <= stop )
-   {
-      if( next == stop )
-         mask |= ~(startMasks[tail]);
-      *next++ &= mask ;
-      mask = '\x00' ;
-   }
-//   dumpHex( "after clear:", bitStart, (startOffs+count-1+7)/8 );
-}
-
-void bitmap_t::rect
-   ( unsigned x, unsigned y,
-     unsigned w, unsigned h,
-     bool setNotClear )
-{
-   if( x < bitWidth_ )
-   {
-      unsigned const wMax = bitWidth_-x ;
-      if( wMax < w )
-         w = wMax ;
-      if( y < bitHeight_ )
-      {
-         void (*bitChange)( unsigned char *bitStart,
-                            unsigned       startOffs,
-                            unsigned       count );
-         if( setNotClear )
-            bitChange = setBits ;
-         else
-            bitChange = clearBits ;
-         
-         unsigned hMax = bitHeight_-y ;
-         if( hMax < h )
-            h = hMax ;
-
-         unsigned char *startOfRow = bits_+(y*bytesPerRow_);
-         unsigned const y2 = y + h ;
-
-         for( ; y < y2 ; y++ )
-         {
-            bitChange( startOfRow, x, w );
-            startOfRow += bytesPerRow_ ;
-         }
-      }
-   }
+	if( x < bitWidth_ ) {
+		unsigned const wMax = bitWidth_-x ;
+		if( wMax < w ) w = wMax ;
+		if( y < bitHeight_ ) {
+			unsigned hMax = bitHeight_-y ;
+			if( hMax < h ) h = hMax ;
+			if( setNotClear ) SetBox(bits_,x,y,w,h,bytesPerRow_);
+			else ClearBox(bits_,x,y,w,h,bytesPerRow_);
+		}
+	}
 }
 
 void bitmap_t::line
@@ -294,4 +208,88 @@ void bitmap_t::ClearBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsi
 		}
 	}
 //	if (bdebug) printf("\r\n");
+}
+
+void bitmap_t::SetBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride )
+{
+	long unsigned int * base;
+	long unsigned startMask;
+	long unsigned endMask;
+	unsigned remWidth;
+	unsigned rowsLeft=h;
+	unsigned char* dest = bmp + (y * bmpStride) + (x>>3);
+	{
+		unsigned unaligned = ((unsigned)dest)&3;
+		unsigned startBit = (x&7) + (unaligned<<3);	//counting from MSB
+		unsigned bitsInFirst = 32-startBit;
+		base = (long unsigned int *)(dest - unaligned);
+		startMask = 0xffffffff >> startBit;
+		if ( bitsInFirst >= w ) {
+			startMask -= (0xffffffff >> (startBit+w));
+			if ((bmpStride&3)==0) {
+				//easy common case
+				startMask = BigEndianToHost(startMask);
+				while (rowsLeft) {
+					*base |= startMask;
+					base = (long unsigned int *)(((unsigned char*)base) + bmpStride);
+					rowsLeft--;
+				}
+				return;
+			}
+			remWidth = 0;
+			endMask = 0xffffffff;
+		} else {
+			remWidth = w - bitsInFirst;
+			endMask = (remWidth & 31) ? (0xffffffff >> (remWidth & 31)) : 0;
+		}
+	}
+	startMask = BigEndianToHost(startMask);
+	endMask = ~BigEndianToHost(endMask);
+	if ((bmpStride&3)==0) {
+		//easy case
+		while (rowsLeft) {
+			unsigned colsLeft = remWidth;
+			long unsigned int* d = base;
+			*d++ |= startMask;
+			while (colsLeft > 32) {
+				*d++ = ~0;
+				colsLeft-=32;
+			}
+			*d |= endMask;
+
+			base = (long unsigned int *)(((unsigned char*)base) + bmpStride);
+			rowsLeft--;
+		}
+	} else {
+		while (rowsLeft) {
+			unsigned colsLeft = remWidth;
+			long unsigned int* d = base;
+			*d++ |= startMask;
+			while (colsLeft > 32) {
+				*d++ = ~0;
+				colsLeft-=32;
+			}
+			*d |= endMask;
+
+			dest += bmpStride;
+			{
+				unsigned unaligned = ((unsigned)dest)&3;
+				unsigned startBit = (x&7) + (unaligned<<3);	//counting from MSB
+				unsigned bitsInFirst = 32-startBit;
+				base = (long unsigned int *)(dest - unaligned);
+				startMask = 0xffffffff >> startBit;
+				if ( bitsInFirst >= w ) {
+					startMask -= (0xffffffff >> (startBit+w));
+					remWidth = 0;
+					endMask = 0xffffffff;
+				} else {
+					remWidth = w - bitsInFirst;
+					endMask = (remWidth & 31) ? (0xffffffff >> (remWidth & 31)) : 0;
+				}
+			}
+			startMask = BigEndianToHost(startMask);
+			endMask = ~BigEndianToHost(endMask);
+			rowsLeft--;
+		}
+	}
 }

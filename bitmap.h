@@ -1,5 +1,5 @@
 #ifndef __BITMAP_H__
-#define __BITMAP_H__ "$Id: bitmap.h,v 1.4 2004-10-28 21:27:59 tkisky Exp $"
+#define __BITMAP_H__ "$Id: bitmap.h,v 1.5 2004-11-16 07:29:58 tkisky Exp $"
 
 /*
  * bitmap.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: bitmap.h,v $
- * Revision 1.4  2004-10-28 21:27:59  tkisky
+ * Revision 1.5  2004-11-16 07:29:58  tkisky
+ * -add SetBox
+ *
+ * Revision 1.4  2004/10/28 21:27:59  tkisky
  * -ClearBox function added
  *
  * Revision 1.3  2004/09/25 21:49:07  ericn
@@ -55,17 +58,6 @@ public:
    inline unsigned bytesPerRow( void ) const { return bitmap_t::bytesPerRow( bitWidth_ ); }
 
    //
-   // Routines to set or clear a range of adjacent bits.
-   // Note that these routines do no range checking!
-   // Use with care.
-   //
-   static void setBits( unsigned char *bitStart,
-                        unsigned       startOffs,
-                        unsigned       count );
-   static void clearBits( unsigned char *bitStart,
-                          unsigned       startOffs,
-                          unsigned       count );
-   //
    // copy bits to specified offset
    // bits are numbered from high bit
    //
@@ -75,7 +67,8 @@ public:
                         unsigned             count,
                         unsigned             srcOffs = 0 );
 
-   static void ClearBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride );
+   static void ClearBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride);
+   static void SetBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride);
 
    inline unsigned char const *getMem( void ) const { return bits_ ; }
 
