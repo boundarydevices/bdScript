@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.4  2003-10-01 05:04:24  ericn
+ * Revision 1.5  2003-10-04 18:31:43  ericn
+ * -removed comments
+ *
+ * Revision 1.4  2003/10/01 05:04:24  ericn
  * -modified to remove echo
  *
  * Revision 1.3  2003/10/01 01:07:55  ericn
@@ -327,26 +330,7 @@ static void *videoThread( void *arg )
 
    struct video_picture    vidpic ; 
    ioctl( fdCamera, VIDIOCGPICT, &vidpic);
-//                        vidpic.palette = VIDEO_PALETTE_RGB24 ;
-//                        vidpic.palette = VIDEO_PALETTE_GREY;	
-//                        vidpic.palette = VIDEO_PALETTE_HI240;	
-//                        vidpic.palette = VIDEO_PALETTE_RGB565;	
    vidpic.palette = VIDEO_PALETTE_RGB24;	
-//                        vidpic.palette = VIDEO_PALETTE_RGB32;	
-//                        vidpic.palette = VIDEO_PALETTE_RGB555;	
-//                        vidpic.palette = VIDEO_PALETTE_YUV422	;
-//                        vidpic.palette = VIDEO_PALETTE_YUYV	;
-//                        vidpic.palette = VIDEO_PALETTE_UYVY	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV420	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV411	;
-//                        vidpic.palette = VIDEO_PALETTE_RAW	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV422P	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV411P	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV420P	;
-//                        vidpic.palette = VIDEO_PALETTE_YUV410P	;
-//                        vidpic.palette = VIDEO_PALETTE_PLANAR	;
-//                        vidpic.palette = VIDEO_PALETTE_COMPONENT;
-//                        vidpic.palette = VIDEO_PALETTE_BAYER ;
    ioctl( fdCamera, VIDIOCSPICT, &vidpic);
 
    struct video_capability vidcap ; 
