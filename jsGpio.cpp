@@ -87,6 +87,7 @@ static JSBool jsSetTurnstile( JSContext *cx, JSObject *obj, uintN argc, jsval *a
 
 static void* FeedbackThread( void *arg )
 {
+printf( "FeedbackThread %p (id %x)\n", &arg, pthread_self() );   
    int fd = open( "/dev/Feedback", O_RDONLY);
    if (fd<0) fprintf( stderr, "Error %d:%s opening /dev/feedback\n",fd,strerror(errno));
    else

@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.4  2002-12-18 04:12:25  ericn
+ * Revision 1.5  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.4  2002/12/18 04:12:25  ericn
  * -removed debug msg, added root for handler scope
  *
  * Revision 1.3  2002/12/01 00:02:50  ericn
@@ -96,6 +99,7 @@ static int       bcDev_ ;
 
 static void *barcodeThread( void *arg )
 {
+printf( "barcodeReader %p (id %x)\n", &arg, pthread_self() );   
    bcDev_ = open( bcDeviceName_, O_RDWR | O_NOCTTY );
    if( 0 <= bcDev_ )
    {

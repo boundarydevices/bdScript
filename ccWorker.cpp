@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.6  2002-12-07 21:00:42  ericn
+ * Revision 1.7  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.6  2002/12/07 21:00:42  ericn
  * -removed debug msg
  *
  * Revision 1.5  2002/12/03 02:48:44  ericn
@@ -105,6 +108,7 @@ static int progress_callback
 
 static void *readerThread( void *arg )
 {
+printf( "curlReader %p (id %x)\n", &arg, pthread_self() );   
    curlQueue_t &queue = getCurlRequestQueue();
 
    while( 1 )

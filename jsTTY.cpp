@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTTY.cpp,v $
- * Revision 1.2  2003-01-03 16:54:30  ericn
+ * Revision 1.3  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.2  2003/01/03 16:54:30  ericn
  * -fixed scope
  *
  * Revision 1.1  2002/12/27 23:31:14  ericn
@@ -169,6 +172,7 @@ static JSBool jsTTY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 
 static void *ttyThread( void *arg )
 {
+printf( "ttyReader %p (id %x)\n", &arg, pthread_self() );   
    char inBuf[256];
    do {
       fwrite( prompt.c_str(), prompt.size(), 1, stdout );

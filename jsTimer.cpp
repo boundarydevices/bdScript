@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.6  2002-12-15 00:00:44  ericn
+ * Revision 1.7  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.6  2002/12/15 00:00:44  ericn
  * -modified to allow 'interrupted system call status'
  *
  * Revision 1.5  2002/11/30 23:58:01  ericn
@@ -47,6 +50,7 @@ struct timerParam_t {
 
 static void *interval( void *arg )
 {
+printf( "timer %p (id %x)\n", &arg, pthread_self() );   
    timerParam_t *param = (timerParam_t *)arg ;
 
    unsigned long const ms = param->milliseconds_ ;
@@ -78,6 +82,7 @@ static void *interval( void *arg )
 
 static void *oneShot( void *arg )
 {
+printf( "oneShot %p (id %x)\n", &arg, pthread_self() );   
    timerParam_t *param = (timerParam_t *)arg ;
 
    unsigned long const ms = param->milliseconds_ ;

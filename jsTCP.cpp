@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.4  2002-12-17 15:03:37  ericn
+ * Revision 1.5  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.4  2002/12/17 15:03:37  ericn
  * -removed debug stuff
  *
  * Revision 1.3  2002/12/16 14:25:41  ericn
@@ -49,9 +52,10 @@ enum {
    haveLF_ = 2
 };
 
-static void *readerThread( void *param )
+static void *readerThread( void *arg )
 {
-   socketData_t *const sd = (socketData_t *)param ;
+printf( "socketReader %p (id %x)\n", &arg, pthread_self() );   
+   socketData_t *const sd = (socketData_t *)arg ;
    jsval jsv ;
 
    if( !( JS_GetProperty( sd->cx_, sd->obj_, "onLineIn", &jsv ) && JSVAL_IS_STRING( jsv ) ) )

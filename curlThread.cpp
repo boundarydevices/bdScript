@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlThread.cpp,v $
- * Revision 1.5  2002-11-15 14:39:24  ericn
+ * Revision 1.6  2003-01-05 01:58:15  ericn
+ * -added identification of threads
+ *
+ * Revision 1.5  2002/11/15 14:39:24  ericn
  * -added dummy return value
  *
  * Revision 1.4  2002/11/11 04:29:06  ericn
@@ -203,6 +206,7 @@ bool queueCurlRequest( jsCurlRequest_t &request,
 
 static void *readerThread( void *arg )
 {
+printf( "curlThread %p (id %x)\n", &arg, pthread_self() );   
    while( 1 )
    {
       curlItem_t item ;
