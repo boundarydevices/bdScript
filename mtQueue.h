@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.8 2003-01-06 04:29:06 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.9 2003-07-06 01:20:44 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.8  2003-01-06 04:29:06  ericn
+ * Revision 1.9  2003-07-06 01:20:44  ericn
+ * -fixed abort on entry to mtQueue_t::pull()
+ *
+ * Revision 1.8  2003/01/06 04:29:06  ericn
  * -streamlined
  *
  * Revision 1.7  2002/12/02 15:06:59  ericn
@@ -112,10 +115,7 @@ bool mtQueue_t<T>::pull( T &item )
       return result ;
    }
    else
-   {
-      fprintf( stderr, "mtQueue aborting(lock)\n" );
       return false ;
-   }
 }
    
 template <class T>
@@ -158,13 +158,18 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
 
          return false ;
       }
-      else
+      else if( !abort_ )
       {
          item = list_.front();
          list_.pop_front();
          pthread_mutex_unlock( &mutex_ );
          return true ;
       } // no need to wait
+      else
+      {
+         pthread_mutex_unlock( &mutex_ );
+         return false ;
+      }
    }
    else
       return false ;
