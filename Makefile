@@ -2,18 +2,19 @@
 # Makefile for curlCache library and utility programs
 # 
 OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
-       curlThread.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
-       imgGIF.o imgPNG.o imgJPEG.o \
+       curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
+       hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
        jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsTouch.o jsURL.o \
-       madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o 
+       madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o \
+       ultodd.o
 LIB = libCurlCache.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
-   LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib -L ./
+   LIBS=-L$(INSTALL_ROOT)/lib -L ./
    IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/freetype2 
 else
    CC=gcc
@@ -26,9 +27,6 @@ endif
 %.o : %.cpp Makefile
 	$(CC) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-%.o : ../boundary1/%.cpp Makefile
-	$(CC) -c -DXP_UNIX=1 -O2 $<
-   
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
@@ -96,6 +94,22 @@ madHeaders: madHeadersMain.o Makefile $(LIB)
 	$(STRIP) madHeaders
 
 all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
+
+.PHONY: install-libs install-headers
+
+install-libs:
+	cp $(LIB) $(INSTALL_ROOT)/lib
+
+shared-headers = ddtoul.h dirByATime.h hexDump.h  \
+   imgGIF.h imgJPEG.h imgPNG.h \
+   macros.h madHeaders.h memFile.h \
+   mtQueue.h relativeURL.h semaphore.h \
+   ultoa.h ultodd.h urlFile.h
+
+install-headers:
+	cp $(shared-headers) $(INSTALL_ROOT)/include
+
+install: install-libs install-headers
 
 clean:
 	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread madHeaders
