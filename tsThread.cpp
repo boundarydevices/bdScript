@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.1  2002-11-03 15:39:36  ericn
+ * Revision 1.2  2002-11-08 13:57:02  ericn
+ * -modified to use tslib
+ *
+ * Revision 1.1  2002/11/03 15:39:36  ericn
  * -Initial import
  *
  *
@@ -23,20 +26,41 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <tslib.h>
 
 static void *tsThread( void *arg )
 {
    fprintf( stderr, "touch screen thread starting...\n" );
 
    touchScreenThread_t *const obj = (touchScreenThread_t *)arg ;
-   struct input_event event ;
-   
+//   struct input_event event ;
+   ts_sample sample ;
    bool wasDown = false ;
-   int  x = 0 ;
-   int  y = 0 ;
+
    int numRead ;
-   while( sizeof( event ) == ( numRead = read( obj->fdDevice_, &event, sizeof( event ) ) ) )
+//   while( sizeof( event ) == ( numRead = read( obj->fdDevice_, &event, sizeof( event ) ) ) )
+   while( 0 <= ( numRead = ts_read( obj->tsDevice_, &sample, 1 ) ) )
    {
+      if( 1 == numRead )
+      {
+//         fprintf( stderr, "touch event %u, x %u, y %u\n", sample.pressure, sample.x, sample.y );
+         bool const down = ( 0 != sample.pressure );
+         if( down != wasDown )
+         {
+// fprintf( stderr, ", %s", down ? "down" : "up" );
+            if( down )
+               obj->onTouch( sample.x, sample.y );
+            else
+               obj->onRelease();
+
+            wasDown = down ;
+         }
+         else
+         {
+// fprintf( stderr, ", same %s", down ? "down" : "up" );
+         }
+      } // translated value
+/*
       if( EV_ABS == event.type )
       {
 // fprintf( stderr, "touch event %u, code %u, value %u", event.type, event.code, event.value );
@@ -77,28 +101,42 @@ static void *tsThread( void *arg )
          }
 //         fprintf( stderr, "\n" );
       }
+*/      
    }
    
    fprintf( stderr, "touch screen thread shutting down due to error %m\n" );
-   fprintf( stderr, "bytes read %d out of %u\n", numRead, sizeof( event ) );
 
 }
 
 touchScreenThread_t :: touchScreenThread_t( void )
    : threadHandle_( -1 ),
-     fdDevice_( open( "/dev/input/event0", O_RDONLY ) )
+     tsDevice_( ts_open( "/dev/input/event0", 0 ) )
+//     fdDevice_( open( "/dev/input/event0", O_RDONLY ) )
 {
-   if( 0 <= fdDevice_ )
+   if( 0 != tsDevice_ )
    {
+      if( 0 == ts_config( tsDevice_ ) ) 
+      {
+      }
+      else
+      {
+         perror( "ts_config" );
+         ts_close( tsDevice_ );
+         tsDevice_ = 0 ;
+      }
    }
+   else
+      fprintf( stderr, "Error opening touch screen device\n" );
 }
 
 touchScreenThread_t :: ~touchScreenThread_t( void )
 {
    if( isOpen() )
    {
-      close( fdDevice_ );
-      fdDevice_ = -1 ;
+//      close( fdDevice_ );
+//      fdDevice_ = -1 ;
+      ts_close( tsDevice_ );
+      tsDevice_ = 0 ;
    }
 
    if( isRunning() )

@@ -1,5 +1,5 @@
 #ifndef __TSTHREAD_H__
-#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.1 2002-11-03 15:39:36 ericn Exp $"
+#define __TSTHREAD_H__ "$Id: tsThread.h,v 1.2 2002-11-08 13:56:59 ericn Exp $"
 
 /*
  * tsThread.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: tsThread.h,v $
- * Revision 1.1  2002-11-03 15:39:36  ericn
+ * Revision 1.2  2002-11-08 13:56:59  ericn
+ * -modified to use tslib
+ *
+ * Revision 1.1  2002/11/03 15:39:36  ericn
  * -Initial import
  *
  *
@@ -21,6 +24,7 @@
 
 
 #include <sys/time.h>
+#include <tslib.h>
 
 class touchScreenThread_t {
 public:
@@ -33,14 +37,15 @@ public:
    virtual void onMove( unsigned        x, 
                         unsigned        y );
 
-   bool isOpen( void ) const { return 0 <= fdDevice_ ; }
+   bool isOpen( void ) const { return 0 != tsDevice_ ; }
    
    bool begin( void );
 
    bool isRunning( void ) const { return 0 <= threadHandle_ ; }
 
-   int threadHandle_ ;
-   int fdDevice_ ;
+   int            threadHandle_ ;
+   tsdev *        tsDevice_ ;
+//   int fdDevice_ ;
 };
 
 #endif

@@ -63,11 +63,11 @@ testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
 testJS: testJS.o $(LIB)
-	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
+	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	$(STRIP) testJS
 
 testEvents: testEvents.o $(LIB)
-	$(CC) -o testEvents testEvents.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
+	$(CC) -o testEvents testEvents.o $(LIBS) -lCurlCache -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm testEvents >testEvents.map
 	$(STRIP) testEvents
 
@@ -83,7 +83,7 @@ tsThreadMain.o: tsThread.h tsThread.cpp Makefile
 	$(CC) -c -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
 
 tsThread: tsThreadMain.o Makefile $(LIB)
-	$(CC) -o tsThread tsThreadMain.o $(LIBS) -lCurlCache -lstdc++ -lpthread -lm
+	$(CC) -o tsThread tsThreadMain.o $(LIBS) -lCurlCache -lstdc++ -lts -lpthread -lm
 	arm-linux-nm tsThread >tsThread.map
 	$(STRIP) tsThread
 
