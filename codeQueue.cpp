@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.20  2004-01-01 20:11:12  ericn
+ * Revision 1.21  2004-12-28 03:32:57  ericn
+ * -localize filter vars
+ *
+ * Revision 1.20  2004/01/01 20:11:12  ericn
  * -report errors only if not shutting down
  *
  * Revision 1.19  2004/01/01 16:02:39  ericn
@@ -101,8 +104,8 @@ static JSObject   *global_ = 0 ;
 static int         codeListRead_ = -1 ;
 static int         codeListWrite_ = -1 ;
 
-pthread_mutex_t filterMutex_ = PTHREAD_MUTEX_INITIALIZER ; 
-pthread_cond_t  filterCond_ = PTHREAD_COND_INITIALIZER ;
+static pthread_mutex_t filterMutex_ = PTHREAD_MUTEX_INITIALIZER ; 
+static pthread_cond_t  filterCond_ = PTHREAD_COND_INITIALIZER ;
 
 LIST_HEAD(filters_);
 
