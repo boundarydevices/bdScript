@@ -1,5 +1,5 @@
 #ifndef __DITHER_H__
-#define __DITHER_H__ "$Id: dither.h,v 1.1 2004-03-17 04:56:19 ericn Exp $"
+#define __DITHER_H__ "$Id: dither.h,v 1.2 2004-07-04 21:33:54 ericn Exp $"
 
 /*
  * dither.h
@@ -9,11 +9,18 @@
  * to black and white using the Floyd-Steinberg
  * dithering algorithm.
  *
+ * Bits are packed tightly into output (rows don't
+ * start on byte boundaries).
+ *
+ * Bit 0 is the left-most bit.
  *
  * Change History : 
  *
  * $Log: dither.h,v $
- * Revision 1.1  2004-03-17 04:56:19  ericn
+ * Revision 1.2  2004-07-04 21:33:54  ericn
+ * -added getBits() method
+ *
+ * Revision 1.1  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  *
@@ -36,6 +43,7 @@ public:
 
    inline bool isBlack( unsigned x, unsigned y ) const ;
    inline bool isWhite( unsigned x, unsigned y ) const { return !isBlack( x, y ); }
+   unsigned char const *getBits(void) const { return bits_ ; }
 
 private:
    unsigned char const * const bits_ ;
