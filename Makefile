@@ -249,6 +249,14 @@ touchPoll: touchPoll.cpp $(LIB)
 	$(CC) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
 	$(STRIP) $@
 
+urlPoll: urlPoll.cpp Makefile $(LIB)
+	$(CC) $(IFLAGS) -fno-rtti -o urlPoll -D__MODULETEST__ -Xlinker -Map -Xlinker urlPoll.map urlPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+flashVar: flashVar.cpp Makefile $(LIB)
+	$(CC) $(IFLAGS) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
 start.o: start.c
 	$(CC) -fno-rtti -c -nodefaultlibs -o $@ $<
 
