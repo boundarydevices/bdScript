@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.15  2002-11-30 23:45:27  ericn
+ * Revision 1.16  2002-12-02 15:19:22  ericn
+ * -two-level callback with code queue filter
+ *
+ * Revision 1.15  2002/11/30 23:45:27  ericn
  * -removed debug msg
  *
  * Revision 1.14  2002/11/30 18:52:57  ericn
@@ -70,9 +73,7 @@
 #include "jsGlobals.h"
 #include "codeQueue.h"
 #include "ccActiveURL.h"
-
-static mutex_t     syncMutex_ ;
-static condition_t syncSem_ ;
+#include <unistd.h>
 
 enum jsCurl_tinyid {
    CURLFILE_ISLOADED, 
@@ -172,63 +173,44 @@ bool initJSCurl( JSContext *cx, JSObject *glob )
    return false ;
 }
 
-static void doLock( jsCurlRequest_t &req )
+static void cbOnComplete( void *cbParam )
 {
-   if( req.callingThread_ != pthread_self() )
-   {
-      int result = pthread_mutex_lock( req.async_ ? &execMutex_.handle_ : &syncMutex_.handle_ );
-      if( 0 != result )
-         fprintf( stderr, "interrupted!\n" );
-   }
-}
+   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
+   req.status_     = req.completed_ ;
+   req.isComplete_ = true ;
 
-static void doUnlock( jsCurlRequest_t &req )
-{
-   if( req.callingThread_ != pthread_self() )
-      pthread_mutex_unlock( req.async_ ? &execMutex_.handle_ : &syncMutex_.handle_ );
-}
+   if( 0 != req.onComplete_ )
+      req.onComplete_( req, req.data_, req.length_ );
 
-void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
-{
-   doLock( req );
-   jsval     handlerVal ;
-   JSString *handlerCode ;
-
-   JSString *const trueString = JS_NewStringCopyN( req.cx_, "true", 4 );
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "isLoaded",
-                      STRING_TO_JSVAL( trueString ),
+                      JSVAL_TRUE,
                       0, 0, 
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
+   jsval handlerVal ;
    if( JS_GetProperty( req.cx_, req.rhObj_, "onLoad", &handlerVal ) 
        && 
        JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onLoad" ) )
-         JS_ReportError( req.cx_, "Error queueing onLoad\n" );
+      executeCode( req.lhObj_, handlerVal, "curlRequest::onLoad" );
    }
-   
-   if( 0 != req.onComplete_ )
-      req.onComplete_( req, data, size );
 
-   req.isComplete_ = true ;
-   if( !req.async_ ) 
-      syncSem_.signal();
-   else
-      delete &req ;
+   getCurlCache().closeHandle( req.handle_ );
 
-   doUnlock( req );
+   delete &req ;
 }
 
-void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
+static void cbOnFailure( void *cbParam )
 {
-   doLock( req );
-    
-   JSString *errorStr = JS_NewStringCopyN( req.cx_, errorMsg.c_str(), errorMsg.size() );
+   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
+   req.status_     = req.failed_ ;
+   req.isComplete_ = true ;
+
+   JSString *errorStr = JS_NewStringCopyN( req.cx_, req.errorMsg_.c_str(), req.errorMsg_.size() );
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "loadErrorMsg",
@@ -238,114 +220,121 @@ void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   jsval     handlerVal ;
-   JSString *handlerCode ;
+   if( 0 != req.onFailure_ )
+      req.onFailure_( req, req.errorMsg_ );
 
+   jsval handlerVal ;
    if( JS_GetProperty( req.cx_, req.rhObj_, "onLoadError", &handlerVal ) 
        && 
        JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onLoadError" ) )
-         JS_ReportError( req.cx_, "Error queueing onLoadError\n" );
+      executeCode( req.lhObj_, handlerVal, "curlRequest::onLoadError" );
    }
    
-   if( 0 != req.onFailure_ )
-      req.onFailure_( req, errorMsg );
-
-   req.isComplete_ = true ;
-   if( !req.async_ ) 
-      syncSem_.signal();
-   else
-      delete &req ;
-   doUnlock( req );
+   delete &req ;
 }
 
-void jsCurlOnCancel( jsCurlRequest_t &req )
+static void cbOnCancel( void *cbParam )
 {
-   doLock( req );
+   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
+   req.status_     = req.cancelled_ ;
+   req.isComplete_ = true ;
 
-   jsval     handlerVal ;
-   JSString *handlerCode ;
-
+   if( 0 != req.onCancel_  )
+      req.onCancel_( req );
+   
+   jsval handlerVal ;
    if( JS_GetProperty( req.cx_, req.rhObj_, "onCancel", &handlerVal ) 
        && 
        JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onCancel" ) )
-         JS_ReportError( req.cx_, "Error queueing onCancel\n" );
+      executeCode( req.lhObj_, handlerVal, "curlRequest::onCancel" );
    }
-   
-   if( 0 != req.onCancel_  )
-      req.onCancel_( req );
 
-   req.isComplete_ = true ;
-   if( !req.async_ ) 
-      syncSem_.signal();
-   else
-      delete &req ;
-   doUnlock( req );
+   delete &req ;
 }
 
-void jsCurlOnSize( jsCurlRequest_t &req, unsigned long size )
+static void cbOnSize( void *cbParam )
 {
-   doLock( req );
-
+   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "expectedSize",
-                      INT_TO_JSVAL( size ),
+                      INT_TO_JSVAL( req.expectedSize_ ),
                       0, 0, 
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   jsval     handlerVal ;
-   JSString *handlerCode ;
+   if( 0 != req.onSize_ )
+      req.onSize_( req, req.expectedSize_ );
 
+   jsval handlerVal ;
    if( JS_GetProperty( req.cx_, req.rhObj_, "onSize", &handlerVal ) 
        && 
        JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onSize" ) )
-         JS_ReportError( req.cx_, "Error queueing onSize\n" );
+      executeCode( req.lhObj_, handlerVal, "curlRequest::onSize" );
    }
-   
-   if( 0 != req.onSize_ )
-      req.onSize_( req, size );
-   
-   doUnlock( req );
 }
 
-#include <unistd.h>
-void jsCurlOnProgress( jsCurlRequest_t &req, unsigned long numReadSoFar )
+static void cbOnProgress( void *cbParam )
 {
-   doLock( req );
-//   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
+   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
 
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "readSoFar",
-                      INT_TO_JSVAL( numReadSoFar ),
+                      INT_TO_JSVAL( req.bytesSoFar_ ),
                       0, 0, 
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   jsval     handlerVal ;
-   JSString *handlerCode ;
-
+   if( 0 != req.onProgress_ )
+      req.onProgress_( req, req.bytesSoFar_ );
+   
+   jsval handlerVal ;
    if( JS_GetProperty( req.cx_, req.rhObj_, "onProgress", &handlerVal ) 
        && 
        JSVAL_IS_STRING( handlerVal ) )
    {
-      if( !queueSource( req.lhObj_, handlerVal, "curlRequest::onProgress" ) )
-         JS_ReportError( req.cx_, "Error queueing onProgress\n" );
+      executeCode( req.lhObj_, handlerVal, "curlRequest::onProgress" );
    }
+}
 
-   if( 0 != req.onProgress_ )
-      req.onProgress_( req, numReadSoFar );
-   
-   doUnlock( req );
+static void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size, unsigned long handle )
+{
+   req.status_ = jsCurlRequest_t::completed_ ;
+   req.data_   = data ;
+   req.length_ = size ;
+   req.handle_ = handle ;
+
+   queueCallback( cbOnComplete, &req );
+}
+
+static void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
+{
+   req.errorMsg_ = errorMsg ;
+   char volatile c = req.errorMsg_[0]; // forcibly detach from errorMsg
+   queueCallback( cbOnFailure, &req );
+}
+
+static void jsCurlOnCancel( jsCurlRequest_t &req )
+{
+   queueCallback( cbOnFailure, &req );
+}
+
+static void jsCurlOnSize( jsCurlRequest_t &req, unsigned long size )
+{
+   req.expectedSize_ = size ;
+   queueCallback( cbOnSize, &req );
+}
+
+static void jsCurlOnProgress( jsCurlRequest_t &req, unsigned long numReadSoFar )
+{
+   req.bytesSoFar_ = numReadSoFar ;
+   queueCallback( cbOnProgress, &req );
 }
 
 static curlCallbacks_t const defaultCallbacks_ = {
@@ -372,6 +361,13 @@ jsCurlRequest_t :: jsCurlRequest_t
      cx_( cx ),
      async_( async ),
      isComplete_( false ),
+     status_( inTransit_ ),
+     data_( 0 ),
+     length_( 0 ),
+     handle_( 0 ),
+     errorMsg_(),
+     expectedSize_( 0 ),
+     bytesSoFar_( 0 ),
      callingThread_( pthread_self() ),
      onComplete_( onComplete ),
      onFailure_( onFailure ),
@@ -385,6 +381,35 @@ jsCurlRequest_t :: ~jsCurlRequest_t( void )
 {
    memset( this, 0, sizeof( this ) );
 }
+
+class curlCodeFilter_t : public codeFilter_t {
+public:
+   curlCodeFilter_t( jsCurlRequest_t &req )
+      : req_( req ){}
+
+   ~curlCodeFilter_t( void ){}
+
+   virtual bool isHandled( callback_t cb, void *cbParam )
+   {
+      if( &req_ == cbParam )
+      {
+         cb( cbParam );
+         return true ;
+      } // it's our request
+      else
+      {
+         return false ;
+      }
+   }
+
+   virtual bool isDone( void )
+   {
+      return req_.isComplete_ ;
+   }
+
+private:
+   jsCurlRequest_t &req_ ;
+};
 
 bool queueCurlRequest
    ( JSObject                     *lhObj, 
@@ -490,34 +515,31 @@ bool queueCurlRequest
          {
          }
 
-         request.isComplete_ = false ;
-
-         if( 0 == postHead )
+         if( request.async_ )
          {
-            getCurlCache().get( absolute, &request, defaultCallbacks_ );
-         }
-         else
-         {
-            getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
-         }
-
-         if( !request.async_ )
-         {
-            mutexLock_t lock( syncMutex_ );
-            bool const complete = request.isComplete_ || syncSem_.wait(lock);
-            if( complete )
-            {   
-               delete &request ;
-               return true ;
-            }
-         }
-         else
-         {
+            if( 0 == postHead )
+               getCurlCache().get( absolute, &request, defaultCallbacks_ );
+            else
+               getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
             return true ;
-         }
+         } // asynchronous
+         else
+         {
+            curlCodeFilter_t filter( request );
+
+            if( 0 == postHead )
+               getCurlCache().get( absolute, &request, defaultCallbacks_ );
+            else
+               getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
+
+            filter.wait();
+            
+            return true ;
+         } // synchronous, install code filter
       }
    }
 
    delete &request ;
 
+   return false ;
 }
