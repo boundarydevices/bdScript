@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.8  2003-08-01 14:29:26  ericn
+ * Revision 1.9  2003-11-22 13:26:36  ericn
+ * -modified to set size for chunked output
+ *
+ * Revision 1.8  2003/08/01 14:29:26  ericn
  * -change onComplete interface
  *
  * Revision 1.7  2003/01/05 01:58:15  ericn
@@ -98,13 +101,15 @@ static int progress_callback
 
    if( 0 == pd->expectedBytes_ )
    {
+      unsigned long expectedSize ;
       if( ( 0.0 != dltotal ) && ( 0 == pd->expectedBytes_ ) )
-      {
-         unsigned long const expectedSize = (unsigned long)floor( dltotal );
-         onSize_( *(pd->request_), expectedSize );
-         pd->expectedBytes_ = expectedSize ;
-         pd->data_->reserve( expectedSize ); // prevent multiple realloc
-      }
+         expectedSize = (unsigned long)floor( dltotal );
+      else
+         expectedSize = ( 1<<20 ); // probably chunked
+
+      onSize_( *(pd->request_), expectedSize );
+      pd->expectedBytes_ = expectedSize ;
+      pd->data_->reserve( expectedSize ); // prevent multiple realloc
    }
    
    onProgress_( *(pd->request_), (unsigned long)floor( dlnow ) );
