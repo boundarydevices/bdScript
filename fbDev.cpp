@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.19  2003-04-02 01:49:48  tkisky
+ * Revision 1.20  2003-07-03 13:35:37  ericn
+ * -modified file handle to close-on-exec
+ *
+ * Revision 1.19  2003/04/02 01:49:48  tkisky
  * -inline min function
  *
  * Revision 1.18  2003/03/12 02:57:18  ericn
@@ -207,6 +210,7 @@ fbDevice_t :: fbDevice_t( char const *name )
 
    if( 0 <= fd_ )
    {
+      fcntl( fd_, F_SETFD, FD_CLOEXEC );
 //      printf( "device %s opened\n", name );
       struct fb_fix_screeninfo fixed_info;
       int err = ioctl( fd_, FBIOGET_FSCREENINFO, &fixed_info);
