@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.20  2003-02-02 13:46:17  ericn
+ * Revision 1.21  2003-02-02 19:38:26  ericn
+ * -removed debug msg
+ *
+ * Revision 1.20  2003/02/02 13:46:17  ericn
  * -added recordBuffer support
  *
  * Revision 1.19  2003/02/01 18:14:30  ericn
@@ -702,7 +705,6 @@ jsRecord( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                                      JSPROP_ENUMERATE
                                      |JSPROP_PERMANENT
                                      |JSPROP_READONLY );
-      printf( "record request queued\n" );
                   *rval = JSVAL_TRUE ;
                }
                else
