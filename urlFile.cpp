@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.3  2002-11-30 05:29:45  ericn
+ * Revision 1.4  2002-11-30 17:32:17  ericn
+ * -modified to allow synchronous callbacks
+ *
+ * Revision 1.3  2002/11/30 05:29:45  ericn
  * -removed debug msgs
  *
  * Revision 1.2  2002/11/30 00:30:15  ericn
@@ -36,24 +39,41 @@ static void onComplete( void         *opaque,
    urlFile_t *f = (urlFile_t *)opaque ;
    unsigned long identifier ;
    getCurlCache().openHandle( f->url_, f->data_, f->size_, f->handle_ );
-   mutexLock_t lock( mutex_ );
-   if( !cond_.signal() )
-      fprintf( stderr, "Error %m signalling completion\n" );
+   if( f->callingThread_ != pthread_self() )
+   {
+      mutexLock_t lock( mutex_ );
+      if( !cond_.signal() )
+         fprintf( stderr, "Error %m signalling completion\n" );
+   }
 }
 
 static void onFailure( void              *opaque,
                        std::string const &errorMsg )
 {
    printf( "failed:%s\n", errorMsg.c_str() );
-   mutexLock_t lock( mutex_ );
-   cond_.signal();
+   urlFile_t *f = (urlFile_t *)opaque ;
+   if( f->callingThread_ != pthread_self() )
+   {
+      mutexLock_t lock( mutex_ );
+      if( !cond_.signal() )
+         fprintf( stderr, "Error %m signalling completion\n" );
+   }
+   else if( !cond_.signal() )
+      fprintf( stderr, "Error %m signalling completion\n" );
 }
 
 static void onCancel( void *opaque )
 {
    printf( "cancelled\n" );
-   mutexLock_t lock( mutex_ );
-   cond_.signal();
+   urlFile_t *f = (urlFile_t *)opaque ;
+   if( f->callingThread_ != pthread_self() )
+   {
+      mutexLock_t lock( mutex_ );
+      if( !cond_.signal() )
+         fprintf( stderr, "Error %m signalling completion\n" );
+   }
+   else if( !cond_.signal() )
+      fprintf( stderr, "Error %m signalling completion\n" );
 }
 
 static void onSize( void         *opaque,
@@ -77,11 +97,14 @@ static curlCallbacks_t const callbacks_ = {
 urlFile_t :: urlFile_t( char const url[] )
    : url_( url ),
      size_( 0 ),
-     data_( 0 )
+     data_( 0 ),
+     handle_( 0xdeadbeef ),
+     callingThread_( pthread_self() )
 {
-   mutexLock_t lock( mutex_ );
    getCurlCache().get( url, this, callbacks_ );
-   cond_.wait( lock );
+   mutexLock_t lock( mutex_ );
+   if( 0 == data_ )
+      cond_.wait( lock );
 }
 
 urlFile_t :: ~urlFile_t( void )

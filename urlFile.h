@@ -1,5 +1,5 @@
 #ifndef __URLFILE_H__
-#define __URLFILE_H__ "$Id: urlFile.h,v 1.2 2002-11-30 00:30:12 ericn Exp $"
+#define __URLFILE_H__ "$Id: urlFile.h,v 1.3 2002-11-30 17:32:14 ericn Exp $"
 
 /*
  * urlFile.h
@@ -19,7 +19,10 @@
  * Change History : 
  *
  * $Log: urlFile.h,v $
- * Revision 1.2  2002-11-30 00:30:12  ericn
+ * Revision 1.3  2002-11-30 17:32:14  ericn
+ * -modified to allow synchronous callbacks
+ *
+ * Revision 1.2  2002/11/30 00:30:12  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
@@ -45,6 +48,7 @@ public:
    void const       *data_ ;
    unsigned long     size_ ;
    unsigned long     handle_ ;
+   unsigned long     callingThread_ ;
 };
 
 
