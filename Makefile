@@ -5,8 +5,8 @@ OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o \
        curlThread.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
-       jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsURL.o \
-       memFile.o relativeURL.o ultoa.o urlFile.o 
+       jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsTouch.o jsURL.o \
+       memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o 
 LIB = curlCacheLib.a
 
 ifneq (,$(findstring arm, $(CC)))
@@ -79,7 +79,15 @@ ftRender: ftRender.o $(LIB)
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
-all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender
+tsThreadMain.o: tsThread.h tsThread.cpp Makefile
+	$(CC) -c -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
+
+tsThread: tsThreadMain.o Makefile
+	$(CC) -o tsThread tsThreadMain.o $(LIB) $(LIBS) -lstdc++ -lpthread -lm
+	arm-linux-nm tsThread >tsThread.map
+	$(STRIP) tsThread
+
+all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread
 
 clean:
-	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender
+	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play ftRender tsTest tsThread
