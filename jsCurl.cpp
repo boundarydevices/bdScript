@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.8  2002-10-31 02:10:46  ericn
+ * Revision 1.9  2002-11-03 17:55:51  ericn
+ * -modified to support synchronous gets and posts
+ *
+ * Revision 1.8  2002/10/31 02:10:46  ericn
  * -modified curlFile() constructor to be multi-threaded, use rh object
  *
  * Revision 1.7  2002/10/25 04:49:05  ericn
@@ -86,8 +89,6 @@ static JSPropertySpec curlFileProperties_[] = {
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    if( ( 1 == argc ) 
-       && 
-       ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
@@ -117,9 +118,8 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
          request.lhObj_ = thisObj ;
          request.rhObj_ = rhObj ;
          request.cx_    = cx ;
-         request.mutex_ = &execMutex_ ;
 
-         if( queueCurlRequest( request ) )
+         if( queueCurlRequest( request, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) ) )
          {
             return JS_TRUE ;
          }
@@ -138,149 +138,6 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 
 }
 
-static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
-{
-   JSObject *obj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
-
-   if( obj )
-   {
-      if( JS_DefineProperty( cx, obj, "worked", 
-                             BOOLEAN_TO_JSVAL( f.isOpen() ), 
-                             0, 0, 
-                             JSPROP_ENUMERATE
-                             |JSPROP_PERMANENT
-                             |JSPROP_READONLY ) )
-      {
-         if( f.isOpen() )
-         {
-//            printf( "file opened\n" );
-            JS_DefineProperty( cx, obj, "data",
-                               STRING_TO_JSVAL( JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() ) ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            JS_DefineProperty( cx, obj, "url",
-                               STRING_TO_JSVAL( JS_NewStringCopyZ( cx, (char const *)f.getEffectiveURL() ) ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            JS_DefineProperty( cx, obj, "httpCode",
-                               INT_TO_JSVAL( f.getHttpCode() ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            JS_DefineProperty( cx, obj, "fileTime",
-                               INT_TO_JSVAL( f.getFileTime() ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            JS_DefineProperty( cx, obj, "mimeType",
-                               STRING_TO_JSVAL( JS_NewStringCopyZ( cx, (char const *)f.getMimeType() ) ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-
-            *rval = OBJECT_TO_JSVAL( obj );
-         }
-         else
-         {
-            JS_ReportError( cx, "error opening file\n" );
-            *rval = JSVAL_FALSE ;
-         }
-      
-         return JS_TRUE ;
-      }
-      else
-         JS_ReportError( cx, "Error defining property\n" );
-   }
-   else
-      JS_ReportError( cx, "Error allocating object\n" );
-   
-   return JS_FALSE ;
-}
-
-static JSBool
-curlGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{
-   //
-   // need at least url. 
-   //
-   // If more parameters, cacheFlag(bool) is next ( must be bool )
-   // and the remainder must be name/value pairs
-   //
-   // names beginning with '@' indicate files to upload
-   // 
-   //
-   if( ( 1 <= argc )
-       &&
-       JSVAL_IS_STRING( argv[0] ) 
-       &&
-       ( ( 1 == argc ) 
-         || 
-         JSVAL_IS_BOOLEAN( argv[1] ) ) )      // second parameter must be boolean
-   {
-      JSString *str = JS_ValueToString( cx, argv[0] );
-      if( str )
-      {
-         curlCache_t &cache = getCurlCache();
-         char const *cURL = JS_GetStringBytes( str );
-         bool const useCache = ( 1 == argc ) 
-                               || 
-                               ( 0 != JSVAL_TO_BOOLEAN( argv[1] ) );
-         if( 2 < argc )
-         {
-            bool failed = false ;
-            curlRequest_t request( cURL );
-            for( uintN arg = 2 ; ( arg < argc-1 ) && !failed ; )
-            {
-               JSString *jsName = JS_ValueToString( cx, argv[arg++] );
-               JSString *jsVal = JS_ValueToString( cx, argv[arg++] );
-               if( ( 0 != jsName ) && ( 0 != jsVal ) )
-               {
-                  char const *cName = JS_GetStringBytes( jsName );
-                  char const *cValue = JS_GetStringBytes( jsVal );
-                  if( '@' != cName[0] )
-                     request.addVariable( cName, cValue );
-                  else
-                     request.addFile( cName+1, cValue );
-               }
-               else
-               {
-                  failed = true ;
-               }
-            } // add each post variable
-
-            if( !failed )
-            {
-               curlFile_t f( cache.post( request, useCache ) );
-               return returnFile( cx, rval, f );
-            }
-         } // have parameters to post
-         else
-         {
-            curlFile_t f( cache.get( cURL, useCache ) );
-            return returnFile( cx, rval, f );
-         } // simple get
-      } // retrieved string
-
-      *rval = JSVAL_FALSE ;
-      return JS_TRUE ;
-
-   } // need at least two params
-
-   return JS_FALSE ;
-}
-
-static JSFunctionSpec curl_functions[] = {
-    {"curlGet",         curlGet,        0},
-    {0}
-};
-
 bool initJSCurl( JSContext *cx, JSObject *glob )
 {
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsCurlClass_,
@@ -290,7 +147,7 @@ bool initJSCurl( JSContext *cx, JSObject *glob )
                        0, 0 );
    if( rval )
    {
-      return JS_DefineFunctions( cx, glob, curl_functions);
+      return true ;
    }
    
    return false ;

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.8  2002-11-03 17:03:22  ericn
+ * Revision 1.9  2002-11-03 17:55:51  ericn
+ * -modified to support synchronous gets and posts
+ *
+ * Revision 1.8  2002/11/03 17:03:22  ericn
  * -added synchronous image loads
  *
  * Revision 1.7  2002/11/02 18:38:14  ericn
@@ -48,8 +51,6 @@
 #include "imgJPEG.h"
 #include "curlThread.h"
 #include "jsGlobals.h"
-
-static mutex_t imageMutex_ ;
 
 static JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -144,7 +145,7 @@ static JSPropertySpec imageProperties_[] = {
   {0,0,0}
 };
 
-static bool sharedOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
 {
    char const *cMime = f.getMimeType();
    char const *cData = (char const *)f.getData();
@@ -217,30 +218,6 @@ static bool sharedOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                          |JSPROP_READONLY );
       jsCurlOnError( req, f );
    }
-
-   return worked ;
-
-}
-
-static void asyncOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
-{
-   sharedOnComplete( req, f );
-}
-
-static void syncOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
-{
-   sharedOnComplete( req, f );
-
-   condition_t *pCond = (condition_t *)req.callerData_ ;
-   pCond->signal();
-}
-
-static void syncOnError( jsCurlRequest_t &req, curlFile_t const &f )
-{
-   jsCurlOnError( req, f );
-
-   condition_t *pCond = (condition_t *)req.callerData_ ;
-   pCond->signal();
 }
 
 static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -270,34 +247,14 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
          jsCurlRequest_t request ;
-         request.lhObj_ = thisObj ;
-         request.rhObj_ = rhObj ;
-         request.cx_    = cx ;
+         request.lhObj_      = thisObj ;
+         request.rhObj_      = rhObj ;
+         request.cx_         = cx ;
+         request.onComplete  = imageOnComplete ;
+         request.onError     = jsCurlOnError ;
          
-         if( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
+         if( queueCurlRequest( request, 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
          {
-            request.onComplete  = asyncOnComplete ;
-            request.onError     = jsCurlOnError ;
-            request.mutex_      = &execMutex_ ;
-            request.callerData_ = 0 ;
-         }
-         else
-         {
-            request.onComplete  = syncOnComplete ;
-            request.onError     = syncOnError ;
-            request.mutex_      = &imageMutex_ ;
-            request.callerData_ = new condition_t ;
-         } // called as function
-         
-         if( queueCurlRequest( request ) )
-         {
-            if( 0 == (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
-            {
-               condition_t *pCond = (condition_t *)request.callerData_ ;
-               mutexLock_t lock( imageMutex_ );
-               pCond->wait( lock );
-               delete pCond ;
-            } // wait for completion
          }
          else
          {

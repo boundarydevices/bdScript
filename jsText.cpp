@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.5  2002-11-02 18:57:03  ericn
+ * Revision 1.6  2002-11-03 17:55:51  ericn
+ * -modified to support synchronous gets and posts
+ *
+ * Revision 1.5  2002/11/02 18:57:03  ericn
  * -removed debug stuff
  *
  * Revision 1.4  2002/11/02 18:38:02  ericn
@@ -778,8 +781,6 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
 {
    *rval = JSVAL_FALSE ;
    if( ( 1 == argc ) 
-       && 
-       ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
        &&
        JSVAL_IS_OBJECT( argv[0] ) )
    {
@@ -808,9 +809,8 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
          request.lhObj_     = thisObj ;
          request.rhObj_     = rhObj ;
          request.cx_        = cx ;
-         request.mutex_     = &execMutex_ ;
-
-         if( queueCurlRequest( request ) )
+         
+         if( queueCurlRequest( request, 0 != ( cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
          {
             return JS_TRUE ;
          }

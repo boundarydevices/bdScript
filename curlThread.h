@@ -1,5 +1,5 @@
 #ifndef __CURLTHREAD_H__
-#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.3 2002-11-03 17:03:04 ericn Exp $"
+#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.4 2002-11-03 17:55:41 ericn Exp $"
 
 /*
  * curlThread.h
@@ -98,7 +98,10 @@
  * Change History : 
  *
  * $Log: curlThread.h,v $
- * Revision 1.3  2002-11-03 17:03:04  ericn
+ * Revision 1.4  2002-11-03 17:55:41  ericn
+ * -modified to support synchronous gets and posts
+ *
+ * Revision 1.3  2002/11/03 17:03:04  ericn
  * -added opaque parameter
  *
  * Revision 1.2  2002/11/02 04:12:20  ericn
@@ -135,9 +138,6 @@ struct jsCurlRequest_t {
                                     //    optional useCache property
                                     //    optionally urlParams[] array property
    JSContext           *cx_ ;       // context in which to run
-   mutex_t             *mutex_ ;    // mutex to grant access to context
-
-   void                *callerData_ ; // used to pass app-specific info to callback
 
    //
    // one of these called when transfer terminates. 
@@ -154,7 +154,8 @@ struct jsCurlRequest_t {
 void jsCurlOnComplete( jsCurlRequest_t &, curlFile_t const &f );
 void jsCurlOnError( jsCurlRequest_t &, curlFile_t const &f );
 
-bool queueCurlRequest( jsCurlRequest_t const &request );
+bool queueCurlRequest( jsCurlRequest_t &request,
+                       bool             async );
 
 void startCurlThreads( void );
 void stopCurlThreads( void );

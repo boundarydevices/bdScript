@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlThread.cpp,v $
- * Revision 1.2  2002-11-02 04:12:00  ericn
+ * Revision 1.3  2002-11-03 17:55:44  ericn
+ * -modified to support synchronous gets and posts
+ *
+ * Revision 1.2  2002/11/02 04:12:00  ericn
  * -modified to set isLoaded flag
  *
  * Revision 1.1  2002/10/31 02:13:08  ericn
@@ -24,6 +27,10 @@
 #include "mtQueue.h"
 #include "codeQueue.h"
 #include "../boundary1/ultoa.h"
+#include "jsGlobals.h"
+
+static mutex_t     syncMutex_ ;
+static condition_t syncCondition_ ;
 
 void jsCurlOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
 {
@@ -60,16 +67,22 @@ void jsCurlOnError( jsCurlRequest_t &req, curlFile_t const &f )
 
 struct curlItem_t {
    curlItem_t( jsCurlRequest_t const &rhs,
-               curlRequest_t   const &request )
+               curlRequest_t   const &request,
+               bool                   useCache,
+               bool                   async )
       : jsRequest_( rhs ),
-        httpRequest_( request )
+        httpRequest_( request ),
+        useCache_( useCache ),
+        async_( async )
    {
    }
    curlItem_t( void )
-      : jsRequest_(), httpRequest_(){}
+      : jsRequest_(), httpRequest_(), useCache_( false ){}
 
    jsCurlRequest_t jsRequest_ ;
    curlRequest_t   httpRequest_ ;
+   bool            useCache_ ;
+   bool            async_ ;
 };
 
 typedef mtQueue_t<curlItem_t> curlQueue_t ;
@@ -78,7 +91,8 @@ typedef mtQueue_t<curlItem_t> curlQueue_t ;
 static curlQueue_t curlQueue_ ;
 static pthread_t   readers_[NUM_READERS];
 
-bool queueCurlRequest( jsCurlRequest_t const &request )
+bool queueCurlRequest( jsCurlRequest_t &request,
+                       bool             async )
 {
    jsval urlVal ;
    JSString *propStr ;
@@ -156,8 +170,23 @@ bool queueCurlRequest( jsCurlRequest_t const &request )
          {
          }
 
-         bool const pushed = curlQueue_.push( curlItem_t( request, httpReq ) );
-         return pushed ;
+         bool const pushed = curlQueue_.push( curlItem_t( request, httpReq, useCache, async ) );
+         if( pushed )
+         {
+            if( !async )
+            {
+               mutexLock_t lock( syncMutex_ );
+               bool complete = syncCondition_.wait( lock );
+               return complete ;
+            }
+            else
+               return true ;
+         }
+         else
+         {
+            JS_ReportError( request.cx_, "Error queueing curl request" );
+            return false ;
+         }
       }
       else
          return false ;
@@ -173,8 +202,9 @@ static void *readerThread( void *arg )
       curlItem_t item ;
       if( curlQueue_.pull( item ) )
       {
-         curlFile_t f( getCurlCache().post( item.httpRequest_, true ) );
-         mutexLock_t lock( *item.jsRequest_.mutex_ );
+         curlFile_t f( getCurlCache().post( item.httpRequest_, item.useCache_ ) );
+
+         mutexLock_t lock( item.async_ ? execMutex_ : syncMutex_ );
 
          if( f.isOpen() && ( 200 == f.getHttpCode() ) )
          {
@@ -210,6 +240,9 @@ static void *readerThread( void *arg )
                                |JSPROP_READONLY );
             item.jsRequest_.onError( item.jsRequest_, f );
          }
+
+         if( !item.async_ )
+            syncCondition_.signal();
       }
       else
          break;
