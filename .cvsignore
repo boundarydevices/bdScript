@@ -13,4 +13,4 @@ avSendTo
 *.sym openFds readCIS
 barcodePoll pollHandlerTest touchPoll udpSpewTo udpRecvAll
 flashThread progFlash reboot pollTimerTest ttyPoll
-udpPoll timerTest
+udpPoll timerTest unpacked
