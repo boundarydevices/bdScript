@@ -21,10 +21,12 @@ ifneq (,$(findstring arm, $(CC)))
    AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L./ -L../install/arm-linux/lib
-   IFLAGS=-I../install/arm-linux/include/nspr \
-          -I../install/arm-linux/include/freetype2 \
+   IFLAGS= \
+          -I../linux-2.4.19/include \
           -I../install/arm-linux/include \
-          -I../linux-2.4.19/include -I../ffmpeg-0.4.6/libavformat -I../ffmpeg-0.4.6/libavcodec
+          -I../install/arm-linux/include/nspr \
+          -I../install/arm-linux/include/freetype2 \
+          -I../install/arm-linux/include/libavcodec
    LIB = ../install/arm-linux/lib/libCurlCache.a
 else
 #   CC=g++
