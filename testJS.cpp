@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.8  2002-10-24 13:16:21  ericn
+ * Revision 1.9  2002-10-25 02:20:05  ericn
+ * -added child process initialization calls
+ *
+ * Revision 1.8  2002/10/24 13:16:21  ericn
  * -added MP3, relative URL support
  *
  * Revision 1.7  2002/10/20 16:30:11  ericn
@@ -51,6 +54,8 @@
 #include "jsMP3.h"
 #include "jsURL.h"
 #include "curlCache.h"
+#include "relativeURL.h"
+#include "childProcess.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -195,6 +200,8 @@ int main(int argc, char **argv)
                initJSScreen( cx, glob );
                initJSURL( cx, glob );
                initJSMP3( cx, glob );
+               startChildMonitor();
+
                printf( "initialized jsCurl and jsImage\n" );
 
                curlCache_t &cache = getCurlCache();
@@ -232,6 +239,9 @@ int main(int argc, char **argv)
                   else
                      printf( "Error opening url %s\n", url );
                }
+
+               stopChildMonitor();  // stop trapping SIGCHLD signal
+            
             }
             else
                printf( "Error defining shell functions\n" );
