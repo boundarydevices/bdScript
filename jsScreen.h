@@ -1,5 +1,5 @@
 #ifndef __JSSCREEN_H__
-#define __JSSCREEN_H__ "$Id: jsScreen.h,v 1.4 2002-11-02 18:36:52 ericn Exp $"
+#define __JSSCREEN_H__ "$Id: jsScreen.h,v 1.5 2002-11-21 14:05:22 ericn Exp $"
 
 /*
  * jsScreen.h
@@ -12,13 +12,17 @@
  *       .getPixel( x, y );
  *       .setPixel( x, y, rgb );
  *       .getRect( x, y, width, height );
+ *       .invertRect( x, y, width, height );
  *       .width
  *       .height
  *
  * Change History : 
  *
  * $Log: jsScreen.h,v $
- * Revision 1.4  2002-11-02 18:36:52  ericn
+ * Revision 1.5  2002-11-21 14:05:22  ericn
+ * -added invertRect() method
+ *
+ * Revision 1.4  2002/11/02 18:36:52  ericn
  * -added getPixel, setPixel, getRect
  *
  * Revision 1.3  2002/10/31 02:08:07  ericn

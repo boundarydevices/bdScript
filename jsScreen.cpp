@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.5  2002-11-08 13:58:16  ericn
+ * Revision 1.6  2002-11-21 14:05:19  ericn
+ * -added invertRect() method
+ *
+ * Revision 1.5  2002/11/08 13:58:16  ericn
  * -modified to handle negative screen positions
  *
  * Revision 1.4  2002/11/02 18:36:54  ericn
@@ -229,6 +232,56 @@ jsGetRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 4 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      int width = JSVAL_TO_INT( argv[2] );
+      int height = JSVAL_TO_INT( argv[3] );
+      if( ( 0 < width ) && ( 0 < height ) )
+      {
+         int const startX = JSVAL_TO_INT( argv[0] );
+         int const startY = JSVAL_TO_INT( argv[1] );
+
+         fbDevice_t &fb = getFB();
+
+         for( unsigned y = 0 ; y < height ; y++ )
+         {
+            int const screenY = startY + y ;
+            if( ( 0 <= screenY ) 
+                &&
+                ( screenY < fb.getHeight() ) )
+            {
+               for( unsigned x = 0 ; x < width ; x++ )
+               {
+                  int const screenX = x + startX ;
+                  if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
+                  {
+                     fb.getPixel( screenX, screenY ) = ~fb.getPixel( screenX, screenY );
+                  } // visible column
+               } // for each column
+            } // visible row
+         } // for each row requested
+      }
+      else
+         JS_ReportError( cx, "Invalid width or height" );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.invertRect( x, y, width, height );" );
+
+   return JS_TRUE ;
+}
+
 enum jsScreen_tinyId {
    SCREEN_WIDTH, 
    SCREEN_HEIGHT, 
@@ -288,6 +341,7 @@ static JSFunctionSpec screen_methods[] = {
    { "getPixel",     jsGetPixel,         0,0,0 },
    { "setPixel",     jsSetPixel,         0,0,0 },
    { "getRect",      jsGetRect,          0,0,0 },
+   { "invertRect",   jsInvertRect,       0,0,0 },
    { 0 }
 };
 
