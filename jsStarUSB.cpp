@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.3  2004-09-10 19:20:15  tkisky
+ * Revision 1.4  2004-11-16 07:37:22  tkisky
+ * -fix letter quality,add reverse for top margin
+ *
+ * Revision 1.3  2004/09/10 19:20:15  tkisky
  * -allow ENQ/EOT to be  used for status as well as ASB
  *
  * Revision 1.2  2004/07/04 21:31:27  ericn
@@ -221,6 +224,8 @@ void starPoll_t :: fire( void )
                   if ((c & 0x13)==0) { lENQ = c; eotNext = 1;}
                   else if ((c & 0x91)==0x10) { lEOT = c; eotNext = 0;}
                   else weird = 1;
+
+//				  printf("Status: %02x\n",c);
                }
 
                if ((lENQ != lastENQ)||(lEOT != lastEOT)||weird) {
@@ -249,19 +254,15 @@ void starPoll_t :: fire( void )
          if (statusWaitTicks==0) {
             static const char strAsbInvalid[] = {0x1b,0x1e,0x61,0x30};
             static const char strAsbValid[] = {0x1b,0x1e,0x61,0x31};
-            static const char strEnq[] = {0x05};
-            static const char strEot[] = {0x04};
+            static const char strEotEnq[] = {0x04, 0x05};
             const char * p = NULL;
             int len = 0;
             if (asbInitialized==0) {
                if (asb_valid) {p = strAsbValid; len = sizeof(strAsbValid); }
                else {p = strAsbInvalid; len = sizeof(strAsbInvalid);}
-            } else if (asb_valid==0) {
-               if (eotNext) {p = strEot; len = sizeof(strEot);}
-               else {p = strEnq; len = sizeof(strEnq);}
-            }
+            } else if (asb_valid==0) { p = strEotEnq; len = sizeof(strEotEnq); }
             if (p) {
-               int const numWritten = usb_bulk_write( udev_, outep,(char*)strEnq,len, 1000 );
+               int const numWritten = usb_bulk_write( udev_, outep,(char*)p,len, 1000 );
                if (numWritten==4) asbInitialized = 1;
                statusWaitTicks = 10;	//wait a second before next write
             }
@@ -309,8 +310,8 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
           bool offline;
           bool presenter;
           bool coveropen;
-          bool paperempty;
-          bool papernearempty;
+          bool paperOut;
+          bool paperNearEmpty;
           bool draweropen;
           bool stackerfull;
           bool etbavailable;
@@ -327,8 +328,8 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
          st.offline        = 0;
          st.presenter      = 0;
          st.coveropen      = (lastENQ & 0x04)!=0;
-         st.paperempty     = ( ((star->eotNext) ?lastENQ : lastEOT) & 0x08)!=0;
-         st.papernearempty = (lastEOT & 0x04)!=0;
+         st.paperOut       = ( ((star->eotNext) ?lastENQ : lastEOT) & 0x08)!=0;
+         st.paperNearEmpty = (lastEOT & 0x04)!=0;
          st.draweropen     = 0;
          st.stackerfull    = 0;
          st.etbavailable = 0;
@@ -340,8 +341,8 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
          st.offline        = (star->prevData_[2] & 0x08)!=0;
          st.presenter      = 1;
          st.coveropen      = (star->prevData_[2] & 0x20)!=0;
-         st.paperempty     = (star->prevData_[5] & 0x08)!=0;
-         st.papernearempty = (star->prevData_[5] & 0x04)!=0;
+         st.paperOut       = (star->prevData_[5] & 0x08)!=0;
+         st.paperNearEmpty = (star->prevData_[5] & 0x04)!=0;
          st.draweropen     = (star->prevData_[2] & 0x04)!=0;
          st.stackerfull    = (star->prevData_[6] & 0x02)!=0;
 
@@ -365,8 +366,8 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
 
          MY_JS_DefineBoolProperty( cx, statObj, "presenter", st.presenter);
          MY_JS_DefineBoolProperty( cx, statObj, "paperInPresenter", st.paperInPresenter);
-         MY_JS_DefineBoolProperty( cx, statObj, "paperNearEmpty", st.papernearempty);
-         MY_JS_DefineBoolProperty( cx, statObj, "paperOut", st.paperempty);
+         MY_JS_DefineBoolProperty( cx, statObj, "paperNearEmpty", st.paperNearEmpty);
+         MY_JS_DefineBoolProperty( cx, statObj, "paperOut", st.paperOut);
          MY_JS_DefineProperty( cx, statObj, "counter", INT_TO_JSVAL(st.etbcounter));
          int errors = 0 ;
          MY_JS_DefineProperty( cx, statObj, "errors", INT_TO_JSVAL(errors));
@@ -423,16 +424,22 @@ static char const initRaster[] = {
    "\x1b*rC"            // clear image
 };
 
+//include 0 terminator
+static char const reverseForTopMargin[] = "\x1b*rT1";
+
+//include 0 terminator
 static char const draftQuality[] = {
-   "\x1b*rQ0\x00"       // 0 == high speed, 1 == normal, 2 == letter quality
+   "\x1b*rQ0"       // 0 == high speed, 1 == normal, 2 == letter quality
 };
 
+//include 0 terminator
 static char const normalQuality[] = {
-   "\x1b*rQ0\x01"       // 0 == high speed, 1 == normal, 2 == letter quality
+   "\x1b*rQ1"       // 0 == high speed, 1 == normal, 2 == letter quality
 };
 
+//include 0 terminator
 static char const letterQuality[] = {
-   "\x1b*rQ0\x02"       // 0 == high speed, 1 == normal, 2 == letter quality
+   "\x1b*rQ2"       // 0 == high speed, 1 == normal, 2 == letter quality
 };
 
 static char const setPageHeight[] = {
@@ -451,12 +458,14 @@ static char const topMargin[] = {
    "\x1b*rT0\x00"
 };
 
+//include 0 terminator
 static char const skipLine[] = {
-   "\x01b*rY1\0"
+   "\x1b*rY1"
 };
 
+//include 0 terminator
 static char const formFeed[] = {
-   "\x1b\x0C\x00" 
+   "\x1b\x0C"
 };
 
 static char const exitRaster[] = {
@@ -533,14 +542,14 @@ printf( "toBits..." ); fflush( stdout );
                *nextOut++ = 'b' ;
                *nextOut++ = '\0' ;
                *nextOut++ = '\0' ;
-      
+
                unsigned char mask = '\x80' ;
                unsigned char out = 0 ;
                for( unsigned x = 0 ; x < bmWidth ; x++ )
                {
                   if( dither.isBlack( x, y ) )
                      out |= mask ;
-                  
+
                   mask >>= 1 ;
                   if( 0 == mask )
                   {
@@ -560,8 +569,8 @@ printf( "toBits..." ); fflush( stdout );
 
                if( lastDot == startOfLine )
                {
-                  memcpy( startOfLine, skipLine, sizeof( skipLine )-1 );
-                  nextOut = startOfLine + sizeof( skipLine ) - 1 ;
+                  memcpy( startOfLine, skipLine, sizeof( skipLine ) );
+                  nextOut = startOfLine + sizeof( skipLine );
                } // blank line
                else
                {
@@ -637,160 +646,143 @@ static JSPropertySpec properties_[] = {
   {0,0,0}
 };
 
-static void printBitmap( starPoll_t &dev,
-                         JSContext  *cx, 
-                         JSObject   *bmpObj )
+static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 {
-   jsval     vPixMap ;
-   jsval     vWidth ;
-   jsval     vHeight ;
-   JSString *sPixMap ;
+	jsval     vPixMap ;
+	jsval     vWidth ;
+	jsval     vHeight ;
+	JSString *sPixMap ;
 
-   if( JS_GetProperty( cx, bmpObj, "pixBuf", &vPixMap )
-       &&
-       JSVAL_IS_STRING( vPixMap )
-       &&
-       ( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) )
-       &&
-       JS_GetProperty( cx, bmpObj, "width", &vWidth )
-       &&
-       JSVAL_IS_INT( vWidth )
-       &&
-       JS_GetProperty( cx, bmpObj, "height", &vHeight )
-       &&
-       JSVAL_IS_INT( vHeight ) )
+	if( JS_GetProperty( cx, bmpObj, "pixBuf", &vPixMap ) &&
+		JSVAL_IS_STRING( vPixMap ) &&
+		( 0 != ( sPixMap = JSVAL_TO_STRING( vPixMap ) ) ) &&
+		JS_GetProperty( cx, bmpObj, "width", &vWidth ) &&
+		JSVAL_IS_INT( vWidth ) &&
+		JS_GetProperty( cx, bmpObj, "height", &vHeight ) &&
+		JSVAL_IS_INT( vHeight ) )
    {
-      unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
-      unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
+		unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+		unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
 
-      char outBuf[4096];
-      char *nextOut = outBuf ;
-      memcpy( nextOut, initPrinter, sizeof( initPrinter )-1 );
-      nextOut += sizeof( initPrinter )-1 ;
+		char outBuf[4096];
+		char *nextOut = outBuf ;
+		memcpy( nextOut, initPrinter, sizeof( initPrinter )-1 );
+		nextOut += sizeof( initPrinter )-1 ;
 
-      memcpy( nextOut, initRaster, sizeof( initRaster )-1 );
-      nextOut += sizeof( initRaster )-1 ;
-      
-      int hSpecLen = sprintf( nextOut, "%s%d", setPageHeight, bmHeight ) + 1 ;
-      nextOut += hSpecLen ;
-      
-      memcpy( nextOut, letterQuality, sizeof( letterQuality )-1 );
-      nextOut += sizeof( letterQuality )-1 ;
+		memcpy( nextOut, initRaster, sizeof( initRaster )-1 );
+		nextOut += sizeof( initRaster )-1 ;
 
-// printf( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );   
+		memcpy( nextOut, reverseForTopMargin, sizeof( reverseForTopMargin ) );
+		nextOut += sizeof( reverseForTopMargin ) ;	//include terminating null
 
-      unsigned const bytesIn = (bmWidth+7)/8 ;
-      unsigned const inBytesPerRow = ((bmWidth+31)/32)*4 ;
-      unsigned const maxBytesPerRow = 3 + bytesIn ;
-      
-// printf( "BYTES %u x %u, %u\n", bytesIn, inBytesPerRow, maxBytesPerRow );   
-      //
-      // flush buffer to device when (if) we get to this point
-      //
-      char *const lastStartOfLine = outBuf+sizeof(outBuf)-maxBytesPerRow ;
-      JSString *const sPixMap = JSVAL_TO_STRING( vPixMap );
-      char const *nextIn = JS_GetStringBytes( sPixMap );
+			//avoid a bug in printer software where 3 ft ticket is printed if bmHeight is small
+		int hSpecLen = sprintf( nextOut, "%s%d", setPageHeight, (bmHeight >= 200)? bmHeight : 0 ) + 1 ;
+		nextOut += hSpecLen ;
 
-      //
-      // print data goes here.
-      // each output line is either:
-      //    skipLine
-      // or 
-      //    'b' m n bits...        where n * 256 + m is the number of bytes worth of bits
-      //
-      unsigned char const n = bytesIn/256 ;
-      unsigned char const m = bytesIn&255 ;
+		memcpy( nextOut, letterQuality, sizeof( letterQuality ) ); //include 0 terminator
+		nextOut += sizeof( letterQuality );
 
-      unsigned totalOut = 0 ;
+// printf( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );
+
+		unsigned const bytesIn = (bmWidth+7)/8 ;
+		unsigned const inBytesPerRow = ((bmWidth+31)/32)*4 ;
+		unsigned const maxBytesPerRow = 3 + bytesIn ;
+
+// printf( "BYTES %u x %u, %u\n", bytesIn, inBytesPerRow, maxBytesPerRow );
+		//
+		// flush buffer to device when (if) we get to this point
+		//
+		char *const lastStartOfLine = outBuf+sizeof(outBuf)-maxBytesPerRow -20;	//cushion for skip lines formfeed and exit raster
+
+		JSString *const sPixMap = JSVAL_TO_STRING( vPixMap );
+		char const *nextIn = JS_GetStringBytes( sPixMap );
+		char const *inEndOfData = nextIn + (inBytesPerRow* bmHeight);
+		//
+		// print data goes here.
+		// each output line is either:
+		//    skipLine
+		// or
+		//    'b' m n bits...        where n * 256 + m is the number of bytes worth of bits
+		//
+
+		unsigned totalOut = 0 ;
 /*
-      hexDumper_t dumpIn( nextIn, inBytesPerRow );
-      while( dumpIn.nextLine() )
-         printf( "%s\n", dumpIn.getLine() );
+		hexDumper_t dumpIn( nextIn, inBytesPerRow );
+		while( dumpIn.nextLine() )
+			printf( "%s\n", dumpIn.getLine() );
 */
 
-      unsigned const inPad = inBytesPerRow-bytesIn ;
-      char *prevSkip = 0 ;
+		unsigned const inPad = inBytesPerRow-bytesIn ;
+		while (nextIn < inEndOfData) {
+			int skipCnt=0;
+			const char * startIn = nextIn;
+			const char * inEndOfline = nextIn + bytesIn;
+			while (1) {
+				if (*nextIn++) {
+					nextIn--;
+					break;
+				} else if (nextIn >= inEndOfline) {
+					nextIn += inPad ;
+					startIn = nextIn;
+					inEndOfline = nextIn + bytesIn;
+					skipCnt++;
+					if (nextIn >= inEndOfData) break;
+				}
+			}
 
-      for( unsigned y = 0 ; y < bmHeight ; y++ )
-      {
-         char *const startOfLine = nextOut ;
-         *nextOut++ = 'b' ;
-         *nextOut++ = (char)m ;
-         *nextOut++ = (char)n ;
+			if (skipCnt) {
+				memcpy( nextOut, skipLine, sizeof( skipLine )-2 );
+				nextOut += sizeof( skipLine )-2 ;	//don't include the 1 or \x00
+				hSpecLen = sprintf( nextOut, "%d", skipCnt ) + 1 ;
+				nextOut += hSpecLen ;
+			}
+			if (nextIn >= inEndOfData) break;
+			int zeroBytes = nextIn - startIn;
 
-         // copy next line from input
-         char *lastSet = startOfLine ;
-         for( unsigned byte = 0 ; byte < bytesIn ; byte++ )
-         {
-            char const in = *nextIn++ ;
-            if( in )
-               lastSet = nextOut ;
-            *nextOut++ = in ;
-         }
+			const char* p = nextIn + (bytesIn - zeroBytes) -1;
+			while (p >= nextIn) {
+				if (*p) break;
+				p--;
+			}
+			int copyCnt = (p+1)- nextIn;
+			*nextOut++ = 'b' ;
+			*nextOut++ = (char)(zeroBytes+copyCnt);
+			*nextOut++ = (char)((zeroBytes+copyCnt)>>8) ;
 
-         nextIn += inPad ;
-         if( lastSet == startOfLine )
-         {
-            if( 0 == prevSkip )
-               prevSkip = startOfLine ;
+			if (zeroBytes) { memset( nextOut, 0, zeroBytes); nextOut += zeroBytes; }
+			memcpy( nextOut, nextIn, copyCnt);
+			nextOut += copyCnt;
+			nextIn += inBytesPerRow - zeroBytes;
+			if( nextOut >= lastStartOfLine ) {
+// printf( "print: %p..%p\n", outBuf, nextOut );
+				dev.print( cx, outBuf, nextOut-outBuf );
+				totalOut += nextOut-outBuf ;
+				nextOut = outBuf ;
+			}
+		}
 
-            nextOut = startOfLine ;
-            memcpy( nextOut, skipLine, sizeof( skipLine )-1 );
-            nextOut += sizeof( skipLine )-1 ;
-         }
-         else if( ++lastSet < nextOut )
-         {
-            if( prevSkip )
-            {
-               unsigned skipBytes  = (startOfLine - prevSkip);
-               unsigned numSkipped = skipBytes/(sizeof(skipLine)-1) ;
-               prevSkip = 0 ;
-            } // could optimize this
-            unsigned const lineBytes = lastSet - startOfLine - 3 ;
-            startOfLine[1] = (char)(lineBytes & 255);
-            startOfLine[2] = (char)(lineBytes / 256);
-            nextOut = lastSet + 1 ;
-         }
-//         memset( nextOut, '\x0', bytesIn );
-//         memset( nextOut, '\xff', bytesIn );
-/*
-         memcpy( nextOut, nextIn, bytesIn );
-         nextOut += bytesIn ;
-         nextIn  += inBytesPerRow ;
-*/
-         if( nextOut >= lastStartOfLine )
-         {
-// printf( "print: %p..%p\n", outBuf, nextOut );            
-            dev.print( cx, outBuf, nextOut-outBuf );
-            totalOut += nextOut-outBuf ;
-            nextOut = outBuf ;
-         }
-      }
+// printf( "done sending data to printer\n" );
 
-// printf( "done sending data to printer\n" );   
+		memcpy( nextOut, formFeed, sizeof( formFeed ) );	//include terminating null
+		nextOut += sizeof( formFeed );
 
-      memcpy( nextOut, formFeed, sizeof( formFeed )-1 );
-      nextOut += sizeof( formFeed )-1 ;
+		memcpy( nextOut, exitRaster, sizeof( exitRaster )-1 );
+		nextOut += sizeof( exitRaster )-1 ;
 
-      memcpy( nextOut, exitRaster, sizeof( exitRaster )-1 );
-      nextOut += sizeof( exitRaster )-1 ;
+		dev.print( cx, outBuf, nextOut-outBuf );
+		totalOut += nextOut-outBuf ;
 
-      dev.print( cx, outBuf, nextOut-outBuf );
-      totalOut += nextOut-outBuf ;
+		assert( nextOut <= outBuf+sizeof(outBuf) );
 
-      assert( nextOut <= outBuf+sizeof(outBuf) );
-
-printf( "%lu total bytes sent to printer\n", totalOut );
-// printf( "done sending to printer\n" );   
-   }
-   else
-      JS_ReportError( cx, "Invalid bitmap\n" );
+		printf( "%lu total bytes sent to printer\n", totalOut );
+//		printf( "done sending to printer\n" );
+	} else JS_ReportError( cx, "Invalid bitmap\n" );
 }
 
 static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   
+
    JSObject *rhObj ;
    JSString *sArg = 0 ;
    starPoll_t *const star = (starPoll_t *)JS_GetInstancePrivate( cx, obj, &jsStarUSBClass_, NULL );
@@ -880,44 +872,44 @@ static JSBool jsStarUSB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
       s = JS_NewStringCopyN( cx, initRaster, sizeof( initRaster )-1 );
-      JS_DefineProperty( cx, star, "initRaster", 
+      JS_DefineProperty( cx, star, "initRaster",
                          STRING_TO_JSVAL( s ),
                          0, 0, 
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      s = JS_NewStringCopyN( cx, formFeed, sizeof( formFeed )-1 );
-      JS_DefineProperty( cx, star, "formFeed", 
+      s = JS_NewStringCopyN( cx, formFeed, sizeof( formFeed ));
+      JS_DefineProperty( cx, star, "formFeed",
                          STRING_TO_JSVAL( s ),
                          0, 0, 
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
       s = JS_NewStringCopyN( cx, exitRaster, sizeof( exitRaster )-1 );
-      JS_DefineProperty( cx, star, "exitRaster", 
+      JS_DefineProperty( cx, star, "exitRaster",
                          STRING_TO_JSVAL( s ),
                          0, 0, 
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      s = JS_NewStringCopyN( cx, draftQuality, sizeof( draftQuality )-1 );
-      JS_DefineProperty( cx, star, "draftQuality", 
+      s = JS_NewStringCopyN( cx, draftQuality, sizeof( draftQuality ) );	//include 0 terminator
+      JS_DefineProperty( cx, star, "draftQuality",
                          STRING_TO_JSVAL( s ),
                          0, 0, 
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      s = JS_NewStringCopyN( cx, normalQuality, sizeof( normalQuality )-1 );
-      JS_DefineProperty( cx, star, "normalQuality", 
+      s = JS_NewStringCopyN( cx, normalQuality, sizeof( normalQuality ) );	//include 0 terminator
+      JS_DefineProperty( cx, star, "normalQuality",
                          STRING_TO_JSVAL( s ),
-                         0, 0, 
+                         0, 0,
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      s = JS_NewStringCopyN( cx, letterQuality, sizeof( letterQuality )-1 );
-      JS_DefineProperty( cx, star, "letterQuality", 
+      s = JS_NewStringCopyN( cx, letterQuality, sizeof( letterQuality ) );	//include 0 terminator
+      JS_DefineProperty( cx, star, "letterQuality",
                          STRING_TO_JSVAL( s ),
-                         0, 0, 
+                         0, 0,
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
@@ -925,7 +917,7 @@ static JSBool jsStarUSB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
    }
    else
       *rval = JSVAL_FALSE ;
-   
+
    return JS_TRUE;
 }
 
