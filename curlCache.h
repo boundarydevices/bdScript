@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.7 2002-10-31 02:08:55 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.8 2002-11-05 15:14:34 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.7  2002-10-31 02:08:55  ericn
+ * Revision 1.8  2002-11-05 15:14:34  ericn
+ * -oops, fixed param_t to use std::string
+ *
+ * Revision 1.7  2002/10/31 02:08:55  ericn
  * -added default constructor for curlRequest_t
  *
  * Revision 1.6  2002/10/24 13:18:22  ericn
@@ -102,11 +105,8 @@ public:
 
    struct param_t {
       bool        isFile_ ;
-      char const *name_ ;
-      union {
-         char const *stringValue_ ;
-         char const *fileValue_ ;
-      } value_ ;
+      std::string name_ ;
+      std::string value_ ;
    };
 
    //

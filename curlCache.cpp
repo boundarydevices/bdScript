@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.9  2002-10-31 02:09:11  ericn
+ * Revision 1.10  2002-11-05 15:14:38  ericn
+ * -oops, fixed param_t to use std::string
+ *
+ * Revision 1.9  2002/10/31 02:09:11  ericn
  * -added default constructor for curlRequest_t, modified to use get() instead of post when no params
  *
  * Revision 1.8  2002/10/25 04:51:20  ericn
@@ -342,9 +345,9 @@ void curlRequest_t :: addVariable
      char const *value )
 {
    param_t param ;
-   param.name_               = name ;
-   param.isFile_             = false ;
-   param.value_.stringValue_ = value ;
+   param.name_    = name ;
+   param.isFile_  = false ;
+   param.value_   = value ;
    parameters_.push_back( param );
 }
 
@@ -353,9 +356,9 @@ void curlRequest_t :: addFile
      char const   *path )
 {
    param_t param ;
-   param.name_             = name ;
-   param.isFile_           = true ;
-   param.value_.fileValue_ = path ;
+   param.name_    = name ;
+   param.isFile_  = true ;
+   param.value_   = path ;
    parameters_.push_back( param );
 }
 
@@ -487,14 +490,16 @@ bool curlCache_t :: startPost
                   curlRequest_t::param_t const &param = req.parameters_[i];
 
                   if( !param.isFile_ )
+                  {
                      curl_formadd( &postHead, &last, 
-                                   CURLFORM_PTRNAME, param.name_,
-                                   CURLFORM_PTRCONTENTS, param.value_.stringValue_,
+                                   CURLFORM_PTRNAME, param.name_.c_str(),
+                                   CURLFORM_PTRCONTENTS, param.value_.c_str(),
                                    CURLFORM_END );
+                  }
                   else
                      curl_formadd( &postHead, &last,
-                                   CURLFORM_PTRNAME, param.name_,
-                                   CURLFORM_FILE, param.value_.fileValue_,
+                                   CURLFORM_PTRNAME, param.name_.c_str(),
+                                   CURLFORM_FILE, param.value_.c_str(),
                                    CURLFORM_CONTENTTYPE, "application/octet-stream",
                                    CURLFORM_END );
                }
@@ -657,15 +662,15 @@ std::string curlCache_t :: getCachedName( curlRequest_t const &req )
    for( unsigned i = 0 ; i < req.parameters_.size(); i++ )
    {
       curlRequest_t::param_t const &param = req.parameters_[i];
-      adler = adler32( adler, (Bytef const *)param.name_, strlen( param.name_ ) );
+      adler = adler32( adler, (Bytef const *)param.name_.c_str(), param.name_.size() );
       if( !param.isFile_ )
       {
-         adler = adler32( adler, (Bytef const *)param.value_.stringValue_, strlen( param.value_.stringValue_ ) );
+         adler = adler32( adler, (Bytef const *)param.value_.c_str(), param.value_.size() );
       } // string value
       else
       {
          adler = ~adler ;
-         adler = adler32( adler, (Bytef const *)param.value_.fileValue_, strlen( param.value_.fileValue_ ) );
+         adler = adler32( adler, (Bytef const *)param.value_.c_str(), param.value_.size() );
       } // file
    }
    
