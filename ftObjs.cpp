@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.13  2004-08-01 18:01:22  ericn
+ * Revision 1.14  2004-10-28 21:31:22  tkisky
+ * -ClearBox function called
+ *
+ * Revision 1.13  2004/08/01 18:01:22  ericn
  * -fix alignment, table-driven (mostly)
  *
  * Revision 1.12  2004/07/28 14:26:59  ericn
@@ -515,7 +518,7 @@ FT_Matrix const * const matrices[] = {
       _m.yx = (FT_Fixed)( sin( _angle ) * 0x10000L );
       _m.yy = (FT_Fixed)( cos( _angle ) * 0x10000L );
       matrix = &_m ;
-*/      
+*/
 
 bool freeTypeToBitmapBox( freeTypeFont_t &font,
                           unsigned        pointSize,
@@ -535,23 +538,27 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
       return false ;
    debugPrint( "rect: x:%ld, y:%ld, w:%ld, h:%ld\n", x, y, w, h );
 
+//   printf("\r\n(");
+//	for (int i=0; i<strLen; i++) printf("%c",*(dataStr+i));
+//   printf(")x:%x,y:%x,w:%x,h:%x\r\n",x,y,w,h);
+
    //
    // Scale maximal bounding box from design (grid) units to pixels
    //
    // See http://freetype.sourceforge.net/freetype2/docs/glyphs/glyphs-2.html for details
    //
    long const pixelSize = ((long)pointSize * XRES+71) / 72 ; // should separate X/Y resolution
-   
+
    signed long emHeight = font.face_->bbox.yMax-font.face_->bbox.yMin ;
    signed long emWidth  = font.face_->bbox.xMax-font.face_->bbox.xMin ;
 
    signed long bboxHeight = ( emHeight * pixelSize + font.face_->units_per_EM - 1 ) / font.face_->units_per_EM ;
-   signed long ascendPixels = ( font.face_->ascender * pixelSize 
-                                + font.face_->units_per_EM - 1 ) 
+   signed long ascendPixels = ( font.face_->ascender * pixelSize
+                                + font.face_->units_per_EM - 1 )
                               / font.face_->units_per_EM ;
    signed long descendPixels = bboxHeight-ascendPixels ;
-   if( ( 0 != pointSize ) 
-       && 
+   if( ( 0 != pointSize )
+       &&
        ( font.face_->face_flags & FT_FACE_FLAG_SCALABLE ) )
    {
       FT_Set_Char_Size( font.face_, 0, pointSize*64, XRES, YRES );
@@ -576,7 +583,7 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    //
    // Need to measure the 'width', or dimension along the text flow direction
    //
-   // In order to keep this code table-driven based on angle, 
+   // In order to keep this code table-driven based on angle,
    // I'll define a handful of flags to use as indeces.
    //
    bool const isVertical = ( 0 != ( angle % 180 ) );
@@ -601,13 +608,13 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
       FT_Error error = FT_Load_Char( font.face_, c, FT_LOAD_RENDER|FT_LOAD_TARGET_MONO );
       if ( error )
          continue;                 /* ignore errors */
-      
-      glyphs[i] = (FT_GlyphSlot)obstack_copy( &glyphStack, 
+
+      glyphs[i] = (FT_GlyphSlot)obstack_copy( &glyphStack,
                                               slot,
                                               sizeof(*slot) );
       glyphs[i]->bitmap.buffer = (unsigned char *)
-                                 obstack_copy( &glyphStack, 
-                                               slot->bitmap.buffer, 
+                                 obstack_copy( &glyphStack,
+                                               slot->bitmap.buffer,
                                                slot->bitmap.rows * slot->bitmap.pitch );
       if( ( 0 < slot->bitmap.rows ) && ( 0 < slot->bitmap.width ) )
       {
@@ -633,30 +640,30 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    debugPrint( "textActual: %lu\n", textActual );
 
    //
-   // Okay, here we want to determine where to 
+   // Okay, here we want to determine where to
    // put the 'pen' before rendering into bitmap space.
    //
    //    Input variables are:
    //       x, y, w, h, textActual
    //       alignment(text direction)
    //
-   // This is done in two steps. The first step will 
-   // adjust one based on the bounding box size in the 
+   // This is done in two steps. The first step will
+   // adjust one based on the bounding box size in the
    // direction perpendicular to the text direction.
    //
    // The equation for this is
-   //    
+   //
    //    pos = targetPos
-   //        + (targetDimension-bboxHeight)/2 
+   //        + (targetDimension-bboxHeight)/2
    //        + mult1*ascender
    //        + mult2*descender
-   //       
+   //
    //
    FT_Pos * const positions[] = {
       &pen.x,
       &pen.y
    };
-   
+
    unsigned * const targets[] = {
       &x,
       &y
@@ -684,17 +691,17 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    int const dm = descendMult[angleIdx];
 
    debugPrint( "ascender: %ld\n"
-               "descender: %ld\n", 
+               "descender: %ld\n",
                ascendPixels,
                descendPixels );
 
-   // since the target box is always right and down, 
+   // since the target box is always right and down,
    // the offset is always added to the target dimension
-   FT_Pos pos = (signed long)*targets[perp] 
+   FT_Pos pos = (signed long)*targets[perp]
                 + (((signed long)*tdimensions[perp])-bboxHeight)/2
-                + am*ascendPixels 
+                + am*ascendPixels
                 + dm*descendPixels ;
-   
+
    // done. store it
    *positions[perp] = pos ;
 
@@ -704,19 +711,19 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    //
    // The general equation is:
    //
-   //    pos = targetPos 
+   //    pos = targetPos
    //        + mult1*boxDimension
-   //        + mult2*(boxDimension-textDimension)/factor 
+   //        + mult2*(boxDimension-textDimension)/factor
    //        - startOffs ;
    //
    // mult1 is a function of the input angle, and is either 1 or zero
    // to determine whether the left-aligned pen should be at the start
    // or end of the box. Since the input x/y defines the lowest value,
    // this is always an addition.
-   // 
-   // mult2 is a function of the alignment, and is used to determine 
-   // whether we should add or subtract the difference between the 
-   // box size and the actual text size. 
+   //
+   // mult2 is a function of the alignment, and is used to determine
+   // whether we should add or subtract the difference between the
+   // box size and the actual text size.
    //
    // factor is either 1 or 2 depending on whether we're centered or not, and
    //
@@ -753,7 +760,7 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    signed long const mult2 = diffMultipliers[3*angleIdx+(alignment&3)];
 
    bool const isCentered = ( 0 != ( alignment & ftCenterHorizontal ) );
-   
+
    signed long const factors[] = { // indexed by isCentered
       1L,
       2L
@@ -763,13 +770,13 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    pos += mult2*(textDim-textActual)/factors[isCentered];
 
    signed long *startOffsets[] = { // indexed by angleIdx
-      &textMin,        //   0 degrees, increasing X 
-      &textMax,        //  90 degrees, decreasing Y 
-      &textMax,        // 180 degrees, decreasing X 
-      &textMin         // 270 degrees, increasing Y 
+      &textMin,        //   0 degrees, increasing X
+      &textMax,        //  90 degrees, decreasing Y
+      &textMax,        // 180 degrees, decreasing X
+      &textMin         // 270 degrees, increasing Y
    };
    pos -= *startOffsets[angleIdx];
-   
+
    // done. store it
    *positions[textFlow] = pos ;
 
@@ -779,6 +786,7 @@ debugPrint( "pen.x: %ld, pen.y: %ld\n", pen.x, pen.y );
    unsigned const bottomY = y + h ;
    unsigned const right = x + w ;
    bool clipped = false ;
+   bitmap_t::ClearBox(bmp,x,y,w,h,bmpStride );
    for( unsigned i = 0 ; i < strLen ; i++ )
    {
       char const c = *sText++ ;
@@ -788,7 +796,7 @@ debugPrint( "pen.x: %ld, pen.y: %ld\n", pen.x, pen.y );
          if( ( 0 < slot->bitmap.rows ) && ( 0 < slot->bitmap.width ) )
          {
             long nextY = pen.y - slot->bitmap_top ;
-            long penX  = slot->bitmap_left + pen.x ; 
+            long penX  = slot->bitmap_left + pen.x ;
 debugPrint( "char %c, x:%ld, y:%ld, top %ld, left %ld\n", c, penX, nextY, slot->bitmap_top, slot->bitmap_left );
             // convert to pixel positions
             // convert Y in direction as well
@@ -808,13 +816,13 @@ clipped = true ;
             if( penX + inPix > right )
             {
 debugPrint( "rclip: x:%u, w:%u, r:%u, left:%ld\n", penX, inPix, right, slot->bitmap_left );
-               inPix -= penX + inPix - right - 1 ;
+               inPix =  right - penX + 1;
 clipped = true ;
             }
             unsigned char *nextOut = bmp + ( nextY * bmpStride );
             for( unsigned row = 0 ; ( row < slot->bitmap.rows ) ; row++, nextY++ )
             {
-               if( ( nextY >= y ) && ( nextY < bottomY ) 
+               if( ( nextY >= y ) && ( nextY < bottomY )
                    &&
                    ( 0 < inPix ) )
                {
