@@ -5,7 +5,7 @@
 #include "ScaleHortObj.h"
 #include "ScaleVertObj.h"
 #include "ScaleUpObj.h"
-extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
+#include "mathLib.h"
 
 //upcode		! is starting point for edges
 //1		1 -> 1  !next

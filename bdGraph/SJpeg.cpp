@@ -1,7 +1,7 @@
 #include "ICommon.h"
 #include "SImageDataJpeg.h"
 #include "SJpeg.h"
-extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
+#include "mathLib.h"
 
 #include "coefficients.h"
 #undef ZeroMemory

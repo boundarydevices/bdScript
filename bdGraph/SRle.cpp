@@ -1,9 +1,7 @@
 #include "ICommon.h"
 #include "SRle.h"
 #include "SImageDataRLE.h"
-
-extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
-extern "C" unsigned long uShiftRight(ULONGLONG* m_nextBitsBuffer,int shift);
+#include "mathLib.h"
 
 //#undef ZeroMemory
 //#define ZeroMemory(dest,count)  ZeroMem(count,dest)

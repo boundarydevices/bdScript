@@ -1,7 +1,6 @@
 #include "ICommon.h"
 #include "SImagePosition.h"
-extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
-
+#include "mathLib.h"
 
 SImagePosition::SImagePosition(ImageData* imageData) : m_cRef(1)
 {
