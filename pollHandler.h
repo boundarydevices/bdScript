@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.4 2003-11-28 14:08:34 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.5 2003-12-28 20:54:35 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.4  2003-11-28 14:08:34  ericn
+ * Revision 1.5  2003-12-28 20:54:35  ericn
+ * -prevent copies
+ *
+ * Revision 1.4  2003/11/28 14:08:34  ericn
  * -added getter method isDeleted()
  *
  * Revision 1.3  2003/11/24 19:42:05  ericn
@@ -58,6 +61,8 @@ protected:
    int               fd_ ;
    pollHandlerSet_t &parent_ ;
    short             mask_ ;
+private:
+   pollHandler_t( pollHandler_t const & ); // no copies
 };
 
 
@@ -92,6 +97,8 @@ protected:
    pollHandler_t    *handlers_[maxHandlers_];
    pollfd            fds_[maxHandlers_];
    bool              deleted_[maxHandlers_];
+private:
+   pollHandlerSet_t( pollHandlerSet_t const & ); // no copies
 };
 
 #endif
