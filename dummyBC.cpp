@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dummyBC.cpp,v $
- * Revision 1.4  2003-07-04 02:42:04  ericn
+ * Revision 1.5  2003-07-04 04:26:18  ericn
+ * -no, really. Host IP, then port
+ *
+ * Revision 1.4  2003/07/04 02:42:04  ericn
  * -added support for hostIP (for compatibility)
  *
  * Revision 1.3  2003/03/19 21:59:07  ericn
@@ -172,7 +175,7 @@ static void process( int fd )
 
 int main( int argc, char const *const argv[] )
 {
-   if( 2 == argc )
+   if( 3 == argc )
    {
       int tcpFd = socket( AF_INET, SOCK_STREAM, 0 );
       if( 0 <= tcpFd )
@@ -183,7 +186,7 @@ int main( int argc, char const *const argv[] )
    
          myAddress.sin_family      = AF_INET;
          myAddress.sin_addr.s_addr = 0 ; // local
-         myAddress.sin_port        = htons( (unsigned short)strtoul( argv[1], 0, 0 ) );
+         myAddress.sin_port        = htons( (unsigned short)strtoul( argv[2], 0, 0 ) );
    
          if( 0 == bind( tcpFd, (struct sockaddr *) &myAddress, sizeof( myAddress ) ) )
          {
@@ -214,7 +217,7 @@ int main( int argc, char const *const argv[] )
             }
          }
          else
-            fprintf( stderr, ":bind %s:%m\n", argv[1] );
+            fprintf( stderr, ":bind %s:%m\n", argv[2] );
       }
       else
          fprintf( stderr, ":socket:%m\n" );
