@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: dither.cpp,v $
- * Revision 1.1  2004-03-17 04:56:19  ericn
+ * Revision 1.2  2004-05-08 19:21:02  ericn
+ * -fixed rounding, tried to speed it up
+ *
+ * Revision 1.1  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  *
@@ -31,12 +34,45 @@ static unsigned char const rightDither = 7 ;
 #define MAX( _first, _second ) ( ((_first) > (_second))?(_first):(_second) )
 #define MIN( _first, _second ) ( ((_first) < (_second))?(_first):(_second) )
 
-static int luminance( int const colors[3] )
+static int luminance( int red, int green, int blue )
 {
-   int max = MAX( colors[0], MAX( colors[1], colors[2] ) );
-   int min = MIN( colors[0], MIN( colors[1], colors[2] ) );
+   // 
+   // I've seen a couple of different algorithms here:
+   // (max+min)/2
+/*
+
+   int max = MAX( red, MAX( green, blue ) );
+   int min = MIN( red, MIN( green, blue ) );
    return (max+min)/2 ;
+*/
+
+   // A more mathematically-correct version
+// return (int)(c.R*0.3 + c.G*0.59+ c.B*0.11);
+
+   // Just return 'green'
+   // return green;
+
+   // and one that uses shifts and adds to come close to the above
+   //
+   //    red   = 5/16= 0.3125    == 1/4 + 1/16
+   //    green = 9/16= 0.5625    == 1/2 + 1/16
+   //    blue  = 1/8 = 0.125
+   //
+   if( 0 < red )
+      red = red>>2 + red>>4 ;
+   else
+      red = 0 ;
+   if( 0 < green )
+      green = green>>1 + green>>4 ;
+   else
+      green = 0 ;
+   if( 0 < blue )
+      blue = blue >> 3 ;
+   else
+      blue = 0 ;
+   return red+green+blue ;
 }
+
 
 #define REDERROR(x)    ((x)*3)
 #define GREENERROR(x)  (((x)*3)+1)
@@ -82,18 +118,30 @@ dither_t :: dither_t
 
       int * const useDown   = downErrors[ y & 1];
       int * const buildDown = downErrors[ (~y) & 1 ];
+//      memset( buildDown, 0, downErrorMax * sizeof( downErrors[1][0] ) );
 
-      for( int x = 0 ; x < width ; x++, bitOffset++ )
+      int errPos ;
+      for( int x = 0, errPos = 0 ; x < width ; x++, bitOffset++, errPos += 3 )
       {
          unsigned short inPix = rgb16[y*width+x];
-         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
+
+         int const blue = ( (inPix & 0x1f) << 3 );
+         inPix >>= 5 ;
+         int const green = ( (inPix & (0x3f<<5)) >> (5-2) );
+         inPix >>= 6 ;
+         int const red = ( inPix << 3 );
+
+         int colors[3] = { red, green, blue };
+/* 200 ms in this line */
+//         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
+
+/* 300 ms in this loop */
          for( unsigned c = 0 ; c < 3 ; c++ )
-         {
-            colors[c] += useDown[(x*3)+c] + rightErrors[c];
-         }
+            colors[c] += useDown[errPos+c] + rightErrors[c];
 
-         int const l = luminance( colors );
-
+/* 100 ms in luminance */
+//         int const l = luminance( colors[0], colors[1], colors[2] );
+         int const l = colors[1];
          int actual[3];
          int actualRed, actualGreen, actualBlue ;
          unsigned char const mask = ( 1 << (bitOffset&7) );
@@ -102,7 +150,9 @@ dither_t :: dither_t
          if( l > 0x80 )
          {
             outBits[outByte] |= mask ;
-            actual[0] = actual[1] = actual[2] = 0xFF ;
+            actual[0] = 0xF8 ;
+            actual[1] = 0xFC ;
+            actual[2] = 0xF8 ;
          } // output white
          else
          {
@@ -110,10 +160,12 @@ dither_t :: dither_t
             actual[0] = actual[1] = actual[2] = 0 ;
          } // output black
 
+/* 300 ms below */
+
          //
          // now calculate and store errors
          //
-         int buildStart = 3*x ;
+         int buildStart = errPos ;
          for( unsigned c = 0 ; c < 3 ; c++ )
          {
             int const diff = colors[c] - actual[c];
@@ -122,8 +174,13 @@ dither_t :: dither_t
             rightErrors[c] = 7*sixteenths ;
 
             if( 0 < x )
-               buildDown[buildStart-3+c] = 3*sixteenths ;
-            buildDown[buildStart+c] = 5*sixteenths ;
+            {
+               buildDown[buildStart-3+c] += 3*sixteenths ;
+               buildDown[buildStart+c] += 5*sixteenths ;
+            }
+            else
+               buildDown[buildStart+c] = 5*sixteenths ;
+
             if( x < width - 1 )
                buildDown[buildStart+3+c] = sixteenths ;
          }
