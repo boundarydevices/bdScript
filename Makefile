@@ -140,7 +140,8 @@ ifneq (,$(findstring arm, $(CC)))
           -I$(INSTALL_ROOT)/include/mad \
           -I$(INSTALL_ROOT)/include/nspr \
           -I$(INSTALL_ROOT)/include/freetype2 \
-          -I$(INSTALL_ROOT)/include/libavcodec
+          -I$(INSTALL_ROOT)/include/libavcodec \
+          -I$(TOOLCHAINROOT)/include
    LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
 #   CC=g++
