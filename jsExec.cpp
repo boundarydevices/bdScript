@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.6  2002-11-05 15:13:46  ericn
+ * Revision 1.7  2002-11-07 02:13:05  ericn
+ * -added audioQueue calls
+ *
+ * Revision 1.6  2002/11/05 15:13:46  ericn
  * -added MP3 support (headers anyway)
  *
  * Revision 1.5  2002/11/03 15:38:20  ericn
@@ -55,6 +58,7 @@
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
 #include "jsMP3.h"
+#include "audioQueue.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -215,6 +219,11 @@ int main(int argc, char **argv)
                      
                      startCurlThreads();
 
+                     //
+                     // start up audio output 
+                     //
+                     audioQueue_t &audioOut = getAudioQueue(); 
+
                      curlCache_t &cache = getCurlCache();
                      curlFile_t f( cache.get( argv[1], false ) );
                      if( f.isOpen() )
@@ -276,6 +285,9 @@ int main(int argc, char **argv)
                         fprintf( stderr, "Error opening url %s\n", argv[1] );
 
                      stopCurlThreads();
+
+                     audioQueue_t::shutdown();
+
                      if( tsThread )
                         delete tsThread ;
                   }
