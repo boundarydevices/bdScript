@@ -1,8 +1,10 @@
 # 
 # Makefile for curlCache library and utility programs
 # 
-OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o dirByATime.o fbDev.o hexDump.o \
-       jsCurl.o jsHyperlink.o jsImage.o jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsURL.o \
+OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o curlThread.o \
+       dirByATime.o fbDev.o hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
+       jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o jsMP3.o jsProc.o \
+       jsScreen.o jsText.o jsTimer.o jsURL.o \
        memFile.o relativeURL.o ultoa.o urlFile.o 
 LIB = curlCacheLib.a
 
@@ -58,11 +60,13 @@ testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
 testJS: testJS.o $(LIB)
-	$(CC) -o testJS testJS.o $(LIB) $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lm -lz
+	$(CC) -o testJS testJS.o $(LIB) $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	$(STRIP) testJS
 
 testEvents: testEvents.o $(LIB)
 	$(CC) -o testEvents testEvents.o $(LIB) $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	arm-linux-nm testEvents >testEvents.map
+	$(STRIP) testEvents
 
 all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play
 
