@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.4  2002-09-29 17:35:55  ericn
+ * Revision 1.5  2002-10-13 15:52:07  ericn
+ * -added ref to image module
+ *
+ * Revision 1.4  2002/09/29 17:35:55  ericn
  * -added curlFile class
  *
  * Revision 1.3  2002/09/28 17:05:07  ericn
@@ -33,7 +36,8 @@
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
 #include "jsCurl.h"
-#include "urlFile.h"
+#include "jsImage.h"
+#include "curlCache.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -85,12 +89,14 @@ UrlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     uintN i ;
     
+    curlCache_t &cache = getCurlCache();
+
     for (i = 0; i < argc; i++) {
         JSString *str = JS_ValueToString(cx, argv[i]);
         if( str )
         {
            char const *cURL = JS_GetStringBytes( str );
-           urlFile_t f( cURL );
+           curlFile_t f( cache.get( cURL, false ) );
            if( f.isOpen() )
            {
                JSScript *script= JS_CompileScript( cx, JS_GetGlobalObject( cx ), (char const *)f.getData(), f.getSize(), cURL, 1 );
@@ -168,13 +174,16 @@ int main(int argc, char **argv)
             if( JS_DefineFunctions( cx, glob, shell_functions2) )
             {
                initJSCurl( cx, glob );
-               printf( "initialized jsCurl\n" );
+               initJSImage( cx, glob );
+               printf( "initialized jsCurl and jsImage\n" );
+
+               curlCache_t &cache = getCurlCache();
 
                for( int arg = 1 ; arg < argc ; arg++ )
                {
                   char const *url = argv[arg];
                   printf( "evaluating %s\n", url );
-                  urlFile_t f( url );
+                  curlFile_t f( cache.get( url, false ) );
                   if( f.isOpen() )
                   {
                      printf( "opened url\n" );

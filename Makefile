@@ -37,8 +37,8 @@ urlTest: urlTest.o curlCache.o dirByATime.o
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
+testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o Makefile
+	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
 
 ifneq (,$(findstring arm, $(CC)))
    all: curlCache curlGet dirTest urlTest testJS
