@@ -698,6 +698,7 @@ void main( int argc, char const * const argv[] )
                         bool skippedP = false ;
                         outQueue.ptsNumerator_   = ic_ptr->pts_num ;
                         outQueue.ptsDenominator_ = ic_ptr->pts_den ;
+                        INT64 ptsAdjustFrame = 0 ;
 
                         while( 1 )
                         {
@@ -811,7 +812,7 @@ void main( int argc, char const * const argv[] )
                                  if( flags & ( 1<<CODEC_TYPE_VIDEO ) )
                                  {
                                     mpeg2_buffer( mpeg2dec, pkt.data, pkt.data + pkt.size );
-         
+
                                     do {
                                        ++numParse ;
                                        mpState = mpeg2_parse( mpeg2dec );
@@ -826,6 +827,13 @@ void main( int argc, char const * const argv[] )
                                                 mpeg2_convert( mpeg2dec, convert_rgb16, NULL );
 //                                                mpeg2_convert( mpeg2dec, null_convert, NULL );
                                  		mpeg2_custom_fbuf (mpeg2dec, 0);
+                                                INT64 period = info->sequence->frame_period ;
+printf( "video frame period == %llu\n", period );
+if( 0 != period )
+   ptsAdjustFrame = outQueue.ptsDenominator_ / ((27000000/period) * outQueue.ptsNumerator_);
+printf( "num %lld/denom %lld\n", outQueue.ptsNumerator_, outQueue.ptsDenominator_ );
+printf( "frame adjust = %llu\n", ptsAdjustFrame );
+
                                              }
                                              else
                                              {
@@ -861,7 +869,7 @@ void main( int argc, char const * const argv[] )
                                              break;
                                           }
                                           case STATE_SLICE:
-                                          case STATE_END:
+//                                          case STATE_END:
                                           {
                                              ++numDraw ;
                                              if (info->display_fbuf) 
@@ -882,8 +890,21 @@ void main( int argc, char const * const argv[] )
                                                          mpgData   += outQueue.mpgStride_ ;
                                                          frameData += outQueue.imgStride_ ;
                                                       }
+/*
+printf( "vPTS %lld\n", pkt.pts );
+if( info->current_picture->flags & PIC_FLAG_PTS )
+   printf( "%ld", info->current_picture->pts );
+else
+   printf( "<empty>" );
+printf( ", %ld, packet %ld, duration %d\n", info->current_picture->temporal_reference, numVideo, pkt.duration );
+printf( "stream pts %lld: %lld/%lld\n", 
+        ic_ptr->streams[pkt.stream_index]->pts.val,
+        ic_ptr->streams[pkt.stream_index]->pts.num,
+        ic_ptr->streams[pkt.stream_index]->pts.den );
+*/        
                                                       vFrame->when_ = pkt.pts ;
                                                       outQueue.postVideoFrame();
+                                                      pkt.pts += ptsAdjustFrame ;
                                                    }
                                                 }
                                                 else
@@ -895,6 +916,7 @@ void main( int argc, char const * const argv[] )
                                           }
                                        }
                                     } while( -1 != mpState );
+
                                  }
                               }
                            }
