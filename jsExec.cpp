@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.33  2003-03-04 14:45:18  ericn
+ * Revision 1.34  2003-03-12 02:56:56  ericn
+ * -added module jsTransitions
+ *
+ * Revision 1.33  2003/03/04 14:45:18  ericn
  * -added jsFileIO module
  *
  * Revision 1.32  2003/02/27 03:51:09  ericn
@@ -128,6 +131,7 @@
 #include "jsTimer.h"
 #include "jsCurl.h"
 #include "jsImage.h"
+#include "jsTransitions.h"
 #include "jsGlobals.h"
 #include "jsScreen.h"
 #include "jsText.h"
@@ -269,6 +273,7 @@ int prMain(int argc, char **argv)
                      initializeCodeQueue( cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
+                     initJSTransitions( cx, glob );
                      initJSMP3( cx, glob );
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
