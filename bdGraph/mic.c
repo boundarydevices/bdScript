@@ -417,7 +417,7 @@ int WriteWavFile(short* pSamples,int samples)
 	return 0;
 }
 
-static inline void testSqRoot()
+static inline void testSqRoot( void )
 {
 	npd temp;
 	np a;
