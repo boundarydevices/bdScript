@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.3  2002-11-02 04:11:43  ericn
+ * Revision 1.4  2002-11-02 18:38:02  ericn
+ * -added font.render()
+ *
+ * Revision 1.3  2002/11/02 04:11:43  ericn
  * -added font class
  *
  * Revision 1.2  2002/10/20 16:31:06  ericn
@@ -24,8 +27,7 @@
 
 
 #include "jsText.h"
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include "ftObjs.h"
 #include <stdio.h>
 #include "fbDev.h"
 #include <ctype.h>
@@ -33,6 +35,7 @@
 #include "js/jscntxt.h"
 #include "jsGlobals.h"
 #include "curlThread.h"
+#include "jsAlphaMap.h"
 
 /*
 static FT_Library library ;
@@ -398,33 +401,8 @@ static char const * const faceFlagNames_[] = {
 static unsigned const numFaceFlags_ = sizeof( faceFlagNames_ )/sizeof( faceFlagNames_[0] );
 
 static JSBool
-jsDumpFont( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   if( ( 1 == argc ) && ( JSTYPE_STRING == JS_TypeOfValue( cx, argv[0] ) ) )
-   {
-      printf( "params check out\n" );
-      
-      *rval = JSVAL_FALSE ;
-      return JS_TRUE ;
-   
-   } // have required # of params
-   else
-      printf( "Invalid parameter count\n" );
-
-   return JS_FALSE ;
-}
-
-static JSBool
 jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   FT_Library library ;
-   int error = FT_Init_FreeType( &library );
-   if( 0 != error )
-   {
-      JS_ReportError( cx, "Error %d initializing freeType library\n", error );
-      exit( 3 );
-   }
-
    jsval     dataVal ;
    JSString *fontString ; 
 
@@ -432,17 +410,15 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        &&
        JSVAL_IS_STRING( dataVal )
        &&
-       ( 0 != ( fontString = JS_ValueToString( cx, dataVal ) ) ) )
+       ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
    {
-      FT_Face face;      /* handle to face object */
-
-      error = FT_New_Memory_Face( library, 
-                                  (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
-                                  JS_GetStringLength(fontString),    /* size in bytes        */
-                                  0,                          /* face_index           */
-                                  &face );
-      if( 0 == error )
+      freeTypeLibrary_t library ;
+      freeTypeFont_t    font( library, 
+                              JS_GetStringBytes( fontString ),
+                              JS_GetStringLength( fontString ) );
+      if( font.worked() )
       {
+         FT_Face face = font.face_ ;
          printf( "num_faces   %ld\n", face->num_faces );
          printf( "face_index    %ld\n", face->face_index );
 
@@ -504,6 +480,8 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             printf( "   platform 0x%02x\n", charmap->platform_id );
             printf( "   encodeId 0x%02x\n", charmap->encoding_id );
          
+            unsigned long numCharCodes = 0 ;
+
 #define BADCHARCODE 0xFFFFaaaa
             
             FT_ULong  startCharCode = BADCHARCODE ;
@@ -517,7 +495,7 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                {
                   if( BADCHARCODE != prevCharCode )
                   {
-                     printf( "   -> charcodes %lu->%lu\n", startCharCode, prevCharCode );
+                     numCharCodes += ( prevCharCode-startCharCode ) + 1 ;
                   }
                   startCharCode = prevCharCode = charcode ;
                }
@@ -527,9 +505,9 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             }                                                                
             
             if( BADCHARCODE != prevCharCode )
-            {
-               printf( "   -> charcodes %lu->%lu\n", startCharCode, prevCharCode );
-            }
+               numCharCodes += ( prevCharCode-startCharCode ) + 1 ;
+
+            printf( "   -> %lu charcodes\n", numCharCodes );
          }
          
          for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
@@ -539,18 +517,9 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             printf( "   height %d\n", bms->height );
             printf( "   width  %d\n", bms->width );
          }
-   
-         FT_Done_Face( face );
       }
       else
-         JS_ReportError( cx, "Error %d loading face\n", error );
-      
-      error = FT_Done_FreeType( library );
-      if( 0 != error )
-      {
-         JS_ReportError( cx, "Error %d freeing freeType library\n", error );
-         exit( 3 );
-      }
+         JS_ReportError( cx, "Error parsing font\n" );
    }
    else
       JS_ReportError( cx, "Error reading font data property" );
@@ -559,16 +528,196 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static JSBool
-jsFontNumFaces( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+static bool addRange( JSContext *cx, 
+                      JSObject  *arrObj, 
+                      FT_ULong  rangeStart,
+                      FT_ULong  rangeEnd )
 {
-   *rval = JSVAL_TRUE ;
+   jsuint numRanges ;
+   if( JS_GetArrayLength(cx, arrObj, &numRanges ) )
+   {
+      jsval range[2];
+      range[0] = INT_TO_JSVAL( rangeStart );
+      range[1] = INT_TO_JSVAL( rangeEnd );
+   
+      if( JS_SetArrayLength( cx, arrObj, numRanges+1 ) )
+      {
+         JSObject *rangeObj = JS_NewArrayObject( cx, 2, range );
+         if( rangeObj )
+         {
+            if( JS_DefineElement( cx, arrObj, numRanges, 
+                                  OBJECT_TO_JSVAL( rangeObj ),
+                                  0, 0, 
+                                  JSPROP_ENUMERATE
+                                 |JSPROP_PERMANENT
+                                 |JSPROP_READONLY ) )
+            {
+               return true ;
+            }
+            else
+               JS_ReportError( cx, "Error adding array element" );
+         }
+         else
+            JS_ReportError( cx, "Error allocating new range" );
+      }
+      else
+         JS_ReportError( cx, "Error changing array length" );
+   }
+
+   return false ;
+
+}
+
+static JSBool
+jsFontCharCodes( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   
+   jsval     dataVal ;
+   JSString *fontString ; 
+
+   if( JS_GetProperty( cx, obj, "data", &dataVal )
+       &&
+       JSVAL_IS_STRING( dataVal )
+       &&
+       ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
+   {
+      freeTypeLibrary_t library ;
+      freeTypeFont_t    font( library, 
+                              JS_GetStringBytes( fontString ),
+                              JS_GetStringLength( fontString ) );
+      if( font.worked() )
+      {
+         JSObject *arrObj = JS_NewArrayObject( cx, 0, 0 );
+         if( arrObj )
+         {
+            *rval = OBJECT_TO_JSVAL( arrObj );
+
+            FT_ULong  startCharCode = BADCHARCODE ;
+            FT_ULong  prevCharCode = BADCHARCODE ;
+   
+            FT_UInt   gindex;                                                
+            FT_ULong  charcode = FT_Get_First_Char( font.face_, &gindex );
+            while( gindex != 0 )                                            
+            {                                                                
+               if( charcode != prevCharCode + 1 )
+               {
+                  if( BADCHARCODE != prevCharCode )
+                  {
+                     if( !addRange( cx, arrObj, startCharCode, prevCharCode ) )
+                        break;
+                  }
+                  startCharCode = prevCharCode = charcode ;
+               }
+               else
+                  prevCharCode = charcode ;
+               
+               charcode = FT_Get_Next_Char( font.face_, charcode, &gindex );        
+            }                                                                
+            
+            if( BADCHARCODE != prevCharCode )
+               addRange( cx, arrObj, startCharCode, prevCharCode );
+         }
+         else
+            JS_ReportError( cx, "Error allocating array" );
+      }
+      else
+         JS_ReportError( cx, "Error parsing font\n" );
+   }
+   else
+      JS_ReportError( cx, "Error reading font data property" );
+   
+   return JS_TRUE ;
+}
+
+static JSBool
+jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_STRING( argv[1] ) )
+   {
+      jsval     dataVal ;
+      JSString *fontString ; 
+   
+      if( JS_GetProperty( cx, obj, "data", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal )
+          &&
+          ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
+      {
+         freeTypeLibrary_t library ;
+         freeTypeFont_t    font( library, 
+                                 JS_GetStringBytes( fontString ),
+                                 JS_GetStringLength( fontString ) );
+         if( font.worked() )
+         {
+            unsigned  pointSize = JSVAL_TO_INT( argv[0] );
+            JSString *sParam = JSVAL_TO_STRING( argv[1] );
+            
+            char const *renderString = JS_GetStringBytes( sParam );
+            unsigned const renderLen = JS_GetStringLength( sParam );
+   
+            freeTypeString_t ftString( font, pointSize, renderString, renderLen );
+            
+            JSObject *returnObj = JS_NewObject( cx, &jsAlphaMapClass_, 0, 0 );
+            if( returnObj )
+            {
+               *rval = OBJECT_TO_JSVAL( returnObj );
+               JSString *sAlphaMap = JS_NewStringCopyN( cx, (char const *)ftString.getRow(0), ftString.getDataLength() );
+               if( sAlphaMap )
+               {
+                  if( JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
+                     printf( "added pixBuf property\n" );
+                  else
+                     printf( "Error adding pixBuf property\n" );
+               }
+               else
+                  JS_ReportError( cx, "Error building alpha map string" );
+   
+               if( JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(ftString.getWidth()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
+                  printf( "added width property\n" );
+               else
+                  printf( "error adding width property\n" );
+   
+               if( JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(ftString.getHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
+                  printf( "added height property\n" );
+               else
+                  printf( "error adding height property\n" );
+   
+               if( JS_DefineProperty( cx, returnObj, "baseline", INT_TO_JSVAL(ftString.getBaseline()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
+                  printf( "added baseline property\n" );
+               else
+                  printf( "error adding baseline property\n" );
+   
+               if( JS_DefineProperty( cx, returnObj, "yAdvance", INT_TO_JSVAL(ftString.getFontHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
+                  printf( "added yAdvance property\n" );
+               else
+                  printf( "error adding yAdvance property\n" );
+            }
+            else
+               JS_ReportError( cx, "Error allocating array" );
+         }
+         else
+            JS_ReportError( cx, "Error parsing font\n" );
+      }
+      else
+         JS_ReportError( cx, "Error reading font data property" );
+   }
+   else
+      JS_ReportError( cx, "Usage: font.render( pointSize, 'string' );" );
+   
    return JS_TRUE ;
 }
 
 static JSFunctionSpec fontMethods[] = {
     {"dump",       jsFontDump,              0 },
-    {"numFaces",   jsFontNumFaces,          0 },
+    {"charCodes",  jsFontCharCodes,         0 },
+    {"render",     jsFontRender,            0 },
     {0}
 };
 
@@ -595,62 +744,49 @@ static JSPropertySpec fontProperties_[] = {
 
 static void fontOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
 {
-   FT_Library library ;
-   int error = FT_Init_FreeType( &library );
-   if( 0 == error )
+   freeTypeLibrary_t library ;
+   std::string sError ;
+   freeTypeFont_t font( library, f.getData(), f.getSize() );
+   if( font.worked() )
    {
-      std::string sError ;
-      
-      FT_Face face;      /* handle to face object */
-      error = FT_New_Memory_Face( library, (FT_Byte *)f.getData(), f.getSize(), 0, &face );
-      if( 0 == error )
+      JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+      if( fontString )
       {
-         FT_Done_Face( face );
-
-         JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
-         if( fontString )
-         {
-            JS_DefineProperty( req.cx_, req.lhObj_, "data",
-                               STRING_TO_JSVAL( fontString ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            jsCurlOnComplete( req, f );
-         }
-         else
-            sError = "Error allocating font string" ;
-      }
-      else
-         sError = "Error loading font face" ;
-         
-      if( 0 < sError.size() )
-      {
-         jsCurlOnError( req, f );
-         JSString *errorStr = JS_NewStringCopyN( req.cx_, sError.c_str(), sError.size() );
-         JS_DefineProperty( req.cx_, 
-                            req.lhObj_, 
-                            "loadErrorMsg",
-                            STRING_TO_JSVAL( errorStr ),
+         JS_DefineProperty( req.cx_, req.lhObj_, "data",
+                            STRING_TO_JSVAL( fontString ),
                             0, 0, 
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
+         jsCurlOnComplete( req, f );
       }
-      
-      error = FT_Done_FreeType( library );
-      if( 0 != error )
-      {
-         JS_ReportError( req.cx_, "Error %d initializing freeType library\n", error );
-         exit( 3 );
-      }
+      else
+         sError = "Error allocating font string" ;
    }
    else
+      sError = "Error loading font face" ;
+         
+   if( 0 < sError.size() )
    {
-      JS_ReportError( req.cx_, "Error %d initializing freeType library\n", error );
-      exit( 3 );
+      JSString *errorStr = JS_NewStringCopyN( req.cx_, sError.c_str(), sError.size() );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "loadErrorMsg",
+                         STRING_TO_JSVAL( errorStr ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "false",
+                         JSVAL_TRUE,
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      jsCurlOnError( req, f );
    }
-
 }
 
 static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -710,7 +846,6 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
 
 static JSFunctionSpec text_functions[] = {
     {"jsText",           jsText,        1 },
-    {"jsDumpFont",       jsDumpFont,    1 },
     {0}
 };
 
