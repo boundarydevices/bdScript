@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFlashVar.cpp,v $
- * Revision 1.1  2004-02-07 12:14:51  ericn
+ * Revision 1.2  2004-02-07 13:40:53  ericn
+ * -removed debug prints
+ *
+ * Revision 1.1  2004/02/07 12:14:51  ericn
  * -Initial import
  *
  *
@@ -60,7 +63,6 @@ jsGetFlashVar( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
 static JSBool
 jsSetFlashVar( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   printf( "Setting flashVar: %u args\n", argc );
    *rval = JSVAL_FALSE ;
    if( ( 2 == argc )
        &&
@@ -72,14 +74,6 @@ jsSetFlashVar( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
       {
          char const *varName = JS_GetStringBytes( sVarName );
          char const *value = JS_GetStringBytes( sValue );
-printf( "name: %s, value %s\n", 
-        (0 != varName) 
-        ? varName 
-        : "NULL",
-        (0 != value) 
-        ? value 
-        : "NULL" );
-
          writeFlashVar( JS_GetStringBytes( sVarName ),
                         JS_GetStringBytes( sValue ) );
          *rval = JSVAL_TRUE ;
@@ -90,7 +84,6 @@ printf( "name: %s, value %s\n",
    else
       JS_ReportError( cx, "Usage: flashVar.set( varName, value );" );
    
-   printf( "Done setting flashVar: %u args\n", argc );
    return JS_TRUE ;
 }
 
