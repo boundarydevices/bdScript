@@ -1,0 +1,29 @@
+#!/bin/jsExec -
+print( "\n" );
+if( 2 == argc )
+{
+   var uploadURL = argv[0];
+   var localFile = argv[1];
+
+   var fileContent = readFile( localFile );
+   if( 0 < fileContent.length )
+   {
+      var ulResults = curlFile( { url: uploadURL, 
+                                  useCache:false, 
+                                  urlParams: { fileName:localFile,
+                                               _data:fileContent } } );
+      if( ulResults.isLoaded )
+      {
+         print( "upload results:", ulResults.data );
+      }
+      else
+         print( "Error uploading file\n" );
+   }
+   else
+      print( "Error reading file: ", localFile, "\n" );
+}
+else
+   print( "Usage: wget url [localFileName]\n" );
+
+exit( 0 );
+
