@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.3  2002-11-24 19:07:48  ericn
+ * Revision 1.4  2002-11-25 00:10:59  ericn
+ * -modified to break through with sound effects
+ *
+ * Revision 1.3  2002/11/24 19:07:48  ericn
  * -added release sound
  *
  * Revision 1.2  2002/11/23 16:14:10  ericn
@@ -171,7 +174,10 @@ static void buttonTouch( box_t         &box,
 
    if( ( 0 != button->touchSoundData_ ) && ( 0 != button->touchSoundLength_ ) )
    {
-      getAudioQueue().insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_, "", "" );
+      audioQueue_t &q = getAudioQueue();
+      unsigned numCancelled ;
+      q.clear( numCancelled );
+      q.insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_, "", "" );
    }
 
    doit( box, x, y, defaultTouch, "onTouch" );
@@ -200,7 +206,10 @@ static void buttonRelease( box_t         &box,
    
    if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
    {
-      getAudioQueue().insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_, "", "" );
+      audioQueue_t &q = getAudioQueue();
+      unsigned numCancelled ;
+      q.clear( numCancelled );
+      q.insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_, "", "" );
    }
 
    doit( box, x, y, defaultRelease, "onRelease" );
