@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.17  2003-02-26 12:19:14  tkisky
+ * Revision 1.18  2003-03-12 02:57:18  ericn
+ * -added blend() method
+ *
+ * Revision 1.17  2003/02/26 12:19:14  tkisky
  * -10.4 display shuffling bits
  *
  * Revision 1.16  2002/12/18 19:10:43  tkisky
@@ -436,6 +439,90 @@ void fbDevice_t :: render
    }
    else
       render( xPos, yPos, w, h, pixels );
+}
+
+void fbDevice_t :: blend
+   ( unsigned short xPos, unsigned short yPos,
+     unsigned short w, unsigned short h,
+     unsigned short const *srcPixels,
+     unsigned short const *destPixels,
+     unsigned char         _256ths )
+{
+   int minWidth = min(getWidth()-xPos,w);
+   int minHeight= min(getHeight()-yPos,h);
+   if ((minWidth > 0) && (minHeight > 0))
+   {
+      unsigned short *const tempBuf = new unsigned short[ minWidth*minHeight ];
+      if( !tempBuf )
+         exit( 1 );
+      unsigned short *outPix = tempBuf ;
+
+      for( int row = 0 ; row < minHeight ; row++ )
+      {
+         unsigned short const *src  = srcPixels ;
+         unsigned short const *dest = destPixels ;
+         for( int i = 0 ; i < minWidth ; i++ )
+         {
+            unsigned short s = *src++ ;
+            unsigned short d = *dest++ ;
+            unsigned short result = 0 ;
+            
+            if( s != d )
+            {
+               //
+               // blue
+               //
+               unsigned short t1 = ( s & 0x1f );
+               unsigned short t2 = ( d & 0x1f );
+               int diff = t2 - t1 ;
+               unsigned short mask = t1 + (diff*_256ths)/255 ;
+               result |= mask ;
+   
+               s >>= 5 ;
+               d >>= 5 ;
+               
+               //
+               // green
+               //
+               t1 = ( s & 0x3f );
+               t2 = ( d & 0x3f );
+               diff = t2 - t1 ;
+               mask = ( t1 + (diff*_256ths)/255 );
+               mask <<= 5 ;
+               result |= mask ;
+               
+               s >>= 6 ;
+               d >>= 6 ;
+               //
+               // red
+               //
+               t1 = ( s & 0x3f );
+               t2 = ( d & 0x3f );
+               diff = t2 - t1 ;
+               mask = ( t1 + (diff*_256ths)/255 );
+               mask <<= 11 ;
+               result |= mask ;
+   
+            }
+            else
+               result = s ;
+
+            *outPix++ = result ;
+         }
+         srcPixels  += w;
+         destPixels += w ;
+      }
+      
+      minWidth <<= 1 ; // short to byte
+      unsigned char const *inPix = (unsigned char *)tempBuf ;
+      do
+      {
+         unsigned short *screenPix = getRow( yPos++ ) + xPos;
+         memcpy( screenPix, inPix, minWidth );
+         inPix += minWidth ;
+      } while (--minHeight);
+      delete [] tempBuf ;
+   }
 }
 
 #define swap( v1, v2 ) { unsigned short t = v1 ; v1 = v2 ; v2 = t ; }

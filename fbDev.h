@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.10 2002-12-11 04:04:48 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.11 2003-03-12 02:57:14 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.10  2002-12-11 04:04:48  ericn
+ * Revision 1.11  2003-03-12 02:57:14  ericn
+ * -added blend() method
+ *
+ * Revision 1.10  2002/12/11 04:04:48  ericn
  * -moved buttonize code from button to fbDev
  *
  * Revision 1.9  2002/12/07 21:01:19  ericn
@@ -84,6 +87,12 @@ public:
                 unsigned short w, unsigned short h,
                 unsigned short const *pixels,
                 unsigned char const  *alpha );
+
+   void blend( unsigned short x, unsigned short y,
+               unsigned short w, unsigned short h,
+               unsigned short const *srcPixels,
+               unsigned short const *destPixels,
+               unsigned char         _256ths );
 
    // draw a filled rectangle
    void rect( unsigned short x1, unsigned short y1,
