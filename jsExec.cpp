@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.19  2002-12-01 02:43:39  ericn
+ * Revision 1.20  2002-12-10 04:48:30  ericn
+ * -added module jsPopen
+ *
+ * Revision 1.19  2002/12/01 02:43:39  ericn
  * -changed queueCode() to root code, moved handler execution to pollCodeQueue()
  *
  * Revision 1.18  2002/11/30 18:52:57  ericn
@@ -101,6 +104,7 @@
 #include "ccDiskCache.h"
 #include "ccWorker.h"
 #include "urlFile.h"
+#include "jsPopen.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -245,6 +249,7 @@ int prMain(int argc, char **argv)
                      initJSBarcode( cx, glob );
                      initJSShell( cx, glob );
                      initJSButton( cx, glob );
+                     initJSPopen( cx, glob );
 
                      getCurlCache();
 
