@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.20  2002-12-10 04:48:30  ericn
+ * Revision 1.21  2002-12-12 15:41:34  ericn
+ * -added environment routines
+ *
+ * Revision 1.20  2002/12/10 04:48:30  ericn
  * -added module jsPopen
  *
  * Revision 1.19  2002/12/01 02:43:39  ericn
@@ -105,6 +108,7 @@
 #include "ccWorker.h"
 #include "urlFile.h"
 #include "jsPopen.h"
+#include "jsEnviron.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -250,6 +254,7 @@ int prMain(int argc, char **argv)
                      initJSShell( cx, glob );
                      initJSButton( cx, glob );
                      initJSPopen( cx, glob );
+                     initJSEnv( cx, glob );
 
                      getCurlCache();
 
