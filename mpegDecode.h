@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.2 2003-07-20 18:35:35 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.3 2004-10-30 18:55:31 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.2  2003-07-20 18:35:35  ericn
+ * Revision 1.3  2004-10-30 18:55:31  ericn
+ * -Neon YUV support
+ *
+ * Revision 1.2  2003/07/20 18:35:35  ericn
  * -added picType, decode timing
  *
  * Revision 1.1  2003/07/20 15:43:35  ericn
@@ -32,6 +35,7 @@
  */
 
 #include <sys/time.h>
+#include <list>
 
 class mpegDecoder_t {
 public:
@@ -59,11 +63,13 @@ public:
 
    inline bool haveHeader( void ) const { return haveVideoHeader_ ; } 
    inline unsigned short width( void ) const { return mpegWidth_ ; }
+   inline unsigned short stride( void ) const { return mpegStride_ ; }
    inline unsigned short height( void ) const { return mpegHeight_ ; }
    inline unsigned numSkipped( void ) const { return numSkipped_ ; }
    inline unsigned numParsed( void ) const { return numParsed_ ; }
    inline unsigned numDrawn( void ) const { return numDraw_ ; }
    inline timeval const &usDecodeTime( void ) const { return usDecodeTime_ ; }
+
 private:
    typedef enum state_e {
       end_e,
@@ -76,6 +82,7 @@ private:
    void        const   *mpegInfo_ ;
    bool                 haveVideoHeader_ ;
    unsigned short       mpegWidth_ ;
+   unsigned short       mpegStride_ ;
    unsigned short       mpegHeight_ ;
    unsigned char        mpegFrameType_ ; // 
    picType_e            lastPicType_ ;
@@ -85,8 +92,18 @@ private:
    unsigned             numSkipped_ ;
    unsigned             numParsed_ ;
    unsigned             numDraw_ ;
+
+#ifdef NEON
+   //
+   // Get a picture buffer. 
+   //
+   // height, width, and stride must have been previously established
+   //
+   void *getPictureBuf( void );
+   
+   std::list<void *>    freeBufs_ ;
+   std::list<void *>    allocated_ ;
+#endif 
 };
 
-
 #endif
-

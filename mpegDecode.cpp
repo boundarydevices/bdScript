@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.5  2004-06-28 02:56:43  ericn
+ * Revision 1.6  2004-10-30 18:55:34  ericn
+ * -Neon YUV support
+ *
+ * Revision 1.5  2004/06/28 02:56:43  ericn
  * -use new tags
  *
  * Revision 1.4  2004/05/23 21:25:21  ericn
@@ -36,6 +39,8 @@ extern "C" {
 #include <time.h>
 #include "config.h"
 #include <mpeg2dec/mpeg2.h>
+#include <assert.h>
+#include <ctype.h>
 
 #ifdef CONFIG_LIBMPEG2_OLD 
    #include "mpeg2dec/video_out.h"
@@ -59,6 +64,7 @@ mpegDecoder_t :: mpegDecoder_t( void )
      mpegInfo_( ( 0 != mpegDecoder_ ) ? mpeg2_info( DECODER ) : 0 ),
      haveVideoHeader_( false ),
      mpegWidth_( 0 ),
+     mpegStride_( 0 ),
      mpegHeight_( 0 ),
      mpegFrameType_( 0 ),
      lastPicType_( ptUnknown_e ),
@@ -79,6 +85,12 @@ mpegDecoder_t :: mpegDecoder_t( void )
 mpegDecoder_t :: ~mpegDecoder_t( void )
 {
    mpeg2_close( DECODER );
+   while( !allocated_.empty() )
+   {
+      void *buf = allocated_.front();
+      allocated_.pop_front();
+      free( buf );
+   }
 }
 
 void mpegDecoder_t :: feed
@@ -89,6 +101,22 @@ void mpegDecoder_t :: feed
    {
       unsigned char *bIn = (unsigned char *)inData ;
       mpeg2_buffer( DECODER, bIn, bIn + inBytes );
+   }
+}
+
+void *mpegDecoder_t :: getPictureBuf( void )
+{
+   if( !freeBufs_.empty() )
+   {
+      void *buf = freeBufs_.back();
+      freeBufs_.pop_back();
+      return buf ;
+   }
+   else
+   {
+      void *buf = malloc( mpegHeight_*mpegStride_*4 );
+      allocated_.push_back( buf );
+      return buf ;
    }
 }
 
@@ -109,6 +137,219 @@ inline void diffTime( timeval       &diff,
    diff.tv_usec = usecs ;
 }
 
+#ifdef NEON
+struct yuv_internal_t {
+   unsigned char *out_ptr;
+   unsigned       width; // in pixels
+   unsigned       outPad; // in pixels
+   unsigned       in_stridex;
+   unsigned       out_stridex;
+   unsigned       in_stride_frame;  // in bytes
+   unsigned       out_stride_frame; // in bytes
+};
+
+void yuv_null_start( void * _id, uint8_t * const * dest, int flags )
+{
+//fprintf( stderr, "null start\n" );
+    yuv_internal_t * id = (yuv_internal_t *) _id;
+    id->out_ptr = dest[0];
+    switch (flags) {
+    case CONVERT_BOTTOM_FIELD:
+	id->out_ptr += id->out_stride_frame ;
+	/* break thru */
+    case CONVERT_TOP_FIELD:
+	id->in_stridex  = id->in_stride_frame << 1;
+	id->out_stridex = id->out_stride_frame << 1 ;
+	break;
+    default:
+	id->in_stridex = id->in_stride_frame ;
+	id->out_stridex = id->out_stride_frame ;
+    }
+}
+
+static bool first = true ;
+static bool second = false ;
+
+void yuv_null_copy( void * _id, uint8_t * const * src, unsigned int v_offset)
+{
+   yuv_internal_t * id = (yuv_internal_t *) _id;
+   unsigned char * dst0 = ( id->out_ptr + (id->out_stridex * v_offset) );
+   unsigned char * dst1 = ( dst0+id->out_stridex );
+
+   uint8_t const * pyIn0 = src[0];
+   uint8_t const * pyIn1 = pyIn0 + id->in_stridex ;
+   uint8_t const * pu    = src[1];
+   uint8_t const * pv    = src[2];
+   
+   unsigned const width4 = id->width/4 ;
+
+   if( first || second )
+   {
+      fprintf( stderr, "null copy: id = %p\n" 
+               "    y0 == %p\n"
+               "    y1 == %p\n"
+               "     u == %p\n"
+               "     v == %p\n"
+               "  dst0 == %p\n"
+               "  dst1 == %p\n"
+               "  vOff == %u\n"
+               "width  == %u\n"
+               "wid4   == %u\n"
+               , id, pyIn0, pyIn1, pu, pv, 
+               dst0, dst1, v_offset,
+               id->width, width4 );
+   }
+   //
+   // called for each 16 lines of input
+   // each U and V apply to 2 lines of output, so we loop 8 times
+   //
+   //
+   int loop = 8 ;
+   do {
+      // for each block of 2 lines, 2 pixels of width
+      for( int i = 0 ; i < id->width ; i += 4 )
+      {
+         unsigned char u ;
+         unsigned char v ;
+         unsigned char y0 ;
+         unsigned char y1 ;
+         
+         // first block of 2
+         u = *pu++ ;
+         v = *pv++ ;
+         
+         y0 = *pyIn0++ ;
+         *dst0++ = y0 ;
+         *dst0++ = u ;
+         y0 = *pyIn0++ ;
+         *dst0++ = y0 ;
+         *dst0++ = v ;
+
+         y1 = *pyIn1++ ;
+         *dst1++ = y1 ;
+         *dst1++ = u ;
+         y1 = *pyIn1++ ;
+         *dst1++ = y1 ;
+         *dst1++ = v ;
+
+         // second block of 2
+         u = *pu++ ;
+         v = *pv++ ;
+         
+         y0 = *pyIn0++ ;
+         *dst0++ = y0 ;
+         *dst0++ = u ;
+         y0 = *pyIn0++ ;
+         *dst0++ = y0 ;
+         *dst0++ = v ;
+
+         y1 = *pyIn1++ ;
+         *dst1++ = y1 ;
+         *dst1++ = u ;
+         y1 = *pyIn1++ ;
+         *dst1++ = y1 ;
+         *dst1++ = v ;
+      }
+/*
+if( first || second )
+   printf( "inner1 %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
+           first ? "first" : "second",
+           dst0, dst1, pyIn0, pyIn1 );
+*/           
+      dst0 += id->outPad ;
+      dst1 += id->outPad ;
+      dst0 = dst1 ;
+      dst1 = dst0 + id->out_stridex ;
+/*
+if( first || second )
+   printf( "inner2 %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
+           first ? "first" : "second",
+           dst0, dst1, pyIn0, pyIn1 );
+*/
+   } while (--loop);
+
+if( first || second )
+{
+   printf( "outer %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
+           first ? "first" : "second",
+           dst0, dst1, pyIn0, pyIn1 );
+/*
+   if( first )
+   {
+      first = false ;
+      second = true ;
+   }
+   else
+      second = false ;
+*/      
+}
+}
+
+void convert_null_128(int width, int height, uint32_t accel, void * arg, convert_init_t * result)
+{
+   if( 0 == result->id )
+   {
+      result->id_size = sizeof( yuv_internal_t );
+   } // initial call before alloc
+   else
+   {
+      yuv_internal_t *const id = (yuv_internal_t *)result->id ;
+      assert( 0 != id );
+      assert( result->id_size == sizeof( yuv_internal_t ) );
+
+      id->width = width ;
+      id->in_stridex = 0 ;
+      id->in_stride_frame  = width ;
+      id->out_stridex = 0 ;
+      id->out_stride_frame = (((width+127)/128)*128);
+      id->outPad = (id->out_stride_frame - width)*2;
+      id->out_stride_frame *= 2 ; // 2 bytes per pixel
+
+printf( "--> width %u, in stride: %u, out: %u\n", 
+        width,
+        id->in_stride_frame,
+        id->out_stride_frame );
+
+      result->buf_size[0] = id->out_stride_frame * height * 2 ;
+      result->buf_size[1] = result->buf_size[2] = 0;
+      result->start = yuv_null_start;
+      result->copy  = yuv_null_copy ;
+   } // second call to fill in details
+}
+
+#endif
+
+void interleaveYUV( int                  width, 
+                    int                  height, 
+                    unsigned char       *yuv, 
+                    unsigned char const *y, 
+                    unsigned char const *u, 
+                    unsigned char const *v )
+{
+   unsigned char const * const startU = u ;
+   for( unsigned row = 0 ; row < height ; row++ )
+   {
+      unsigned char const *uRow = u ;
+      unsigned char const *vRow = v ;
+      for( unsigned col = 0 ; col < width ; col++ )
+      {
+         *yuv++ = *y++ ;
+         if( 0 == ( col & 1 ) )
+            *yuv++ = *uRow++ ;
+         else
+            *yuv++ = *vRow++ ;
+
+//         yuv += 2 ;
+      }
+      
+      if( 1 == ( row & 1 ) )
+      {
+         u += width/2 ;
+         v += width/2 ;
+      }
+   }
+}
+
 bool mpegDecoder_t :: getPicture
    ( void const *&picture,
      picType_e   &type,
@@ -123,15 +364,33 @@ bool mpegDecoder_t :: getPicture
          case STATE_SEQUENCE:
          {
             mpeg2_sequence_t const &seq = *INFOPTR->sequence ;
-            if( !haveVideoHeader_ )
+//            if( !haveVideoHeader_ )
             {
                haveVideoHeader_ = true ;
+#ifdef NEON
                mpegWidth_ = seq.width ;
+               mpegStride_ = ((seq.width+15)/16)*16 ;
+#else
+               mpegWidth_ = seq.width ;
+#endif 
                mpegHeight_ = seq.height ;
+//printf( "mpegw: %u, stride: %u, mpegh:%u\n", mpegWidth_, mpegStride_, mpegHeight_ );
+//printf( "dispw: %u, disph:%u\n", seq.display_width, seq.picture_height );
+//printf( "pixw: %u, pixh:%u\n", seq.pixel_width, seq.pixel_height );
+            }
+//            else 
+               if( seq.width != mpegWidth_ )
+            {
+               printf( "varying width: %u/%u\n", seq.width, mpegWidth_ );
             }
 
+#ifdef NEON
+//            mpeg2_convert( DECODER, convert_null_128, NULL );
+            mpeg2_custom_fbuf (DECODER, 1);
+#else
             mpeg2_convert( DECODER, mpeg2convert_rgb16, NULL );
             mpeg2_custom_fbuf (DECODER, 0);
+#endif 
 /*
             printf( "w: %u, h:%u\n", seq.width, seq.height );
             printf( "chroma_width %u, chroma_height %u\n", seq.chroma_width, seq.chroma_height );
@@ -155,6 +414,7 @@ bool mpegDecoder_t :: getPicture
          }
          case STATE_PICTURE:
          {
+//printf( "picture\n" );
             int picType = ( INFOPTR->current_picture->flags & PIC_MASK_CODING_TYPE ) - 1;
             bool skip ;
             if( picType <= ptD_e )
@@ -183,6 +443,18 @@ bool mpegDecoder_t :: getPicture
             if( !skip )
             {
                gettimeofday( &usStartDecode_, 0 );
+
+#ifdef NEON
+               unsigned char *buf = (unsigned char *)getPictureBuf();
+               unsigned ySize = mpegStride_*mpegHeight_ ; 
+               unsigned uvSize = ySize / 2 ;
+               unsigned char *planes[3] = { 
+                  buf,
+                  buf+ySize,
+                  buf+ySize+uvSize
+               };
+               mpeg2_set_buf((mpeg2dec_t *)mpegDecoder_, planes, buf);
+#endif 
             }
             break;
          }
@@ -197,7 +469,35 @@ bool mpegDecoder_t :: getPicture
                {
                   type = lastPicType_ ;
                   lastPicType_ = ptUnknown_e ;
-                  picture = INFOPTR->display_fbuf->buf[0];
+                  
+                  unsigned char *buf = (unsigned char *)INFOPTR->display_fbuf->id ;
+                  if( buf )
+                  {
+                     unsigned ySize = mpegStride_*mpegHeight_ ;
+                     unsigned uvSize = ySize / 2 ;
+                     unsigned char *yBuf = buf ;
+                     unsigned char *uBuf = yBuf+ySize ;
+                     unsigned char *vBuf = uBuf+uvSize ;
+                     unsigned char *yuv  = vBuf+uvSize ;
+
+                     picture = yuv ;
+
+                     interleaveYUV( mpegStride_, mpegHeight_, yuv, yBuf, uBuf, vBuf );
+                     freeBufs_.push_back( buf );
+/*
+printf( "buf == %p/%p/%p --> %p\n",
+        INFOPTR->display_fbuf->buf[0],
+        INFOPTR->display_fbuf->buf[1],
+        INFOPTR->display_fbuf->buf[2], 
+        INFOPTR->display_fbuf->id
+        );
+printf( "yuv:%p, y:%p, u:%p, v:%p\n",
+        yuv, yBuf, uBuf, vBuf );
+*/        
+                  }
+                  else
+                     fprintf( stderr, "Invalid fbuf id!\n" );
+                  
                   gettimeofday( &usDecodeTime_, 0 );
                   diffTime( usDecodeTime_, usStartDecode_, usDecodeTime_ );
 
@@ -228,3 +528,152 @@ char mpegDecoder_t :: getPicType( picType_e t )
       return '?' ;
 }
 
+#ifdef __MODULETEST__
+#include "mpDemux.h"
+#include "memFile.h"
+
+static char const * const frameTypes_[] = {
+   "video",
+   "audio",
+   "endOfFile"
+};
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <zlib.h>
+#include "tickMs.h"
+#include <termios.h>
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 == argc )
+   {
+      memFile_t fIn( argv[1] );
+      if( fIn.worked() )
+      {
+         unsigned long numPackets[2] = { 0, 0 };
+         unsigned long numBytes[2] = { 0, 0 };
+         unsigned long crc[2] = { 0, 0 };
+         
+         mpegDemux_t demuxer( fIn.getData(), fIn.getLength() );
+
+         memset( &numPackets, 0, sizeof( numPackets ) );
+         memset( &numBytes, 0, sizeof( numBytes ) );
+         memset( &crc, 0, sizeof( crc ) );
+         printf( "reading in bulk\n" );
+         mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
+         printf( "%lu streams\n", bi->count_ );
+
+         int videoIdx = -1 ;
+
+         for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
+         {
+            mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[sIdx];
+            mpegDemux_t::frameType_e ft = sAndF.sInfo_.type ;
+            printf( "%s stream %u: %u frames\n", frameTypes_[ft], sIdx, sAndF.numFrames_ );
+            if( mpegDemux_t::videoFrame_e == ft )
+               videoIdx = sIdx ;
+            numPackets[ft] += sAndF.numFrames_ ;
+         }
+         
+         if( 0 <= videoIdx )
+         {   
+            struct termios oldTermState ;
+            tcgetattr( 0, &oldTermState );
+            struct termios raw = oldTermState ;
+            raw.c_lflag &= ~(ICANON | ECHO | ISIG );
+            tcsetattr( 0, TCSANOW, &raw );
+            fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+
+            mpegDecoder_t decoder ;
+            mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[videoIdx];
+            mpegDemux_t::frameType_e ft = sAndF.sInfo_.type ;
+            mpegDemux_t::frame_t const *next = sAndF.frames_ ;
+            int numLeft = sAndF.numFrames_ ;
+            unsigned numPictures = 0 ;
+            long long startMs = tickMs();
+            bool haveHeader = false ;
+            unsigned long bytesPerPicture = 0 ;
+            int const fdYUV = open( "/dev/yuv", O_WRONLY );
+            char keyvalue = '\0' ;
+            
+            do {
+printf( "feed: %p/%u\n", next->data_, next->length_ );
+               decoder.feed( next->data_, next->length_ );
+               next++ ;
+               numLeft-- ;
+               void const *picture ;
+               mpegDecoder_t::picType_e picType ;
+               if( !haveHeader )
+               {
+                  haveHeader = decoder.haveHeader();
+                  if( haveHeader )
+                  {
+                     bytesPerPicture = decoder.width() * decoder.height() * 2;
+                     printf( "%u x %u: %u bytes per picture\n", 
+                             decoder.width(), decoder.height(), bytesPerPicture );
+                  }
+               }
+
+               while( decoder.getPicture( picture, picType ) )
+               {
+                  ++numPictures ;
+                  if( haveHeader )
+                  {
+                     if( 0 <= fdYUV )
+                     {
+                        int const numWritten = write( fdYUV, picture, bytesPerPicture );
+                        if( numWritten != bytesPerPicture )
+                        {
+                           printf( "write %d of %u bytes\n", numWritten, bytesPerPicture );
+                           numLeft = 0 ;
+                           break;
+                        }
+if( 'g' != keyvalue )
+{
+                        while( 0 >= read(0,&keyvalue,1) )
+                           ;
+//read(0,&keyvalue,1);
+                        keyvalue = tolower( keyvalue );
+                        if( ( 'x' == keyvalue ) || ( '\x03' == keyvalue ) )
+                        {
+                           numLeft = 0 ;
+                           break;
+                        }
+}
+                     }
+                  }
+                  else
+                     printf( "picture without header\n" );
+               }
+            } while( 0 < numLeft );
+
+            long long endMs = tickMs();
+            
+            if( 0 <= fdYUV )
+               close( fdYUV );
+
+            unsigned elapsed = (unsigned)( endMs-startMs );
+            printf( "%u pictures, %u ms\n", numPictures, elapsed );
+            if( decoder.haveHeader() )
+            {
+            }
+            
+            fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
+            tcsetattr( 0, TCSANOW, &oldTermState );
+         }
+
+         printf( "done\ndeleting\n" );
+         bi->clear( bi );
+         printf( "done\n" );
+      }
+      else
+         perror( argv[1] );
+   }
+   else
+      fprintf( stderr, "Usage: mpegDecode fileName\n" );
+
+   return 0 ;
+}
+#endif
