@@ -1,5 +1,5 @@
 #ifndef __HTTPPOLL_H__
-#define __HTTPPOLL_H__ "$Id: httpPoll.h,v 1.2 2004-12-18 18:30:41 ericn Exp $"
+#define __HTTPPOLL_H__ "$Id: httpPoll.h,v 1.3 2004-12-28 03:44:15 ericn Exp $"
 
 /*
  * httpPoll.h
@@ -38,7 +38,10 @@
  * Change History : 
  *
  * $Log: httpPoll.h,v $
- * Revision 1.2  2004-12-18 18:30:41  ericn
+ * Revision 1.3  2004-12-28 03:44:15  ericn
+ * -callback-driven
+ *
+ * Revision 1.2  2004/12/18 18:30:41  ericn
  * -require tcpHandler, not more generic pollHandler, add dns support
  *
  * Revision 1.1  2004/03/17 04:56:19  ericn
@@ -54,6 +57,19 @@
 
 #include <string>
 #include <list>
+
+class httpPoll_t ;
+
+//
+// Return value should be true if we should keep polling
+// for dataAvail and writeSpaceAvail events, or false to
+// ignore the signal (clear the POLL mask)
+//
+typedef bool (*httpCallback_t)( void       *opaque,
+                                httpPoll_t &handler,
+                                int         event,          // httpPoll_t::event_e
+                                void       *eventParam );   // parameter depends on event
+
 
 class httpPoll_t {
 public:
@@ -96,6 +112,16 @@ public:
    // ---------------------------------------------------------------
    //                   HTTP-level callbacks
    // ---------------------------------------------------------------
+   enum event_e {
+      connect,
+      rxData,
+      eof,
+      numEvents
+   };
+
+   void setHandler( event_e         which,
+                    httpCallback_t  callback,
+                    void           *cbParam );
 
    // return true if username and password are available
    virtual bool getAuth( char const *&username, char const *&password );
@@ -130,9 +156,12 @@ protected:
    tcpHandler_t        *h_ ;
    std::string          file_ ;
    state_e              state_ ;
+   bool                 started_ ;
    std::list<header_t>  headers_ ;
    std::list<header_t>  params_ ;
    std::list<header_t>  files_ ;
+   httpCallback_t       handlers_[numEvents];
+   void                *hParams_[numEvents];
 };
 
 #endif
