@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.11  2002-11-23 16:13:11  ericn
+ * Revision 1.12  2002-12-04 13:12:53  ericn
+ * -added rect, line, box methods
+ *
+ * Revision 1.11  2002/11/23 16:13:11  ericn
  * -added render with alpha
  *
  * Revision 1.10  2002/11/22 21:31:43  tkisky
@@ -408,6 +411,114 @@ void fbDevice_t :: render
    }
    else
       render( xPos, yPos, w, h, pixels );
+}
+
+#define swap( v1, v2 ) { unsigned short t = v1 ; v1 = v2 ; v2 = t ; }
+
+void fbDevice_t :: rect
+   ( unsigned short x1, unsigned short y1,
+     unsigned short x2, unsigned short y2,
+     unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned short const rgb = get16( red, green, blue );
+
+   if( x1 > x2 )
+      swap( x1, x2 );
+   if( y1 > y2 )
+      swap( y1, y2 );
+   
+   if( ( x1 < getWidth() ) && ( y1 < getHeight() ) )
+   {
+      if( x2 >= getWidth() )
+         x2 = getWidth() - 1 ;
+      unsigned short const w = x2 - x1 + 1 ;
+
+      if( y2 >= getHeight() )
+         y2 = getHeight() - 1 ;
+
+      unsigned short *row = getRow( y1 ) + x1 ;
+      unsigned short *endRow = row + ( y2 - y1 ) * getWidth();
+      while( row <= endRow )
+      {
+         unsigned short *next = row ;
+         unsigned short * const endLine = next + w ;
+         while( next < endLine )
+            *next++ = rgb ;
+         row += getWidth();
+      }
+   } // something is visible
+}
+
+void fbDevice_t :: line
+   ( unsigned short x1, unsigned short y1,
+     unsigned short x2, unsigned short y2,
+     unsigned char penWidth,
+     unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned short const rgb = get16( red, green, blue );
+   unsigned char const halfWidth = penWidth/2 ;
+
+   if( y1 == y2 )
+   {
+      if( y1 < getHeight() + halfWidth )
+      {
+         int yStart = y1 - halfWidth ;
+         if( 0 <= yStart )
+            y1 = yStart ;
+         else
+            y1 = 0 ;
+         y2 = yStart + penWidth - 1 ;
+         rect( x1, y1, x2, y2, red, green, blue );
+      } // something visible
+   } // horizontal
+   else if( x1 == x2 )
+   {
+      if( x1 < getWidth() + halfWidth )
+      {
+         int xStart = x1 - halfWidth ;
+         if( 0 <= xStart )
+            x1 = xStart ;
+         else
+            x1 = 0 ;
+         x2 = xStart + penWidth - 1 ;
+         rect( x1, y1, x2, y2, red, green, blue );
+      }
+   } // vertical
+   else
+      fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
+}
+
+
+void fbDevice_t :: box
+   ( unsigned short x1, unsigned short y1,
+     unsigned short x2, unsigned short y2,
+     unsigned char penWidth,
+     unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned short const rgb = get16( red, green, blue );
+   unsigned char const halfWidth = penWidth/2 ;
+
+   if( x1 > x2 )
+      swap( x1, x2 );
+   if( y1 > y2 )
+      swap( y1, y2 );
+
+   if( ( y1 < getHeight() - halfWidth )
+       &&
+       ( x1 < getWidth() - halfWidth ) )
+   {
+      // draw vertical lines
+      unsigned short const xLeft = ( x1 + halfWidth );
+      line( xLeft, y1, xLeft, y2, penWidth, red, green, blue );
+      unsigned short const xRight = ( x2 - halfWidth );
+      line( xRight, y1, xRight, y2, penWidth, red, green, blue );
+
+      // horizontal lines
+      unsigned short const yTop = ( y1 + halfWidth );
+      line( x1, yTop, x2, yTop, penWidth, red, green, blue );
+      unsigned short const yBottom = ( y2 - halfWidth );
+      line( x1, yBottom, x2, yBottom, penWidth, red, green, blue );
+   } // something is visible
 }
 
 

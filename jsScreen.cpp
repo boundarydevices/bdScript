@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.6  2002-11-21 14:05:19  ericn
+ * Revision 1.7  2002-12-04 13:13:06  ericn
+ * -added rect, line, box methods
+ *
+ * Revision 1.6  2002/11/21 14:05:19  ericn
  * -added invertRect() method
  *
  * Revision 1.5  2002/11/08 13:58:16  ericn
@@ -282,6 +285,102 @@ jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    return JS_TRUE ;
 }
 
+static JSBool
+jsRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( ( 4 == argc ) || ( 5 == argc ) )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      unsigned long const color = ( 5 == argc ) ? JSVAL_TO_INT( argv[4] ) : 0 ;
+      unsigned char const red   = (unsigned char)( color >> 11 );
+      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const blue  = (unsigned char)( color );
+      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
+      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
+      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
+      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      getFB().rect( x1, y1, x2, y2, red, green, blue );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.rect( x1, y1, x2, y2 [,color] );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 4 <= argc ) 
+       &&
+       ( 6 >= argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
+      unsigned long const color = ( 6 <= argc ) ? JSVAL_TO_INT( argv[5] ) : 0 ;
+      unsigned char const red   = (unsigned char)( color >> 11 );
+      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const blue  = (unsigned char)( color );
+      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
+      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
+      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
+      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      getFB().line( x1, y1, x2, y2, penWidth, red, green, blue );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.line( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 4 <= argc ) 
+       &&
+       ( 6 >= argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
+      unsigned long const color = ( 6 <= argc ) ? JSVAL_TO_INT( argv[5] ) : 0 ;
+      unsigned char const red   = (unsigned char)( color >> 11 );
+      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const blue  = (unsigned char)( color );
+      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
+      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
+      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
+      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      getFB().box( x1, y1, x2, y2, penWidth, red, green, blue );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.box( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
+
+   return JS_TRUE ;
+}
+
 enum jsScreen_tinyId {
    SCREEN_WIDTH, 
    SCREEN_HEIGHT, 
@@ -342,6 +441,9 @@ static JSFunctionSpec screen_methods[] = {
    { "setPixel",     jsSetPixel,         0,0,0 },
    { "getRect",      jsGetRect,          0,0,0 },
    { "invertRect",   jsInvertRect,       0,0,0 },
+   { "rect",         jsRect,             0,0,0 },
+   { "line",         jsLine,             0,0,0 },
+   { "box",          jsBox,              0,0,0 },
    { 0 }
 };
 

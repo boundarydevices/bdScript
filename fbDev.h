@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.6 2002-11-23 16:09:14 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.7 2002-12-04 13:12:55 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.6  2002-11-23 16:09:14  ericn
+ * Revision 1.7  2002-12-04 13:12:55  ericn
+ * -added rect, line, box methods
+ *
+ * Revision 1.6  2002/11/23 16:09:14  ericn
  * -added render with alpha
  *
  * Revision 1.5  2002/11/22 21:31:43  tkisky
@@ -69,9 +72,27 @@ public:
               );
 
    void render( unsigned short x, unsigned short y,
-                unsigned short w, unsigned short h, // width and height of image
+                unsigned short w, unsigned short h,
                 unsigned short const *pixels,
                 unsigned char const  *alpha );
+
+   // draw a filled rectangle
+   void rect( unsigned short x1, unsigned short y1,
+              unsigned short x2, unsigned short y2,
+              unsigned char red, unsigned char green, unsigned char blue );
+   
+   // draw a line of specified thickness, points specify center of line
+   void line( unsigned short x1, unsigned short y1, // only vertical and horizonta supported (for now)
+              unsigned short x2, unsigned short y2,
+              unsigned char penWidth,
+              unsigned char red, unsigned char green, unsigned char blue );
+   
+   // outlined box (4 connecting lines), points specify outside of box
+   void box( unsigned short x1, unsigned short y1,
+             unsigned short x2, unsigned short y2,
+             unsigned char penWidth,
+             unsigned char red, unsigned char green, unsigned char blue );
+
 private:
    fbDevice_t( char const *name );
    ~fbDevice_t( void );
