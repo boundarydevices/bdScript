@@ -1183,7 +1183,7 @@ ImageData* SJpeg::LoadYCbCr(IFileData* data)
 }
 
 
-#define GETIDCT GetIDCT_ARM
+#define GETIDCT GetIDCT_ARM_JQ
 
 extern "C"
 {
