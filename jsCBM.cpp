@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.13  2003-06-29 17:36:54  tkisky
+ * Revision 1.14  2003-07-08 13:15:17  ericn
+ * -added CLOEXEC to printer file handle
+ *
+ * Revision 1.13  2003/06/29 17:36:54  tkisky
  * -debug code
  *
  * Revision 1.12  2003/06/26 08:02:41  tkisky
@@ -346,6 +349,7 @@ static JSBool jsCBM( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          int const fd = open( JS_GetStringBytes( sDevice ), O_WRONLY );
          if( 0 <= fd )
          {
+            fcntl( fd, F_SETFD, FD_CLOEXEC );
 fprintf( stderr, "-----> opened printer: fd == %d\n", fd );
             *pfd = fd ;
 
