@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.2  2002-11-07 02:18:13  ericn
+ * Revision 1.3  2002-11-07 14:39:07  ericn
+ * -added audio output, buffering and scheduler spec
+ *
+ * Revision 1.2  2002/11/07 02:18:13  ericn
  * -fixed shutdown_ flag
  *
  * Revision 1.1  2002/11/07 02:16:33  ericn
@@ -33,6 +36,13 @@
 static bool volatile _cancel = false ;
 static audioQueue_t *audioQueue_ = 0 ; 
 
+#define OUTBUFSIZE 8192
+
+inline unsigned short scale( mad_fixed_t sample )
+{
+   return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
+}
+
 void *audioOutputThread( void *arg )
 {
    int dspFd = open( "/dev/dsp", O_WRONLY );
@@ -45,10 +55,10 @@ void *audioOutputThread( void *arg )
       if( 0 != ioctl( dspFd, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
                
-      int const channels = 2 ;
-      if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
-         fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-   
+      unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
+      unsigned short *       nextOut = outBuffer ;
+      unsigned short         spaceLeft = OUTBUFSIZE ;
+
       audioQueue_t *queue = (audioQueue_t *)arg ;
       while( !queue->shutdown_ )
       {
@@ -62,7 +72,94 @@ void *audioOutputThread( void *arg )
                        item.length_, 
                        headers.lengthSeconds(),
                        item.data_ );
-               sleep( headers.lengthSeconds() );
+
+               struct mad_stream stream;
+               struct mad_frame	frame;
+               struct mad_synth	synth;
+               mad_stream_init(&stream);
+               mad_stream_buffer(&stream, (unsigned char const *)item.data_, item.length_ );
+               mad_frame_init(&frame);
+               mad_synth_init(&synth);
+
+               bool eof = false ;
+               unsigned short nChannels = 0 ;               
+               
+               unsigned frameId = 0 ;
+               do {
+                  if( -1 != mad_frame_decode(&frame, &stream ) )
+                  {
+                     if( 0 == frameId++ )
+                     {
+                        int sampleRate = frame.header.samplerate ;
+                        if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &sampleRate ) )
+                        {
+                           fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
+                           break;
+                        }
+                        
+                        int channels = nChannels = MAD_NCHANNELS(&frame.header) ;
+                        if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                        {
+                           fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+                           break;
+                        }
+                     } // first frame... check sample rate
+                     else
+                     {
+                     } // not first frame
+         
+                     mad_synth_frame( &synth, &frame );
+                     if( 1 == nChannels )
+                     {
+                        mad_fixed_t const *left = synth.pcm.samples[0];
+                        for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
+                        {
+                           *nextOut++ = scale( *left++ );
+                           if( 0 == --spaceLeft )
+                           {
+                              write( dspFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                              nextOut = outBuffer ;
+                              spaceLeft = OUTBUFSIZE ;
+                           }
+                        }
+                     } // mono
+                     else
+                     {
+                        mad_fixed_t const *left  = synth.pcm.samples[0];
+                        mad_fixed_t const *right = synth.pcm.samples[1];
+                        for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
+                        {
+                           *nextOut++ = scale( *left++ );
+                           *nextOut++ = scale( *right++ );
+                           spaceLeft -= 2 ;
+                           if( 0 == spaceLeft )
+                           {
+                              write( dspFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                              nextOut = outBuffer ;
+                              spaceLeft = OUTBUFSIZE ;
+                           }
+                        }
+                     } // stereo
+                  } // frame decoded
+                  else
+                  {
+                     if( !MAD_RECOVERABLE( stream.error ) )
+                        break;
+                  }
+               } while( !( eof || _cancel || queue->shutdown_ ) );
+   
+               if( eof )
+               {
+                  if( OUTBUFSIZE != spaceLeft )
+                  {
+                     write( dspFd, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
+                     spaceLeft = OUTBUFSIZE ;
+                     nextOut = outBuffer ;
+                  } // flush tail end of output
+               }
+               /* close input file */
+               
+               mad_stream_finish(&stream);
             }
             else
             {
@@ -81,7 +178,11 @@ void *audioOutputThread( void *arg )
             }
          }
       }
+      
       close( dspFd );
+
+      delete [] outBuffer ;
+
    }
    else
       fprintf( stderr, "Error %m opening audio device\n" );
@@ -99,6 +200,9 @@ audioQueue_t :: audioQueue_t( void )
    int const create = pthread_create( &tHandle, 0, audioOutputThread, this );
    if( 0 == create )
    {
+      struct sched_param tsParam ;
+      tsParam.__sched_priority = 90 ;
+      pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
       threadHandle_ = (void *)tHandle ;
       audioQueue_ = this ;
    }
