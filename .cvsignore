@@ -6,3 +6,5 @@ ffPlay ffFormat ffFrames testffFormat dlopen cbmGraph cbmStat cbmReset cbmImage
 testquickcam
 jpegview
 backtrace
+ffTest
+*.sym
