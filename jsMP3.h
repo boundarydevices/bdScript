@@ -1,26 +1,39 @@
 #ifndef __JSMP3_H__
-#define __JSMP3_H__ "$Id: jsMP3.h,v 1.3 2002-10-25 14:19:08 ericn Exp $"
+#define __JSMP3_H__ "$Id: jsMP3.h,v 1.4 2002-11-07 02:14:18 ericn Exp $"
 
 /*
  * jsMP3.h
  *
  * This header file declares the initialization routine
- * for the MP3 output routines:
+ * for the mp3File class and function.
  *
- *    mp3Play( url );      // queue playback of url
- *    mp3Wait();           // wait for queue to flush
- *    mp3Skip();           // skip to end of currently running file
- *    mp3Count();          // returns count of queued files
+ * When called as a function, mp3File() will download
+ * an MP3 file synchronously and try parse the headers. 
+ * (See curlThread.h for right-hand object specs).
  *
- * Note that mp3Play() is an asynchronous call. If it 
- * returns true, all that is indicated is that the url 
- * was downloaded and playback queued.
+ * When used as a constructor, mp3File() queues a download
+ * request, and the application can use the onLoad and onLoadError
+ * properties to specify code to execute upon completion.
+ * 
+ * Properties of mp3File objects include:
  *
+ *    isLoaded    - true if loaded, false until then
+ *    data        - raw MP3 data
+ *    frameCount  - number of MP3 frames
+ *    sampleRate  - output playback rate
+ *    numChannels - number of output channels
+ *
+ * Methods of mp3File objects include:
+ *
+ *    play( { onComplete:"handler", onCancel="handler" } );
  *
  * Change History : 
  *
  * $Log: jsMP3.h,v $
- * Revision 1.3  2002-10-25 14:19:08  ericn
+ * Revision 1.4  2002-11-07 02:14:18  ericn
+ * -updated comments
+ *
+ * Revision 1.3  2002/10/25 14:19:08  ericn
  * -added mp3Skip() and mp3Count() routines
  *
  * Revision 1.2  2002/10/25 02:52:46  ericn

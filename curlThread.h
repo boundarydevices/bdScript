@@ -1,5 +1,5 @@
 #ifndef __CURLTHREAD_H__
-#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.4 2002-11-03 17:55:41 ericn Exp $"
+#define __CURLTHREAD_H__ "$Id: curlThread.h,v 1.5 2002-11-07 02:14:58 ericn Exp $"
 
 /*
  * curlThread.h
@@ -98,7 +98,10 @@
  * Change History : 
  *
  * $Log: curlThread.h,v $
- * Revision 1.4  2002-11-03 17:55:41  ericn
+ * Revision 1.5  2002-11-07 02:14:58  ericn
+ * -updated comments
+ *
+ * Revision 1.4  2002/11/03 17:55:41  ericn
  * -modified to support synchronous gets and posts
  *
  * Revision 1.3  2002/11/03 17:03:04  ericn
@@ -137,7 +140,7 @@ struct jsCurlRequest_t {
                                     //    must be object with at least url property
                                     //    optional useCache property
                                     //    optionally urlParams[] array property
-   JSContext           *cx_ ;       // context in which to run
+   JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
 
    //
    // one of these called when transfer terminates. 
