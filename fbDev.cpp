@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.23  2004-05-08 14:23:02  ericn
+ * Revision 1.24  2004-06-27 14:50:44  ericn
+ * -fix for game/suite controller
+ *
+ * Revision 1.23  2004/05/08 14:23:02  ericn
  * -added drawing primitives to image object
  *
  * Revision 1.22  2004/05/05 03:19:01  ericn
@@ -653,9 +656,6 @@ void fbDevice_t :: render
          pixels += w ;
          yPos++ ;
       } while (--minHeight);
-
-      refresh();
-
 #endif
    }
 }
