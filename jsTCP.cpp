@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.3  2002-12-16 14:25:41  ericn
+ * Revision 1.4  2002-12-17 15:03:37  ericn
+ * -removed debug stuff
+ *
+ * Revision 1.3  2002/12/16 14:25:41  ericn
  * -removed warning messages
  *
  * Revision 1.2  2002/12/16 14:20:14  ericn
@@ -61,7 +64,6 @@ static void *readerThread( void *param )
       int numRead = recv( sd->fd_, inData, sizeof( inData ) - 1, 0 );
       if( 0 < numRead )
       {
-printf( "read %d bytes\n", numRead );
          for( int i = 0 ; i < numRead ; i++ )
          {
             char const c = inData[i];
@@ -99,11 +101,7 @@ printf( "read %d bytes\n", numRead );
          }
       }
       else
-      {
-         if( 0 != numRead )
-            fprintf( stderr, "tcpClientRead %d/%m\n", numRead );
-         break;
-      }
+         break; // eof
    } while( 1 );
 
    if( 0 != curLine.size() )
@@ -124,7 +122,6 @@ static void closeSocket( socketData_t &socketData,
                          JSContext    *cx, 
                          JSObject     *obj )
 {
-printf( "closin'\n" );
    close( socketData.fd_ );
    socketData.fd_ = -1 ;
    jsval jsv = JSVAL_FALSE ;
@@ -137,7 +134,6 @@ printf( "closin'\n" );
 JSBool
 jsTCPClientSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "jsTCPSend\n" );
    *rval = JSVAL_FALSE ;
 
    if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
@@ -152,7 +148,6 @@ printf( "jsTCPSend\n" );
             int numSent = send( socketData->fd_, JS_GetStringBytes( sArg ), len, 0 );
             if( len == (unsigned)numSent )
             {
-printf( "sent %u bytes to host\n", len );
                *rval = JSVAL_TRUE ;
             }
             else
@@ -176,7 +171,6 @@ printf( "sent %u bytes to host\n", len );
 JSBool
 jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "jsTCPReadln\n" );
    *rval = JSVAL_FALSE ;
    if( 0 == argc )
    {
@@ -203,7 +197,6 @@ printf( "jsTCPReadln\n" );
 JSBool
 jsTCPClientClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-printf( "TCPClientClose\n" );
    *rval = JSVAL_FALSE ;
 
    if( 0 == argc )
@@ -301,7 +294,6 @@ static JSBool tcpClient( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
    
          if( thisObj )
          {
-printf( "tcpClient %p\n", thisObj );
             *rval = OBJECT_TO_JSVAL( thisObj ); // root
             jsval jsv = JSVAL_FALSE ;
             JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
@@ -330,10 +322,7 @@ printf( "tcpClient %p\n", thisObj );
             socketData->cx_  = cx ;
             socketData->obj_ = thisObj ;
             socketData->fd_  = -1 ;
-            if( JS_SetPrivate( cx, thisObj, socketData ) )
-               printf( "set private data\n" );
-            else
-               printf( "error setting private data\n" );
+            JS_SetPrivate( cx, thisObj, socketData );
 
             ddtoul_t fromDotted( serverIP.c_str() );
             if( fromDotted.worked() )
@@ -341,6 +330,7 @@ printf( "tcpClient %p\n", thisObj );
                int sFd = socket( AF_INET, SOCK_STREAM, 0 );
                if( 0 <= sFd )
                {
+                  socketData->fd_ = sFd ;
                   sockaddr_in serverAddr ;
 
                   memset( &serverAddr, 0, sizeof( serverAddr ) );
@@ -349,23 +339,16 @@ printf( "tcpClient %p\n", thisObj );
                   serverAddr.sin_addr.s_addr = fromDotted.networkOrder(); // server's IP
                   serverAddr.sin_port        = htons( (unsigned short)JSVAL_TO_INT(vServerPort) );
 
-printf( "connectin' to %lx,%lx\n", serverAddr.sin_addr.s_addr, serverAddr.sin_port );
                   if( 0 == connect( sFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) )
                   {
-printf( "connected\n" );
                      int doit = 1 ;
                      setsockopt( sFd, IPPROTO_TCP, TCP_NODELAY, &doit, sizeof( doit ) );
                      JS_AddRoot( cx, &socketData->obj_ );
                      pthread_t thread ;
                      int create = pthread_create( &thread, 0, readerThread, socketData );
-printf( "threadCreate %d\n", create );
 
                      jsval jsv = JSVAL_TRUE ;
-                     if( JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY ) )
-                        printf( "set connected property\n" );
-                     else
-                        printf( "error setting connected property\n" );
-                     socketData->fd_ = sFd ;
+                     JS_DefineProperty( cx, thisObj, "isConnected", jsv, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                   }
                   else
                   {
