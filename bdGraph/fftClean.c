@@ -2,36 +2,6 @@
 #include "fft.h"
 #include "fftClean.h"
 
-static inline void Magnitude2(npd* dest, const np* a, const np* b)
-{
-	int i,j;
-	np a_,b_;
-	ZeroNpd(dest);
-	if ( ((int)(a->n[NP_CNT-1]))<0) {Negate2(&a_,a); a= &a_;}
-	if ( ((int)(b->n[NP_CNT-1]))<0) {Negate2(&b_,b); b= &b_;}
-
-	for (i=0; i<NPD_CNT-1; i++) {
-		const int max = (i<=(NP_CNT-1))? i : NP_CNT-1;
-		for (j=i-max; j<=max; j++) {
-			AddM(&dest->n[i],a->n[j],a->n[i-j]);
-			AddM(&dest->n[i],b->n[j],b->n[i-j]);
-		}
-	}
-}
-static inline void Magnitude(np* dest, np* a, np* b)
-{
-	npd temp;
-	Magnitude2(&temp,a,b);
-	Sqroot(dest,&temp);
-#if 0
-	PrintNpd(&temp,0);
-	printf(" = ");
-	PrintNpData(a,0);
-	printf("**2 + ");
-	PrintNpData(b,0);
-	printf("**2\n");
-#endif
-}
 
 static void printNpd_p1(char* s,npd_p1* p)
 {
@@ -85,7 +55,6 @@ static void printNpd_p1(char* s,npd_p1* p)
 //                                                    |______________________________________|                                |______________________________________|
 //                                                 |____________________________________________|                          |____________________________________________|
 //                                                                                                 |____________________________________________________________________________________________|  |____________________________________________________________________________________________________________________________________________________________________________________________|  |____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________|
-#define NOISE_SIZE (n_d4-4)		//entries not zeroed are 4 .. (n_d4-1)
 static void inline CalcPower(npd* power,npd_p1* powerSum,cmplx* vect,const int logN)
 {
 	const int n_d2=(1<<(logN-1));
@@ -202,6 +171,26 @@ static inline void DoSymmetry(cmplx * vect,const int n_d2,const int n)
 //		printf("%i %i %8x %8x\r\n",i,n-i,vect[i].r.n[NP_CNT-1],vect[n-i].r.n[NP_CNT-1]);
 	}
 #endif
+}
+
+static inline void PrintFFT_Average(const npd_p1* noise,const int noiseCnt,const int size)
+{
+	int i,j;
+	npd temp;
+	int cnt = 0;
+	int divisor = noiseCnt;
+	for (i=0; i<size; i++) {
+		DivNpd_p1(&temp,noise,divisor);
+		if ((i & 3)==0) printf("\r\n%i,%iHz",i,((i*44100)>>10));
+
+		printf("{");
+		for (j=0; j<NP_CNT-1; j++) printf("0x%08x,",temp.n[j]);
+		printf("0x%08x}",temp.n[j]);
+		printf((i!=(size-1)) ? "," : "};");
+		noise++;
+		cnt++;
+	}
+	printf("\r\n");
 }
 static inline void PrintNoise(const npd_p1* noise,const int noiseCnt,const int size)
 {
@@ -342,11 +331,16 @@ void Finish_cnw(CleanNoiseWork* cnw)
 {
 	free(cnw->noise);
 	cnw->noise = NULL;
-#ifdef NOISE_ACCUM
+#if defined(NOISE_ACCUM) || defined(AVERAGE_FFT)
 	if (cnw->noiseAccum) {
 		const int logN=cnw->logN;
+		const int n_d2=(1<<(logN-1));
 		const int n_d4=(1<<(logN-2));
+#ifdef AVERAGE_FFT
+		PrintFFT_Average(cnw->noiseAccum,cnw->noiseCnt,NOISE_SIZE);
+#else
 		PrintNoise(cnw->noiseAccum,cnw->noiseCnt,NOISE_SIZE);
+#endif
 		free(cnw->noiseAccum);
 		cnw->noiseAccum = NULL;
 	}
@@ -354,9 +348,10 @@ void Finish_cnw(CleanNoiseWork* cnw)
 }
 static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 {
+	const int n_d2=(1<<(logN-1));
 	const int n_d4=(1<<(logN-2));
 	int i;
-#ifndef NOISE_ACCUM
+#if !defined(NOISE_ACCUM) && !defined(AVERAGE_FFT)
 #ifdef ARM
 #include "noise_default-arm.c"
 #else
@@ -366,7 +361,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 
 	if (cnw->logN != logN) Finish_cnw(cnw);	//free space on size change
 	cnw->logN = logN;
-#ifdef NOISE_ACCUM
+#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
 	if (cnw->noiseAccum==NULL) {
 		cnw->noiseAccum = (npd_p1*)malloc(NOISE_SIZE*sizeof(*cnw->noiseAccum));
 		memset(cnw->noiseAccum,0,(NOISE_SIZE)*sizeof(cnw->noiseAccum[0]));
@@ -376,7 +371,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 
 	if (cnw->noise==NULL) {
 		cnw->noise = (npd*)malloc(NOISE_SIZE*sizeof(*cnw->noise));
-#ifdef NOISE_ACCUM
+#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
 		for (i=0; i<NOISE_SIZE; i++) SetNpd(&cnw->noise[i],90000,logN);
 #else
 		memcpy(cnw->noise,noise_default,(NOISE_SIZE)*sizeof(cnw->noise[0]));
@@ -389,7 +384,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 }
 void Init_cnw(CleanNoiseWork* cnw,int logN)
 {
-#ifdef NOISE_ACCUM
+#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
 	cnw->noiseAccum = NULL;
 #endif
 	cnw->noise = NULL;

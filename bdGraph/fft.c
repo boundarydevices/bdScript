@@ -63,20 +63,6 @@
 #define SIN2_TABLE(i)  &sin2Table7[(SIN2_SE_PI_D2&i) ? (SIN2_SE_PI_D2-(i&(SIN2_SE_PI_D2-1))) : (i&(SIN2_SE_PI_D2-1))]
 #define SIN2_TEST_USE_LOOKUP(i) (i&(SIN2_SE_PI_D2-1))
 
-static inline int IncReversed(int i,int k)
-{
-	//now increment bit reversed i
-//	printf("IncR(%i,%i)=",i,k);
-	do {
-		i ^= k;
-		if (i&k) break;
-		k>>=1;
-	} while (k);
-//	printf("%i\n",i);
-	return i;
-}
-
-
 
 void PrintNpd(const npd* src,int level)
 {

@@ -138,8 +138,8 @@ static int openReadFd(int* pBlkSize,int channels)
 		perror( "get record level" );
 
 	recordLevel = 100 ;
-//	if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-//		perror( "set record level" );
+	if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+		perror( "set record level" );
 
 //	if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
 //		perror( "get record level" );
@@ -167,6 +167,55 @@ static int openReadFd(int* pBlkSize,int channels)
 		perror( "getISpace" );
 	}
 	return readFd;
+}
+
+static void inline CalcPowerSqroot(npd* power,npd_p1* powerSum,cmplx* vect,const int logN)
+{
+	const int n_d2=(1<<(logN-1));
+	const int n_d4=(1<<(logN-2));
+	const int n3_d4=(3<<(logN-2));
+	int i,j,k;
+	memset(powerSum,0,sizeof(*powerSum));
+	for (i=0,j=0; i<NOISE_SIZE; i++,j=IncReversed(j,n_d2)) {
+#ifndef SKIP_REVERSAL_SORT
+		j = i;
+#endif
+		np temp1;
+		Magnitude(&temp1,&vect[j].r,&vect[j].i);
+		memcpy(power,&temp1,sizeof(temp1));
+		memset(&power[NP_CNT],0,sizeof(temp1));
+		AddNPD_P1(powerSum,power);
+		power++;
+	}
+}
+
+int AverageFFT(short* src,int startPos,int srcBufMask,CleanNoiseWork* cnw)
+{
+	int i;
+	const int logN=cnw->logN;
+	const int n=(1<<logN);
+	const int n_d2=(1<<(logN-1));
+	const int n_d4=(1<<(logN-2));
+	const int n3_d4=(3<<(logN-2));
+	cmplx vect[n];
+	short outputBuffer[n];
+	short* pSamples;
+	npd power[NOISE_SIZE];
+	npd_p1 powerSum;
+
+	fft_forward(vect,src,logN);
+//	PrintTable(vect,logN,AFTER_FFT_SHIFT,1);
+//	printf("e\r\n");
+//	printNpd_p1("a noiseSum: 0x",&cnw->noiseSum);
+	CalcPowerSqroot(&power[0],&powerSum,vect,logN);
+//	printNpd_p1("b noiseSum: 0x",&cnw->noiseSum);
+
+#ifdef NOISE_ACCUM
+	for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseAccum[i],&power[i]);
+	cnw->noiseCnt++;
+	if (cnw->noiseCnt >= 4096) return 0;
+#endif
+	return n;
 }
 
 int WriteWavFile(short* pSamples,int samples);
@@ -231,24 +280,27 @@ void test2(void)
 		}
 		writePos=(writePos+numRead)& (blkSize-1);
 
-#ifdef NOISE_ACCUM
+#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
 		outSampleCnt=0;
 #endif
 
-
+#ifdef AVERAGE_FFT
+		i = AverageFFT((short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);
+#else
 		i = CleanNoise(outSamples+outSampleCnt,outSampleCntMax-outSampleCnt,(short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);	//shifts needed to convert from char oriented to short oriented
+#endif
 		if (i==0) break;
 		{
 			int max = outSampleCntMax - outSampleCnt;
 			if (max>n_d4) max = n_d4;
 			outSampleCnt += max;
 		}
-		readPos =(readPos+n_d2)& (blkSize-1);	//advance n_d4 samples (n_d4<<1 == n_d2)
+		readPos =(readPos+SAMPLE_ADVANCE)& (blkSize-1);
 //		printf("readPos:%i,outSampleCnt*2:%i\r\n",readPos,outSampleCnt<<1);
 	}
 	printf("\r\n");
 	close(readFd);
-#ifndef NOISE_ACCUM
+#if !defined(NOISE_ACCUM) && !defined(AVERAGE_FFT)
 	WriteWavFile(outSamples,outSampleCnt);
 #endif
 	free(inSamples);

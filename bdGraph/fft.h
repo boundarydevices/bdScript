@@ -40,6 +40,19 @@ void fft_forward(cmplx* vect,const short* src,const int logN);
 void fft_inverse(short* dest,cmplx* vect,const int logN);
 void PrintTable(cmplx* vect,const int logN,const int level,const int frequencyDomain);
 
+static inline int IncReversed(int i,int k)
+{
+	//now increment bit reversed i
+//	printf("IncR(%i,%i)=",i,k);
+	do {
+		i ^= k;
+		if (i&k) break;
+		k>>=1;
+	} while (k);
+//	printf("%i\n",i);
+	return i;
+}
+
 #ifdef ARM
 #if (NP_CNT==1)
 #define ARM_1

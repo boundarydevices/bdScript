@@ -305,16 +305,6 @@ else AverageNpd(&cos2,&temp,c);
 		}
 	}
 }
-static inline int IncReversed(int i,int k)
-{
-	//now increment bit reversed i
-	do {
-		i ^= k;
-		if (i&k) break;
-		k>>=1;
-	} while (k);
-	return i;
-}
 static inline void Round(unsigned int * v,int cnt)
 {
 	int i;
