@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsProcess.cpp,v $
- * Revision 1.2  2003-08-24 18:33:04  ericn
+ * Revision 1.3  2003-08-24 22:01:51  ericn
+ * -added shutdown routine (atexit doesn't appear to work) and use SIGABRT, not SIGKILL
+ *
+ * Revision 1.2  2003/08/24 18:33:04  ericn
  * -provide dummy args to child
  *
  * Revision 1.1  2003/08/24 17:32:20  ericn
@@ -111,7 +114,7 @@ jsChildProcessClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
    {
       if( child->isRunning() )
       {
-         int const result = kill( child->pid_, SIGKILL );
+         int const result = kill( child->pid_, SIGABRT );
          if( 0 == result )
             *rval = JSVAL_TRUE ;
          else
@@ -190,7 +193,7 @@ static void cleanupProcesses( void )
          int const pid = (*it).first;
          if( 0 != pid )
          {
-            int const result = kill( pid, SIGKILL );
+            int const result = kill( pid, SIGABRT );
             if( 0 != result )
                perror( "kill" );
          }
@@ -230,5 +233,10 @@ bool initJSProcess( JSContext *cx, JSObject *glob )
       JS_ReportError( cx, "initializing childProcess class\n" );
    
    return false ;
+}
+
+void shutdownJSProcesses( void )
+{
+   cleanupProcesses();
 }
 
