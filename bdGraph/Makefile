@@ -4,7 +4,7 @@
 OBJS = Scale.o Scale16.o SImageData16.o ScaleUpObj.o ScaleYCbCrf1.o ScaleYf1.o SImageDataRLE.o SJpeg.o \
        ScaleHortObj.o ScaleVertObj.o ScaleYCbCrf2.o ScaleYf2.o SImagePositionBottom.o SRle.o \
        ScaleRGB.o ScaleYCbCr.o ScaleY.o SImageDataJpeg.o SImagePosition.o invDCT_JQ.o fft.o fftClean.o \
-       ResourceView.o
+       ResourceView.o mathLib.o
 
 
 
@@ -41,7 +41,7 @@ ifneq (,$(findstring arm, $(CC)))
    CCC_FLAGS =  $(CC_BFLAGS) $(SOFT_FLOAT) -Os -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
    			-fno-common -Uarm  -pipe -mno-apcs-frame \
             -mno-sched-prolog -mapcs-32 -D__LINUX_ARM_ARCH__=5 -march=armv4 -mshort-load-bytes \
-            -fno-exceptions -fomit-frame-pointer -DARM -D__ARM_ARCH_4__ 
+            -fno-exceptions -fomit-frame-pointer -DARM -D__ARM_ARCH_4__
 
    CCC_CPPFLAGS		= $(CCC_FLAGS) -fno-rtti
 
@@ -64,12 +64,16 @@ CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
 %.o : %.cpp Makefile
 	$(CC) $(CCC_CPPFLAGS) $<
 
+
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
 buildSinTable: buildSinTable.cpp fft.h
 	gcc -DX86 buildSinTable.cpp -o $@ -fno-exceptions -lm
 
+
+mathLib.S :
+	ln -s ../../boundaryLib/mathLib.S
 
 sinTable8.c : buildSinTable
 	./buildSinTable
