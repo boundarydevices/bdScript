@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.38  2003-05-10 19:14:10  ericn
+ * Revision 1.39  2003-06-06 03:38:57  ericn
+ * -modified to use backtrace() to get a stack dump
+ *
+ * Revision 1.38  2003/05/10 19:14:10  ericn
  * -added closeCBM routine
  *
  * Revision 1.37  2003/05/09 04:27:04  ericn
@@ -352,6 +355,8 @@ int prMain(int argc, char **argv)
                                     }
                                     else 
                                     {
+printf( "collectin garbage\n" );
+fflush( stdout );
                                        mutexLock_t lock( execMutex_ );
                                        JS_GC( cx );
                                     }
@@ -413,6 +418,7 @@ int prMain(int argc, char **argv)
 #include <prinit.h>
 #include <signal.h>
 #include "hexDump.h"
+#include <execinfo.h>
 
 static struct sigaction sa;
 static struct sigaction oldint;
@@ -430,6 +436,23 @@ void handler(int sig)
    while( dumpStack.nextLine() )
       fprintf( stderr, "%s\n", dumpStack.getLine() );
 
+   void *btArray[128];
+   int btSize;
+   
+   fprintf( stderr, "########## Backtrace ##########\n"
+                    "Number of elements in backtrace: %u\n", backtrace(btArray, sizeof(btArray) / sizeof(void *) ) );
+
+   if (btSize > 0)
+   {
+      char** btSymbols = backtrace_symbols( btArray, btSize );
+      if( btSymbols )
+      {
+         for (int i = btSize - 1; i >= 0; --i)
+            fprintf( stderr, "%s\n", btSymbols[i] );
+      }
+   }
+
+   fprintf( stderr, "Handler done.\n" );
    fflush( stderr );
    if( oldint.sa_handler )
       oldint.sa_handler( sig );
