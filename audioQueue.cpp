@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.4  2002-11-14 13:14:08  ericn
+ * Revision 1.5  2002-11-14 14:44:40  ericn
+ * -fixed clear() routine, modified to always use stereo
+ *
+ * Revision 1.4  2002/11/14 13:14:08  ericn
  * -modified to expose dsp file descriptor
  *
  * Revision 1.3  2002/11/07 14:39:07  ericn
@@ -37,6 +40,7 @@
 #include "madHeaders.h"
 
 static bool volatile _cancel = false ;
+static bool volatile _playing = false ;
 static audioQueue_t *audioQueue_ = 0 ; 
 
 #define OUTBUFSIZE 8192
@@ -65,6 +69,10 @@ printf( "opened dsp device\n" );
       if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
                
+      int const channels = 2 ;
+      if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_CHANNELS, &channels ) )
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+
       unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
       unsigned short *       nextOut = outBuffer ;
       unsigned short         spaceLeft = OUTBUFSIZE ;
@@ -74,6 +82,8 @@ printf( "opened dsp device\n" );
          audioQueue_t :: item_t item ;
          if( queue->pull( item ) )
          {
+            _playing = true ;
+
             madHeaders_t headers( item.data_, item.length_ );
             if( headers.worked() )
             {
@@ -106,12 +116,7 @@ printf( "opened dsp device\n" );
                            break;
                         }
                         
-                        int channels = nChannels = MAD_NCHANNELS(&frame.header) ;
-                        if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_CHANNELS, &channels ) )
-                        {
-                           fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-                           break;
-                        }
+                        nChannels = MAD_NCHANNELS(&frame.header) ;
                      } // first frame... check sample rate
                      else
                      {
@@ -123,8 +128,9 @@ printf( "opened dsp device\n" );
                         mad_fixed_t const *left = synth.pcm.samples[0];
                         for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
                         {
-                           *nextOut++ = scale( *left++ );
-                           if( 0 == --spaceLeft )
+                           *nextOut++ = *nextOut++ = scale( *left++ );
+                           spaceLeft -= 2 ;
+                           if( 0 == spaceLeft )
                            {
                               write( queue->dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                               nextOut = outBuffer ;
@@ -157,6 +163,8 @@ printf( "opened dsp device\n" );
                   }
                } while( !( eof || _cancel || queue->shutdown_ ) );
    
+               _playing = false ;
+
                if( eof )
                {
                   if( OUTBUFSIZE != spaceLeft )
@@ -244,6 +252,8 @@ bool audioQueue_t :: insert
    
 bool audioQueue_t :: clear( unsigned &numCancelled )
 {
+   numCancelled = 0 ;
+
    //
    // This should only be run in the context of 
    // a lock on Javascript execution (i.e. from 
@@ -256,12 +266,22 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       item_t item = queue_.list_.front();
       queue_.list_.pop_front();
       queueSource( item.obj_, item.onCancel_, "audioComplete" );
+      ++numCancelled ;
    }
 
    //
    // tell player to cancel at next frame
    //
-   _cancel = true ;
+   if( _playing )
+   {
+      _cancel = true ;
+      ++numCancelled ;
+   }
+   else
+   {
+      if( 0 != ioctl( dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+   } // not playing
 
    return true ;
 }
