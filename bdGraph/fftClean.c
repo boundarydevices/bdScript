@@ -181,9 +181,9 @@ static inline void PrintFFT_Average(const npd_p1* noise,const int noiseCnt,const
 	int divisor = noiseCnt;
 	for (i=0; i<size; i++) {
 		DivNpd_p1(&temp,noise,divisor);
-		if ((i & 3)==0) printf("\r\n%i,%iHz",i,((i*44100)>>10));
+		if ((i & 3)==0) printf("\r\n%i: ",i);
+		printf(" %iHz{",((i*44100)>>10));
 
-		printf("{");
 		for (j=0; j<NP_CNT-1; j++) printf("0x%08x,",temp.n[j]);
 		printf("0x%08x}",temp.n[j]);
 		printf((i!=(size-1)) ? "," : "};");
@@ -218,9 +218,11 @@ static inline void PrintNoise(const npd_p1* noise,const int noiseCnt,const int s
 static inline void PrintSamples(const short* pSamples,const int n)
 {
 	int i;
+	printf("--------------------\n");
 	for (i=0; i<n; i++) {
-		if ((i&7)==0) printf("\r\n");
-		printf("%7i",*pSamples);
+		if ((i&7)==0) printf("\r\n%3i:",i);
+//		printf("%7i",*pSamples);
+		printf("%04x ",*pSamples);
 		pSamples++;
 	}
 	printf("\n");
@@ -273,7 +275,7 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 #ifdef NOISE_ACCUM
 	for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseAccum[i],&power[i]);
 	cnw->noiseCnt++;
-	if (cnw->noiseCnt >= 4096) return 0;
+	if (cnw->noiseCnt >= REP_FFT_CNT) return 0;
 #endif
 	if (CmpNPD_P1(&powerSum,&cnw->noiseSum) > 0) cnw->silenceCnt=0;
 	else {
@@ -285,10 +287,10 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 		//this is a signal
 		int max = bufSize;
 		short* p = dest;
-		if (max>n_d4) max = n_d4;
+		if (max>MAX_ADD_SIZE) max = MAX_ADD_SIZE;
 		printf(".");
 		ZeroHighLowFrequencies(vect,logN);
-		SubtractNoise(&power[0],&cnw->noise[0],vect,logN);
+//		SubtractNoise(&power[0],&cnw->noise[0],vect,logN);
 		DoSymmetry(vect,n_d2,n);
 #if 0
 		PrintTable(vect,logN,AFTER_FFT_SHIFT,1);
@@ -297,18 +299,20 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 		fft_inverse(pSamples,vect,logN);
 //		PrintTable(vect,logN,FINAL_SHIFT,0);
 //		PrintSamples(pSamples,n);
+//		PrintSamples(p,max);
 		for (i=0; i<max; i++) {
 			int val = *p + *pSamples++;
 			if (val>0x7fff) val = 0x7fff;
 			else if (val< -0x8000) val = -0x8000;
 			*p++ = val;
 		}
-		max = bufSize - n_d4;
+//		PrintSamples(p-max,max);
+		max = bufSize - MAX_ADD_SIZE;
 		if (max>n_d4) max = n_d4;
 		if (max>0) memcpy(p,pSamples,max*sizeof(*p));
 	} else {
-		short* p = dest+n_d4;
-		int max = bufSize - n_d4;
+		short* p = dest+MAX_ADD_SIZE;
+		int max = bufSize - MAX_ADD_SIZE;
 		npd* n = &cnw->noise[0];
 		npd* pow = &power[0];
 		if (max>n_d4) max = n_d4;
@@ -331,7 +335,7 @@ void Finish_cnw(CleanNoiseWork* cnw)
 {
 	free(cnw->noise);
 	cnw->noise = NULL;
-#if defined(NOISE_ACCUM) || defined(AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 	if (cnw->noiseAccum) {
 		const int logN=cnw->logN;
 		const int n_d2=(1<<(logN-1));
@@ -351,7 +355,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 	const int n_d2=(1<<(logN-1));
 	const int n_d4=(1<<(logN-2));
 	int i;
-#if !defined(NOISE_ACCUM) && !defined(AVERAGE_FFT)
+#ifndef NOISE_ACCUM
 #ifdef ARM
 #include "noise_default-arm.c"
 #else
@@ -361,7 +365,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 
 	if (cnw->logN != logN) Finish_cnw(cnw);	//free space on size change
 	cnw->logN = logN;
-#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 	if (cnw->noiseAccum==NULL) {
 		cnw->noiseAccum = (npd_p1*)malloc(NOISE_SIZE*sizeof(*cnw->noiseAccum));
 		memset(cnw->noiseAccum,0,(NOISE_SIZE)*sizeof(cnw->noiseAccum[0]));
@@ -371,7 +375,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 
 	if (cnw->noise==NULL) {
 		cnw->noise = (npd*)malloc(NOISE_SIZE*sizeof(*cnw->noise));
-#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 		for (i=0; i<NOISE_SIZE; i++) SetNpd(&cnw->noise[i],90000,logN);
 #else
 		memcpy(cnw->noise,noise_default,(NOISE_SIZE)*sizeof(cnw->noise[0]));
@@ -384,7 +388,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 }
 void Init_cnw(CleanNoiseWork* cnw,int logN)
 {
-#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 	cnw->noiseAccum = NULL;
 #endif
 	cnw->noise = NULL;
