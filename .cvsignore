@@ -12,4 +12,4 @@ ffTest videoQueue mpDemux mpDecode madDecode pcapTest sniffWLAN monitorWLAN ping
 avSendTo
 *.sym openFds readCIS
 barcodePoll pollHandlerTest touchPoll udpSpewTo udpRecvAll
-flashThread progFlash reboot pollTimerTest
+flashThread progFlash reboot pollTimerTest ttyPoll
