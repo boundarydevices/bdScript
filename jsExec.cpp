@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.48  2003-08-03 03:25:31  ericn
+ * Revision 1.49  2003-08-06 13:51:33  ericn
+ * -modified to re-run same executable
+ *
+ * Revision 1.48  2003/08/03 03:25:31  ericn
  * -added flash module
  *
  * Revision 1.47  2003/07/30 20:25:26  ericn
@@ -163,6 +166,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 
 /* include the JS engine API header */
 #include "js/jsstddef.h"
@@ -505,10 +509,33 @@ int main( int argc, char *argv[] )
    // Set up the signal handler
    sigaction(SIGSEGV, &sa, NULL);
 
+   char *exePath = argv[0];
+   
+   {
+      char temp[80];
+      sprintf( temp, "/proc/%d/exe", getpid() );
+      struct stat st ;
+      int stResult = stat( temp, &st );
+      if( 0 == stResult )
+      {
+         exePath = new char [ st.st_size + 1 ];
+         int numRead = readlink( temp, exePath, st.st_size + 1 );
+         if( 0 < numRead )
+         {
+            argv[0] = exePath ;
+         }
+         else
+            fprintf( stderr, "Error resolving path2:%m\n" );
+      }
+      else
+      {
+         fprintf( stderr, "Error resolving exe:%m\n" );
+      }
+   } // limit scope of temporaries
+
    printf( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
    do
    {
-printf( "---> initializing NSPR\n" );
       int result = PR_Initialize( prMain, argc, argv, 0 );
       if( gotoCalled_ )
       {
