@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.12  2002-11-17 16:08:33  ericn
+ * Revision 1.13  2002-11-17 22:24:45  ericn
+ * -reworked goto, added jsShell
+ *
+ * Revision 1.12  2002/11/17 16:08:33  ericn
  * -modified to initialize NSPR
  *
  * Revision 1.11  2002/11/17 03:31:48  ericn
@@ -76,6 +79,7 @@
 #include "audioQueue.h"
 #include "jsVolume.h"
 #include "jsBarcode.h"
+#include "jsShell.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -231,6 +235,7 @@ int prMain(int argc, char **argv)
                      initJSHyperlink( cx, glob );
                      initJSVolume( cx, glob );
                      initJSBarcode( cx, glob );
+                     initJSShell( cx, glob );
 
                      touchScreenThread_t *tsThread ;
                      if( !initJSTouch( tsThread, cx, glob ) )
@@ -265,16 +270,19 @@ int prMain(int argc, char **argv)
 
                            if( exec )
                            {
+                              unsigned numEvents = 0 ;
+
                               while( 1 )
                               {
                                  if( gotoCalled_ )
                                  {
-                                    argv[2] = (char *)gotoURL_.c_str();
-                                    argv[3] = 0 ;
-                                    execv( argv[0], argv ); // start next
+                                    printf( "executing %s\n", gotoURL_.c_str() );
+                                    break;
                                  }
                                  else 
                                  {
+                                    bool doGC = ( 0 == ( ++numEvents % 10 ) );
+
                                     JSObject *scope ;
                                     if( dequeueByteCode( script, scope, 5000 ) )
                                     {
@@ -285,9 +293,14 @@ int prMain(int argc, char **argv)
                                        JS_DestroyScript( cx, script );
                                     }
                                     else
+                                       doGC = true ;
+                                    
+                                    if( doGC )
                                     {
+                                       printf( "collectin' garbage\n" );
                                        mutexLock_t lock( execMutex_ );
                                        JS_GC( cx );
+                                       printf( "done\n" );
                                     }
                                  }
                               }
@@ -344,9 +357,13 @@ int prMain(int argc, char **argv)
 
 int main( int argc, char *argv[] )
 {
-   printf( "starting via PR_Initialize\n" );
    int result = PR_Initialize( prMain, argc, argv, 0 );
-   printf( "prMain exited %d\n", result );
+   if( gotoCalled_ )
+   {
+      printf( "executing %s\n", gotoURL_.c_str() );
+      argv[1] = (char *)gotoURL_.c_str();
+      execv( argv[0], argv ); // start next
+   }
 
    return result ;
 }
