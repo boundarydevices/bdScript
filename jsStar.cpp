@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStar.cpp,v $
- * Revision 1.1  2004-05-05 03:20:32  ericn
+ * Revision 1.2  2004-05-08 16:33:59  ericn
+ * -high-speed
+ *
+ * Revision 1.1  2004/05/05 03:20:32  ericn
  * -Initial import
  *
  *
@@ -35,7 +38,7 @@ static char const initPrinter[] = {
    "\x1b@"              // initPrinter
    "\x1b*rR"            // initialize raster mode (to defaults)
    "\x1b*rA"            // enter raster mode
-   "\x1b*rQ2\x00"       // letter quality
+   "\x1b*rQ0\x00"       // 0 == high speed, 1 == normal, 2 == letter quality
    "\x1b*rC"            // clear image
    "\x01b*rP"           // set page height
 };
