@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsProcess.cpp,v $
- * Revision 1.1  2003-08-24 17:32:20  ericn
+ * Revision 1.2  2003-08-24 18:33:04  ericn
+ * -provide dummy args to child
+ *
+ * Revision 1.1  2003/08/24 17:32:20  ericn
  * -Initial import
  *
  *
@@ -51,6 +54,8 @@ jsProcess_t :: jsProcess_t
    {
       if( JSVAL_IS_STRING( args[arg] ) )
          charArgs[arg+1] = JS_GetStringBytes( JSVAL_TO_STRING( args[arg] ) );
+      else
+         charArgs[arg+1] = "notstring" ;
    }
    charArgs[nargs+1] = 0 ; // terminate
 
