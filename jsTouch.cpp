@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.21  2004-11-26 15:33:51  ericn
+ * Revision 1.22  2004-11-27 18:00:34  ericn
+ * -only 6 params
+ *
+ * Revision 1.21  2004/11/26 15:33:51  ericn
  * -remove range from touch calibration
  *
  * Revision 1.20  2004/11/16 15:48:59  ericn
@@ -166,7 +169,7 @@ void jsTouchPoll_t :: setCooked( char const *data )
 {
    double a[6];
    unsigned swap ;
-   if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf,%u,%u", a, a+1, a+2, a+3, a+4, a+5 ) )
+   if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf", a, a+1, a+2, a+3, a+4, a+5 ) )
    {
       raw_ = false ;
 
