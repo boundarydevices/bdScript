@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.2  2002-11-23 16:14:10  ericn
+ * Revision 1.3  2002-11-24 19:07:48  ericn
+ * -added release sound
+ *
+ * Revision 1.2  2002/11/23 16:14:10  ericn
  * -added touch and release sounds, alpha support
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -194,6 +197,12 @@ static void buttonRelease( box_t         &box,
    assert( button->box_ == &box );
    
    display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
+   
+   if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
+   {
+      getAudioQueue().insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_, "", "" );
+   }
+
    doit( box, x, y, defaultRelease, "onRelease" );
 }
 
