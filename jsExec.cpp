@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.60  2003-09-09 03:58:34  ericn
+ * Revision 1.61  2003-09-10 04:56:30  ericn
+ * -Added UDP support
+ *
+ * Revision 1.60  2003/09/09 03:58:34  ericn
  * -modified to supply default environment variables
  *
  * Revision 1.59  2003/09/06 19:50:13  ericn
@@ -246,6 +249,7 @@
 #include "jsProcess.h"
 #include "jsDir.h"
 #include "md5.h"
+#include "jsUDP.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -472,6 +476,7 @@ int prMain(int argc, char **argv)
                      initPing( cx, glob );
                      initJSProcess( cx, glob );
                      initJSDir( cx, glob );
+                     initJSUDP( cx, glob );
 
                      getCurlCache();
 
