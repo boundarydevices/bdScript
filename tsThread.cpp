@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.6  2002-12-15 00:00:22  ericn
+ * Revision 1.7  2002-12-23 05:09:35  ericn
+ * -modified to use either /dev/input/event0 or /dev/touchscreen/ucb1x00
+ *
+ * Revision 1.6  2002/12/15 00:00:22  ericn
  * -removed debug msg
  *
  * Revision 1.5  2002/11/30 17:32:58  ericn
@@ -40,6 +43,12 @@
 #include <pthread.h>
 #include <tslib.h>
 #include "fbDev.h"
+
+#if TSINPUTAPI == 1
+#define TSDEVICE "/dev/input/event0"
+#else
+#define TSDEVICE "/dev/touchscreen/ucb1x00"
+#endif
 
 static void *tsThread( void *arg )
 {
@@ -93,8 +102,7 @@ static void *tsThread( void *arg )
 
 touchScreenThread_t :: touchScreenThread_t( void )
    : threadHandle_( -1 ),
-     tsDevice_( ts_open( "/dev/input/event0", 0 ) )
-//     fdDevice_( open( "/dev/input/event0", O_RDONLY ) )
+     tsDevice_( ts_open( TSDEVICE, 0 ) )
 {
    if( 0 != tsDevice_ )
    {
