@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.5  2003-01-05 01:58:15  ericn
+ * Revision 1.6  2003-01-12 03:04:12  ericn
+ * -added sendToScanner() and fakeBarcode()
+ *
+ * Revision 1.5  2003/01/05 01:58:15  ericn
  * -added identification of threads
  *
  * Revision 1.4  2002/12/18 04:12:25  ericn
@@ -34,12 +37,13 @@
 #include <string>
 #include "codeQueue.h"
 #include "jsGlobals.h"
+#include "semClasses.h"
 
 static std::string sBarcode_ ;
 static std::string sSymbology_( "unknown" );
 static jsval       sHandler_ = JSVAL_VOID ;
 static JSObject   *handlerScope_ ;
-
+static mutex_t     bcMutex_ ;
 static JSBool
 jsOnBarcode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -84,18 +88,61 @@ jsGetBarcodeSymbology( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
    return JS_TRUE ;
 }
 
+static int       bcDev_ ;
+
+static JSBool
+jsSendToScanner( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( 1 == argc )
+   {
+      JSString *jsMsg = JSVAL_TO_STRING( argv[0] );
+      int const numWritten = write( bcDev_, JS_GetStringBytes( jsMsg ), JS_GetStringLength( jsMsg ) );
+      *rval = INT_TO_JSVAL( numWritten );
+   }
+   else
+   {
+      *rval = JSVAL_FALSE ;
+      JS_ReportError( cx, "Usage: sendToScanner( \'string\' );" );
+   }
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsFakeBarcode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( 1 == argc )
+   {
+      JSString *jsMsg = JSVAL_TO_STRING( argv[0] );
+      mutexLock_t lock( bcMutex_ );
+      sBarcode_.assign( JS_GetStringBytes( jsMsg ), JS_GetStringLength( jsMsg ) );
+
+      if( ( JSVAL_VOID != sHandler_ ) && ( 0 != handlerScope_ ) )
+         queueSource( handlerScope_, sHandler_, "onBarcode" );
+      
+      *rval = JSVAL_TRUE ;
+   }
+   else
+   {
+      *rval = JSVAL_FALSE ;
+      JS_ReportError( cx, "Usage: fakeBarcode( \'string\' );" );
+   }
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec _functions[] = {
     {"onBarcode",            jsOnBarcode,             1 },
     {"getBarcode",           jsGetBarcode,            0 },
     {"getBarcodeSymbology",  jsGetBarcodeSymbology,   0 },
+    {"sendToScanner",        jsSendToScanner,         1 },
+    {"fakeBarcode",          jsFakeBarcode,           1 },
     {0}
 };
 
 static char const bcDeviceName_[] = {
    "/dev/ttyS2"
 };
-
-static int       bcDev_ ;
 
 static void *barcodeThread( void *arg )
 {
@@ -130,7 +177,9 @@ printf( "barcodeReader %p (id %x)\n", &arg, pthread_self() );
             if( 0 < numRead )
             {
                inBuf[numRead] = '\0' ;
+               mutexLock_t lock( bcMutex_ );
                sBarcode_ = inBuf ;
+               
                if( ( JSVAL_VOID != sHandler_ ) && ( 0 != handlerScope_ ) )
                {
                   queueSource( handlerScope_, sHandler_, "onBarcode" );
