@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.2  2002-10-25 02:53:14  ericn
+ * Revision 1.3  2002-10-25 02:57:04  ericn
+ * -removed debug print statements
+ *
+ * Revision 1.2  2002/10/25 02:53:14  ericn
  * -moved MP3 decoding to sub-process
  *
  * Revision 1.1  2002/10/24 13:19:03  ericn
@@ -38,13 +41,13 @@ public:
 
 void mp3Process_t :: died( void )
 {
-   printf( "mp3 process died\n" );
+//   printf( "mp3 process died\n" );
    pid_ = -1 ;
    if( !playList_.empty() )
    {
       std::string const url = playList_.front();
       playList_.pop_front();
-      printf( "starting %s\n", url.c_str() );
+//      printf( "starting %s\n", url.c_str() );
       char *args[3] = {
          "./mp3Play",
          (char *)url.c_str(),
@@ -69,7 +72,7 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       curlFile_t f( cache.get( cURL, true ) );
       if( f.isOpen() )
       {
-         printf( "mime type %s\n", f.getMimeType() );
+//         printf( "mime type %s\n", f.getMimeType() );
          childProcessLock_t lock ;
 
          std::string absolute ;
@@ -84,7 +87,9 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             };
 
             if( curProcess_.run( args[0], args, __environ ) )
-               printf( "playing %s\n", cURL );
+            {
+//               printf( "playing %s\n", cURL );
+            }
             else
             {
                printf( "Error %m running ./mp3Play %s\n", cURL );
@@ -92,7 +97,7 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          }
          else
          {
-            printf( "queueing %s\n", absolute.c_str() );
+//            printf( "queueing %s\n", absolute.c_str() );
             playList_.push_back( absolute );
          }
 
