@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.1  2002-11-02 04:13:07  ericn
+ * Revision 1.2  2002-11-02 18:38:48  ericn
+ * -modified to initialize pixmap
+ *
+ * Revision 1.1  2002/11/02 04:13:07  ericn
  * -Initial import
  *
  *
@@ -141,7 +144,9 @@ freeTypeString_t :: freeTypeString_t
 
    if( ( 0 != width_ ) && ( 0 != height_ ) )
    {
-      data_ = new unsigned char [ width_*height_ ];
+      unsigned const outBytes = width_*height_ ;
+      data_ = new unsigned char [ outBytes ];
+      memset( data_, 0, outBytes );
       sText = dataStr ;
 
       unsigned penX = leftMargin ;
