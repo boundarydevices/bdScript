@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.3 2002-11-30 18:52:57 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.4 2002-12-01 02:42:04 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.3  2002-11-30 18:52:57  ericn
+ * Revision 1.4  2002-12-01 02:42:04  ericn
+ * -added queueCallback() and queueUnrootedSource(), changed dequeueByteCode() to pollCodeQueue()
+ *
+ * Revision 1.3  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.2  2002/10/31 02:09:35  ericn
@@ -36,19 +39,34 @@
 #include "js/jsapi.h"
 
 //
-// returns true if compiled and queued successfully, 
-// false if the code couldn't be compiled 
+// returns true if queued successfully, 
+// false if the program is aborting.
+//
+// Use this routine only for rooted code
 //
 bool queueSource( JSObject   *scope,
                   jsval       sourceCode,
                   char const *sourceFile );
+//
+// same as queueSource for unrooted code.
+//
+bool queueUnrootedSource( JSObject   *scope,
+                          jsval       sourceCode,
+                          char const *sourceFile );
+
+typedef void (*callback_t)( void *cbData );
+
+bool queueCallback( callback_t callback,
+                    void      *cbData );
 
 //
-// returns a valid pointer if successful. 
+// returns when idle for specified time in milliseconds,
+// when 'iterations' fragments of code have been executed,
+// or upon a 'gotoURL' call
 //
-bool dequeueByteCode( JSScript    *&script,
-                      JSObject    *&scope,
-                      unsigned long milliseconds = 0xFFFFFFFF );
+void pollCodeQueue( JSContext *cx,
+                    unsigned   milliseconds,
+                    unsigned   iterations );
 
 //
 // This should be called after the initial script is 
