@@ -68,7 +68,7 @@ OBJS = \
        jsKernel.o \
        jsMD5.o \
        jsMonWLAN.o \
-       jsNewTouch.o \
+       jsTouch.o \
        jsPing.o \
        jsPopen.o \
        jsProcess.o \
