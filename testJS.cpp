@@ -8,14 +8,17 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.2  2002-09-28 17:04:16  ericn
+ * Revision 1.3  2002-09-28 17:05:07  ericn
+ * -changed copyright tag
+ *
+ * Revision 1.2  2002/09/28 17:04:16  ericn
  * -changed #include references
  *
  * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
  * -Initial import
  *
  *
- * Copyright Ticketmaster Technologies, Inc. 2002
+ * Copyright Boundary Devices, Inc. 2002
  */
 
 
