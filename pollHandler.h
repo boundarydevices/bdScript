@@ -1,19 +1,39 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.7 2004-01-01 20:11:42 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.8 2004-02-08 10:34:46 ericn Exp $"
 
 /*
  * pollHandler.h
  *
- * This header file declares the pollHandler_t class, and
- * the pollHandlerSet_t class, which are used to allow a 
+ * This header file declares the pollHandler_t, pollClient_t,
+ * and pollHandlerSet_t classes, which are used to allow a 
  * single, generic thread to process I/O on a set of file
  * handles.
  *
+ * Expected usage is something like the following:
+ *
+ *       pollHandlerSet_t handlers ;
+ *
+ *       ...instantiate some handlers here
+ *
+ *       while( !exit )
+ *          handlers.poll( -1UL );
+ *
+ * Various pollHandler_t variants are available for serial
+ * ports, console, barcode readers, etc...
+ *
+ * Usually, application-level processing is done directly by
+ * pollHandler_t descendants, but the pollClient_t provides 
+ * an extra level of indirection when it is useful to re-use
+ * an I/O channel for multiple requests (e.g. Audio, HTTP, HTTPS).
+ * 
  *
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.7  2004-01-01 20:11:42  ericn
+ * Revision 1.8  2004-02-08 10:34:46  ericn
+ * -added pollClient_t declaration
+ *
+ * Revision 1.7  2004/01/01 20:11:42  ericn
  * -added isOpen() routine, and switched pollHandlers to use close()
  *
  * Revision 1.6  2004/01/01 16:02:15  ericn
@@ -44,26 +64,21 @@
 
 class pollHandlerSet_t ;
 
-
 class pollHandler_t {
 public:
    pollHandler_t( int               fd,
                   pollHandlerSet_t &set );
    virtual ~pollHandler_t( void );
 
-   //
-   // These routines should return true if the handler
-   // still wants callbacks on the same events.
-   //
    virtual void onDataAvail( void );     // POLLIN
    virtual void onWriteSpace( void );    // POLLOUT
    virtual void onError( void );         // POLLERR
    virtual void onHUP( void );           // POLLHUP
 
-   void setMask( short events );
+   void  setMask( short events );
    short getMask( void ) const { return mask_ ; }
    int   getFd( void ) const { return fd_ ; }
-   bool isOpen( void ) const { return 0 <= fd_ ; }
+   bool  isOpen( void ) const { return 0 <= fd_ ; }
    void  close( void ){ ::close( fd_ ); fd_ = -1 ; }
 
 protected:
@@ -73,6 +88,19 @@ protected:
 private:
    pollHandler_t( pollHandler_t const & ); // no copies
 };
+
+
+class pollClient_t {
+public:
+   virtual ~pollClient_t( void );
+
+   virtual unsigned short getMask( void );
+   virtual void onDataAvail( pollHandler_t & );     // POLLIN
+   virtual void onWriteSpace( pollHandler_t & );    // POLLOUT
+   virtual void onError( pollHandler_t & );         // POLLERR
+   virtual void onHUP( pollHandler_t & );           // POLLHUP
+};
+
 
 
 class pollHandlerSet_t {
