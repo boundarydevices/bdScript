@@ -4,10 +4,13 @@
  * This module defines ...
  *
  *
- * Change History : 
+ * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.6  2002-11-21 14:03:21  ericn
+ * Revision 1.7  2002-11-21 23:03:00  tkisky
+ * -Make it easy to turn off/change reordering
+ *
+ * Revision 1.6  2002/11/21 14:03:21  ericn
  * -removed display clear on instantiation
  *
  * Revision 1.5  2002/11/02 18:39:25  ericn
@@ -43,11 +46,29 @@ static unsigned short rTable[32];
 static unsigned short gTable[64];
 static unsigned short bTable[32];
 
+
+#if 1
+#define LCD_REORDER
+#define LCD_REORDER_BLUE  15,14, 8, 7, 6
+#define LCD_REORDER_GREEN 13,12,11, 5, 4, 3
+#define LCD_REORDER_RED   10, 9, 2, 1, 0
+
+#else
+#define LCD_REORDER_BLUE  0,1,2,3,4
+#define LCD_REORDER_GREEN 5,6,7,8,9,10
+#define LCD_REORDER_RED   11,12,13,14,15
+#endif
+
+#define M5Masks(a,b,c,d,e)   1<<a, 1<<b, 1<<c, 1<<d, 1<<e
+#define M6Masks(a,b,c,d,e,f) 1<<a, 1<<b, 1<<c, 1<<d, 1<<e, 1<<f
+//the macro indirection allows "a" to be evaluated as multiple parameters
+#define Make5Masks(a) M5Masks(a)
+#define Make6Masks(a) M6Masks(a)
 static void InitBoundaryReordering(void)
 {
-	const char rMap[] = {10,9,2,1,0};
-	const char gMap[] = {13,12,11,5,4,3};
-	const char bMap[] = {15,14,8,7,6};
+	const char bMap[] = {LCD_REORDER_BLUE};
+	const char gMap[] = {LCD_REORDER_GREEN};
+	const char rMap[] = {LCD_REORDER_RED};
 	int i,j;
 
    memset( rTable, 0, sizeof( rTable ) );
@@ -81,37 +102,52 @@ unsigned short fbDevice_t :: get16( unsigned char red, unsigned char green, unsi
         | bTable[blue>>3];
 }
 
+
+
+
 unsigned char fbDevice_t :: getRed( unsigned short screenRGB )
 {
-   unsigned short const shortMasks[] = {1<<10,1<<9,1<<2,1<<1,1<<0};
+#ifdef LCD_REORDER
+   unsigned short const shortMasks[] = {Make5Masks(LCD_REORDER_RED)};
    unsigned char out = 0 ;
    unsigned char mask = 1 ;
    for( unsigned i = 0 ; i < 5 ; i++, mask <<= 1 )
       if( screenRGB & shortMasks[i] )
          out |= mask ;
    return out << 3 ;
+#else
+   return (screenRGB & (0x1f<<11)) >> (11-3);
+#endif
 }
 
 unsigned char fbDevice_t :: getGreen( unsigned short screenRGB )
 {
-   unsigned short const shortMasks[] = {1<<13,1<<12,1<<11,1<<5,1<<4,1<<3};
+#ifdef LCD_REORDER
+   unsigned short const shortMasks[] = {Make6Masks(LCD_REORDER_GREEN)};
    unsigned char out = 0 ;
    unsigned char mask = 1 ;
    for( unsigned i = 0 ; i < 6 ; i++, mask <<= 1 )
       if( screenRGB & shortMasks[i] )
          out |= mask ;
    return out << 2 ;
+#else
+   return (screenRGB & (0x3f<<5)) >> (5-2);
+#endif
 }
 
 unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
 {
-   unsigned short const shortMasks[] = {1<<15,1<<14,1<<8,1<<7,1<<6};
+#ifdef LCD_REORDER
+   unsigned short const shortMasks[] = {Make5Masks(LCD_REORDER_BLUE)};
    unsigned char out = 0 ;
    unsigned char mask = 1 ;
    for( unsigned i = 0 ; i < 5 ; i++, mask <<= 1 )
       if( screenRGB & shortMasks[i] )
          out |= mask ;
    return out << 3 ;
+#else
+   return (screenRGB & 0x1f) << 3;
+#endif
 }
 
 fbDevice_t :: fbDevice_t( char const *name )
@@ -350,4 +386,3 @@ int main( int argc, char const * const argv[] )
 }
 
 #endif
-
