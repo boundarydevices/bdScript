@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.2  2002-10-25 03:08:30  ericn
+ * Revision 1.3  2002-10-26 14:13:36  ericn
+ * -changed return value to indicate success
+ *
+ * Revision 1.2  2002/10/25 03:08:30  ericn
  * -removed debug statements
  *
  * Revision 1.1  2002/10/25 02:55:01  ericn
@@ -297,6 +300,7 @@ int main( int argc, char *argv[] )
                         unsigned const used = (fragSize-spaceLeft);
                         write( dspFd_, outBuffer, used * sizeof( outBuffer[0] ) ); // flush output
                      }
+                     return 0 ;
                   }
                   else
                      fprintf( stderr, "Error retrieving %s\n", cURL );
@@ -321,5 +325,5 @@ int main( int argc, char *argv[] )
    else
       fprintf( stderr, "usage %s mp3URL\n", argv[0] );
    
-   return 0 ;
+   return 3 ;
 }
