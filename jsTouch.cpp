@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.6  2002-11-30 23:45:49  ericn
+ * Revision 1.7  2002-12-14 23:59:58  ericn
+ * -removed redundant touch code
+ *
+ * Revision 1.6  2002/11/30 23:45:49  ericn
  * -rooted touch handlers
  *
  * Revision 1.5  2002/11/30 18:52:57  ericn
@@ -202,12 +205,11 @@ void jsTouchScreenThread_t :: onMove
    lastX_ = x ;
    lastY_ = y ;
 
-   printf( "move %u/%u\n", x, y );
    if( 0 == curBox_ )
-      onTouch( x, y );
-
-   if( JSVAL_VOID != onMoveCode_ )
-      queueSource( scope_, onMoveCode_, "onMove" );
+   {
+      if( JSVAL_VOID != onMoveCode_ )
+         queueSource( scope_, onMoveCode_, "onMove" );
+   }
 }
 
 static JSFunctionSpec touch_functions[] = {
