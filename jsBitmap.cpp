@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.2  2004-07-04 21:34:58  ericn
+ * Revision 1.3  2004-07-25 22:33:42  ericn
+ * -added support for rotation
+ *
+ * Revision 1.2  2004/07/04 21:34:58  ericn
  * -added line, rect, textBox, and conversions
  *
  * Revision 1.1  2004/03/17 04:56:19  ericn
@@ -247,7 +250,7 @@ jsTextBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    jsval     fontDataVal ;
    JSString *fontStr ;
    JSString *sText ;
-   if( ( 8 == argc )
+   if( ( ( 8 == argc ) || ( 9 == argc ) )
        &&
        JSVAL_IS_OBJECT( argv[0] )
        &&
@@ -297,13 +300,17 @@ jsTextBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
              &&
              JSVAL_IS_STRING( dataVal ) )
          {
+            unsigned rotation = 0 ;
+            if( ( 9 == argc ) && JSVAL_IS_INT( argv[8] ) )
+               rotation = JSVAL_TO_INT( argv[8] );
             if( freeTypeToBitmapBox( font, pointSize, alignment,
                                      JS_GetStringBytes( sText ),
                                      JS_GetStringLength( sText ),
                                      x, y, w, h,
                                      (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
                                      bitmap_t::bytesPerRow( JSVAL_TO_INT( widthVal ) ), 
-                                     JSVAL_TO_INT( heightVal ) ) )
+                                     JSVAL_TO_INT( heightVal ),
+                                     rotation ) )
                *rval = JSVAL_TRUE ;
             else
                JS_ReportError( cx, "Error rendering textBox" );

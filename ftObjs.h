@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.6 2004-07-04 21:30:32 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.7 2004-07-25 22:33:59 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.6  2004-07-04 21:30:32  ericn
+ * Revision 1.7  2004-07-25 22:33:59  ericn
+ * -added support for rotation
+ *
+ * Revision 1.6  2004/07/04 21:30:32  ericn
  * -add monochrome(bitmap) support
  *
  * Revision 1.5  2003/02/10 01:17:00  ericn
@@ -113,7 +116,8 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
                           unsigned        h,
                           unsigned char  *bmp,
                           unsigned        bmpStride, // bytes per row
-                          unsigned        bmpRows );
+                          unsigned        bmpRows,
+                          unsigned        rotation = 0 ); // only 0, 90, 180, 270 supported
 
 #endif
 
