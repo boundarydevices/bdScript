@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.6  2003-08-02 19:29:36  ericn
+ * Revision 1.7  2003-08-03 14:41:49  ericn
+ * -fixed return value from release() call
+ *
+ * Revision 1.6  2003/08/02 19:29:36  ericn
  * -modified to allow width, height, and output sampleRate and numChannels
  *
  * Revision 1.5  2003/08/02 15:20:39  ericn
@@ -162,6 +165,7 @@ jsMPEGRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
                             |JSPROP_READONLY );
       }
    }
+   return JS_TRUE ;
 }
 
 static JSFunctionSpec mpegMethods_[] = {
