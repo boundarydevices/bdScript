@@ -1,13 +1,14 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.4 2002-12-01 03:13:54 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.5 2003-02-01 18:15:27 ericn Exp $"
 
 /*
  * audioQueue.h
  *
- * This header file declares the audioQueue_t
- * class, the global accessor, and a shutdown 
- * routine. Note that an audio output thread is
- * created upon first activation. 
+ * This header file declares the audioQueue_t class, 
+ * the global accessor, and a shutdown routine. 
+ *
+ * Note that an audio input/output thread is created upon 
+ * first activation. 
  * 
  * Use the shutdown() method to 
  *
@@ -15,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.4  2002-12-01 03:13:54  ericn
+ * Revision 1.5  2003-02-01 18:15:27  ericn
+ * -preliminary wave file and record support
+ *
+ * Revision 1.4  2002/12/01 03:13:54  ericn
  * -modified to root objects through audio queue
  *
  * Revision 1.3  2002/11/30 18:52:57  ericn
@@ -42,7 +46,14 @@
 
 class audioQueue_t {
 public:
+   enum itemType_e {
+      mp3Play_    = 0,
+      wavRecord_  = 1,
+      wavPlay_    = 2
+   };
+
    struct item_t {
+      itemType_e           type_ ;                 
       JSObject            *obj_ ;
       unsigned char const *data_ ;
       unsigned             length_ ;
@@ -52,16 +63,46 @@ public:
    };
 
    //
-   // queue an item for playback
+   // wave file data is prepended with this
    //
-   bool insert( JSObject            *mp3Obj,
-                unsigned char const *data,
-                unsigned             length,
-                jsval                onComplete = JSVAL_VOID,
-                jsval                onCancel = JSVAL_VOID );
+   struct waveHeader_t {
+      unsigned char  numChannels_ ;
+      unsigned short sampleRate_ ;
+      unsigned long  numSamples_ ;
+      unsigned short samples_[1];
+   };
 
    //
-   // flush all outbound audio
+   // queue an mp3 file for playback
+   //
+   bool queuePlayback( JSObject            *mp3Obj,
+                       unsigned char const *data,
+                       unsigned             length,
+                       jsval                onComplete = JSVAL_VOID,
+                       jsval                onCancel = JSVAL_VOID );
+
+   //
+   // queue a wave file for playback
+   //
+   bool queuePlayback( JSObject            *mp3Obj,
+                       waveHeader_t const  &data,
+                       jsval                onComplete = JSVAL_VOID,
+                       jsval                onCancel = JSVAL_VOID );
+
+   //
+   // queue a record buffer
+   //
+   // numChannels_ will alway be 1 (only 1 microphone)
+   // numSamples_ should be filled to dimension of samples[] array
+   // sampleRate_ should be filled in with the desired sample rate (default 44100)
+   //
+   bool queueRecord( JSObject            *mp3Obj,
+                     waveHeader_t        &data,
+                     jsval                onComplete = JSVAL_VOID,
+                     jsval                onCancel = JSVAL_VOID );
+
+   //
+   // flush all inbound/outbound audio
    //
    bool clear( unsigned &numCancelled );
 
@@ -87,13 +128,14 @@ private:
    // returns false if thread should shutdown
    bool pull( item_t *& );
 
-   friend void *audioOutputThread( void *arg );
+   friend void *audioThread( void *arg );
 
    typedef       mtQueue_t<item_t *> queue_t ;
    queue_t       queue_ ;
    void         *threadHandle_ ;
    bool volatile shutdown_ ;
-   int           dspFd_ ;
+   int           readFd_ ;
+   int           writeFd_ ;
 };
 
 #endif
