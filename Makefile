@@ -59,6 +59,7 @@ OBJS = \
        jsImage.o \
        jsJPEG.o \
        jsKernel.o \
+       jsMD5.o \
        jsMonWLAN.o \
        jsNewTouch.o \
        jsPing.o \
