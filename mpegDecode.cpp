@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.6  2004-10-30 18:55:34  ericn
+ * Revision 1.7  2005-01-09 04:53:08  ericn
+ * -added piece-wise processing test via mpegStream.cpp
+ *
+ * Revision 1.6  2004/10/30 18:55:34  ericn
  * -Neon YUV support
  *
  * Revision 1.5  2004/06/28 02:56:43  ericn
@@ -41,6 +44,7 @@ extern "C" {
 #include <mpeg2dec/mpeg2.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/ioctl.h>
 
 #ifdef CONFIG_LIBMPEG2_OLD 
    #include "mpeg2dec/video_out.h"
@@ -544,11 +548,32 @@ static char const * const frameTypes_[] = {
 #include <zlib.h>
 #include "tickMs.h"
 #include <termios.h>
+#include <linux/sm501yuv.h>
 
 int main( int argc, char const * const argv[] )
 {
-   if( 2 == argc )
+   if( 2 <= argc )
    {
+      unsigned xPos = 0 ;
+      unsigned yPos = 0 ;
+      unsigned outWidth  = 0 ;
+      unsigned outHeight = 0 ;
+      if( 2 < argc )
+      {
+         xPos = (unsigned)strtoul( argv[2], 0, 0 );
+         if( 3 < argc )
+         {
+            yPos = (unsigned)strtoul( argv[3], 0, 0 );
+            if( 4 < argc )
+            {
+               outWidth = (unsigned)strtoul( argv[4], 0, 0 );
+               if( 5 < argc )
+               {
+                  outHeight = (unsigned)strtoul( argv[5], 0, 0 );
+               }
+            }
+         }
+      }
       memFile_t fIn( argv[1] );
       if( fIn.worked() )
       {
@@ -574,6 +599,15 @@ int main( int argc, char const * const argv[] )
             printf( "%s stream %u: %u frames\n", frameTypes_[ft], sIdx, sAndF.numFrames_ );
             if( mpegDemux_t::videoFrame_e == ft )
                videoIdx = sIdx ;
+            else if( mpegDemux_t::audioFrame_e == ft )
+            {
+               if( 0 < sAndF.numFrames_ )
+               {
+                  printf( "   start: %llu, end %llu\n", 
+                          sAndF.frames_[0].when_ms_,
+                          sAndF.frames_[sAndF.numFrames_-1].when_ms_ );
+               }
+            }
             numPackets[ft] += sAndF.numFrames_ ;
          }
          
@@ -598,8 +632,10 @@ int main( int argc, char const * const argv[] )
             int const fdYUV = open( "/dev/yuv", O_WRONLY );
             char keyvalue = '\0' ;
             
+            long long prevPTS = -1LL ;
             do {
-printf( "feed: %p/%u\n", next->data_, next->length_ );
+// printf( "feed: %p/%u/%llu\n", next->data_, next->length_, next->when_ms_ );
+               long long pts = next->when_ms_ ;
                decoder.feed( next->data_, next->length_ );
                next++ ;
                numLeft-- ;
@@ -613,36 +649,60 @@ printf( "feed: %p/%u\n", next->data_, next->length_ );
                      bytesPerPicture = decoder.width() * decoder.height() * 2;
                      printf( "%u x %u: %u bytes per picture\n", 
                              decoder.width(), decoder.height(), bytesPerPicture );
+                     struct sm501yuvPlane_t plane ;
+                     plane.xLeft_     = xPos ;
+                     plane.yTop_      = yPos ;
+                     plane.inWidth_   = decoder.width();
+                     plane.inHeight_  = decoder.height();
+                     plane.outWidth_  = ( 0 == outWidth ) ? decoder.width() : outWidth ;
+                     plane.outHeight_ = ( 0 == outHeight ) ? decoder.height() : outHeight ;
+                     if( 0 != ioctl( fdYUV, SM501YUV_SETPLANE, &plane ) )
+                     {
+                        perror( "setPlane" );
+                        return 0 ;
+                     }
                   }
                }
 
                while( decoder.getPicture( picture, picType ) )
                {
+
+printf( "%c - %llu\n", 
+        ( mpegDecoder_t::ptD_e >= picType )
+        ? cPicTypes[picType]
+        : '?',
+        pts );
                   ++numPictures ;
                   if( haveHeader )
                   {
-                     if( 0 <= fdYUV )
+                     if( pts != prevPTS )
                      {
-                        int const numWritten = write( fdYUV, picture, bytesPerPicture );
-                        if( numWritten != bytesPerPicture )
+                        prevPTS = pts ;
+                        if( 0 <= fdYUV )
                         {
-                           printf( "write %d of %u bytes\n", numWritten, bytesPerPicture );
-                           numLeft = 0 ;
-                           break;
+                           int const numWritten = write( fdYUV, picture, bytesPerPicture );
+                           if( numWritten != bytesPerPicture )
+                           {
+                              printf( "write %d of %u bytes\n", numWritten, bytesPerPicture );
+                              numLeft = 0 ;
+                              break;
+                           }
+   if( 'g' != keyvalue )
+   {
+                           while( 0 >= read(0,&keyvalue,1) )
+                              ;
+   //read(0,&keyvalue,1);
+                           keyvalue = tolower( keyvalue );
+                           if( ( 'x' == keyvalue ) || ( '\x03' == keyvalue ) )
+                           {
+                              numLeft = 0 ;
+                              break;
+                           }
+   }
                         }
-if( 'g' != keyvalue )
-{
-                        while( 0 >= read(0,&keyvalue,1) )
-                           ;
-//read(0,&keyvalue,1);
-                        keyvalue = tolower( keyvalue );
-                        if( ( 'x' == keyvalue ) || ( '\x03' == keyvalue ) )
-                        {
-                           numLeft = 0 ;
-                           break;
-                        }
-}
                      }
+                     else
+                        printf( "skip\n" );
                   }
                   else
                      printf( "picture without header\n" );
@@ -672,8 +732,197 @@ if( 'g' != keyvalue )
          perror( argv[1] );
    }
    else
-      fprintf( stderr, "Usage: mpegDecode fileName\n" );
+      fprintf( stderr, "Usage: mpegDecode fileName [x [,y [,width [,height]]]]\n" );
+
+   return 0 ;
+}
+
+
+#elif defined( __MODULETEST2__ )
+
+#include "mpegStream.h"
+#include "memFile.h"
+
+#include "hexDump.h"
+
+static char const *cFrameTypes_[] = {
+     "video"
+   , "audio"
+   , "other"
+};
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <zlib.h>
+#include "tickMs.h"
+#include <termios.h>
+#include <linux/sm501yuv.h>
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 <= argc )
+   {
+      unsigned xPos = 0 ;
+      unsigned yPos = 0 ;
+      unsigned outWidth  = 0 ;
+      unsigned outHeight = 0 ;
+      if( 2 < argc )
+      {
+         xPos = (unsigned)strtoul( argv[2], 0, 0 );
+         if( 3 < argc )
+         {
+            yPos = (unsigned)strtoul( argv[3], 0, 0 );
+            if( 4 < argc )
+            {
+               outWidth = (unsigned)strtoul( argv[4], 0, 0 );
+               if( 5 < argc )
+               {
+                  outHeight = (unsigned)strtoul( argv[5], 0, 0 );
+               }
+            }
+         }
+      }
+      FILE *fIn = fopen( argv[1], "rb" );
+      if( fIn )
+      {
+         mpegStream_t stream ;
+         mpegDecoder_t decoder ;
+         unsigned numPictures = 0 ;
+         long long startMs = tickMs();
+         bool haveHeader = false ;
+         unsigned long bytesPerPicture = 0 ;
+         int const fdYUV = open( "/dev/yuv", O_WRONLY );
+         long long prevPTS = -1LL ;
+
+         unsigned long globalOffs = 0 ;
+         unsigned char inBuf[4096];
+         int  numRead ;
+         while( 0 < ( numRead = fread( inBuf, 1, sizeof(inBuf)/2, fIn ) ) )
+         {
+            unsigned                  inOffs = 0 ;
+            
+            mpegStream_t::frameType_e type ;
+            unsigned                  frameOffs ;
+            unsigned                  frameLen ;
+            long long                 when ;
+            unsigned char             streamId ;
+
+            while( ( numRead > inOffs )
+                   &&
+                   stream.getFrame( inBuf+inOffs, 
+                                  numRead-inOffs,
+                                  type,
+                                  frameOffs,
+                                  frameLen,
+                                  when,
+                                  streamId ) )
+            {
+               unsigned end = inOffs+frameOffs+frameLen ;
+               if( end > numRead )
+               {
+                  unsigned left = end-numRead ;
+                  unsigned max = sizeof(inBuf)-numRead ;
+                  if( max > left )
+                  {
+                     int numRead2 = fread( inBuf+numRead, 1, left, fIn );
+                     if( numRead2 == left )
+                     {
+                        fprintf( stderr, "tail end %u bytes\n", left );
+                        globalOffs += numRead2 ;
+                     }
+                     else
+                     {
+                        fprintf( stderr, "packet underflow: %d of %u bytes read\n", numRead, left );
+                        return 0 ;
+                     }
+                  }
+                  else
+                  {
+                     fprintf( stderr, "packet overflow: %lu bytes needed, %lu bytes avail\n", left, max );
+                     return 0 ;
+                  }
+               }
+
+               if( mpegStream_t::videoFrame_e == type )
+               {
+                  unsigned char const *frameData = inBuf+inOffs+frameOffs ;
+                  decoder.feed( frameData, frameLen );
+                  
+                  if( !haveHeader )
+                  {
+                     haveHeader = decoder.haveHeader();
+                     if( haveHeader )
+                     {
+                        bytesPerPicture = decoder.width() * decoder.height() * 2;
+                        printf( "%u x %u: %u bytes per picture\n", 
+                                decoder.width(), decoder.height(), bytesPerPicture );
+                        struct sm501yuvPlane_t plane ;
+                        plane.xLeft_     = xPos ;
+                        plane.yTop_      = yPos ;
+                        plane.inWidth_   = decoder.width();
+                        plane.inHeight_  = decoder.height();
+                        plane.outWidth_  = ( 0 == outWidth ) ? decoder.width() : outWidth ;
+                        plane.outHeight_ = ( 0 == outHeight ) ? decoder.height() : outHeight ;
+                        if( 0 != ioctl( fdYUV, SM501YUV_SETPLANE, &plane ) )
+                        {
+                           perror( "setPlane" );
+                           return 0 ;
+                        }
+                     }
+                  }
+                  void const *picture ;
+                  mpegDecoder_t::picType_e picType ;
+                  while( decoder.getPicture( picture, picType ) )
+                  {
+   printf( "%c - %llu\n", 
+           ( mpegDecoder_t::ptD_e >= picType )
+           ? cPicTypes[picType]
+           : '?',
+           when );
+                     ++numPictures ;
+                     if( haveHeader )
+                     {
+                        if( when != prevPTS )
+                        {
+                           prevPTS = when ;
+                           if( 0 <= fdYUV )
+                           {
+                              int const numWritten = write( fdYUV, picture, bytesPerPicture );
+                              if( numWritten != bytesPerPicture )
+                              {
+                                 printf( "write %d of %u bytes\n", numWritten, bytesPerPicture );
+                              }
+                           }
+                        }
+                     }
+                     else
+                        printf( "picture without header\n" );
+                  }
+   
+               }
+               
+               inOffs += frameOffs+frameLen ;
+            }
+            globalOffs += numRead ;
+         }
+         long long endMs = tickMs();
+         
+         if( 0 <= fdYUV )
+            close( fdYUV );
+
+         unsigned elapsed = (unsigned)( endMs-startMs );
+         printf( "%u pictures, %u ms\n", numPictures, elapsed );
+         
+         fclose( fIn );
+      }
+      else
+         perror( argv[1] );
+   }
+   else
+      fprintf( stderr, "Usage: mpegDecode fileName [x [,y [,width [,height]]]]\n" );
 
    return 0 ;
 }
 #endif
+
