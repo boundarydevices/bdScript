@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsHyperlink.cpp,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-12-01 02:40:38  ericn
+ * -made gotoCalled_ volatile
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -18,7 +21,7 @@
 #include "jsHyperlink.h"
 #include "relativeURL.h"
 
-bool        gotoCalled_ = false ;
+bool volatile gotoCalled_ = false ;
 std::string gotoURL_( "" );
 
 static JSBool

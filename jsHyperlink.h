@@ -1,5 +1,5 @@
 #ifndef __JSHYPERLINK_H__
-#define __JSHYPERLINK_H__ "$Id: jsHyperlink.h,v 1.1 2002-10-27 17:42:08 ericn Exp $"
+#define __JSHYPERLINK_H__ "$Id: jsHyperlink.h,v 1.2 2002-12-01 02:40:36 ericn Exp $"
 
 /*
  * jsHyperlink.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: jsHyperlink.h,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-12-01 02:40:36  ericn
+ * -made gotoCalled_ volatile
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -24,8 +27,8 @@
 #include "js/jsapi.h"
 #include <string>
 
-extern bool        gotoCalled_ ;
-extern std::string gotoURL_ ;
+extern bool volatile gotoCalled_ ;
+extern std::string   gotoURL_ ;
 
 bool initJSHyperlink( JSContext *cx, JSObject *glob );
 
