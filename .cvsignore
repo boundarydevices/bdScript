@@ -2,7 +2,7 @@
 build ftRender tsThread madHeaders madTest imgJPEG imgPNG ccDiskCache ccWorker ccActiveURL hexDump semClasses popen
 parsedURL recordTest ftDump
 *.lst *.out bc
-ffPlay ffFormat ffFrames testffFormat dlopen cbmGraph cbmStat cbmReset
+ffPlay ffFormat ffFrames testffFormat dlopen cbmGraph cbmStat cbmReset cbmImage
 testquickcam
 jpegview
 backtrace

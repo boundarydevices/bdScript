@@ -10,7 +10,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        jsGpio.o madDecode.o madHeaders.o memFile.o parsedURL.o \
        relativeURL.o tsThread.o ultoa.o \
        ultodd.o box.o urlFile.o zOrder.o \
-       ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
+       cbmImage.o ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
        popen.o jsPopen.o jsCBM.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
        jsFileIO.o
 
@@ -181,6 +181,10 @@ cbmGraph: cbmGraph.cpp
 
 cbmStat: cbmStat.cpp
 	$(CC) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS)
+	$(STRIP) $@
+
+cbmImage: cbmImage.cpp
+	$(CC) $(IFLAGS) -DMODULETEST=1 -o cbmImage -Xlinker -Map -Xlinker cbmImage.map cbmImage.cpp hexDump.cpp $(LIBS)
 	$(STRIP) $@
 
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
