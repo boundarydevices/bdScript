@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.15  2002-12-11 04:04:48  ericn
+ * Revision 1.16  2002-12-18 19:10:43  tkisky
+ * -don't unscamble LCD data
+ *
+ * Revision 1.15  2002/12/11 04:04:48  ericn
  * -moved buttonize code from button to fbDev
  *
  * Revision 1.14  2002/12/07 21:01:06  ericn
@@ -71,7 +74,7 @@ static unsigned short gTable[64];
 static unsigned short bTable[32];
 
 
-#if 1
+#if 0
 #define LCD_REORDER
 #define LCD_REORDER_BLUE  15,14, 8, 7, 6
 #define LCD_REORDER_GREEN 13,12,11, 5, 4, 3
