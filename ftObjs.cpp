@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.3  2002-11-17 22:23:48  ericn
+ * Revision 1.4  2003-01-20 06:49:10  ericn
+ * -removed underrun and erase on negative bitmap
+ *
+ * Revision 1.3  2002/11/17 22:23:48  ericn
  * -rounding errors in render
  *
  * Revision 1.2  2002/11/02 18:38:48  ericn
@@ -112,7 +115,6 @@ freeTypeString_t :: freeTypeString_t
          // byte-map with the image data in 1/255ths
          //
          
-         
          // chars like "T" have negative value for bitmap_left... aargh!
          if( 0 > font.face_->glyph->bitmap_left ) 
          {
@@ -123,7 +125,7 @@ freeTypeString_t :: freeTypeString_t
              }
          }
 
-         width_  += ( font.face_->glyph->advance.x / 64 );
+         width_  += ( ( font.face_->glyph->advance.x + 63 ) / 64 );
 
          if( maxAscend < font.face_->glyph->bitmap_top )
             maxAscend = font.face_->glyph->bitmap_top ;
@@ -236,11 +238,16 @@ freeTypeString_t :: freeTypeString_t
                      assert( nextY < height_ );
                         
                      unsigned char const *rasterCol = rasterLine ;
-                     unsigned short nextX = penX + font.face_->glyph->bitmap_left ;
+                     unsigned short nextX ;
+                     if( ( 0 <= font.face_->glyph->bitmap_left ) 
+                         ||
+                         ( penX > ( 0 - font.face_->glyph->bitmap_left ) ) )
+                        nextX = penX + font.face_->glyph->bitmap_left ;
+                     else
+                        nextX = 0 ;
                      unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
                      for( int col = 0 ; col < bmp.width ; col++, nextX++ )
                      {
-
                         if( nextX >= width_ )
                         {
                            fprintf( stderr, "Invalid x : %d, penX = %d, width_ = %u\n", (short)nextX, penX, width_ );
@@ -249,7 +256,15 @@ freeTypeString_t :: freeTypeString_t
                         }
                         
 //                        assert( nextX < width_ );
-                        *nextOut++ = *rasterCol++ ;
+                        unsigned char const rasterVal = *rasterCol++ ;
+                        unsigned const oldVal = *nextOut ;
+                        unsigned const sum = oldVal + rasterVal ;
+                        if( 256 > sum )
+                           *nextOut = (unsigned char)sum ;
+                        else
+                           *nextOut = '\xff' ;
+
+                        nextOut++ ;
                      } // for each column
                      rasterLine += bmp.pitch ;
                   }
@@ -282,7 +297,7 @@ freeTypeString_t :: freeTypeString_t
                   }
                }
             } // non-blank
-            penX  += ( font.face_->glyph->advance.x / 64 );
+            penX  += ( ( font.face_->glyph->advance.x + 63 ) / 64 );
          }
          else
          {
