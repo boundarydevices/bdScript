@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.2  2002-10-15 05:00:14  ericn
+ * Revision 1.3  2002-10-16 02:03:19  ericn
+ * -Added GIF support
+ *
+ * Revision 1.2  2002/10/15 05:00:14  ericn
  * -added imageJPEG routine
  *
  * Revision 1.1  2002/10/13 16:32:25  ericn
@@ -21,13 +24,15 @@
 
 
 #include "jsImage.h"
-#include "libpng12/png.h"
+#include <libpng12/png.h>
 #include "fbDev.h"
 #include "../boundary1/hexDump.h"
 
 extern "C" {
 #include <jpeglib.h>
+#include <gif_lib.h>
 };
+
 
 typedef struct {
    png_bytep   data_ ;
@@ -404,9 +409,222 @@ imageJPEG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_FALSE ;
 }
 
+
+typedef struct {
+   GifByteType const *data_ ;
+   size_t             length_ ;
+   size_t             numRead_ ;
+} gifSrc_t ;
+
+static int gifRead( GifFileType *fIn, GifByteType *data, int count )
+{
+   gifSrc_t &src = *( gifSrc_t * )fIn->UserData ;
+   unsigned const left = src.length_ - src.numRead_ ;
+   if( count > left )
+      count = left ;
+
+   memcpy( data, src.data_+src.numRead_, count );
+   src.numRead_ += count ;
+
+   return count ;
+}
+
+//
+// Change each color in palette once to 16-bit
+//
+static void fixupColorMap( fbDevice_t     &fb,
+                           ColorMapObject &map )
+{
+   GifColorType   *rgb = map.Colors ;
+   unsigned short *rgb16 = (unsigned short *)map.Colors ;
+   for( unsigned i = 0 ; i < map.ColorCount ; i++, rgb++, rgb16++ )
+   {
+      unsigned short color = fb.get16( rgb->Red, rgb->Green, rgb->Blue );
+      *rgb16 = color ;
+   }
+}
+
+static int const InterlacedOffset[] = { 0, 4, 2, 1 }; /* The way Interlaced image should. */
+static int const InterlacedJumps[] = { 8, 8, 4, 2 };    /* be read - offsets and jumps... */
+
+static void displayGIF( fbDevice_t           &fb,
+                        ColorMapObject const &map,
+                        SavedImage const     &image,
+                        unsigned              startX,
+                        unsigned              startY )
+{
+   unsigned top    = image.ImageDesc.Top + startY ; // screen position
+   unsigned left   = image.ImageDesc.Left + startX ; // screen position
+
+   if( ( top < fb.getHeight() ) && ( left < fb.getWidth() ) )
+   {
+      unsigned height = image.ImageDesc.Height ;
+      unsigned width  = image.ImageDesc.Width ;
+
+      unsigned bottom = top + height ;
+      if( bottom > fb.getHeight() )
+         bottom = fb.getHeight();
+      unsigned right = left + width ;
+      if( right > fb.getWidth() )
+         right = fb.getWidth();
+
+      unsigned short const * const rgb16 = (unsigned short *)map.Colors ;
+      char const *raster = image.RasterBits ;
+
+      if( 0 == image.ImageDesc.Interlace )
+      {
+         for( int row = 0 ; row < image.ImageDesc.Height ; row++ )
+         {
+            unsigned const screenY = top + row ;
+            if( screenY < fb.getHeight() )
+            {
+               for( int column = 0 ; column < image.ImageDesc.Width ; column++, raster++ )
+               {
+                  unsigned const screenX = left + column ;
+                  if( screenX < fb.getWidth() )
+                  {
+                     char const colorIdx = *raster ;
+                     fb.getPixel( screenX, screenY ) = rgb16[colorIdx];
+                  } // visible
+               }
+            }
+            else
+               break;
+         }
+      } // non-interlaced image
+      else
+      {
+         //
+         // make 4 passes
+         //
+         for( unsigned i = 0; i < 4; i++ )
+         {
+            for( int row = InterlacedOffset[i] ; row < image.ImageDesc.Height ; row += InterlacedJumps[i] )
+            {
+               unsigned const screenY = top + row ;
+               if( screenY < fb.getHeight() )
+               {
+                  for( int column = 0 ; column < image.ImageDesc.Width ; column++, raster++ )
+                  {
+                     unsigned const screenX = left + column ;
+                     if( screenX < fb.getWidth() )
+                     {
+                        char const colorIdx = *raster ;
+                        fb.getPixel( screenX, screenY ) = rgb16[colorIdx];
+                     } // visible
+                  }
+               } // ? visible
+               else
+                  raster += image.ImageDesc.Width ;
+            } // for each row in this pass
+         } // for each of 4 passes
+      } // interlaced
+
+   } // room for something
+}
+
+static JSBool
+imageGIF( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   //
+   // need at least data, plus optional x and y
+   //
+   if( ( ( 1 == argc ) || ( 3 == argc ) )
+       &&
+       JSVAL_IS_STRING( argv[0] ) 
+       &&
+       ( ( 1 == argc ) 
+         || 
+         ( JSVAL_IS_INT( argv[1] )
+           &&
+           JSVAL_IS_INT( argv[2] ) ) ) )   // second and third parameters must be ints
+   {
+      JSString *str = JS_ValueToString( cx, argv[0] );
+      if( str )
+      {
+         unsigned startX ;
+         unsigned startY ;
+         if( 1 == argc )
+         {
+            startX = 0 ;
+            startY = 0 ;
+         }
+         else
+         {
+            startX = JSVAL_TO_INT( argv[1] );
+            startY = JSVAL_TO_INT( argv[2] );
+         }
+
+         gifSrc_t src ;
+         src.data_    = (GifByteType *)JS_GetStringBytes( str );
+         src.length_  = JS_GetStringLength(str);
+         src.numRead_ = 0 ;
+
+         GifFileType *fGIF = DGifOpen( &src, gifRead );
+         if( fGIF )
+         {   
+            printf( "opened GIF structure\n" );
+            if( GIF_OK == DGifSlurp( fGIF ) )
+            {
+               fbDevice_t &fb = getFB();
+               printf( "read GIF successfully\n" );
+               printf( "   width %d, height %d\n", fGIF->SWidth, fGIF->SHeight );
+               printf( "   colorRes %d\n", fGIF->SColorResolution );
+               printf( "   bgColor  %d\n", fGIF->SBackGroundColor );
+               printf( "   SColorMap %p\n", fGIF->SColorMap );
+               if( fGIF->SColorMap )
+                  fixupColorMap( fb, *fGIF->SColorMap );
+
+               printf( "   imgCount %d\n", fGIF->ImageCount );
+               printf( "   Left,Top,Width,Height = %d,%d,%d,%d\n", fGIF->Image.Left, fGIF->Image.Top, fGIF->Image.Width, fGIF->Image.Height );
+               printf( "   %s\n", fGIF->Image.Interlace ? "Interlaced" : "Not interlaced" );
+               printf( "   Image.ColorMap %p\n", fGIF->Image.ColorMap );
+               for( int i = 0 ; i < fGIF->ImageCount ; i++ )
+               {
+                  printf( "   --- Image %d ---\n", i );
+                  SavedImage const *image = fGIF->SavedImages + i ;
+                  printf( "      Left,Top,Width,Height = %d,%d,%d,%d\n", image->ImageDesc.Left, image->ImageDesc.Top, image->ImageDesc.Width, image->ImageDesc.Height );
+                  printf( "      %s\n", image->ImageDesc.Interlace ? "Interlaced" : "Not interlaced" );
+                  printf( "      ColorMap %p\n", image->ImageDesc.ColorMap );
+                  ColorMapObject *colorMap ;
+                  if( image->ImageDesc.ColorMap )
+                  {
+                     fixupColorMap( fb, *image->ImageDesc.ColorMap );
+                     colorMap = image->ImageDesc.ColorMap ;
+                  }
+                  else 
+                     colorMap = fGIF->SColorMap ;
+
+                  printf( "      bits %p\n", image->RasterBits );
+                  if( colorMap )
+                  {
+                     printf( "      using map %p\n", colorMap );
+                     displayGIF( fb, *colorMap, *image, startX, startY );
+                  }
+                  else
+                     printf( "      no color map... can't display\n" );
+
+               }
+            }
+            DGifCloseFile( fGIF );
+         }
+         else
+            printf( "Error opening GIF\n" );
+
+      } // retrieved string
+
+      *rval = JSVAL_FALSE ;
+      return JS_TRUE ;
+
+   } // need at least two params
+
+   return JS_FALSE ;
+}
+
 static JSFunctionSpec image_functions[] = {
     {"imagePNG",         imagePNG,        1 },
     {"imageJPEG",        imageJPEG,       1 },
+    {"imageGIF",         imageGIF,        1 },
     {0}
 };
 
