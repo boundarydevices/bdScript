@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.13  2002-12-15 00:07:58  ericn
+ * Revision 1.14  2003-01-05 01:46:27  ericn
+ * -removed SYNC call on completion
+ *
+ * Revision 1.13  2002/12/15 00:07:58  ericn
  * -removed debug msgs
  *
  * Revision 1.12  2002/12/02 15:14:35  ericn
@@ -86,7 +89,9 @@ static void audioHandlerCallback( void *cbParam )
    jsval handler = item->isComplete_ ? item->onComplete_ : item->onCancel_ ;
 
    if( JSVAL_VOID != handler )
+   {
       executeCode( item->obj_, handler, "audioQueue" );
+   }
 
    JS_RemoveRoot( execContext_, &item->obj_ );
    JS_RemoveRoot( execContext_, &item->onComplete_ );
@@ -97,6 +102,7 @@ static void audioHandlerCallback( void *cbParam )
 
 void *audioOutputThread( void *arg )
 {
+printf( "audioOutThread %p (id %x)\n", &arg, pthread_self() );
    audioQueue_t *queue = (audioQueue_t *)arg ;
    queue->dspFd_ = open( "/dev/dsp", O_WRONLY );
    if( 0 <= queue->dspFd_ )
@@ -261,9 +267,6 @@ void *audioOutputThread( void *arg )
                {
                   item->isComplete_ = true ;
                   queueCallback( audioHandlerCallback, item );
-
-                  if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
-                     fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                }
             }
 
@@ -301,7 +304,6 @@ audioQueue_t :: audioQueue_t( void )
       tsParam.__sched_priority = 90 ;
       pthread_setschedparam( tHandle, SCHED_FIFO, &tsParam );
       threadHandle_ = (void *)tHandle ;
-      audioQueue_ = this ;
    }
    else
       fprintf( stderr, "Error %m creating curl-reader thread\n" );
