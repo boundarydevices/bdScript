@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.2  2002-11-15 14:39:52  ericn
+ * Revision 1.3  2002-11-22 14:58:16  ericn
+ * -fixed off-by-one bug, added stand-alone test
+ *
+ * Revision 1.2  2002/11/15 14:39:52  ericn
  * -added dummy return value
  *
  * Revision 1.1  2002/10/31 02:13:08  ericn
@@ -138,15 +141,14 @@ bool imageJPEG( void const    *inData,     // input
    jpeg_start_decompress(&cinfo);
 
    fbDevice_t &fb = getFB();
-
    unsigned short * const pixMap = new unsigned short[ cinfo.output_height*cinfo.output_width ];
 
    // read the scanlines
    for( unsigned row = 0 ; row < cinfo.output_height ; row++ )
    {
       unsigned numRead = jpeg_read_scanlines( &cinfo, buffer, 1);
-
       unsigned char const *nextOut = buffer[0];
+
       for( unsigned column = 0; column < cinfo.output_width; ++column ) 
       {
          unsigned char red, green, blue ;
@@ -161,13 +163,7 @@ bool imageJPEG( void const    *inData,     // input
             blue  = *nextOut++ ;
          }
          
-         unsigned short const color = ( cinfo.output_components == 1 ) 
-                                      ? fb.get16( *nextOut, 
-                                                  *nextOut, 
-                                                  *nextOut )
-                                      : fb.get16( nextOut[0], 
-                                                  nextOut[1], 
-                                                  nextOut[2] );
+         unsigned short const color = fb.get16( red, green, blue );
          pixMap[row*cinfo.output_width+column] = color ;
       }
    }
@@ -183,3 +179,45 @@ bool imageJPEG( void const    *inData,     // input
    return true ;
 }
 
+
+#ifdef __STANDALONE__
+
+#include "hexDump.h"
+#include "memFile.h"
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 <= argc )
+   {
+      memFile_t fIn( argv[1] );
+      if( fIn.worked() )
+      {
+         printf( "%lu bytes read at address %p\n", fIn.getLength(), fIn.getData() );
+         void const *pixData ;
+         unsigned short width ;
+         unsigned short height ;
+         if( imageJPEG( fIn.getData(), fIn.getLength(),
+                        pixData,
+                        width,
+                        height ) )
+         {
+
+            printf( "image: %u x %u pixels\n", width, height );
+            unsigned long size = (unsigned long)width * height * 2 ;
+            hexDumper_t dump( pixData, size );
+            while( dump.nextLine() )
+               printf( "%s\n", dump.getLine() );
+         }
+         else
+            fprintf( stderr, "Error converting image\n" );
+      }
+      else
+         fprintf( stderr, "Error %s opening %s\n", fIn.getError(), argv[1] );
+   }
+   else
+      fprintf( stderr, "Usage : imgJPEG fileName\n" );
+
+   return 0 ;
+}
+
+#endif
