@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.9  2002-11-03 17:55:51  ericn
+ * Revision 1.10  2002-11-05 05:41:19  ericn
+ * -pre-declare image::isLoaded
+ *
+ * Revision 1.9  2002/11/03 17:55:51  ericn
  * -modified to support synchronous gets and posts
  *
  * Revision 1.8  2002/11/03 17:03:22  ericn
@@ -125,6 +128,7 @@ static JSFunctionSpec imageMethods_[] = {
 };
 
 enum jsImage_tinyId {
+   IMAGE_ISLOADED,
    IMAGE_WIDTH, 
    IMAGE_HEIGHT, 
    IMAGE_PIXBUF,
@@ -139,6 +143,7 @@ JSClass jsImageClass_ = {
 };
 
 static JSPropertySpec imageProperties_[] = {
+  {"isLoaded",      IMAGE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"width",         IMAGE_WIDTH,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"height",        IMAGE_HEIGHT,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"pixBuf",        IMAGE_PIXBUF,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
