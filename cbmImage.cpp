@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: cbmImage.cpp,v $
- * Revision 1.1  2003-05-26 22:08:19  ericn
+ * Revision 1.2  2003-06-26 08:01:33  tkisky
+ * -fix last segment bugs
+ *
+ * Revision 1.1  2003/05/26 22:08:19  ericn
  * -Initial import
  *
  *
@@ -27,7 +30,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 
-#define EVENBYTES( bits ) ((((bits)+7)/8)*8)
+#define EVENBYTES( bits ) (((bits)+7)&~7)
 
 static unsigned fixupWidth( unsigned width )
 {
@@ -54,7 +57,7 @@ cbmImage_t :: cbmImage_t( unsigned short widthPix,
      actualWidth_( fixupWidth(widthPix) ),
      actualHeight_( EVENBYTES(heightPix) ),
      rowsPerSegment_( getRowsPerSegment( actualWidth_ ) ),
-     rowsLastSegment_( actualHeight_ % rowsPerSegment_ ),
+     rowsLastSegment_( (((actualHeight_-1) % rowsPerSegment_)+1+7)&~7 ),
      numSegments_( (actualHeight_+rowsPerSegment_-1)/rowsPerSegment_ ),
      bytesPerSegment_( (rowsPerSegment_*actualWidth_/8) + headerLen + trailerLen ),
      length_( bytesPerSegment_*numSegments_ ),
@@ -66,11 +69,11 @@ cbmImage_t :: cbmImage_t( unsigned short widthPix,
 
    for( unsigned seg = 0 ; seg < numSegments_ ; seg++ )
    {
-      unsigned char const hBytes = ( seg < numSegments_ - 1 )
-                                   ? rowsPerSegment_ / 8 
-                                   : ( ( actualHeight_ % rowsPerSegment_ ) + 7 ) / 8 ;
-      nextOut += sprintf( nextOut, "\x1d*%c%c", wBytes, hBytes );
-      nextOut += actualWidth_ * rowsPerSegment_ / 8 ;
+      unsigned char const rowBytesInSeg = ((seg < (numSegments_-1)) ? rowsPerSegment_ : rowsLastSegment_) /8;
+      nextOut += sprintf( nextOut, "\x1d*%c%c", wBytes, rowBytesInSeg );
+      int bytes = actualWidth_ * rowBytesInSeg;
+      printf( "seg bytes %i, wBytes:%i,hBytes:%i\n",bytes,wBytes,rowBytesInSeg );
+      nextOut +=  bytes;
       nextOut += sprintf( nextOut, "\x1d/%c", 0 );
    }
 
@@ -103,18 +106,21 @@ void cbmImage_t :: setPixel
          // high order bit is top row
          //
 // printf( "yOffs 0x%x\n", yOffs );
+         int rowBytesInSeg = ((ySeg < (numSegments_-1)) ? rowsPerSegment_ : rowsLastSegment_) /8;
+         int maxBytes = actualWidth_ * rowBytesInSeg;
+         int bytes = ( yOffs / 8 );
          unsigned char bitOffs = yOffs % 8 ;
-         segData += ( yOffs / 8 );
          if( x )
          {
-            unsigned const rowHeightBytes = ( ySeg < numSegments_ - 1 )
-                                            ? rowsPerSegment_ / 8
-                                            : rowsLastSegment_ / 8 ;
-            segData += x * rowHeightBytes ;
+            bytes += x * rowBytesInSeg;
 // printf( "xOffs == %u\n", xOffs );
          }
+         if (bytes >= maxBytes) {
+            printf( "maxBytes: %i, tried:%i, x:%i, y:%i\n",maxBytes,bytes,x,y );
+            bytes = maxBytes-1;
+         }
          unsigned char const mask = 0x80 >> bitOffs ;
-         *segData |= mask ;
+         *(segData+bytes) |= mask ;
 // printf( "segment offset %u, mask 0x%02x\n", segData-segStart, mask );
       }
    }
