@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.6  2002-11-03 17:55:51  ericn
+ * Revision 1.7  2002-11-05 05:40:55  ericn
+ * -pre-declare font::isLoaded()
+ *
+ * Revision 1.6  2002/11/03 17:55:51  ericn
  * -modified to support synchronous gets and posts
  *
  * Revision 1.5  2002/11/02 18:57:03  ericn
@@ -711,7 +714,8 @@ static JSFunctionSpec fontMethods[] = {
 
 
 enum jsFont_tinyId {
-   FONTDATA,
+   FONT_ISLOADED,
+   FONT_DATA
 };
 
 
@@ -726,7 +730,8 @@ JSClass jsFontClass_ = {
 };
 
 static JSPropertySpec fontProperties_[] = {
-  {"data",        FONTDATA,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"isLoaded",    FONT_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"data",        FONT_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
