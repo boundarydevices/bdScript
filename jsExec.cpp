@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.42  2003-06-22 23:03:54  ericn
+ * Revision 1.43  2003-07-03 03:17:47  ericn
+ * -expanded JS mem
+ *
+ * Revision 1.42  2003/06/22 23:03:54  ericn
  * -removed closeCBM call
  *
  * Revision 1.41  2003/06/08 15:20:48  ericn
@@ -274,7 +277,7 @@ int prMain(int argc, char **argv)
    if( 2 == argc )
    {
       // initialize the JS run time, and return result in rt
-      JSRuntime * const rt = JS_NewRuntime(1L * 1024L * 1024L);
+      JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
       if( rt )
       {
          // create a context and associate it with the JS run time
