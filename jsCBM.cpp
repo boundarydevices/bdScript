@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.1  2003-05-09 04:28:12  ericn
+ * Revision 1.2  2003-05-10 03:18:54  ericn
+ * -removed redundant test, changed CBM print command
+ *
+ * Revision 1.1  2003/05/09 04:28:12  ericn
  * -Initial import
  *
  *
@@ -96,7 +99,7 @@ fprintf( stderr, "--> Printing something\n" );
                unsigned const height = bmHeight ;
                unsigned const hBytes = (height+7)/8 ;
                unsigned const headerLen = 4 ;
-               unsigned const trailerLen = 7 ;
+               unsigned const trailerLen = 9 ;
                char * const outBuf = new char [ headerLen+trailerLen + wBits*hBytes ];
                char *nextOut = outBuf ;
          
@@ -109,39 +112,34 @@ fprintf( stderr, "--> Printing something\n" );
                      for( unsigned y = 0 ; y < hBytes ; y++ )
                      {
                         unsigned yPixel = 8*y ;
-                        if( yPixel < bmHeight )
+                        unsigned char outMask = 0 ;
+                        unsigned const maxY = yPixel + 8 ;
+                        for( ; yPixel < maxY ; yPixel++ )
                         {
-                           unsigned char outMask = 0 ;
-                           unsigned const maxY = yPixel + 8 ;
-                           for( ; yPixel < maxY ; yPixel++ )
+                           outMask <<= 1 ;
+                           if( ( yPixel < bmHeight ) && ( x < bmWidth ) )
                            {
-                              outMask <<= 1 ;
-                              if( ( yPixel < bmHeight ) && ( x < bmWidth ) )
-                              {
-                                 if( 0 == alphaData[ yPixel*bmWidth+x ] )
-                                    outMask |= 1 ;
-                              }
+                              if( 0 == alphaData[ yPixel*bmWidth+x ] )
+                                 outMask |= 1 ;
                            }
-                           *nextOut++ = outMask ;
                         }
-                        else
-                           *nextOut++ = 0xFF ; // tail end byte
+                        *nextOut++ = outMask ;
                      }
                   }
                   else
                   {
-                     memset( nextOut, 0xFFFFFFFF, hBytes );
+                     memset( nextOut, 0, hBytes );
                      nextOut += hBytes ;
                   }
                }
+
                nextOut += sprintf( nextOut, "\x1d/%c\n\n\n\n", 0 );
-         
+
                int const numWritten = write( fd, outBuf, nextOut-outBuf );
                printf( "wrote %d bytes\n", numWritten );
          
-               sleep( 3 );
-               write( fd, "\x1bm", 2 );
-         
+               write( fd, "\x1dV", 3 );
+
                close( fd );
                
                *rval = JSVAL_TRUE ;
