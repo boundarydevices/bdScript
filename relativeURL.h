@@ -1,5 +1,5 @@
 #ifndef __RELATIVEURL_H__
-#define __RELATIVEURL_H__ "$Id: relativeURL.h,v 1.1 2002-10-25 02:55:01 ericn Exp $"
+#define __RELATIVEURL_H__ "$Id: relativeURL.h,v 1.2 2003-03-22 15:30:41 ericn Exp $"
 
 /*
  * relativeURL.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: relativeURL.h,v $
- * Revision 1.1  2002-10-25 02:55:01  ericn
+ * Revision 1.2  2003-03-22 15:30:41  ericn
+ * -added printURLStack()
+ *
+ * Revision 1.1  2002/10/25 02:55:01  ericn
  * -initial import
  *
  *
@@ -50,6 +53,11 @@ void pushURL( std::string const &url );
 //
 void popURL( void );
 
+
+//
+// dump URL stack
+//
+void printURLStack();
 
 #endif
 
