@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.7  2002-12-04 13:13:06  ericn
+ * Revision 1.8  2002-12-06 02:23:07  ericn
+ * -fixed color mapping
+ *
+ * Revision 1.7  2002/12/04 13:13:06  ericn
  * -added rect, line, box methods
  *
  * Revision 1.6  2002/11/21 14:05:19  ericn
@@ -300,8 +303,8 @@ jsRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        JSVAL_IS_INT( argv[3] ) )
    {
       unsigned long const color = ( 5 == argc ) ? JSVAL_TO_INT( argv[4] ) : 0 ;
-      unsigned char const red   = (unsigned char)( color >> 11 );
-      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const red   = (unsigned char)( color >> 16 );
+      unsigned char const green = (unsigned char)( color >> 8 );
       unsigned char const blue  = (unsigned char)( color );
       unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
       unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
@@ -333,8 +336,8 @@ jsLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    {
       unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
       unsigned long const color = ( 6 <= argc ) ? JSVAL_TO_INT( argv[5] ) : 0 ;
-      unsigned char const red   = (unsigned char)( color >> 11 );
-      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const red   = (unsigned char)( color >> 16 );
+      unsigned char const green = (unsigned char)( color >> 8 );
       unsigned char const blue  = (unsigned char)( color );
       unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
       unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
@@ -366,8 +369,8 @@ jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    {
       unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
       unsigned long const color = ( 6 <= argc ) ? JSVAL_TO_INT( argv[5] ) : 0 ;
-      unsigned char const red   = (unsigned char)( color >> 11 );
-      unsigned char const green = (unsigned char)( color >> 5 );
+      unsigned char const red   = (unsigned char)( color >> 16 );
+      unsigned char const green = (unsigned char)( color >> 8 );
       unsigned char const blue  = (unsigned char)( color );
       unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
       unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
