@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.4  2002-10-13 14:36:54  ericn
+ * Revision 1.5  2002-10-15 05:00:55  ericn
+ * -.
+ *
+ * Revision 1.4  2002/10/13 14:36:54  ericn
  * -made cache usage optional
  *
  * Revision 1.3  2002/10/13 13:42:13  ericn
@@ -644,9 +647,7 @@ static curlCache_t *cache_ = 0 ;
 curlCache_t &getCurlCache( void )
 {
    if( 0 == cache_ )
-   {
       cache_ = new curlCache_t( "/tmp/curl", 8*(1<<20), 5 );
-   }
 
    return *cache_ ;
 }
