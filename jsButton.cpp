@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.17  2003-02-01 18:14:54  ericn
+ * Revision 1.18  2003-02-07 03:01:33  ericn
+ * -made freeTypeLibrary_t internal and persistent
+ *
+ * Revision 1.17  2003/02/01 18:14:54  ericn
  * -modified to use queuePlayback() instead of insert()
  *
  * Revision 1.16  2003/01/31 13:30:05  ericn
@@ -232,8 +235,7 @@ static void drawButton( buttonData_t const &button, bool pressed )
       b[2] += button.borderWidth_ ;
    }
 
-   freeTypeLibrary_t library ;
-   freeTypeFont_t    font( library, button.fontData_, button.fontSize_ );
+   freeTypeFont_t font( button.fontData_, button.fontSize_ );
    if( font.worked() )
    {
       freeTypeString_t ftString( font, button.pointSize_, button.msgString_, strlen( button.msgString_ ) );

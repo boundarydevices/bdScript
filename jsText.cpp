@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.14  2003-01-31 13:29:07  ericn
+ * Revision 1.15  2003-02-07 03:01:33  ericn
+ * -made freeTypeLibrary_t internal and persistent
+ *
+ * Revision 1.14  2003/01/31 13:29:07  ericn
  * -added getLineGap(), getHeight(), getBaseline()
  *
  * Revision 1.13  2003/01/03 16:57:00  ericn
@@ -211,9 +214,7 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        &&
        ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
    {
-      freeTypeLibrary_t library ;
-      freeTypeFont_t    font( library, 
-                              JS_GetStringBytes( fontString ),
+      freeTypeFont_t    font( JS_GetStringBytes( fontString ),
                               JS_GetStringLength( fontString ) );
       if( font.worked() )
       {
@@ -382,10 +383,8 @@ jsFontCharCodes( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
        &&
        ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
    {
-      freeTypeLibrary_t library ;
-      freeTypeFont_t    font( library, 
-                              JS_GetStringBytes( fontString ),
-                              JS_GetStringLength( fontString ) );
+      freeTypeFont_t font( JS_GetStringBytes( fontString ),
+                           JS_GetStringLength( fontString ) );
       if( font.worked() )
       {
          JSObject *arrObj = JS_NewArrayObject( cx, 0, 0 );
@@ -448,10 +447,8 @@ jsFontGetBaseline( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
           &&
           ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
       {
-         freeTypeLibrary_t library ;
-         freeTypeFont_t    font( library, 
-                                 JS_GetStringBytes( fontString ),
-                                 JS_GetStringLength( fontString ) );
+         freeTypeFont_t font( JS_GetStringBytes( fontString ),
+                              JS_GetStringLength( fontString ) );
          if( font.worked() )
          {
             if( 0 != font.face_->units_per_EM )
@@ -489,10 +486,8 @@ jsFontGetHeight( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
           &&
           ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
       {
-         freeTypeLibrary_t library ;
-         freeTypeFont_t    font( library, 
-                                 JS_GetStringBytes( fontString ),
-                                 JS_GetStringLength( fontString ) );
+         freeTypeFont_t font( JS_GetStringBytes( fontString ),
+                              JS_GetStringLength( fontString ) );
          if( font.worked() )
          {
             if( 0 != font.face_->units_per_EM )
@@ -530,9 +525,7 @@ jsFontGetLinegap( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
           &&
           ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
       {
-         freeTypeLibrary_t library ;
-         freeTypeFont_t    font( library, 
-                                 JS_GetStringBytes( fontString ),
+         freeTypeFont_t    font( JS_GetStringBytes( fontString ),
                                  JS_GetStringLength( fontString ) );
          if( font.worked() )
          {
@@ -579,9 +572,7 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
           &&
           ( 0 != ( fontString = JSVAL_TO_STRING( dataVal ) ) ) )
       {
-         freeTypeLibrary_t library ;
-         freeTypeFont_t    font( library, 
-                                 JS_GetStringBytes( fontString ),
+         freeTypeFont_t    font( JS_GetStringBytes( fontString ),
                                  JS_GetStringLength( fontString ) );
          if( font.worked() )
          {
@@ -660,9 +651,8 @@ static JSPropertySpec fontProperties_[] = {
 
 static void fontOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   freeTypeLibrary_t library ;
    std::string sError ;
-   freeTypeFont_t font( library, data, size );
+   freeTypeFont_t font( data, size );
    if( font.worked() )
    {
       JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)data, size );

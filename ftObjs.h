@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.2 2002-11-02 18:38:28 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.3 2003-02-07 03:01:33 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.2  2002-11-02 18:38:28  ericn
+ * Revision 1.3  2003-02-07 03:01:33  ericn
+ * -made freeTypeLibrary_t internal and persistent
+ *
+ * Revision 1.2  2002/11/02 18:38:28  ericn
  * -added method getDataLength()
  *
  * Revision 1.1  2002/11/02 04:13:07  ericn
@@ -32,46 +35,15 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-class freeTypeLibrary_t {
-public:
-   freeTypeLibrary_t( void )
-   {
-      FT_Init_FreeType( &library_ );
-   }
-   
-   ~freeTypeLibrary_t( void )
-   {
-      FT_Done_FreeType( library_ );
-   }
-
-   FT_Library library_ ;
-
-};
-   
 class freeTypeFont_t {
 public:
-   freeTypeFont_t( freeTypeLibrary_t &lib,
-                   void const        *data,
-                   unsigned long      size )
-      : lib_( lib ),
-        face_( 0 )
-   {
-      int error = FT_New_Memory_Face( lib_.library_, (FT_Byte *)data, size, 0, &face_ );
-      if( 0 != error )
-         face_ = 0 ;
-   }
-   
-   ~freeTypeFont_t( void )
-   {
-      if( face_ )
-         FT_Done_Face( face_ );
-   }
+   freeTypeFont_t( void const        *data,
+                   unsigned long      size );
+   ~freeTypeFont_t( void );
 
    bool worked( void ) const { return 0 != face_ ; }
 
-   freeTypeLibrary_t &lib_ ;
    FT_Face            face_ ;
-
 };
 
 

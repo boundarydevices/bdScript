@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.4  2003-01-20 06:49:10  ericn
+ * Revision 1.5  2003-02-07 03:01:33  ericn
+ * -made freeTypeLibrary_t internal and persistent
+ *
+ * Revision 1.4  2003/01/20 06:49:10  ericn
  * -removed underrun and erase on negative bitmap
  *
  * Revision 1.3  2002/11/17 22:23:48  ericn
@@ -23,9 +26,42 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-
 #include "ftObjs.h"
 #include <assert.h>
+
+class freeTypeLibrary_t {
+public:
+   freeTypeLibrary_t( void )
+   {
+      FT_Init_FreeType( &library_ );
+   }
+   
+   ~freeTypeLibrary_t( void )
+   {
+      FT_Done_FreeType( library_ );
+   }
+
+   FT_Library library_ ;
+
+};
+   
+static freeTypeLibrary_t lib ;
+
+freeTypeFont_t :: freeTypeFont_t
+   ( void const        *data,
+     unsigned long      size )
+   : face_( 0 )
+{
+   int error = FT_New_Memory_Face( lib.library_, (FT_Byte *)data, size, 0, &face_ );
+   if( 0 != error )
+      face_ = 0 ;
+}
+   
+freeTypeFont_t :: ~freeTypeFont_t( void )
+{
+   if( face_ )
+      FT_Done_Face( face_ );
+}
 
 freeTypeString_t :: freeTypeString_t
    ( freeTypeFont_t &font,
@@ -245,6 +281,7 @@ freeTypeString_t :: freeTypeString_t
                         nextX = penX + font.face_->glyph->bitmap_left ;
                      else
                         nextX = 0 ;
+                     
                      unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
                      for( int col = 0 ; col < bmp.width ; col++, nextX++ )
                      {
@@ -321,6 +358,7 @@ freeTypeString_t :: ~freeTypeString_t( void )
 #ifdef __MODULETEST__
 
 #include "memFile.h"
+#include <time.h>
 
 int main( int argc, char const * const argv[] )
 {
@@ -329,15 +367,26 @@ int main( int argc, char const * const argv[] )
       memFile_t fIn( argv[1] );
       if( fIn.worked() )
       {
-         freeTypeLibrary_t lib ;
-         freeTypeFont_t    font( lib, fIn.getData(), fIn.getLength() );
+         freeTypeFont_t font( fIn.getData(), fIn.getLength() );
          if( font.worked() )
          {
             char const *stringToRender = argv[3];
             unsigned    stringLen = strlen( stringToRender );
-            freeTypeString_t render( font, atoi( argv[2] ), stringToRender, stringLen );
-            printf( "width %u, height %u, y advance %u\n", render.getWidth(), render.getHeight(), render.getFontHeight() );
 
+            time_t startTime ; 
+            startTime = time( &startTime );
+            for( unsigned i = 0 ; i < 100 ; i++ )
+            {
+               freeTypeString_t render( font, atoi( argv[2] ), stringToRender, stringLen );
+               if( 0 == i )
+                  printf( "width %u, height %u, y advance %u\n", render.getWidth(), render.getHeight(), render.getFontHeight() );
+            }
+            
+            time_t endTime ; 
+            endTime = time( &endTime );
+            printf( "%u seconds\n", endTime - startTime );
+
+/*
             for( unsigned y = 0 ; y < render.getHeight(); y++ )
             {
                for( unsigned x = 0 ; x < render.getWidth(); x++ )
@@ -347,7 +396,7 @@ int main( int argc, char const * const argv[] )
                }
                printf( "\n" );
             }
-
+*/
          }
          else
             fprintf( stderr, "Error reading font file %s\n", argv[1] );
