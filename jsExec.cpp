@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.36  2003-04-21 00:24:19  ericn
+ * Revision 1.37  2003-05-09 04:27:04  ericn
+ * -added CBM printer support
+ *
+ * Revision 1.36  2003/04/21 00:24:19  ericn
  * -added camera initialization
  *
  * Revision 1.35  2003/03/22 03:33:45  ericn
@@ -163,6 +166,7 @@
 #include "jsURL.h"
 #include "jsFileIO.h"
 #include "jsCamera.h"
+#include "jsCBM.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -299,6 +303,7 @@ int prMain(int argc, char **argv)
                      initJSURL( cx, glob );
                      initJSFileIO( cx, glob );
                      initJSCamera( cx, glob );
+                     initJSCBM( cx, glob );
 
                      getCurlCache();
 
@@ -440,9 +445,9 @@ int main( int argc, char *argv[] )
    sigaction(SIGSEGV, &sa, NULL);
 
    printf( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
-
    do
    {
+printf( "---> initializing NSPR\n" );
       int result = PR_Initialize( prMain, argc, argv, 0 );
       if( gotoCalled_ )
       {
