@@ -2,8 +2,8 @@
 # Makefile for curlCache library and utility programs
 #
 
-HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
-#HARDWARE_TYPE=-DCONFIG_BD2003
+#HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
+HARDWARE_TYPE=-DCONFIG_BD2003
 
 OBJS = \
        barcodePoll.o \
@@ -93,6 +93,8 @@ OBJS += \
        jsFlash.o \
        jsMP3.o \
        jsMPEG.o \
+       jsPrinter.o \
+       jsStar.o \
        jsVolume.o \
        madDecode.o \
        madHeaders.o \
