@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.3  2003-12-04 02:23:45  ericn
+ * Revision 1.4  2004-09-28 04:02:59  ericn
+ * -don't draw to screen for BD2004, reboot when done programming
+ *
+ * Revision 1.3  2003/12/04 02:23:45  ericn
  * -more error messages
  *
  * Revision 1.2  2003/12/01 04:54:58  ericn
@@ -37,6 +40,8 @@
 #include <linux/mtd/mtd.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
+#include <sys/reboot.h>
+#include <signal.h>
 #include "fbDev.h"
 #include "meter.h"
 
@@ -46,8 +51,18 @@ static char const kernelDev[] = {
 };
 
 static char const fileSysDev[] = {
+#ifdef CONFIG_BD2003
    "/dev/mtd2"
+#else 
+   "/dev/mtd3"
+#endif
 };
+
+#ifdef CONFIG_BD2003
+#define FBRECT( xl, yt, xr, yb, r, g, b ) fb.rect( xl, yt, xr, yb, r, g, b )
+#else
+#define FBRECT( xl, yt, xr, yb, r, g, b ) /**/
+#endif 
 
 static JSBool
 jsKernelMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -95,12 +110,13 @@ jsKernelMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
             }
          }
 
+/*
 printf( "0x%x bytes of kernel partition\n"
         "0x%x bytes of parameter data\n"
         "0x%x bytes of erased data\n"
         "0x%x bytes of boot loader+partition\n",
         totalSize, totalSize-paramStart, paramStart-numRead, numRead );
-
+*/
          if( 0 < numRead )
          {
             md5_t result ;
@@ -200,6 +216,28 @@ static bool programParams( JSContext   *cx,
    return false ;
 }
 
+static void doReboot()
+{
+   signal(SIGTERM,SIG_IGN);
+   signal(SIGHUP,SIG_IGN);
+   setpgrp();
+   
+   /* Allow Ctrl-Alt-Del to reboot system. */
+   reboot(RB_ENABLE_CAD);
+   
+   /* Send signals to every process _except_ pid 1 */
+   kill(-1, SIGTERM);
+   sleep(1);
+   
+   kill(-1, SIGKILL);
+   sleep(1);
+   
+   sync();
+   
+   reboot(RB_AUTOBOOT);
+   kill(1, SIGTERM);
+   exit(0);
+}
 
 static bool doProgram( JSContext  *cx, 
                        int         devFd,
@@ -228,7 +266,7 @@ static bool doProgram( JSContext  *cx,
       unsigned char blue  = 0xFF ;
 
       if( 0 < height )
-         fb.rect( xLeft, yTop, xRight, yBottom, red, green, blue );
+         FBRECT( xLeft, yTop, xRight, yBottom, red, green, blue );
 
       red = green = blue = 0x40 ;
 
@@ -243,7 +281,7 @@ static bool doProgram( JSContext  *cx,
             bytePos += meminfo.erasesize ;
             unsigned newLeft = meter.project( bytePos );
             if( 0 < height )
-               fb.rect( xNext, yTop, newLeft, yBottom, red, green, blue );
+               FBRECT( xNext, yTop, newLeft, yBottom, red, green, blue );
             xNext = newLeft ;
             printf( "." ); fflush( stdout );
          }
@@ -257,7 +295,7 @@ static bool doProgram( JSContext  *cx,
 
       // fill if necessary
       if( ( xNext < xRight ) && ( count == numToErase ) && ( 0 < height ) )
-         fb.rect( xNext, yTop, xRight, yBottom, red, green, blue );
+         FBRECT( xNext, yTop, xRight, yBottom, red, green, blue );
 
       unsigned char const *nextIn = (unsigned char const *)data ;
 
@@ -279,8 +317,9 @@ static bool doProgram( JSContext  *cx,
             bytePos    += numWritten ;
             unsigned newLeft = meter2.project( bytePos );
             if( 0 < height )
-               fb.rect( xNext, yTop, newLeft, yBottom, red, green, blue );
+               FBRECT( xNext, yTop, newLeft, yBottom, red, green, blue );
             xNext = newLeft ;
+            printf( "|" ); fflush( stdout );
          }
          else
          {
@@ -306,10 +345,10 @@ static bool doProgram( JSContext  *cx,
       }
       
       if( ( xNext < xRight ) && ( 0 == dataLength ) && ( 0 < height ) )
-         fb.rect( xNext, yTop, xRight, yBottom, red, green, blue );
+         FBRECT( xNext, yTop, xRight, yBottom, red, green, blue );
 
-      return ( 0 == dataLength );
-
+      if( 0 == dataLength )
+         doReboot();
    }
    else
       JS_ReportError( cx, "%s reading partition info", strerror( errno ) );
