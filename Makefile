@@ -1,10 +1,11 @@
 # 
 # Makefile for curlCache library and utility programs
 # 
-OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o curlThread.o \
-       dirByATime.o fbDev.o hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
-       jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o jsMP3.o jsProc.o \
-       jsScreen.o jsText.o jsTimer.o jsURL.o \
+OBJS = childProcess.o codeQueue.o curlCache.o curlCacheMain.o \
+       curlThread.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
+       imgGIF.o imgPNG.o imgJPEG.o \
+       jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
+       jsMP3.o jsProc.o jsScreen.o jsText.o jsTimer.o jsURL.o \
        memFile.o relativeURL.o ultoa.o urlFile.o 
 LIB = curlCacheLib.a
 
