@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.4  2002-11-30 18:52:57  ericn
+ * Revision 1.5  2002-11-30 23:58:01  ericn
+ * -rooted timer handlers
+ *
+ * Revision 1.4  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.3  2002/10/31 02:07:14  ericn
@@ -31,6 +34,7 @@
 #include <string>
 #include <pthread.h>
 #include "codeQueue.h"
+#include "jsGlobals.h"
 
 struct timerParam_t {
    JSObject     *scope_ ;
@@ -40,7 +44,7 @@ struct timerParam_t {
 
 static void *interval( void *arg )
 {
-   timerParam_t const *param = (timerParam_t *)arg ;
+   timerParam_t *param = (timerParam_t *)arg ;
 
    unsigned long const ms = param->milliseconds_ ;
    struct timespec tspec ;
@@ -62,6 +66,8 @@ static void *interval( void *arg )
       }
    } while( 1 );
 
+   JS_RemoveRoot( execContext_, &param->sourceCode_ );
+
    delete param ;
    
    return 0 ;
@@ -69,7 +75,7 @@ static void *interval( void *arg )
 
 static void *oneShot( void *arg )
 {
-   timerParam_t const *param = (timerParam_t *)arg ;
+   timerParam_t *param = (timerParam_t *)arg ;
 
    unsigned long const ms = param->milliseconds_ ;
    struct timespec tspec ;
@@ -86,7 +92,9 @@ static void *oneShot( void *arg )
    }
    else
       printf( "oneShot cancelled %d\n", result );
-   
+
+   JS_RemoveRoot( execContext_, &param->sourceCode_ );
+
    delete param ;
    return (void *)result ;
 }
@@ -105,6 +113,7 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
       param->sourceCode_   = argv[1];
 
+      JS_AddRoot( execContext_, &param->sourceCode_ );
       pthread_t thread ;
       int create = pthread_create( &thread, 0, interval, param );
       if( 0 == create )
@@ -113,7 +122,10 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          return JS_TRUE ;
       }
       else
+      {
+         JS_RemoveRoot( execContext_, &param->sourceCode_ );
          delete param ;
+      }
    }
 
    *rval = JSVAL_FALSE ;
@@ -134,6 +146,7 @@ jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       param->scope_        = obj ;
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
       param->sourceCode_   = argv[1];
+      JS_AddRoot( execContext_, &param->sourceCode_ );
 
       pthread_t thread ;
       int create = pthread_create( &thread, 0, oneShot, param );
@@ -143,7 +156,10 @@ jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          return JS_TRUE ;
       }
       else
+      {
+         JS_RemoveRoot( execContext_, &param->sourceCode_ );
          delete param ;
+      }
    }
 
    *rval = JSVAL_FALSE ;
