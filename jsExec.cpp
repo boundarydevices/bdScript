@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.37  2003-05-09 04:27:04  ericn
+ * Revision 1.38  2003-05-10 19:14:10  ericn
+ * -added closeCBM routine
+ *
+ * Revision 1.37  2003/05/09 04:27:04  ericn
  * -added CBM printer support
  *
  * Revision 1.36  2003/04/21 00:24:19  ericn
@@ -366,6 +369,7 @@ int prMain(int argc, char **argv)
                            fprintf( stderr, "Error opening url %s\n", argv[1] );
                      } // limit scope of urlFile
 
+                     closeCBM( cx, glob );
                      shutdownTTY();
                      shutdownGpio();
                      stopBarcodeThread();
