@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.1  2003-09-14 18:08:03  ericn
+ * Revision 1.2  2003-09-22 02:07:35  ericn
+ * -modified to keep running with no camera
+ *
+ * Revision 1.1  2003/09/14 18:08:03  ericn
  * -Initial import
  *
  *
@@ -440,11 +443,11 @@ int main( int argc, char const * const argv[] )
          int mixerFd = open( "/dev/mixer", O_RDWR );
          if( 0 <= mixerFd )
          {
-            int recordLevel = 0x6464 ;
+            int recordLevel = 1 ;
             if( 0 == ioctl( mixerFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-               printf( "record level is now %d\n", recordLevel );
+               printf( "record boost is now %d\n", recordLevel );
             else
-               perror( "set record level" );
+               perror( "set boost" );
             
             recordLevel = 0x6464 ;
             if( 0 == ioctl( mixerFd, MIXER_READ( SOUND_MIXER_IGAIN ), &recordLevel ) )
@@ -486,7 +489,7 @@ int main( int argc, char const * const argv[] )
                   if( 0 < speed )
                   {
                      int fdCamera = open( "/dev/video0", O_RDONLY );
-                     if( 0 <= fdCamera )
+//                     if( 0 <= fdCamera )
                      {
                         int const udpSock = socket( AF_INET, SOCK_DGRAM, 0 );
                         if( 0 <= udpSock )
@@ -499,21 +502,29 @@ int main( int argc, char const * const argv[] )
                            int create = pthread_create( &audioHandle, 0, audioThread, &audioParams );
                            if( 0 == create )
                            {
-                              threadParam_t videoParams ; 
-                              videoParams.remote_ = remote ;
-                              videoParams.mediaFd_ = fdCamera ;
-                              videoParams.udpSock_ = udpSock ;
-
-                              pthread_t videoHandle ;
-                              create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
-                              if( 0 == create )
+                              if( 0 <= fdCamera )
                               {
-                                 printf( "threads created... <ctrl-c> to stop\n" );
+                                 threadParam_t videoParams ; 
+                                 videoParams.remote_ = remote ;
+                                 videoParams.mediaFd_ = fdCamera ;
+                                 videoParams.udpSock_ = udpSock ;
+   
+                                 pthread_t videoHandle ;
+                                 create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
+                                 if( 0 == create )
+                                 {
+                                    printf( "threads created... <ctrl-c> to stop\n" );
+                                    pause();
+                                    printf( "shutting down\n" );
+                                    pthread_cancel( videoHandle );
+                                    void *exitStat ;
+                                    pthread_join( videoHandle, &exitStat );
+                                 }
+                              }
+                              else
+                              {   
+                                 printf( "no video... sending audio\n" );
                                  pause();
-                                 printf( "shutting down\n" );
-                                 pthread_cancel( videoHandle );
-                                 void *exitStat ;
-                                 pthread_join( videoHandle, &exitStat );
                               }
 
                               void *exitStat ;
@@ -526,8 +537,8 @@ int main( int argc, char const * const argv[] )
                         else
                            perror( "udpSock" );
                      }
-                     else
-                        perror( "/dev/video0" );
+//                     else
+//                        perror( "/dev/video0" );
                   }
                }
                else
