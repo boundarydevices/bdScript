@@ -1,5 +1,5 @@
 #ifndef __IMGPNG_H__
-#define __IMGPNG_H__ "$Id: imgPNG.h,v 1.1 2002-10-31 02:13:08 ericn Exp $"
+#define __IMGPNG_H__ "$Id: imgPNG.h,v 1.2 2002-11-20 00:38:28 ericn Exp $"
 
 /*
  * imgPNG.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: imgPNG.h,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-20 00:38:28  ericn
+ * -added comment
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -22,7 +25,7 @@
 
 bool imagePNG( void const    *inData,     // input
                unsigned long  inSize,     // input
-               void const    *&pixData,   // output
+               void const    *&pixData,   // output : delete [] when done
                unsigned short &width,     // output
                unsigned short &height );  // output
 

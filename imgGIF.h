@@ -1,5 +1,5 @@
 #ifndef __IMGGIF_H__
-#define __IMGGIF_H__ "$Id: imgGIF.h,v 1.1 2002-10-31 02:13:08 ericn Exp $"
+#define __IMGGIF_H__ "$Id: imgGIF.h,v 1.2 2002-11-20 00:38:40 ericn Exp $"
 
 /*
  * imgGIF.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: imgGIF.h,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-20 00:38:40  ericn
+ * -added comment
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -22,7 +25,7 @@
 
 bool imageGIF( void const    *inData,     // input
                unsigned long  inSize,     // input
-               void const    *&pixData,   // output
+               void const    *&pixData,   // output : delete [] when done
                unsigned short &width,     // output
                unsigned short &height );  // output
 
