@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsHyperlink.cpp,v $
- * Revision 1.3  2003-01-12 03:03:52  ericn
+ * Revision 1.4  2003-01-31 13:29:28  ericn
+ * -added currentURL()
+ *
+ * Revision 1.3  2003/01/12 03:03:52  ericn
  * -added currentURL() method
  *
  * Revision 1.2  2002/12/01 02:40:38  ericn
@@ -42,18 +45,8 @@ jsGoto( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static JSBool
-jsCurrentURL( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   std::string url ;
-   currentURL( url );
-   *rval = STRING_TO_JSVAL( JS_NewStringCopyN( cx, url.c_str(), url.size() ) );
-   return JS_TRUE ;
-}
-
 static JSFunctionSpec text_functions[] = {
     {"gotoURL",          jsGoto,       1 },
-    {"currentURL",       jsCurrentURL, 0 },
     {0}
 };
 
