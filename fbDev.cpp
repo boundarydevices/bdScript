@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.5  2002-11-02 18:39:25  ericn
+ * Revision 1.6  2002-11-21 14:03:21  ericn
+ * -removed display clear on instantiation
+ *
+ * Revision 1.5  2002/11/02 18:39:25  ericn
  * -added getRed(), getGreen(), getBlue() methods to descramble pins
  *
  * Revision 1.4  2002/10/31 02:06:28  ericn
@@ -223,7 +226,7 @@ fbDevice_t :: fbDevice_t( char const *name )
                             MAP_SHARED, fd_, 0 );
                if( MAP_FAILED != mem_ )
                {
-                  memset( mem_, 0, fixed_info.smem_len );
+//                  memset( mem_, 0, fixed_info.smem_len );
                   return ;
                }
                else
