@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.10  2003-10-18 19:15:28  ericn
+ * Revision 1.11  2003-10-19 17:02:56  ericn
+ * -added U/I
+ *
+ * Revision 1.10  2003/10/18 19:15:28  ericn
  * -made udp rx handler polled
  *
  * Revision 1.9  2003/10/18 16:37:03  ericn
@@ -407,6 +410,7 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
                   if( numSent == numToSend )
                   {
                      frameCnt++ ;
+/*
                      time_t const now = time( 0 );
                      if( now != prevSec )
                      {
@@ -416,6 +420,7 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
                         unsigned const deltaSecs = now-start ;
                         printf( "\r%u fps, %u BPS audio   ", deltaFrames, audioBytesOut/deltaSecs ); fflush( stdout );
                      }
+*/                     
                   }
                   else
                      fprintf( stderr, "%m sending image: %u/%u\n", numSent, numToSend );
@@ -447,6 +452,115 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
    else
       perror( "VIDIOCGMBUF" );
 }
+
+//
+// this class represents the U/I state for the 
+//
+// Note that there are probably six elements which
+// could be used to drive the display :
+//
+//    lock/unlock                - set+cleared by udpRxThread
+//    Touch/not                  - set+cleared by touchPoll
+//    barcode pending/not        - set+cleared by barcodePoll cleared by 
+//                                 udpRxThread(unlock or reject) or timeout
+//    open/not                   - set+cleared by gpioPoll
+//    barcode reject/not         - set by udpRxThread, cleared by 
+//                                 udpRxThread(unlock) or timeout
+//    car present/not            - set/cleared by gpio poll handler
+//
+// For now, we're only using three:
+//
+//    lock/not    - depending on whether we're trying to open the gate
+//    open/not    - depending on whether the gate remains open
+//    touch/not   - depending on whether the screen is touched
+// 
+class uiState_t {
+public:
+   enum input_e {
+      lock_e         = 1,
+      gateOpen_e     = 2,
+      touch_e        = 4,
+      bcReject_e     = 8,
+      bcPending_e    = 16,
+      carPresent_e   = 32
+   };
+
+   uiState_t( void );
+   ~uiState_t( void ){}
+
+   void setState( input_e input,
+                  bool    setNotCleared );
+
+   unsigned char getState( void ) const { return state_ ; }
+
+private:
+   unsigned char state_ ;
+   image_t const *images_[4];
+   image_t        welcomeImage_ ;
+   image_t        unlockImage_ ;
+   image_t        openImage_ ;
+};
+
+
+uiState_t :: uiState_t( void )
+   : state_( 0 )
+{
+   if( !imageFromFile( "logo.jpg", welcomeImage_ ) )
+      fprintf( stderr, "Error reading welcome logo\n" );
+   if( !imageFromFile( "unlock.jpg", unlockImage_ ) )
+      fprintf( stderr, "Error reading unlocked image\n" );
+   if( !imageFromFile( "open.gif", openImage_ ) )
+      fprintf( stderr, "Error reading open image\n" );
+   
+   images_[0]           = &unlockImage_ ;
+   images_[lock_e]      = &welcomeImage_ ;
+   images_[gateOpen_e]  = &openImage_ ;
+   images_[lock_e
+          |gateOpen_e]  = &openImage_ ;
+   setState( lock_e, true );
+}
+
+static void invertScreen( void )
+{
+   fbDevice_t &fb = getFB();
+   unsigned long *fbMem = (unsigned long *)fb.getMem();
+   unsigned long longs = fb.getMemSize()/sizeof(fbMem[0]);
+
+   while( 0 < longs-- )
+   {
+      *fbMem = ~(*fbMem);
+      fbMem++ ;
+   }
+}
+
+void uiState_t :: setState
+   ( input_e input,
+     bool    setNotCleared )
+{
+   unsigned char const imgBits  = lock_e | gateOpen_e ;
+   unsigned char const oldState = state_ ;
+   if( setNotCleared )
+      state_ |= input ;
+   else
+      state_ &= ~input ;
+
+   if( ( oldState & imgBits ) != ( state_ & imgBits ) )
+   {
+      image_t const &image = *images_[state_ & imgBits];
+      if( image.pixData_ )
+         getFB().render( 0, 0, image.width_, image.height_, (unsigned short *)image.pixData_ );
+      if( state_ & touch_e )
+      {
+         invertScreen();
+      }
+   }
+   else if( ( state_ & touch_e ) != ( oldState & touch_e ) )
+   {
+      invertScreen();
+   }
+}
+
+
 
 class udpBarcode_t : public barcodePoll_t {
 public:
@@ -559,19 +673,6 @@ udpTouch_t :: udpTouch_t
       perror( "dong" );
 }
 
-static void invertScreen( void )
-{
-   fbDevice_t &fb = getFB();
-   unsigned long *fbMem = (unsigned long *)fb.getMem();
-   unsigned long longs = fb.getMemSize()/sizeof(fbMem[0]);
-
-   while( 0 < longs-- )
-   {
-      *fbMem = ~(*fbMem);
-      fbMem++ ;
-   }
-}
-
 void udpTouch_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
    bool send ;
@@ -626,24 +727,33 @@ void udpTouch_t :: onRelease( timeval const &tv )
 
 class udpGPIO_t : public gpioPoll_t {
 public:
-   udpGPIO_t( pollHandlerSet_t  &set,
-              char const        *devName,
-              int                udpSock,
-              sockaddr_in const &remote,
-              unsigned char      mask )
+   udpGPIO_t( pollHandlerSet_t   &set,
+              char const         *devName,
+              int                 udpSock,
+              sockaddr_in const  &remote,
+              unsigned char       mask,
+              uiState_t          &ui,
+              uiState_t::input_e  uiBit )
       : gpioPoll_t( set, devName )
       , udpSock_( udpSock )
       , remote_( remote )
-      , mask_( mask ){}
+      , mask_( mask )
+      , ui_( ui )
+      , uiBit_( uiBit )
+   {
+   }
 
    virtual void onHigh( void );
    virtual void onLow( void );
 
    void sendPinState( void );
+
 private:
    int                 udpSock_ ;
    sockaddr_in         remote_ ;
    unsigned char const mask_ ;
+   uiState_t          &ui_ ;
+   uiState_t::input_e  uiBit_ ;
 };
 
 
@@ -665,6 +775,7 @@ void udpGPIO_t :: onHigh( void )
 {
    gpioPins_.pinState_ |= mask_ ;
    sendPinState();
+   ui_.setState( uiBit_, true );
 }
 
 
@@ -672,6 +783,7 @@ void udpGPIO_t :: onLow( void )
 {
    gpioPins_.pinState_ &= ~mask_ ;
    sendPinState();
+   ui_.setState( uiBit_, false );
 }
 
 
@@ -696,7 +808,8 @@ class udpRxPoll_t : public pollHandler_t {
 public:
    udpRxPoll_t( int               fdUDP,
                 pollHandlerSet_t &set,
-                int               fdAudio );
+                int               fdAudio,
+                uiState_t        &ui );
 
    bool isOpen( void ) const { return 0 <= getFd(); }
    
@@ -712,65 +825,22 @@ public:
    virtual void onDataAvail( void );
 
 protected:
-   int const fdAudio_ ;
-   int const fdLock_ ;
-   image_t   welcomeImage_ ;
-   image_t   unlockImage_ ;
-   image_t   openImage_ ;
+   int const  fdAudio_ ;
+   int const  fdLock_ ;
+   uiState_t &ui_ ;
 };
 
 
 udpRxPoll_t :: udpRxPoll_t
    ( int               fdUDP,
      pollHandlerSet_t &set,
-     int               fdAudio )
+     int               fdAudio,
+     uiState_t        &ui )
       : pollHandler_t( fdUDP, set )
       , fdAudio_( fdAudio )
       , fdLock_( open( "/dev/Turnstile", O_WRONLY ) )
+      , ui_( ui )
 {
-   fbDevice_t &fb = getFB();
-   if( imageFromFile( "logo.jpg", welcomeImage_ ) )
-   {
-      unsigned logoX, logoY ;
-      if( fb.getWidth() > welcomeImage_.width_ )
-         logoX = (fb.getWidth()-welcomeImage_.width_)/2 ;
-      else
-         logoX = 0 ;
-      if( fb.getHeight() > welcomeImage_.height_ )
-         logoY = (fb.getHeight()-welcomeImage_.height_)/2 ;
-      else
-         logoY = 0 ;
-
-      fb.rect( 0, 0, fb.getWidth()-1, fb.getHeight()-1, 0xFF, 0xFF, 0xFF );
-      fb.render( logoX, logoY, 
-                 welcomeImage_.width_, 
-                 welcomeImage_.height_, 
-                 (unsigned short *)welcomeImage_.pixData_ );
-
-      printf( "welcome image: %u x %u pixels\n"
-              "display at %u/%u\n",                  
-              welcomeImage_.width_, 
-              welcomeImage_.height_, 
-              logoX, logoY );
-      printf( "welcome image: %u x %u pixels\n"
-              "display at %u/%u\n",                  
-              welcomeImage_.width_, 
-              welcomeImage_.height_, 
-              logoX, logoY );
-      printf( "welcome image: %u x %u pixels\n"
-              "display at %u/%u\n",                  
-              welcomeImage_.width_, 
-              welcomeImage_.height_, 
-              logoX, logoY );
-
-   }
-   else
-      fprintf( stderr, "Error reading welcome logo\n" );
-   if( !imageFromFile( "unlocked.jpg", welcomeImage_ ) )
-      fprintf( stderr, "Error reading unlocked image\n" );
-   if( !imageFromFile( "open.jpg", welcomeImage_ ) )
-      fprintf( stderr, "Error reading open image\n" );
-
    setMask( POLLIN );
    set.add( *this );
 }
@@ -790,6 +860,7 @@ void udpRxPoll_t :: onMsg( deviceMsg_t const &msg )
    }
    else if( deviceMsg_t :: unlock_e == msg.type_ )
    {
+      ui_.setState( uiState_t::lock_e, false );
       if( -1 != fdLock_ )
       {
          char const cOut = '\1' ;
@@ -800,6 +871,7 @@ void udpRxPoll_t :: onMsg( deviceMsg_t const &msg )
    }
    else if( deviceMsg_t :: lock_e == msg.type_ )
    {
+      ui_.setState( uiState_t::lock_e, true );
       if( -1 != fdLock_ )
       {
          char const cOut = '\0' ;
@@ -864,6 +936,12 @@ static pinData_t const pins_[] = {
    { "/dev/Feedback3", gpioPins_t::guardShack_e },
 };
 
+static uiState_t::input_e const pinUI_[] = {
+   uiState_t::gateOpen_e,
+   (uiState_t::input_e)0,
+   (uiState_t::input_e)0
+};
+
 static unsigned const pinCount_ = sizeof( pins_ )/sizeof( pins_[0] );
 
 static void *pollThread( void *arg )
@@ -881,6 +959,7 @@ static void *pollThread( void *arg )
       {
          printf( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
          
+         uiState_t  uiState ;
          udpGPIO_t *pollPins[pinCount_] = {
             0, 0
          };
@@ -888,14 +967,14 @@ static void *pollThread( void *arg )
          for( unsigned p = 0 ; p < pinCount_ ; p++ )
          {
             char const *devName = pins_[p].name_ ;
-            pollPins[p] = new udpGPIO_t( handlers, devName, params.udpSock_, params.remote_, pins_[p].mask_ );
+            pollPins[p] = new udpGPIO_t( handlers, devName, params.udpSock_, params.remote_, pins_[p].mask_, uiState, pinUI_[p] );
             if( pollPins[p]->isOpen() )
                printf( "opened %s: fd %d, mask %x\n", devName, pollPins[p]->getFd(), pollPins[p]->getMask() );
          }
-
          udpRxPoll_t udpPoll( params.udpSock_,
                               handlers,
-                              params.mediaFd_ );
+                              params.mediaFd_,
+                              uiState );
 
          int iterations = 0 ;
          while( 1 )
