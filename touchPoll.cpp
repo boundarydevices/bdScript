@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.7  2004-12-03 04:43:50  ericn
+ * Revision 1.8  2004-12-28 03:48:01  ericn
+ * -clean queue on exit
+ *
+ * Revision 1.7  2004/12/03 04:43:50  ericn
  * -use median/mean filters
  *
  * Revision 1.6  2004/11/26 15:28:54  ericn
@@ -67,6 +70,7 @@ touchPoll_t :: touchPoll_t
      char const       *devName )
    : pollHandler_t( open( devName, O_RDONLY ), set )
 {
+debugPrint( "touchPoll constructed, fd == %d\n", getFd() );   
    if( isOpen() )
    {
       fcntl( fd_, F_SETFD, FD_CLOEXEC );
@@ -79,7 +83,14 @@ touchPoll_t :: touchPoll_t
 touchPoll_t :: ~touchPoll_t( void )
 {
    if( isOpen() )
+   {
+      ts_event event ;
+      int numRead ;
+   
+      while( sizeof( event ) == ( numRead = read( fd_, &event, sizeof( event ) ) ) )
+         ; // purge queue
       close();
+   }
 }
 
 void touchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
