@@ -268,7 +268,7 @@ progFlash: start.o progFlash.o
 	$(LD) -o $@ start.o progFlash.o -L../install/lib/gcc-lib/arm-linux/2.95.3 -lgcc
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc ffPlay cbmGraph cbmStat jpegview progFlash
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc ffPlay cbmGraph cbmStat jpegview progFlash flashVar
 
 .PHONY: install-libs install-headers
 
@@ -284,6 +284,8 @@ install-headers:
 install-bin:
 	$(OBJCOPY) -S -v jsExec   ../install/arm-linux/bin/jsExec
 	$(OBJCOPY) -S -v jpegview ../install/arm-linux/bin/jpegview
+	$(OBJCOPY) -S -v flashVar ../install/arm-linux/bin/flashVar
+	cp wget ../install/arm-linux/bin
 
 install: install-bin install-headers
 
