@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.5  2002-11-14 14:44:40  ericn
+ * Revision 1.6  2002-11-14 14:55:48  ericn
+ * -fixed mono output
+ *
+ * Revision 1.5  2002/11/14 14:44:40  ericn
  * -fixed clear() routine, modified to always use stereo
  *
  * Revision 1.4  2002/11/14 13:14:08  ericn
@@ -128,7 +131,9 @@ printf( "opened dsp device\n" );
                         mad_fixed_t const *left = synth.pcm.samples[0];
                         for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
                         {
-                           *nextOut++ = *nextOut++ = scale( *left++ );
+                           unsigned short const sample = scale( *left++ );
+                           *nextOut++ = sample ;
+                           *nextOut++ = sample ;
                            spaceLeft -= 2 ;
                            if( 0 == spaceLeft )
                            {
