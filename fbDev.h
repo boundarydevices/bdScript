@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.13 2004-03-17 04:56:19 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.14 2004-05-05 03:18:59 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.13  2004-03-17 04:56:19  ericn
+ * Revision 1.14  2004-05-05 03:18:59  ericn
+ * -add render and antialias into image
+ *
+ * Revision 1.13  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.12  2003/11/24 19:42:05  ericn
@@ -70,6 +73,8 @@ public:
    unsigned short getPixel( unsigned x, unsigned y );
    void           setPixel( unsigned x, unsigned y, unsigned short rgb );
 
+   inline static unsigned short get16( unsigned long rgb );
+
    static unsigned short get16( unsigned char red, unsigned char green, unsigned char blue );
 
    //
@@ -92,11 +97,29 @@ public:
                 int imageDisplayWidth=0,		//portion of image to display
                 int imageDisplayHeight=0
               );
+   static void render( int x, int y,
+                       int w, int h,				 // width and height of source image
+                       unsigned short const *pixels,
+                       unsigned short       *dest,
+                       unsigned short        destW,
+                       unsigned short        destH,
+                       int imagexPos=0,			//offset within image to start display
+                       int imageyPos=0,
+                       int imageDisplayWidth=0,		//portion of image to display
+                       int imageDisplayHeight=0
+                     );
 
    void render( unsigned short x, unsigned short y,
                 unsigned short w, unsigned short h,
                 unsigned short const *pixels,
                 unsigned char const  *alpha );
+   static void render( unsigned short x, unsigned short y,
+                       unsigned short w, unsigned short h,
+                       unsigned short const *pixels,
+                       unsigned char const  *alpha,
+                       unsigned short       *dest,
+                       unsigned short        destW,
+                       unsigned short        destH );
 
    // draw a filled rectangle
    void rect( unsigned short x1, unsigned short y1,
@@ -126,6 +149,21 @@ public:
                    unsigned short       yBottom,
                    unsigned char red, unsigned char green, unsigned char blue );
 
+   // render anti-aliased alphamap in specified color to 16-bit image with clipping
+   void antialias( unsigned char const *bmp,       // input: alphaMap
+                   unsigned short       bmpWidth,  // row stride
+                   unsigned short       bmpHeight, // num rows in bmp
+                   unsigned short       xLeft,     // display coordinates: clip to this rectangle
+                   unsigned short       yTop,
+                   unsigned short       xRight,
+                   unsigned short       yBottom,
+                   unsigned char        red, 
+                   unsigned char        green, 
+                   unsigned char        blue,
+                   unsigned short      *imageMem,
+                   unsigned short       imageWidth,
+                   unsigned short       imageHeight );
+
    // draw a box with specified background color and button highlighting.
    // pressed will highlight bottom-right and shade upper left
 #ifdef CONFIG_BD2003
@@ -154,6 +192,14 @@ private:
 };
 
 fbDevice_t &getFB( char const *devName = "/dev/fb0" );
+
+
+unsigned short fbDevice_t :: get16( unsigned long rgb )
+{ 
+   return get16( (unsigned char)( ( rgb & 0xFF0000 ) >> 16 ),
+                 (unsigned char)( ( rgb & 0x00FF00 ) >> 8 ),
+                 (unsigned char)rgb );
+}
 
 #endif
 

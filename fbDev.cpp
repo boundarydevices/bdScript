@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.21  2004-03-17 04:56:19  ericn
+ * Revision 1.22  2004-05-05 03:19:01  ericn
+ * -add render and antialias into image
+ *
+ * Revision 1.21  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.20  2003/07/03 13:35:37  ericn
@@ -575,6 +578,86 @@ void fbDevice_t :: render
    }
 }
 
+
+void fbDevice_t :: render
+   ( int xPos,				//placement on screen
+     int yPos,
+     int w,
+     int h,	 			// width and height of image
+     unsigned short const *pixels,
+     unsigned short       *dest,
+     unsigned short        destW,
+     unsigned short        destH,
+     int imagexPos,			//offset within image to start display
+     int imageyPos,
+     int imageDisplayWidth,		//portion of image to display
+     int imageDisplayHeight
+   )
+{
+   if (xPos<0)
+   {
+      imagexPos -= xPos;		//increase offset
+      imageDisplayWidth += xPos;	//reduce width
+      xPos = 0;
+   }
+   if (yPos<0)
+   {
+      imageyPos -= yPos;
+      imageDisplayHeight += yPos;
+      yPos = 0;
+   }
+   if ((imageDisplayWidth <=0)||(imageDisplayWidth >(w-imagexPos))) imageDisplayWidth = w-imagexPos;
+   if ((imageDisplayHeight<=0)||(imageDisplayHeight>(h-imageyPos))) imageDisplayHeight = h-imageyPos;
+
+   pixels += (w*imageyPos)+imagexPos;
+
+   int minWidth = min(destW-xPos,imageDisplayWidth);
+   int minHeight= min(destH-yPos,imageDisplayHeight);
+   if ((minWidth > 0) && (minHeight > 0))
+   {
+#ifdef CONFIG_BD2003
+      // 16-bit color
+      minWidth *= sizeof( unsigned short ); //2 bytes/pixel
+      do
+      {
+         unsigned short *pix = dest + ( destW * yPos++ ) + xPos;
+         memcpy(pix,pixels,minWidth);
+         pixels += w;
+      } while (--minHeight);
+#else
+      dither_t dither( pixels, w, h );
+
+      // monochrome
+      unsigned char *const bits = (unsigned char *)dest ;
+      do
+      {
+         unsigned offs       = yPos*destW+xPos ;
+         unsigned byteOffs   = offs/8 ;
+         unsigned char mask  = 1 << (offs&7);
+         for( unsigned x = 0 ; x < minWidth ; x++ )
+         {
+            if( dither.isBlack( xPos+x, yPos ) )
+               bits[byteOffs] |= mask ;
+            else
+               bits[byteOffs] &= ~mask ;
+            mask <<= 1 ;
+            if( 0 == mask )
+            {
+               mask = 1 ;
+               byteOffs++ ;
+            }
+         }
+         pixels += w ;
+         yPos++ ;
+      } while (--minHeight);
+
+      refresh();
+
+#endif
+   }
+}
+
+
 void fbDevice_t :: render
    ( unsigned short xPos, 
      unsigned short yPos,
@@ -645,6 +728,73 @@ printf( "!!!!!!!!!!!! ignoring transparency !!!!!!!!!!!\n" );
       render( xPos, yPos, w, h, pixels );
 }
 
+void fbDevice_t :: render
+   ( unsigned short xPos, 
+     unsigned short yPos,
+     unsigned short w, 
+     unsigned short h, // width and height of image
+     unsigned short const *pixels,
+     unsigned char const  *alpha,
+     unsigned short       *dest,
+     unsigned short        destW,
+     unsigned short        destH )
+{
+   if( alpha )
+   {
+      if( ( 0 < w ) && ( 0 < h ) && ( xPos < destW ) && ( yPos < destH ) )
+      {
+         int const left = xPos ;
+         for( unsigned y = 0 ; y < h ; y++, yPos++, alpha += w )
+         {
+            if( yPos < destH )
+            {
+               // 16-bit color
+               unsigned short *pix = dest + ( yPos*destW ) + left ;
+               xPos = left ;
+               for( unsigned x = 0 ; x < w ; x++, xPos++ )
+               {
+                  if( xPos < destW )
+                  {
+                     unsigned short const foreColor = pixels[y*w+x];
+                     unsigned char const coverage = alpha[x];
+                     if( 0xFF != coverage )
+                     {
+                        if( 0 != coverage )
+                        {
+                           unsigned short const bgColor = *pix ;
+                           unsigned char const bgRed   = getRed( bgColor );
+                           unsigned char const bgGreen = getGreen( bgColor );
+                           unsigned char const bgBlue = getBlue( bgColor );
+
+                           unsigned char const fgRed   = getRed( foreColor );
+                           unsigned char const fgGreen = getGreen( foreColor );
+                           unsigned char const fgBlue = getBlue( foreColor );
+                           unsigned const alias = coverage + 1 ;
+                           unsigned const notAlias = 256 - alias ;
+                           
+                           unsigned mixRed = ((alias*fgRed)+(notAlias*bgRed))/256 ;
+                           unsigned mixGreen = ((alias*fgGreen)+(notAlias*bgGreen))/256 ;
+                           unsigned mixBlue = ((alias*fgBlue)+(notAlias*bgBlue))/256 ;
+                           *pix++ = get16( mixRed, mixGreen, mixBlue );
+                        } // not entirely background, need to mix
+                        else
+                           pix++ ;
+                     }
+                     else
+                        *pix++ = foreColor ;                     
+                  }
+                  else
+                     break; // only going further off the screen
+               }
+            }
+            else
+               break; // only going further off the screen
+         }
+      }
+   }
+   else
+      render( xPos, yPos, w, h, pixels, dest, destW, destH );
+}
 
 #define swap( v1, v2 ) { unsigned short t = v1 ; v1 = v2 ; v2 = t ; }
 
@@ -813,6 +963,98 @@ void fbDevice_t :: antialias
                if( 0x80 <= coverage )
                {
                   unsigned const offs = yTop * getWidth() + screenCol ;
+                  unsigned char *bitMem = (unsigned char *)mem_ ;
+                  unsigned char const mask = ( 1 << ( offs&7 ) );
+                  unsigned char &thisByte = bitMem[offs/8];
+                  thisByte |= mask ;
+               }
+            }
+            else
+               break;
+         }
+         yTop++ ;
+#endif 
+      }
+      else
+         break;
+   }
+#ifndef CONFIG_BD2003
+refresh();
+#endif 
+}
+
+void fbDevice_t :: antialias
+   ( unsigned char const *bmp,
+     unsigned short       bmpWidth,  // row stride
+     unsigned short       bmpHeight, // num rows in bmp
+     unsigned short       xLeft,     // display coordinates: clip to this rectangle
+     unsigned short       yTop,
+     unsigned short       xRight,
+     unsigned short       yBottom,
+     unsigned char        red, 
+     unsigned char        green, 
+     unsigned char        blue,
+     unsigned short      *imageMem,
+     unsigned short       imageWidth,
+     unsigned short       imageHeight )
+{
+   unsigned height = yBottom-yTop+1 ;
+   if( height > bmpHeight )
+      height = bmpHeight ;
+   unsigned width = xRight-xLeft+1 ;
+   if( width > bmpWidth )
+      width = bmpWidth ; 
+
+   unsigned short const fullColor = get16( red, green, blue );
+
+   for( unsigned row = 0 ; row < height ; row++ )
+   {
+      if( yTop < imageHeight )
+      {
+         unsigned char const *alphaCol = bmp + (row*bmpWidth);
+
+#ifdef CONFIG_BD2003
+         unsigned short      *screenPix = imageMem+ (imageWidth*yTop++) + xLeft ;
+
+         unsigned short screenCol = xLeft ;
+         for( unsigned col = 0 ; col < width ; col++, screenCol++, screenPix++, alphaCol++ )
+         {
+            if( screenCol < imageWidth )
+            {
+               unsigned char const coverage = *alphaCol ;
+               if( 0xFF != coverage )
+               {
+                  if( 0 != coverage )
+                  {
+                     unsigned short const bgColor = *screenPix ;
+                     unsigned char const bgRed   = getRed( bgColor );
+                     unsigned char const bgGreen = getGreen( bgColor );
+                     unsigned char const bgBlue  = getBlue( bgColor );
+
+                     unsigned char const bg255ths = ~coverage ;
+                     unsigned char mixRed = ( ( bgRed * bg255ths ) + ( coverage * red ) ) / 256 ;
+                     unsigned char mixGreen = ( ( bgGreen * bg255ths ) + ( coverage * green ) ) / 256 ;
+                     unsigned char mixBlue = ( ( bgBlue * bg255ths ) + ( coverage * blue ) ) / 256 ;
+                     unsigned short outColor = get16( mixRed, mixGreen, mixBlue );
+                     *screenPix = outColor ;
+                  } // not entirely background, need to mix
+               } // not entirely foreground, need to mix
+               else
+                  *screenPix = fullColor ;                     
+            }
+            else
+               break;
+         }
+#else
+         unsigned short screenCol = xLeft ;
+         for( unsigned col = 0 ; col < width ; col++, screenCol++, alphaCol++ )
+         {
+            if( screenCol < imageWidth )
+            {
+               unsigned char const coverage = *alphaCol ;
+               if( 0x80 <= coverage )
+               {
+                  unsigned const offs = yTop * imageWidth + screenCol ;
                   unsigned char *bitMem = (unsigned char *)mem_ ;
                   unsigned char const mask = ( 1 << ( offs&7 ) );
                   unsigned char &thisByte = bitMem[offs/8];
