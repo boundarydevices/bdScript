@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.79  2004-09-25 14:17:02  ericn
+ * Revision 1.80  2004-09-27 04:51:05  ericn
+ * -move md5 routine to its' own module
+ *
+ * Revision 1.79  2004/09/25 14:17:02  ericn
  * -made global_class global
  *
  * Revision 1.78  2004/07/04 21:32:38  ericn
@@ -295,7 +298,6 @@
 #include "jsPing.h"
 #include "jsProcess.h"
 #include "jsDir.h"
-#include "md5.h"
 #include "jsUDP.h"
 #include "jsKernel.h"
 #include "pollTimer.h"
@@ -305,6 +307,7 @@
 #include "fbDev.h"
 #include "jsSerial.h"
 #include "jsFlashVar.h"
+#include "jsMD5.h"
 
 #ifdef CONFIG_BD2003
 #include "audioQueue.h"
@@ -357,32 +360,6 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
          *rval = JSVAL_FALSE ;
       }
    }
-
-   return JS_TRUE;
-}
-
-static JSBool
-jsMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{
-   *rval = JSVAL_FALSE ;
-   if( ( 1 == argc )
-       &&
-       JSVAL_IS_STRING( argv[0] ) )
-   {
-      JSString *sArg = JSVAL_TO_STRING( argv[0] );
-      md5_t md5 ;
-      getMD5( JS_GetStringBytes( sArg ), JS_GetStringLength( sArg ), md5 );
-      unsigned const nalloc = sizeof( md5.md5bytes_)*2+1 ;
-      char * const stringMem = (char *)JS_malloc( cx, nalloc );
-      char *nextOut = stringMem ;
-      for( unsigned i = 0 ; i < sizeof( md5.md5bytes_); i++ )
-         nextOut += sprintf( nextOut, "%02x", md5.md5bytes_[i] );
-      *nextOut = '\0' ;
-
-      *rval = STRING_TO_JSVAL( JS_NewString( cx, stringMem, nalloc - 1 ) );
-   }
-   else
-      JS_ReportError( cx, "Usage: md5( string );" );
 
    return JS_TRUE;
 }
@@ -498,7 +475,6 @@ static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
     {"garbageCollect",  jsGarbageCollect, 0},
-    {"md5",             jsMD5,            0},
     {"pollStat",        jsPollStat,       0},
     {"waitFor",         jsWaitFor,        0},
     {0}
@@ -583,6 +559,7 @@ int prMain(int argc, char **argv)
 //                  initJSShell( cx, glob );
                   initJSPopen( cx, glob );
                   initJSGpio( cx, glob );
+                  initJSMD5( cx, glob );
                   initJSEnv( cx, glob );
                   initJSTCP( cx, glob );
                   initJSTTY( cx, glob );
