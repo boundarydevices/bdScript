@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.5 2002-11-30 00:52:51 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.6 2002-11-30 01:41:46 ericn Exp $"
 
 /*
  * semClasses.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.5  2002-11-30 00:52:51  ericn
+ * Revision 1.6  2002-11-30 01:41:46  ericn
+ * -modified to prevent copies
+ *
+ * Revision 1.5  2002/11/30 00:52:51  ericn
  * -changed name to semClasses.h
  *
  * Revision 1.4  2002/11/30 00:30:30  ericn
@@ -44,7 +47,7 @@ public:
    pthread_mutex_t handle_ ;
 
 private:
-   mutex_t( mutex_t & ); // no copies
+   mutex_t( mutex_t const & ); // no copies
 };
 
 class mutexLock_t {
@@ -59,7 +62,7 @@ public:
    int              result_ ;
 
 private:
-   mutexLock_t( mutexLock_t & ); // no copies
+   mutexLock_t( mutexLock_t const & ); // no copies
 };
 
 
@@ -91,19 +94,21 @@ public:
    pthread_cond_t handle_ ;
 
 private:
-   condition_t( condition_t & ); // no copies
+   condition_t( condition_t const & ); // no copies
 };
 
 
 class semaphore_t {
 public:
-   semaphore_t( void ){ sem_init( &sem_, 0, 0 ); }
+   semaphore_t( void ){ printf( "seminit:%d\n", sem_init( &sem_, 0, 0 ) ); }
    ~semaphore_t( void ){ sem_destroy( &sem_ ); }
 
    inline bool wait( void ){ return 0 == sem_wait( &sem_ ); }
    inline bool signal( void ){ return 0 == sem_post( &sem_ ); }
 
    sem_t sem_ ;
+private:
+   semaphore_t( semaphore_t const & );
 };
 
 mutexLock_t :: ~mutexLock_t( void )
