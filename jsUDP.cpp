@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUDP.cpp,v $
- * Revision 1.3  2003-12-28 20:55:49  ericn
+ * Revision 1.4  2005-01-01 17:51:05  ericn
+ * -allow broadcasts
+ *
+ * Revision 1.3  2003/12/28 20:55:49  ericn
  * -get rid of secondary thread
  *
  * Revision 1.2  2003/11/04 00:41:24  tkisky
@@ -139,22 +142,18 @@ static JSBool jsUDPSendTo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
           JSVAL_IS_STRING( argv[2] ) )
       {
          int const targetIP = inet_addr( JS_GetStringBytes( JSVAL_TO_STRING( argv[0] ) ) );
-         if( INADDR_NONE != targetIP )
-         {
-            unsigned short const targetPort = JSVAL_TO_INT( argv[1] );
-            sockaddr_in remote ;
-            remote.sin_family      = AF_INET ;
-            remote.sin_addr.s_addr = targetIP ;
-            remote.sin_port        = htons(targetPort) ;
-            JSString *const sData = JSVAL_TO_STRING( argv[2] );
-            char const     *data = JS_GetStringBytes( sData );
-            unsigned const  dataLen = JS_GetStringLength( sData );
-            int const numSent = sendto( udpSocket->getFd(), data, dataLen, 0, (struct sockaddr *)&remote, sizeof( remote ) );
-printf( "sent %d bytes to ip 0x%08lx, port 0x%04x\n", numSent, targetIP, targetPort );
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Usage: udpSocket.sendto( hostIPString, port, dataString );" );
+         unsigned short const targetPort = JSVAL_TO_INT( argv[1] );
+         sockaddr_in remote ;
+         remote.sin_family      = AF_INET ;
+         remote.sin_addr.s_addr = targetIP ;
+         remote.sin_port        = htons(targetPort) ;
+         JSString *const sData = JSVAL_TO_STRING( argv[2] );
+         char const     *data = JS_GetStringBytes( sData );
+         unsigned const  dataLen = JS_GetStringLength( sData );
+         int const numSent = sendto( udpSocket->getFd(), data, dataLen, 0, (struct sockaddr *)&remote, sizeof( remote ) );
+         *rval = (numSent == dataLen )
+                 ? JSVAL_TRUE 
+                 : JSVAL_FALSE ;
       }
       else
          JS_ReportError( cx, "Usage: udpSocket.sendto( hostIPString, port, dataString );" );
@@ -164,8 +163,24 @@ printf( "sent %d bytes to ip 0x%08lx, port 0x%04x\n", numSent, targetIP, targetP
    return JS_TRUE ;
 }
 
+static JSBool jsAllowBroadcast( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   udpSocket_t * const udpSocket = (udpSocket_t *)JS_GetInstancePrivate( cx, obj, &jsUDPClass_, NULL );
+   if( 0 != udpSocket )
+   {
+      int opt = 1 ;
+      setsockopt( udpSocket->getFd(), SOL_SOCKET, SO_BROADCAST, &opt, sizeof( opt ) );
+   }
+   else
+      JS_ReportError( cx, "allowBroadcast:no socket" );
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec udpSocketMethods_[] = {
     {"sendto", jsUDPSendTo,  0 },
+    {"allowBroadcast", jsAllowBroadcast,  0 },
     {0}
 };
 
