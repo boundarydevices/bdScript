@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.54  2003-08-24 22:02:13  ericn
+ * Revision 1.55  2003-08-31 16:53:00  ericn
+ * -added jsDir module
+ *
+ * Revision 1.54  2003/08/24 22:02:13  ericn
  * -added shutdown routine for jsProcess.cpp
  *
  * Revision 1.53  2003/08/24 17:30:31  ericn
@@ -226,6 +229,7 @@
 #include "jsMonWLAN.h"
 #include "jsPing.h"
 #include "jsProcess.h"
+#include "jsDir.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -370,6 +374,7 @@ int prMain(int argc, char **argv)
                      initMonitorWLAN( cx, glob );
                      initPing( cx, glob );
                      initJSProcess( cx, glob );
+                     initJSDir( cx, glob );
 
                      getCurlCache();
 
