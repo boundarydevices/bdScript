@@ -30,7 +30,7 @@ void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
      int imageDisplayTop,
      int imageDisplayWidth,		//portion of image to display
      int imageDisplayHeight,
-	 ConvertRgb24Line_t convertLineFunc=NULL
+	 ConvertRgb24Line_t convertLineFunc
    )
 {
    int minWidth;
