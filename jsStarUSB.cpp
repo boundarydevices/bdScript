@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.2  2004-07-04 21:31:27  ericn
+ * Revision 1.3  2004-09-10 19:20:15  tkisky
+ * -allow ENQ/EOT to be  used for status as well as ASB
+ *
+ * Revision 1.2  2004/07/04 21:31:27  ericn
  * -added status and bitmap support
  *
  * Revision 1.1  2004/06/28 02:57:34  ericn
@@ -44,17 +47,23 @@ public:
    virtual ~starPoll_t( void );
    
    virtual void fire( void );
-   void print( JSContext  *cx, 
-               void const *data, 
+   void print( JSContext  *cx,
+               void const *data,
                unsigned    len );
 
    void setHandler( jsval method, JSObject *obj );
-
-   char                   prevData_[512];
+#define STATUS_BUF_SIZE 512
+   char                   prevData_[STATUS_BUF_SIZE];
    unsigned               prevLen_ ;
    struct usb_dev_handle *udev_ ;
    jsval                  statusHandler_ ;
    JSObject              *statusObj_ ;
+   char                  asb_valid;
+   char                  lastENQ;
+   char                  lastEOT;
+   char                  asbInitialized;
+   char                  statusWaitTicks;
+   char                  eotNext;
 };
 
 static int const inep  = 130; // find_ep(dev, config, interface, altsetting, USB_ENDPOINT_IN, USB_ENDPOINT_TYPE_BULK);
@@ -66,7 +75,7 @@ starPoll_t :: starPoll_t( void )
    , udev_( 0 )
    , prevLen_( 0 )
    , statusHandler_( JSVAL_VOID )
-   , statusObj_( 0 )
+   , statusObj_( 0 ), asb_valid(0), lastENQ(0), lastEOT(0), asbInitialized(0), statusWaitTicks(2), eotNext(0)
 {
 //   usb_debug = 2 ;
    JS_AddRoot( execContext_, &statusHandler_ );
@@ -76,11 +85,11 @@ starPoll_t :: starPoll_t( void )
 
    usb_find_busses();
    usb_find_devices();
-   
+
    unsigned char found = 0;
    struct usb_bus *bus;
    struct usb_device *dev;
-   
+
    for (bus = usb_busses; bus; bus = bus->next)
    {
       for (dev = bus->devices; dev; dev = dev->next)
@@ -94,11 +103,11 @@ starPoll_t :: starPoll_t( void )
             }
          }
       }
-      
+
       if( found )
          break;
    }
-   
+
     if( found )
     {
       udev_ = usb_open(dev);
@@ -107,7 +116,12 @@ starPoll_t :: starPoll_t( void )
          int const intNum = dev->config[0].interface[0].altsetting[0].bInterfaceNumber ;
          usb_claim_interface( udev_, intNum );
          set( 100 );
+         printf( "printer interface claimed\r\n" );
+      } else {
+         printf( "!!!usb_open of printer interface failed\r\n" );
       }
+   } else {
+      printf( "!!!printer interface not found\r\n" );
    }
 }
 
@@ -119,9 +133,11 @@ void starPoll_t :: print( JSContext *cx, void const *data, unsigned len )
    while( ( 0 < outBytes ) && ( 0 != udev_ ) )
    {
       unsigned toWrite = (4096 < outBytes) ? 4096 : outBytes ;
-      
-      int const numWritten = usb_bulk_write( udev_, outep, 
+
+      int const numWritten = usb_bulk_write( udev_, outep,
                                              (char *)nextOut, toWrite, 1000 );
+      statusWaitTicks = 2;
+      lastENQ &= ~0x20;		//clear idle bit
       if( toWrite == numWritten )
       {
          outBytes -= numWritten ;
@@ -171,39 +187,90 @@ starPoll_t :: ~starPoll_t( void )
 void starPoll_t :: fire( void )
 {
    short availableReadLength = 0;
-   if( 0 <= usb_control_msg(udev_, (char) 0xc0, (char) 3, (short) 256, (short) 0, (char *) &availableReadLength, (short) 2, 100 ))
+   if (udev_==0) {
+      printf( "!!!!!Printer has been closed\n" );
+      fflush( stdout );
+      return;
+   } else if( 0 <= usb_control_msg(udev_, (char) 0xc0, (char) 3, (short) 256, (short) 0, (char *) &availableReadLength, (short) 2, 100 ))
    {
       if( 0 < availableReadLength )
       {
-         char inBuf[512];
+         char inBuf[STATUS_BUF_SIZE];
          int numRead = usb_bulk_read(udev_, inep, inBuf, sizeof(inBuf), 100 );
-         if( 0 < numRead )
-         {
-            if( ( numRead != prevLen_ )
-                ||
-                ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) )
-                
-            {
-               for( int i = 0 ; i < numRead ; i++ )
-                  printf( "%02x ", (unsigned char)inBuf[i] );
-               printf( "\n" );
-               memcpy( prevData_, inBuf, numRead );
-               prevLen_ = numRead ;
+         if( 0 < numRead ) {
+            char change=0;
+            statusWaitTicks = 0;
+            if (asb_valid) {
+               if ( ( numRead != prevLen_ ) || ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) ) {
+                  for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
+                  printf( "\n" );
+                  if (numRead >= 9) {
+                     memcpy( prevData_, inBuf, numRead );
+                     prevLen_ = numRead ;
+                     change = 1;
+                  } else {
+                    printf("ASB status too short\n");
+                  }
+               }
+            } else {
+               char lENQ = lastENQ;
+               char lEOT = lastEOT;
+               char weird = 0;
+               for (int i=0; i<numRead; i++) {
+                  char c = inBuf[i];
+                  if ((c & 0x13)==0) { lENQ = c; eotNext = 1;}
+                  else if ((c & 0x91)==0x10) { lEOT = c; eotNext = 0;}
+                  else weird = 1;
+               }
 
-               if( JSVAL_VOID != statusHandler_ )
-               {
-                  JSObject *scope = statusObj_ ;
-                  executeCode( statusObj_, statusHandler_, "starUSB:onStatusChange", 0, 0 );
+               if ((lENQ != lastENQ)||(lEOT != lastEOT)||weird) {
+                  if (lENQ != lastENQ) {
+                     lastENQ = lENQ;
+                     printf( "ENQ status: %02x\n",lastENQ );
+                  }
+                  if (lEOT != lastEOT) {
+                     lastEOT = lEOT;
+                     printf( "EOT status: %02x\n",lastEOT );
+                  }
+                  if (weird) printf( "weird status:");
+                  for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
+                  printf( "\n" );
+                  change = 1;
                }
             }
-         }
-         else
-            printf( "read error %d\n", numRead );
+            if (change) if( JSVAL_VOID != statusHandler_ )
+            {
+               JSObject *scope = statusObj_ ;
+               executeCode( statusObj_, statusHandler_, "starUSB:onStatusChange", 0, 0 );
+            }
+         } else printf( "read error %d\n", numRead );
       } // data available
+	  else {
+         if (statusWaitTicks==0) {
+            static const char strAsbInvalid[] = {0x1b,0x1e,0x61,0x30};
+            static const char strAsbValid[] = {0x1b,0x1e,0x61,0x31};
+            static const char strEnq[] = {0x05};
+            static const char strEot[] = {0x04};
+            const char * p = NULL;
+            int len = 0;
+            if (asbInitialized==0) {
+               if (asb_valid) {p = strAsbValid; len = sizeof(strAsbValid); }
+               else {p = strAsbInvalid; len = sizeof(strAsbInvalid);}
+            } else if (asb_valid==0) {
+               if (eotNext) {p = strEot; len = sizeof(strEot);}
+               else {p = strEnq; len = sizeof(strEnq);}
+            }
+            if (p) {
+               int const numWritten = usb_bulk_write( udev_, outep,(char*)strEnq,len, 1000 );
+               if (numWritten==4) asbInitialized = 1;
+               statusWaitTicks = 10;	//wait a second before next write
+            }
+         } else statusWaitTicks--;
+      }
    }
    else
       printf( "Error issuing ctrl msg\n" );
-   
+
    fflush( stdout );
    set( 100 );
 }
@@ -223,7 +290,7 @@ static JSBool jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 }
 
 static JSClass jsStarStatusClass_ = {
-   "starStatus",                
+   "starStatus",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
    JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
@@ -240,6 +307,7 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
       struct status {
           // parsed
           bool offline;
+          bool presenter;
           bool coveropen;
           bool paperempty;
           bool papernearempty;
@@ -248,65 +316,64 @@ static JSBool jsGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
           bool etbavailable;
           unsigned char etbcounter;
           bool paperInPresenter;
+          bool idle;
       };
 
-      if( 9 <= star->prevLen_ )
-      {
-         status st ;
+      status st ;
+      char valid = 0;
+      if (star->asb_valid==0) {
+         char lastENQ = star->lastENQ;
+         char lastEOT = star->lastEOT;
+         st.offline        = 0;
+         st.presenter      = 0;
+         st.coveropen      = (lastENQ & 0x04)!=0;
+         st.paperempty     = ( ((star->eotNext) ?lastENQ : lastEOT) & 0x08)!=0;
+         st.papernearempty = (lastEOT & 0x04)!=0;
+         st.draweropen     = 0;
+         st.stackerfull    = 0;
+         st.etbavailable = 0;
+         st.etbcounter = 0;
+         st.paperInPresenter = 0;
+         st.idle = lastENQ & 0x20;		//reception Buffer Empty
+         valid = 1;
+      } else if( 9 <= star->prevLen_ ) {
          st.offline        = (star->prevData_[2] & 0x08)!=0;
+         st.presenter      = 1;
          st.coveropen      = (star->prevData_[2] & 0x20)!=0;
          st.paperempty     = (star->prevData_[5] & 0x08)!=0;
          st.papernearempty = (star->prevData_[5] & 0x04)!=0;
          st.draweropen     = (star->prevData_[2] & 0x04)!=0;
          st.stackerfull    = (star->prevData_[6] & 0x02)!=0;
-         
-         st.etbavailable = 1;
-         st.etbcounter = (((star->prevData_[7] & 0x40) >> 2) |
-                          ((star->prevData_[7] & 0x20) >> 2) |
-                          ((star->prevData_[7] & 0x08) >> 1) |
-                          ((star->prevData_[7] & 0x04) >> 1) |
-                          ((star->prevData_[7] & 0x02) >> 1));
-         st.paperInPresenter = (0 != (star->prevData_[8] & 0x0e));
 
+         st.etbavailable = 1;
+#define ASB7_ETB_COUNTER	0x6e
+         int i = (star->prevData_[7] & ASB7_ETB_COUNTER);
+         st.etbcounter = (i + (i&0x0e)) >> 2;
+         st.paperInPresenter = (0 != (star->prevData_[8] & 0x0e));
+         st.idle = 0;
+         valid = 1;
+      }
+      if (valid) {
          JSObject *statObj = JS_NewObject( cx, &jsStarStatusClass_, 0, obj );
          *rval = OBJECT_TO_JSVAL(statObj); // root
 
-         JS_DefineProperty( cx, statObj, "paperInPresenter", 
-                            st.paperInPresenter ? JSVAL_TRUE : JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, statObj, "paperNearEmpty", 
-                            st.papernearempty ? JSVAL_TRUE : JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, statObj, "paperOut", 
-                            st.paperempty ? JSVAL_TRUE : JSVAL_FALSE,
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, statObj, "counter", 
-                            INT_TO_JSVAL(st.etbcounter),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
+#define MY_JS_DefineBoolProperty(cx,obj,name,val) JS_DefineProperty( cx, obj, name, \
+   val ? JSVAL_TRUE : JSVAL_FALSE, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY )
+
+#define MY_JS_DefineProperty(cx,obj,name,val) JS_DefineProperty( cx, obj, name, \
+   val, 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY )
+
+         MY_JS_DefineBoolProperty( cx, statObj, "presenter", st.presenter);
+         MY_JS_DefineBoolProperty( cx, statObj, "paperInPresenter", st.paperInPresenter);
+         MY_JS_DefineBoolProperty( cx, statObj, "paperNearEmpty", st.papernearempty);
+         MY_JS_DefineBoolProperty( cx, statObj, "paperOut", st.paperempty);
+         MY_JS_DefineProperty( cx, statObj, "counter", INT_TO_JSVAL(st.etbcounter));
          int errors = 0 ;
-         JS_DefineProperty( cx, statObj, "errors", 
-                            INT_TO_JSVAL(errors),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-      }
-      else
+         MY_JS_DefineProperty( cx, statObj, "errors", INT_TO_JSVAL(errors));
+         MY_JS_DefineBoolProperty( cx, statObj, "idle", st.idle);
+      } else
          JS_ReportError( cx, "No printer status available" );
-   }
-   else
+   } else
       JS_ReportError( cx, "printer closed!" );
    return JS_TRUE ;
 }
