@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.1 2002-10-27 17:42:08 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.2 2002-10-31 02:05:54 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-10-31 02:05:54  ericn
+ * -added abort method to wake up threads (pthread_cancel doesn't wake 'em)
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -28,11 +31,11 @@
 template <class T>
 class mtQueue_t {
 public:
-   mtQueue_t( void ) : mutex_(), cond_(), list_(){}
+   mtQueue_t( void ) : mutex_(), cond_(), list_(), abort_( false ){}
    ~mtQueue_t( void ){}
 
    //
-   // reader-side 
+   // reader-side. returns false on abort
    //
    inline bool pull( T &item );
    inline bool pull( T &item, unsigned long milliseconds );
@@ -41,9 +44,16 @@ public:
    // writer side
    //
    inline bool push( T const &item );
+   
+   //
+   // abort (meaningful to threads)
+   //
+   inline bool abort( void );
+
    mutex_t        mutex_ ;
    condition_t    cond_ ;
    std::list<T>   list_ ;
+   bool volatile  abort_ ;
 };
 
 //
@@ -52,29 +62,50 @@ public:
 template <class T>
 bool mtQueue_t<T>::pull( T &item )
 {
+//   printf( "locking\n" );
    mutexLock_t lock( mutex_ );
    if( lock.worked() )
    {
-      if( list_.empty() )
+      if( !abort_ && list_.empty() )
       {
+//   printf( "waiting\n" );
          if( cond_.wait( lock ) )
          {
-            item = list_.front();
-            list_.pop_front();
-            return true ;
+            if( !list_.empty() )
+            {
+               item = list_.front();
+               list_.pop_front();
+//   printf( "returning\n" );
+               return true ;
+            }
+            else if( !abort_ )
+            {   
+               printf( "unproductive poll\n" );
+            }
+            else
+               return false ;
          }
          else
+         {
+      printf( "aborting(wait)\n" );
             return false ;
+         }
       }
-      else
+      else if( !abort_ )
       {
+//   printf( "returning immediately\n" );
          item = list_.front();
          list_.pop_front();
          return true ;
       } // no need to wait
+      else
+         return false ;
    }
    else
+   {
+      printf( "aborting(lock)\n" );
       return false ;
+   }
 }
    
 template <class T>
@@ -83,13 +114,17 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
    mutexLock_t lock( mutex_ );
    if( lock.worked() )
    {
-      if( list_.empty() )
+      if( !abort_ && list_.empty() )
       {
          if( cond_.wait( lock, milliseconds ) )
          {
-            item = list_.front();
-            list_.pop_front();
-            return true ;
+            if( !abort_ && !list_.empty() )
+            {
+               item = list_.front();
+               list_.pop_front();
+            }
+            else if( abort_ )
+               return false ;
          }
          else
          {
@@ -118,6 +153,20 @@ bool mtQueue_t<T>::push( T const &item )
    {
       list_.push_back( item );
       cond_.signal();
+      return true ;
+   }
+   else
+      return false ;
+}
+   
+template <class T>
+bool mtQueue_t<T>::abort( void )
+{
+   mutexLock_t lock( mutex_ );
+   if( lock.worked() )
+   {
+      abort_ = true ;
+      cond_.broadcast();
       return true ;
    }
    else
