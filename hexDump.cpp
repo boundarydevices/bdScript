@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: hexDump.cpp,v $
- * Revision 1.2  2004-03-17 04:56:19  ericn
+ * Revision 1.3  2004-07-04 21:31:47  ericn
+ * -added dumpHex method
+ *
+ * Revision 1.2  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.1  2002/11/11 04:30:45  ericn
@@ -26,6 +29,7 @@
 
 
 #include "hexDump.h"
+#include <stdio.h>
 
 static const char hexChars[] = { 
    '0', '1', '2', '3',
@@ -109,6 +113,14 @@ bool hexDumper_t :: nextLine( void )
    }
    else
       return false ;
+}
+
+void dumpHex( char const *label, void const *data, unsigned size )
+{
+   printf( "---> %s\n", label );
+   hexDumper_t dump( data, size );
+   while( dump.nextLine() )
+      printf( "%s\n", dump.getLine() );
 }
 
 #ifdef __STANDALONE__

@@ -1,5 +1,5 @@
 #ifndef __HEXDUMP_H__
-#define __HEXDUMP_H__ "$Id: hexDump.h,v 1.1 2002-11-11 04:30:45 ericn Exp $"
+#define __HEXDUMP_H__ "$Id: hexDump.h,v 1.2 2004-07-04 21:31:45 ericn Exp $"
 
 /*
  * hexDump.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: hexDump.h,v $
- * Revision 1.1  2002-11-11 04:30:45  ericn
+ * Revision 1.2  2004-07-04 21:31:45  ericn
+ * -added dumpHex method
+ *
+ * Revision 1.1  2002/11/11 04:30:45  ericn
  * -moved from boundary1
  *
  * Revision 1.1  2002/09/10 14:30:44  ericn
@@ -44,6 +47,8 @@ private:
    char            lineBuf_[ 81 ];
 };
 
+// dump to stdout
+void dumpHex( char const *label, void const *data, unsigned size );
 
 #endif
 
