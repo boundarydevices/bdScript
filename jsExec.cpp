@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.2  2002-10-31 02:04:17  ericn
+ * Revision 1.3  2002-11-02 04:10:43  ericn
+ * -added jsText initialization
+ *
+ * Revision 1.2  2002/10/31 02:04:17  ericn
  * -added nanosleep, modified queueCode to include scope
  *
  * Revision 1.1  2002/10/27 17:42:08  ericn
@@ -27,7 +30,6 @@
 #include <sys/time.h>
 
 /* include the JS engine API header */
-#include "testEvents.h"
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
 #include "curlCache.h"
@@ -40,6 +42,7 @@
 #include "jsImage.h"
 #include "jsGlobals.h"
 #include "jsScreen.h"
+#include "jsText.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -186,6 +189,7 @@ int main(int argc, char **argv)
                   {
                      initJSTimer( cx, glob );
                      initJSScreen( cx, glob );
+                     initJSText( cx, glob );
                      initializeCodeQueue( cx, glob );
                      initJSCurl( cx, glob );
                      initJSImage( cx, glob );
