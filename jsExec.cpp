@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.44  2003-07-03 14:08:00  ericn
+ * Revision 1.45  2003-07-06 01:22:15  ericn
+ * -added exit() support
+ *
+ * Revision 1.44  2003/07/03 14:08:00  ericn
  * -modified to release js file after compilation
  *
  * Revision 1.43  2003/07/03 03:17:47  ericn
@@ -157,6 +160,7 @@
 #include "js/jsapi.h"
 #include "relativeURL.h"
 #include "jsHyperlink.h"
+#include "jsExit.h"
 #include "codeQueue.h"
 #include "jsTimer.h"
 #include "jsCurl.h"
@@ -311,6 +315,7 @@ int prMain(int argc, char **argv)
                      initJSMP3( cx, glob );
                      initJSAlphaMap( cx, glob );
                      initJSHyperlink( cx, glob );
+                     initJSExit( cx, glob );
                      initJSVolume( cx, glob );
                      initJSBarcode( cx, glob );
                      initJSShell( cx, glob );
@@ -374,12 +379,13 @@ int prMain(int argc, char **argv)
                               while( 1 )
                               {
                                  pollCodeQueue( cx, 5000, 10 );
-                                 if( gotoCalled_ || execCalled_ )
+                                 if( gotoCalled_ || execCalled_ || exitRequested_ )
                                  {
                                     break;
                                  }
                                  else 
                                  {
+printf( "exit not requested\n" );
                                     mutexLock_t lock( execMutex_ );
                                     JS_GC( cx );
                                  }
@@ -502,6 +508,8 @@ printf( "---> initializing NSPR\n" );
          system( execCmd_.c_str() );
          execv( argv[0], argv ); // start next
       }
+      else
+         return exitStatus_ ;
    } while( 1 );
 
    return 0 ;
