@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgPNG.cpp,v $
- * Revision 1.2  2002-11-11 04:29:14  ericn
+ * Revision 1.3  2002-11-20 00:39:22  ericn
+ * -modified to catch errors
+ *
+ * Revision 1.2  2002/11/11 04:29:14  ericn
  * -moved headers
  *
  * Revision 1.1  2002/10/31 02:13:08  ericn
@@ -90,7 +93,7 @@ bool imagePNG( void const    *inData,     // input
 
                         png_read_update_info(png_ptr, info_ptr);
 
-                        png_bytep *row_pointers = new png_bytep[lHeight];
+                        png_bytep *const row_pointers = new png_bytep[lHeight];
                         unsigned const rowBytes = png_get_rowbytes( png_ptr, info_ptr );
 
                         for( unsigned row = 0; row < lHeight; row++ )
