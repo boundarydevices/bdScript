@@ -10,7 +10,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        madDecode.o madHeaders.o memFile.o \
        relativeURL.o tsThread.o ultoa.o urlFile.o \
        ultodd.o box.o zOrder.o
-LIB = $(INSTALL_LIB)/libCurlCache.a
+
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
@@ -18,12 +18,14 @@ ifneq (,$(findstring arm, $(CC)))
    STRIP=arm-linux-strip
    LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
    IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
+   LIB = $(INSTALL_LIB)/libCurlCache.a
 else
-   CC=g++
+#   CC=g++
    AR=ar
-   LIBS=-L/usr/local/lib -L./
+   LIBS=-L./
    IFLAGS=-I$(INSTALL_ROOT)/include/g++-3 -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
    STRIP=strip
+   LIB = ./libCurlCache.a
 endif
 
 %.o : %.cpp Makefile
@@ -113,6 +115,9 @@ imgPNGMain.o : imgPNG.cpp Makefile
 imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
 	$(CC) -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
 	$(STRIP) imgPNG
+
+ccDiskCache: ccDiskCache.cpp memFile.o Makefile
+	$(CC) -D__STANDALONE__ -ggdb -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
 
 all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
