@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.9  2003-06-08 15:19:07  ericn
+ * Revision 1.10  2003-06-10 23:54:08  ericn
+ * -added check on typeof( onData )
+ *
+ * Revision 1.9  2003/06/08 15:19:07  ericn
  * -objectified scanner interface
  *
  * Revision 1.8  2003/05/21 23:24:32  tkisky
@@ -67,14 +70,16 @@ static void deliverBarcodeData( bcrParams_t const &params,
                                 std::string const &bcData )
 {
    mutexLock_t lock( execMutex_ );
-   jsval onbarcode ;
-   if( JS_GetProperty( execContext_, params.scope_, "onData", &onbarcode ) )
+   jsval onData ;
+   if( JS_GetProperty( execContext_, params.scope_, "onData", &onData ) 
+       &&
+       ( JSTYPE_FUNCTION == JS_TypeOfValue( execContext_, onData ) ) )
    {
       JSString *jsBarcode = JS_NewStringCopyN( execContext_, bcData.c_str(), bcData.size() );
       if( jsBarcode )
       {
          jsval bcv[1] = { STRING_TO_JSVAL( jsBarcode ) };
-         queueSource( params.scope_, onbarcode, "onData", 1, bcv );
+         queueSource( params.scope_, onData, "onData", 1, bcv );
       }
       else
          fprintf( stderr, "Error allocating barcode\n" );
