@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.5 2003-12-28 20:54:35 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.6 2004-01-01 16:02:15 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.5  2003-12-28 20:54:35  ericn
+ * Revision 1.6  2004-01-01 16:02:15  ericn
+ * -added close() method
+ *
+ * Revision 1.5  2003/12/28 20:54:35  ericn
  * -prevent copies
  *
  * Revision 1.4  2003/11/28 14:08:34  ericn
@@ -56,6 +59,7 @@ public:
    void setMask( short events );
    short getMask( void ) const { return mask_ ; }
    int   getFd( void ) const { return fd_ ; }
+   void  close( void ){ close( fd_ ); fd_ = -1 ; }
 
 protected:
    int               fd_ ;
