@@ -16,7 +16,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        jsMPEG.o jsFlash.o jsSniffWLAN.o sniffWLAN.o jsMonWLAN.o monitorWLAN.o \
        ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o \
        pollHandler.o barcodePoll.o touchPoll.o gpioPoll.o image.o imgFile.o \
-       flashThread.o parsedFlash.o
+       flashThread.o parsedFlash.o jsKernel.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a

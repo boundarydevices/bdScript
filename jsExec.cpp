@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.64  2003-11-28 14:11:18  ericn
+ * Revision 1.65  2003-11-30 16:45:53  ericn
+ * -kernel and JFFS2 upgrade support
+ *
+ * Revision 1.64  2003/11/28 14:11:18  ericn
  * -added method pollStat(), fixed backtrace
  *
  * Revision 1.63  2003/11/24 19:42:05  ericn
@@ -259,6 +262,7 @@
 #include "jsDir.h"
 #include "md5.h"
 #include "jsUDP.h"
+#include "jsKernel.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -513,6 +517,7 @@ int prMain(int argc, char **argv)
                      initJSProcess( cx, glob );
                      initJSDir( cx, glob );
                      initJSUDP( cx, glob );
+                     initJSKernel( cx, glob );
 
                      getCurlCache();
 
