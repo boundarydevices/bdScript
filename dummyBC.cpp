@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dummyBC.cpp,v $
- * Revision 1.1  2003-02-09 02:25:07  ericn
+ * Revision 1.2  2003-02-10 01:17:38  ericn
+ * -modified to support retrieval
+ *
+ * Revision 1.1  2003/02/09 02:25:07  ericn
  * -added dummy barcode approval program
  *
  *
@@ -38,6 +41,30 @@ static unsigned const maxRxSize = 0x200 ;
 
 static char const usage[] = {
    "Usage: enter|exit|retrieve\\tidentifier\\tsymbology\\tbarcode\n"
+};
+
+static char const enterMsgs[] = {
+   "\tentry messages\tgo here"
+};
+
+static char const exitMsgs[] = {
+   "\texit messages\tgo here"
+};
+
+static char const reportMsgs[] = {
+   "\thistory report\t\tmessages go here\t\tnormally history of barcode"
+};
+
+static char const approved[] = {
+   "\tapproved\trGF"
+};
+
+static char const denied[] = {
+   "\tdenied\tRgf"
+};
+
+static char const report[] = {
+   "\treport\t   "
 };
 
 static void processCmd( std::string const &cmdLine,
@@ -63,39 +90,33 @@ static void processCmd( std::string const &cmdLine,
 
    if( 4 == i )
    {
-      bool validCmd = false ;
-      
       char const *cmd = parts[0].c_str();
+      char const *approval = 0 ;
+      char const *msgs = 0 ;
       if( 0 == strcmp( "enter", cmd ) )
       {
-         validCmd = true ;
+         approval = approved ;
+         msgs = enterMsgs ;
       }
       else if( 0 == strcmp( "exit", cmd ) )
       {
-         validCmd = true ;
+         approval = approved ;
+         msgs = exitMsgs ;
       }
       else if( 0 == strcmp( "retrieve", cmd ) )
       {
-         validCmd = true ;
+         approval = report ;
+         msgs = reportMsgs ;
       }
       else
          fprintf( stderr, "unknown barcode cmd %s\n", cmd );
 
-      if( validCmd )
+      if( 0 != approval )
       {
          std::string responseString ;
          responseString = parts[1];
-         responseString += '\t' ;
-         responseString += "approved" ; // approved ? "approved" : "denied" ;
-         responseString += '\t' ;
-         responseString += 'r' ; // ledRed ? 'R' : 'r' ;
-         responseString += 'g' ; // ledGreen ? 'G' : 'g' ;
-         responseString += 'f' ; // ledFlash ? 'F' : 'f' ;
-         
-         responseString += "\tmsg line1" ;
-         responseString += "\tmsg line2" ;
-         responseString += "\tmsg line3" ;
-   
+         responseString += approval ;
+         responseString += msgs ;
          responseString += '\r' ;
          write( fd, responseString.c_str(), responseString.size() );
       }
