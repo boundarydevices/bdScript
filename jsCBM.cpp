@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.14  2003-07-08 13:15:17  ericn
+ * Revision 1.15  2004-03-27 20:23:10  ericn
+ * -added ioctl calls
+ *
+ * Revision 1.14  2003/07/08 13:15:17  ericn
  * -added CLOEXEC to printer file handle
  *
  * Revision 1.13  2003/06/29 17:36:54  tkisky
@@ -80,6 +83,12 @@
 #define IOCNR_HP_SET_CHANNEL		4
 #define IOCNR_GET_BUS_ADDRESS		5
 #define IOCNR_GET_VID_PID		6
+#define IOCNR_RESET		        7
+#define IOCNR_1284STAT		        8
+#define IOCNR_GETCTRLREG   	        9
+#define IOCNR_CHIPVER		        10
+#define IOCNR_GETSTATUS		        11
+
 /* Get device_id string: */
 #define LPIOC_GET_DEVICE_ID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_DEVICE_ID, len)
 /* The following ioctls were added for http://hpoj.sourceforge.net: */
@@ -94,7 +103,12 @@
 /* Get two-int array: [0]=bus number, [1]=device address: */
 #define LPIOC_GET_BUS_ADDRESS(len) _IOC(_IOC_READ, 'P', IOCNR_GET_BUS_ADDRESS, len)
 /* Get two-int array: [0]=vendor ID, [1]=product ID: */
+#define LPIOC_RESET            _IOC(_IOC_WRITE, 'P', IOCNR_RESET, 0)
 #define LPIOC_GET_VID_PID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_VID_PID, len)
+#define LPIOC_1284STAT(len)   _IOC(_IOC_READ, 'P', IOCNR_1284STAT, len)
+#define LPIOC_GETCTRLREG(len) _IOC(_IOC_READ, 'P', IOCNR_GETCTRLREG, len)
+#define LPIOC_CHIPVER(len)    _IOC(_IOC_READ, 'P', IOCNR_CHIPVER, len)
+#define LPIOC_GETSTATUS(len)  _IOC(_IOC_READ, 'P', IOCNR_GETSTATUS, len)
 
 #define MAXDEVICE 1024
 
@@ -238,10 +252,10 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                &&
                ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) )
       {
-         int const numWritten = write( *pfd, 
-                                       JS_GetStringBytes( sArg ), 
-                                       JS_GetStringLength( sArg ) );
-         printf( "wrote %d string bytes\n", numWritten );
+         unsigned const outLen = JS_GetStringLength( sArg );
+         int const numWritten = write( *pfd, JS_GetStringBytes( sArg ), outLen );
+         if( numWritten != outLen )
+            printf( "wrote %d of %u string bytes\n", numWritten, outLen );
    
          *rval = JSVAL_TRUE ;
       }
@@ -310,11 +324,116 @@ fprintf( stderr, "---> closing printer:fd %d\n", *pfd );
    return JS_TRUE ;
 }
 
+static JSBool
+jsCBMReset( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      if( 0 == ioctl(*pfd, LPIOC_RESET, 0) ) 
+      {
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "%s resetting port", strerror( errno ) );
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsCBMGetStatus( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      unsigned char status = 0x5a ;
+      if( 0 == ioctl(*pfd, LPIOC_GETSTATUS(sizeof(status)), &status) ) 
+      {
+         *rval = INT_TO_JSVAL( status );
+      }
+      else
+         JS_ReportError( cx, "%s reading port status", strerror( errno ) );
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsCBMChipVer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      unsigned short chipVer = 0x0123 ;
+      if( 0 == ioctl(*pfd, LPIOC_CHIPVER(sizeof(chipVer)), &chipVer) ) 
+      {
+         *rval = INT_TO_JSVAL( chipVer );
+      }
+      else
+         JS_ReportError( cx, "%s reading chip version", strerror( errno ) );
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsCBMCtrlReg( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      unsigned long ctrlReg = 0x5555aaaa ;
+      if( 0 == ioctl(*pfd, LPIOC_GETCTRLREG(sizeof(ctrlReg)), &ctrlReg) ) 
+      {
+         *rval = INT_TO_JSVAL( ctrlReg );
+      }
+      else
+         JS_ReportError( cx, "%s reading ctrl reg", strerror( errno ) );
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsCBM1284Stat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      unsigned long ieeStat = 0xaaaa5555 ;
+      if( 0 == ioctl(*pfd, LPIOC_1284STAT(sizeof(ieeStat)), &ieeStat) ) 
+      {
+         *rval = INT_TO_JSVAL( ieeStat );
+      }
+      else
+         JS_ReportError( cx, "%s reading 1284 status", strerror( errno ) );
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   return JS_TRUE ;
+}
+
+
 static JSFunctionSpec cbm_methods[] = {
    { "print",        jsCBMPrint,      0,0,0 },
    { "cut",          jsCBMCut,        0,0,0 },
    { "close",        jsCBMClose,      0,0,0 },
    { "flush",        jsCBMFlush,      0,0,0 },
+   { "reset",        jsCBMReset,      0,0,0 },
+   { "getStatus",    jsCBMGetStatus,  0,0,0 },
+   { "chipVer",      jsCBMChipVer,    0,0,0 },
+   { "ctrlReg",      jsCBMCtrlReg,    0,0,0 },
+   { "ieeeStat",     jsCBM1284Stat,   0,0,0 },
    { 0 }
 };
 
@@ -377,6 +496,9 @@ fprintf( stderr, "-----> opened printer: fd == %d\n", fd );
             }
             else
                perror( "getDeviceId" );
+            
+            delete [] device_id ;
+
          }
          else
             JS_ReportError( cx, "%s opening printer fd", strerror( errno ) );
