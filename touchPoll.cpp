@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.3  2003-11-24 19:42:05  ericn
+ * Revision 1.4  2003-11-28 14:04:48  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.3  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.2  2003/11/24 19:09:13  ericn
@@ -27,6 +30,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include "debugPrint.h"
 
 struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
 	unsigned short pressure;
@@ -67,12 +71,12 @@ touchPoll_t :: ~touchPoll_t( void )
 
 void touchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
-   printf( "touch screen touch : %u/%u, pressure %u\n", x, y, pressure );
+   debugPrint( "touch screen touch : %u/%u, pressure %u\n", x, y, pressure );
 }
 
 void touchPoll_t :: onRelease( timeval const &tv )
 {
-   printf( "touch screen release\n" );
+   debugPrint( "touch screen release\n" );
 }
 
 static bool wasDown = false ;
@@ -145,9 +149,9 @@ void touchPoll_t :: onDataAvail( void )
          }
          else
          {
-//            printf( "x: range[%d,%d], value %d\n", minX, maxX, event.x );
-//            printf( "y: range[%d,%d], value %d\n", minY, maxY, event.y );
-//            printf( "e" ); 
+//            debugPrint( "x: range[%d,%d], value %d\n", minX, maxX, event.x );
+//            debugPrint( "y: range[%d,%d], value %d\n", minY, maxY, event.y );
+//            debugPrint( "e" ); 
 //            fflush( stdout );
          } // eat wild one
          
@@ -157,13 +161,13 @@ void touchPoll_t :: onDataAvail( void )
          prevY_ = event.y ;
          if( !wasDown )
          {
-printf( "first touch at %u:%u\n", event.x, event.y );
+debugPrint( "first touch at %u:%u\n", event.x, event.y );
             wasDown = true ;
          }
       }
       else
       {
-printf( "release at %u/%u\n", prevX_, prevY_ );
+debugPrint( "release at %u/%u\n", prevX_, prevY_ );
          xMotion_ = yMotion_ = 0 ;
          prevX_ = prevY_ = 0 ;
          onRelease( event.stamp );
@@ -186,13 +190,13 @@ int main( void )
    touchPoll_t      touchPoll( handlers );
    if( touchPoll.isOpen() )
    {
-      printf( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
+      debugPrint( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
 
       int iterations = 0 ;
       while( 1 )
       {
          handlers.poll( -1 );
-//         printf( "poll %d\n", ++iterations );
+//         debugPrint( "poll %d\n", ++iterations );
       }
    }
    else
