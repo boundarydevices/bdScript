@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: starGraph.cpp,v $
- * Revision 1.1  2004-05-02 14:07:22  ericn
+ * Revision 1.2  2004-05-10 15:41:58  ericn
+ * -read status
+ *
+ * Revision 1.1  2004/05/02 14:07:22  ericn
  * -Initial import
  *
  *
@@ -58,6 +61,10 @@ static char const topMargin[] = {
 
 static char const formFeed[] = {
    "\x1b\x0C\x00" 
+};
+
+static char const exitRaster[] = {
+   "\x1b*rB"            // exit raster mode
 };
 
 static int writeCount( int fd, char const *data, int length )
@@ -110,7 +117,7 @@ static int writeBits( int fd, unsigned char const data[], unsigned bytes )
 
 int main( void )
 {
-   int const fd = open( "/dev/usb/lp0", O_WRONLY );
+   int const fd = open( "/dev/usb/lp0", O_RDWR );
    if( 0 <= fd )
    {
       printf( "printer port opened\n" );
@@ -136,8 +143,39 @@ int main( void )
       }
 
       SENDCOMMAND( formFeed );
+      SENDCOMMAND( exitRaster );
 
-      fsync( fd );
+      // 
+      // read response (status)
+      //
+      char prevIn[80];
+      int  numPrev = 0 ;
+      char inBuf[80];
+      int  numRead ;
+      unsigned sameCount = 0 ;
+
+      while( 0 < ( numRead = read( fd, inBuf, sizeof( inBuf )-1 ) ) )
+      {
+         if( ( numRead != numPrev ) || ( 0 != memcmp( inBuf, prevIn, numRead ) ) )
+         {
+            printf( "read %u bytes\n", numRead );
+            for( unsigned i = 0 ; i < numRead ; i++ )
+               printf( "%02x ", inBuf[i] );
+            printf( "\n" );
+            numPrev = numRead ;
+            memcpy( prevIn, inBuf, numRead );
+            sameCount = 0 ;
+         } // change in status
+         else
+         {
+            printf( "%u\r", ++sameCount );    // same data as before
+            if( 7 == ( sameCount & 7 ) )
+               write( fd, "\x04", 1 ); // EOT command
+         }
+      }
+
+      perror( "read" );
+
       close( fd );
       printf( "printer port closed\n" );
    }
