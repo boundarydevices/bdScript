@@ -58,6 +58,11 @@ static char const * const codecIds[] =  {
 
 static unsigned short numCodecIds = sizeof( codecIds )/sizeof( codecIds[0] );
 
+static char const * const codecTypes[] = {
+   "video",
+   "audio"
+};
+
 void main( int argc, char const * const argv[] )
 {
    if( 2 == argc )
@@ -88,11 +93,12 @@ void main( int argc, char const * const argv[] )
             for( int i = 0 ; i < ic_ptr->nb_streams ; i++ )
             {
                AVStream *const str = ic_ptr->streams[i];
-               printf( "stream %d -> codec %d (%s)\n", 
+               printf( "stream %d -> codec %d (%s), type %s\n", 
                        i, str->codec.codec_id,
                        str->codec.codec_id < numCodecIds 
                            ? codecIds[str->codec.codec_id] 
-                           : "unknown" );
+                           : "unknown",
+                       codecTypes[str->codec.codec_type] );
             }
          }
          else
