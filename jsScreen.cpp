@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.10  2002-12-15 20:01:16  ericn
+ * Revision 1.11  2002-12-27 23:30:54  ericn
+ * -made global screen
+ *
+ * Revision 1.10  2002/12/15 20:01:16  ericn
  * -modified to use JS_NewObject instead of js_NewObject
  *
  * Revision 1.9  2002/12/11 04:04:48  ericn
@@ -504,9 +507,32 @@ bool initJSScreen( JSContext *cx, JSObject *glob )
                                   0, 0 );
    if( rval )
    {
-      return true ;
+      JSObject *obj = JS_NewObject( cx, &jsScreenClass_, NULL, NULL );
+      if( obj )
+      {
+         JS_DefineProperty( cx, glob, "screen", 
+                            OBJECT_TO_JSVAL( obj ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         fbDevice_t &fb = getFB();
+         
+         JS_DefineProperty( cx, obj, "width",
+                            INT_TO_JSVAL( fb.getWidth() ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, obj, "height", 
+                            INT_TO_JSVAL( fb.getHeight() ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         return true ;
+      }
    }
-   else
-      return false ;
+   return false ;
 }
 
