@@ -1,5 +1,5 @@
 #ifndef __BARCODEPOLL_H__
-#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.1 2003-10-05 19:15:44 ericn Exp $"
+#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.2 2003-10-31 13:31:18 ericn Exp $"
 
 /*
  * barcodePoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.h,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-10-31 13:31:18  ericn
+ * -added terminator and support for partial reads
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -29,7 +32,8 @@ public:
                   int               baud = 9600,
                   int               databits = 8,
                   char              parity = 'N',
-                  int               outDelay = 0 );   // inter-character delay on output
+                  int               outDelay = 0,           // inter-character delay on output
+                  char              terminator = '\0' );    // end-of-barcode char
    ~barcodePoll_t( void );
 
    bool isOpen( void ) const { return 0 <= getFd(); }
@@ -37,13 +41,18 @@ public:
    // override this to perform processing of a received barcode
    virtual void onBarcode( void );
 
-   bool         haveBarcode( void ){ return '\0' != barcode_[0]; }
+   bool         haveBarcode( void ) const { return complete_ ; }
+   bool         havePartial( void ) const { return '\0' != barcode_[0]; }
    char const  *getBarcode( void ) const ;
 
    virtual void onDataAvail( void );
+   void         timeout( void );
+   bool         haveTerminator( void ) const { return '\0' != terminator_ ; }
 
 protected:
+   bool complete_ ;
    char barcode_[256];
+   char terminator_ ;
 };
 
 #endif

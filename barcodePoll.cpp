@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.cpp,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2003-10-31 13:31:21  ericn
+ * -added terminator and support for partial reads
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -27,8 +30,11 @@ barcodePoll_t :: barcodePoll_t
      int              baud,
      int              databits,
      char             parity,
-     int              outDelay )
-   : pollHandler_t( open( devName, O_RDWR ), set )
+     int              outDelay,
+     char             terminator )      // end-of-barcode char
+   : pollHandler_t( open( devName, O_RDWR ), set ),
+     complete_( false ),
+     terminator_( terminator )
 {
    barcode_[0] = '\0' ;
 
@@ -94,11 +100,26 @@ void barcodePoll_t :: onDataAvail( void )
    {
       curLen += numRead ;
       barcode_[curLen] = '\0' ;
-      onBarcode();
-      barcode_[0] = '\0' ;
+      if( terminator_ == barcode_[curLen-1] )
+      {
+         complete_ = true ;
+         onBarcode();
+         complete_ = false ;
+         barcode_[0] = '\0' ;
+      }
    }
 }
 
+void barcodePoll_t :: timeout( void )
+{
+   if( '\0' != barcode_[0] )
+   {
+      complete_ = true ;
+      onBarcode();
+      complete_ = false ;
+      barcode_[0] = '\0' ;
+   }
+}
 
 
 #ifdef STANDALONE
