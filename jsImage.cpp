@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.18  2002-11-30 05:30:16  ericn
+ * Revision 1.19  2002-11-30 16:26:00  ericn
+ * -better error checking, new curl interface
+ *
+ * Revision 1.18  2002/11/30 05:30:16  ericn
  * -modified to expect call from default curl hander to app-specific
  *
  * Revision 1.17  2002/11/30 00:31:24  ericn
@@ -97,30 +100,39 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
           &&
           JS_GetProperty( cx, obj, "height", &heightVal )
           &&
-          JS_GetProperty( cx, obj, "pixBuf", &dataVal ) )
+          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal ) )
       {
          int width  = JSVAL_TO_INT( widthVal ); 
          int height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
-
-         fbDevice_t &fb = getFB();
-
-         jsval     alphaVal ;
-         JSString *sAlpha ;
-         if( JS_GetProperty( cx, obj, "alpha", &alphaVal ) 
-             &&
-             JSVAL_IS_STRING( alphaVal )
-             &&
-             ( 0 != ( sAlpha = JSVAL_TO_STRING( alphaVal ) ) ) )
+         if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
          {
-            unsigned char const *alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
-            fb.render(xPos,yPos,width,height,pixMap, alpha );
-         } // have alpha channel... use it
+            fbDevice_t &fb = getFB();
+   
+            jsval     alphaVal ;
+            JSString *sAlpha ;
+            if( JS_GetProperty( cx, obj, "alpha", &alphaVal ) 
+                &&
+                JSVAL_IS_STRING( alphaVal )
+                &&
+                ( 0 != ( sAlpha = JSVAL_TO_STRING( alphaVal ) ) ) )
+            {
+               unsigned char const *alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
+               fb.render(xPos,yPos,width,height,pixMap, alpha );
+            } // have alpha channel... use it
+            else
+               fb.render(xPos,yPos,width,height,pixMap);
+         }
          else
-            fb.render(xPos,yPos,width,height,pixMap);
+            JS_ReportError( cx, "Invalid pixMap\n" );
+
 //         JS_ReportError( cx, "w:%d, h:%d", width, height );
       }
+      else
+         JS_ReportError( cx, "Object not initialized, can't draw\n" );
 
       *rval = JSVAL_TRUE ;
       return JS_TRUE ;
@@ -266,26 +278,13 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                             |JSPROP_READONLY );
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
-         jsCurlRequest_t request ;
-         request.lhObj_      = thisObj ;
-         request.rhObj_      = rhObj ;
-         request.cx_         = cx ;
-         request.onComplete_ = imageOnComplete ;
-         request.onFailure_  = jsCurlOnFailure ;
-         request.onCancel_   = jsCurlOnCancel ;
-         request.onSize_     = jsCurlOnSize ; 
-         request.onProgress_ = jsCurlOnProgress ;
-         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
-         
-printf( "loading image\n" );
-         if( queueCurlRequest( request ) )
+         if( queueCurlRequest( thisObj, rhObj, cx, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ), imageOnComplete ) )
          {
          }
          else
          {
             JS_ReportError( cx, "Error queueing curlRequest" );
          }
-printf( "done\n" );
       }
       else
          JS_ReportError( cx, "Error allocating image" );

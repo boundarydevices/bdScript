@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.13  2002-11-30 05:30:16  ericn
+ * Revision 1.14  2002-11-30 16:26:33  ericn
+ * -better error checking, new curl interface
+ *
+ * Revision 1.13  2002/11/30 05:30:16  ericn
  * -modified to expect call from default curl hander to app-specific
  *
  * Revision 1.12  2002/11/30 00:31:37  ericn
@@ -66,6 +69,7 @@
 static JSBool
 jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+printf( "playing file\n" );
    jsval                dataVal ;
    JSString            *dataStr ;
    unsigned char const *data ;
@@ -121,7 +125,7 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       }
    }
    else
-      JS_ReportError( cx, "Error retrieving MP3 data" );
+      JS_ReportError( cx, "Invalid MP3 data" );
 
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
@@ -165,6 +169,7 @@ static JSPropertySpec mp3FileProperties_[] = {
 
 static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
+   printf( "mp3OnComplete\n" );
    //
    // MP3 data is loaded in data[], validate and parse headers
    //
@@ -215,6 +220,7 @@ static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long
    }
    else
    {
+      JS_ReportError( req.cx_, "parsing MP3 headers\n" );
    }
 }
 
@@ -244,18 +250,8 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
                             |JSPROP_READONLY );
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
-         jsCurlRequest_t request ;
-         request.onComplete_ = mp3OnComplete ;
-         request.onFailure_  = jsCurlOnFailure ;
-         request.onCancel_   = jsCurlOnCancel ;
-         request.onSize_     = jsCurlOnSize ; 
-         request.onProgress_ = jsCurlOnProgress ;
-         request.lhObj_      = thisObj ;
-         request.rhObj_      = rhObj ;
-         request.cx_         = cx ;
-         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
-
-         if( queueCurlRequest( request ) )
+printf( "retrieving MP3\n" );
+         if( queueCurlRequest( thisObj, rhObj, cx, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ), mp3OnComplete ) )
          {
             return JS_TRUE ;
          }
@@ -263,6 +259,7 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
          {
             JS_ReportError( cx, "Error queueing curlRequest" );
          }
+printf( "done\n" );
       }
       else
          JS_ReportError( cx, "Error allocating mp3File" );

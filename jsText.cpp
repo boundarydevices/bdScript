@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.9  2002-11-30 05:30:16  ericn
+ * Revision 1.10  2002-11-30 16:26:50  ericn
+ * -better error checking, new curl interface
+ *
+ * Revision 1.9  2002/11/30 05:30:16  ericn
  * -modified to expect call from default curl hander to app-specific
  *
  * Revision 1.8  2002/11/30 00:31:29  ericn
@@ -534,10 +537,10 @@ jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          }
       }
       else
-         JS_ReportError( cx, "Error parsing font\n" );
+         JS_ReportError( cx, "parsing font\n" );
    }
    else
-      JS_ReportError( cx, "Error reading font data property" );
+      JS_ReportError( cx, "reading font data property" );
       
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
@@ -634,13 +637,13 @@ jsFontCharCodes( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
                addRange( cx, arrObj, startCharCode, prevCharCode );
          }
          else
-            JS_ReportError( cx, "Error allocating array" );
+            JS_ReportError( cx, "allocating array" );
       }
       else
-         JS_ReportError( cx, "Error parsing font\n" );
+         JS_ReportError( cx, "parsing font\n" );
    }
    else
-      JS_ReportError( cx, "Error reading font data property" );
+      JS_ReportError( cx, "reading font data property" );
    
    return JS_TRUE ;
 }
@@ -697,13 +700,13 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
                JS_DefineProperty( cx, returnObj, "yAdvance", INT_TO_JSVAL(ftString.getFontHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
             }
             else
-               JS_ReportError( cx, "Error allocating array" );
+               JS_ReportError( cx, "allocating array" );
          }
          else
-            JS_ReportError( cx, "Error parsing font\n" );
+            JS_ReportError( cx, "parsing font\n" );
       }
       else
-         JS_ReportError( cx, "Error reading font data property" );
+         JS_ReportError( cx, "reading font data property" );
    }
    else
       JS_ReportError( cx, "Usage: font.render( pointSize, 'string' );" );
@@ -795,18 +798,7 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
                             |JSPROP_READONLY );
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
-         jsCurlRequest_t request ;
-         request.onComplete_ = fontOnComplete ;
-         request.onFailure_  = jsCurlOnFailure ;
-         request.onCancel_   = jsCurlOnCancel ;
-         request.onSize_     = jsCurlOnSize ; 
-         request.onProgress_ = jsCurlOnProgress ;
-         request.lhObj_      = thisObj ;
-         request.rhObj_      = rhObj ;
-         request.cx_         = cx ;
-         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
-         
-         if( queueCurlRequest( request ) )
+         if( queueCurlRequest( thisObj, rhObj, cx, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ), fontOnComplete ) )
          {
             return JS_TRUE ;
          }
