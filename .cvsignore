@@ -16,3 +16,4 @@ flashThread progFlash reboot pollTimerTest ttyPoll
 udpPoll timerTest unpacked
 urlPoll flashVar mkFlash
 tcpPoll tcpPollServer
+dumpCPP palette serialPoll
