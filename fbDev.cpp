@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.16  2002-12-18 19:10:43  tkisky
+ * Revision 1.17  2003-02-26 12:19:14  tkisky
+ * -10.4 display shuffling bits
+ *
+ * Revision 1.16  2002/12/18 19:10:43  tkisky
  * -don't unscamble LCD data
  *
  * Revision 1.15  2002/12/11 04:04:48  ericn
@@ -75,10 +78,20 @@ static unsigned short bTable[32];
 
 
 #if 0
+// 0  1  2  3  4    5  6  7  8  9 10    11 12 13 14 15
+//15 14  8  7  6   13 12 11  5  4  3    10  9  2  1  0
+//15 14 13 10  9    8  4  3  2 12 11     7  6  5  1  0
+
+#if 1
+#define LCD_REORDER_BLUE  15,14,13,10, 9		//10.4 on new board
+#define LCD_REORDER_GREEN  8, 4, 3, 2, 12, 11
+#define LCD_REORDER_RED    7, 6, 5, 1, 0
+#else
 #define LCD_REORDER
-#define LCD_REORDER_BLUE  15,14, 8, 7, 6
+#define LCD_REORDER_BLUE  15,14, 8, 7, 6		//5.7 on 1st board
 #define LCD_REORDER_GREEN 13,12,11, 5, 4, 3
 #define LCD_REORDER_RED   10, 9, 2, 1, 0
+#endif
 
 #else
 #define LCD_REORDER_BLUE  0,1,2,3,4
