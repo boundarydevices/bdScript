@@ -11,4 +11,4 @@ backtrace
 ffTest videoQueue mpDemux mpDecode madDecode pcapTest sniffWLAN monitorWLAN ping
 avSendTo
 *.sym openFds readCIS
-barcodePoll pollHandlerTest touchPoll
+barcodePoll pollHandlerTest touchPoll udpSpewTo udpRecvAll
