@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.58  2003-09-05 13:07:34  ericn
+ * Revision 1.59  2003-09-06 19:50:13  ericn
+ * -added md5 routine
+ *
+ * Revision 1.58  2003/09/05 13:07:34  ericn
  * -added waitFor() routine to allow modal input
  *
  * Revision 1.57  2003/09/04 13:16:19  ericn
@@ -239,6 +242,7 @@
 #include "jsPing.h"
 #include "jsProcess.h"
 #include "jsDir.h"
+#include "md5.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -279,6 +283,32 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
          *rval = JSVAL_FALSE ;
       }
    }
+
+   return JS_TRUE;
+}
+
+static JSBool
+jsMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) )
+   {
+      JSString *sArg = JSVAL_TO_STRING( argv[0] );
+      md5_t md5 ;
+      getMD5( JS_GetStringBytes( sArg ), JS_GetStringLength( sArg ), md5 );
+      unsigned const nalloc = sizeof( md5.md5bytes_)*2+1 ;
+      char * const stringMem = (char *)JS_malloc( cx, nalloc );
+      char *nextOut = stringMem ;
+      for( unsigned i = 0 ; i < sizeof( md5.md5bytes_); i++ )
+         nextOut += sprintf( nextOut, "%02x", md5.md5bytes_[i] );
+      *nextOut = '\0' ;
+
+      *rval = STRING_TO_JSVAL( JS_NewString( cx, stringMem, nalloc - 1 ) );
+   }
+   else
+      JS_ReportError( cx, "Usage: md5( string );" );
 
    return JS_TRUE;
 }
@@ -365,6 +395,7 @@ static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
     {"garbageCollect",  jsGarbageCollect, 0},
+    {"md5",             jsMD5,            0},
     {"waitFor",         jsWaitFor,        0},
     {0}
 };
