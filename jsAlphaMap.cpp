@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.3  2003-01-12 03:04:41  ericn
+ * Revision 1.4  2003-05-26 22:07:20  ericn
+ * -added method rotate()
+ *
+ * Revision 1.3  2003/01/12 03:04:41  ericn
  * -fixed colormap
  *
  * Revision 1.2  2002/12/15 20:01:57  ericn
@@ -162,8 +165,132 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 
 }
 
+static JSBool
+jsAlphaMapRotate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   jsval widthVal, heightVal, dataVal ;
+   if( JS_GetProperty( cx, obj, "width", &widthVal )
+       &&
+       JS_GetProperty( cx, obj, "height", &heightVal )
+       &&
+       JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+       &&
+       JSVAL_IS_STRING( dataVal ) )
+   {
+      int const width  = JSVAL_TO_INT( widthVal );
+      int const height = JSVAL_TO_INT( heightVal );
+      JSString *pixStr = JSVAL_TO_STRING( dataVal );
+      unsigned char const *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
+      if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
+      {
+         JSObject *returnObj = JS_NewObject( cx, &jsAlphaMapClass_, 0, 0 );
+         if( returnObj )
+         {
+            *rval = OBJECT_TO_JSVAL( returnObj ); // root
+            unsigned const pixBytes = width*height ;
+            void *const pixMem = JS_malloc( cx, pixBytes );
+            JSString *sAlphaMap = JS_NewString( cx, (char *)pixMem, pixBytes );
+            if( sAlphaMap )
+            {
+               JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_ENUMERATE );
+
+               enum rotate_e {
+                  rotate90_e,
+                  rotate180_e,
+                  rotate270_e
+               };
+         
+               int const degrees = JSVAL_TO_INT( argv[0] );
+               rotate_e  rotation ;
+               if( 90 == degrees )
+                  rotation = rotate90_e ;
+               else if( 180 == degrees )
+                  rotation = rotate180_e ;
+               else if( 270 == degrees )
+                  rotation = rotate270_e ;
+               else
+               {
+                  JS_ReportError( cx, "Only 90, 180, 270 degree rotations supported\n" );
+                  return JS_TRUE ;
+               }
+         
+               //
+               // point row at start row/col
+               //
+               unsigned char *const output = (unsigned char *)pixMem ;
+      
+               switch( rotation )
+               {
+                  case rotate90_e :
+                     {
+                        for( unsigned y = 0 ; y < height ; y++ )
+                        {
+                           for( unsigned x = 0 ; x < width ; x++ )
+                           {
+                              output[y+x*height] = pixMap[x+(height-y-1)*width];
+                           }
+                        }
+      
+                        break;
+                     }
+                  case rotate180_e :
+                     {
+                        for( unsigned y = 0 ; y < height ; y++ )
+                        {
+                           for( unsigned x = 0 ; x < width ; x++ )
+                           {
+                              output[y*width+x] = pixMap[((height-y-1)*width)+width-x-1];
+                           }
+                        }
+                        break;
+                     }
+                  case rotate270_e :
+                     {
+                        for( unsigned y = 0 ; y < height ; y++ )
+                        {
+                           for( unsigned x = 0 ; x < width ; x++ )
+                           {
+                              output[y+x*height] = pixMap[width-x-1+y*width];
+                           }
+                        }
+
+                        break;
+                     }
+               }
+      
+               if( ( rotate90_e == rotation ) 
+                   ||
+                   ( rotate270_e == rotation ) )
+               {
+                  JS_DefineProperty( cx, returnObj, "width", heightVal, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                  JS_DefineProperty( cx, returnObj, "height", widthVal, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               } // swap width and height
+               else
+               {
+                  JS_DefineProperty( cx, returnObj, "width", widthVal, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                  JS_DefineProperty( cx, returnObj, "height", heightVal, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               }
+            }
+            else
+               JS_ReportError( cx, "Error building alpha map string" );
+         }
+         else
+            JS_ReportError( cx, "allocating array" );
+      }
+      else
+         JS_ReportError( cx, "Invalid width or height" );
+   }
+   else
+      JS_ReportError( cx, "Invalid image" );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec alphaMapMethods_[] = {
     {"draw",         jsAlphaMapDraw,           3 },
+    {"rotate",       jsAlphaMapRotate,         3 },
     {0}
 };
 
