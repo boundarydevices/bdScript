@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.9  2003-06-05 14:35:17  ericn
+ * Revision 1.10  2003-06-06 01:48:46  ericn
+ * -added include
+ *
+ * Revision 1.9  2003/06/05 14:35:17  ericn
  * -modified error messages to use strerror
  *
  * Revision 1.8  2003/06/04 14:38:33  ericn
@@ -54,6 +57,7 @@
 #include <linux/lp.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <errno.h>
 
 /* ioctls: */
 #define LPGETSTATUS		0x060b		/* same as in drivers/char/lp.c */
