@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.6  2002-10-18 01:18:13  ericn
+ * Revision 1.7  2002-10-20 16:30:11  ericn
+ * -added URL support
+ *
+ * Revision 1.6  2002/10/18 01:18:13  ericn
  * -added text and screen clear support
  *
  * Revision 1.5  2002/10/13 15:52:07  ericn
@@ -42,6 +45,7 @@
 #include "jsImage.h"
 #include "jsText.h"
 #include "jsScreen.h"
+#include "jsURL.h"
 #include "curlCache.h"
 
 static JSBool
@@ -147,7 +151,7 @@ static JSFunctionSpec shell_functions2[] = {
 int main(int argc, char **argv)
 {
    // initialize the JS run time, and return result in rt
-   JSRuntime * const rt = JS_NewRuntime(8L * 1024L * 1024L);
+   JSRuntime * const rt = JS_NewRuntime(2L * 1024L * 1024L);
  
    printf( "allocated runtime\n" );
    // if rt does not have a value, end the program here
@@ -182,6 +186,7 @@ int main(int argc, char **argv)
                initJSImage( cx, glob );
                initJSText( cx, glob );
                initJSScreen( cx, glob );
+               initJSURL( cx, glob );
                printf( "initialized jsCurl and jsImage\n" );
 
                curlCache_t &cache = getCurlCache();

@@ -9,7 +9,7 @@ else
 endif
 
 %.o : %.cpp
-	$(CC) -c -DXP_UNIX=1 -O2 $<
+	$(CC) -c -DXP_UNIX=1 -I/usr/local/arm/2.95.3/arm-linux/include/freetype2 -O2 $<
 
 %.o : ../boundary1/%.cpp
 	$(CC) -c -DXP_UNIX=1 -O2 $<
@@ -40,8 +40,9 @@ urlTest: urlTest.o curlCache.o dirByATime.o
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o dirByATime.o fbDev.o hexDump.o jsText.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o dirByATime.o fbDev.o hexDump.o \
+testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o dirByATime.o fbDev.o hexDump.o ultoa.o jsText.o jsURL.o Makefile
+	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o jsURL.o dirByATime.o fbDev.o \
+      hexDump.o ultoa.o \
       $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lm -lz
 
 ifneq (,$(findstring arm, $(CC)))
