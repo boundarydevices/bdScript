@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.9 2002-12-07 21:01:19 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.10 2002-12-11 04:04:48 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.9  2002-12-07 21:01:19  ericn
+ * Revision 1.10  2002-12-11 04:04:48  ericn
+ * -moved buttonize code from button to fbDev
+ *
+ * Revision 1.9  2002/12/07 21:01:19  ericn
  * -added antialias() method for text rendering
  *
  * Revision 1.8  2002/12/04 13:56:37  ericn
@@ -105,6 +108,16 @@ public:
                    unsigned short       bmpWidth,  // row stride
                    unsigned short       bmpHeight, // num rows in bmp
                    unsigned short       xLeft,     // display coordinates: clip to this rectangle
+                   unsigned short       yTop,
+                   unsigned short       xRight,
+                   unsigned short       yBottom,
+                   unsigned char red, unsigned char green, unsigned char blue );
+
+   // draw a box with specified background color and button highlighting.
+   // pressed will highlight bottom-right and shade upper left
+   void buttonize( bool                 pressed,
+                   unsigned char        borderWidth,
+                   unsigned short       xLeft,
                    unsigned short       yTop,
                    unsigned short       xRight,
                    unsigned short       yBottom,

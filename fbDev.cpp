@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.14  2002-12-07 21:01:06  ericn
+ * Revision 1.15  2002-12-11 04:04:48  ericn
+ * -moved buttonize code from button to fbDev
+ *
+ * Revision 1.14  2002/12/07 21:01:06  ericn
  * -added antialias() method for text rendering
  *
  * Revision 1.13  2002/12/04 13:56:40  ericn
@@ -568,6 +571,65 @@ void fbDevice_t :: antialias
    }
 }
 
+void fbDevice_t :: buttonize
+   ( bool                 pressed,
+     unsigned char        borderWidth,
+     unsigned short       xLeft,
+     unsigned short       yTop,
+     unsigned short       xRight,
+     unsigned short       yBottom,
+     unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned char const bgColors[3] = { 
+      red, green, blue
+   };
+
+   unsigned char darkIncr[3] = {
+      bgColors[0]/borderWidth,
+      bgColors[1]/borderWidth,
+      bgColors[2]/borderWidth
+   };
+
+   unsigned char liteDecr[3] = {
+      (256-bgColors[0])/borderWidth,
+      (256-bgColors[1])/borderWidth,
+      (256-bgColors[2])/borderWidth
+   };
+   
+   unsigned char lite[3] = {
+      0xFF, 0xFF, 0xFF
+   };
+
+   unsigned char dark[3] = {
+      0, 0, 0
+   };
+
+   unsigned short b[4] = { xLeft, yTop, xRight, yBottom };
+
+   unsigned char const *const topLeft     = pressed ? dark : lite ;
+   unsigned char const *const bottomRight = pressed ? lite : dark ;
+
+   //
+   // draw something that looks like a button
+   //
+   for( unsigned char i = 0 ; i < borderWidth ; i++ )
+   {
+      line( b[0], b[1], b[2], b[1], 1, topLeft[0],topLeft[1],topLeft[2] );
+      line( b[0], b[1], b[0], b[3], 1, topLeft[0],topLeft[1],topLeft[2] );
+      line( b[0], b[3], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
+      line( b[2], b[1], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
+
+      b[0]++ ; b[1]++ ; b[2]-- ; b[3]-- ;
+
+      for( unsigned j = 0 ; j < 3 ; j++ )
+      {
+         lite[j] -= liteDecr[j];
+         dark[j] += darkIncr[j];
+      } // change shades
+   } // draw bounding box
+
+   rect( b[0], b[1], b[2], b[3], bgColors[0], bgColors[1], bgColors[2] );
+}
 
 fbDevice_t :: ~fbDevice_t( void )
 {

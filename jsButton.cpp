@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.10  2002-12-07 23:19:48  ericn
+ * Revision 1.11  2002-12-11 04:04:48  ericn
+ * -moved buttonize code from button to fbDev
+ *
+ * Revision 1.10  2002/12/07 23:19:48  ericn
  * -fixed msg termination and allocation, added changeText method
  *
  * Revision 1.9  2002/12/07 21:01:37  ericn
@@ -194,65 +197,18 @@ static void display( unsigned short  xLeft,
 
 static void drawButton( buttonData_t const &button, bool pressed )
 {
-   unsigned char const bgColors[3] = { 
-      button.bgColor_ >> 16,
-      button.bgColor_ >> 8,
-      button.bgColor_
-   };
-
-   unsigned char const border = button.borderWidth_ ;
-
-   unsigned char darkIncr[3] = {
-      bgColors[0]/border,
-      bgColors[1]/border,
-      bgColors[2]/border
-   };
-
-   unsigned char liteDecr[3] = {
-      (256-bgColors[0])/border,
-      (256-bgColors[1])/border,
-      (256-bgColors[2])/border
-   };
-   
-   unsigned char lite[3] = {
-      0xFF, 0xFF, 0xFF
-   };
-   unsigned char dark[3] = {
-      0, 0, 0
-   };
-
    fbDevice_t &fb = getFB();
+   fb.buttonize( pressed,
+                 button.borderWidth_,
+                 button.box_->xLeft_, button.box_->yTop_, button.box_->xRight_, button.box_->yBottom_, 
+                 button.bgColor_ >> 16, button.bgColor_ >> 8, button.bgColor_ );
 
    unsigned short b[4] = { button.box_->xLeft_, button.box_->yTop_, button.box_->xRight_, button.box_->yBottom_ };
 
-   unsigned char const *const topLeft     = pressed ? dark : lite ;
-   unsigned char const *const bottomRight = pressed ? lite : dark ;
-
-   //
-   // draw something that looks like a button
-   //
-   for( unsigned char i = 0 ; i < border ; i++ )
-   {
-      fb.line( b[0], b[1], b[2], b[1], 1, topLeft[0],topLeft[1],topLeft[2] );
-      fb.line( b[0], b[1], b[0], b[3], 1, topLeft[0],topLeft[1],topLeft[2] );
-      fb.line( b[0], b[3], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
-      fb.line( b[2], b[1], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
-
-      b[0]++ ; b[1]++ ; b[2]-- ; b[3]-- ;
-
-      for( unsigned j = 0 ; j < 3 ; j++ )
-      {
-         lite[j] -= liteDecr[j];
-         dark[j] += darkIncr[j];
-      } // change shades
-   } // draw bounding box
-
-   fb.rect( b[0], b[1], b[2], b[3], bgColors[0], bgColors[1], bgColors[2] );
-
    if( pressed )
    {
-      b[0] += border ;
-      b[2] += border ;
+      b[0] += button.borderWidth_ ;
+      b[2] += button.borderWidth_ ;
    }
 
    freeTypeLibrary_t library ;

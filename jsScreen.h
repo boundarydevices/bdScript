@@ -1,5 +1,5 @@
 #ifndef __JSSCREEN_H__
-#define __JSSCREEN_H__ "$Id: jsScreen.h,v 1.6 2002-12-04 13:13:04 ericn Exp $"
+#define __JSSCREEN_H__ "$Id: jsScreen.h,v 1.7 2002-12-11 04:04:48 ericn Exp $"
 
 /*
  * jsScreen.h
@@ -16,13 +16,17 @@
  *       .rect( x1, y1, x2, y2, color = 0x000000 );               filled rectangle
  *       .line( x1, y1, x2, y2, penWidth = 1, color = 0x000000 ); only implemented for horizontal and vertical
  *       .box( x1, y1, x2, y2, penWidth = 1, color = 0x000000 );
+ *       .buttonize( pressed, borderWidth, x1, y1, x2, y2, color );
  *       .width
  *       .height
  *
  * Change History : 
  *
  * $Log: jsScreen.h,v $
- * Revision 1.6  2002-12-04 13:13:04  ericn
+ * Revision 1.7  2002-12-11 04:04:48  ericn
+ * -moved buttonize code from button to fbDev
+ *
+ * Revision 1.6  2002/12/04 13:13:04  ericn
  * -added rect, line, box methods
  *
  * Revision 1.5  2002/11/21 14:05:22  ericn

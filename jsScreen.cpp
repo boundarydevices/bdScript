@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.8  2002-12-06 02:23:07  ericn
+ * Revision 1.9  2002-12-11 04:04:48  ericn
+ * -moved buttonize code from button to fbDev
+ *
+ * Revision 1.8  2002/12/06 02:23:07  ericn
  * -fixed color mapping
  *
  * Revision 1.7  2002/12/04 13:13:06  ericn
@@ -384,6 +387,44 @@ jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsButtonize( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 7 == argc )
+       &&
+       JSVAL_IS_BOOLEAN( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] )
+       &&
+       JSVAL_IS_INT( argv[4] )
+       &&
+       JSVAL_IS_INT( argv[5] )
+       &&
+       JSVAL_IS_INT( argv[6] ) )
+   {
+      bool const pressed = JSVAL_TO_BOOLEAN( argv[0] );
+      unsigned short border = (unsigned short)JSVAL_TO_INT( argv[1] );
+      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[2] );
+      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[4] );
+      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[5] );
+      unsigned long const color = JSVAL_TO_INT( argv[6] );
+      unsigned char const red   = (unsigned char)( color >> 16 );
+      unsigned char const green = (unsigned char)( color >> 8 );
+      unsigned char const blue  = (unsigned char)( color );
+      getFB().buttonize( pressed, border, x1, y1, x2, y2, red, green, blue );
+   }
+   else
+      JS_ReportError( cx, "Usage: screen.box( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
+
+   return JS_TRUE ;
+}
+
 enum jsScreen_tinyId {
    SCREEN_WIDTH, 
    SCREEN_HEIGHT, 
@@ -447,6 +488,7 @@ static JSFunctionSpec screen_methods[] = {
    { "rect",         jsRect,             0,0,0 },
    { "line",         jsLine,             0,0,0 },
    { "box",          jsBox,              0,0,0 },
+   { "buttonize",    jsButtonize,        0,0,0 },
    { 0 }
 };
 
