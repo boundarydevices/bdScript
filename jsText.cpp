@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.1  2002-10-18 01:18:25  ericn
+ * Revision 1.2  2002-10-20 16:31:06  ericn
+ * -added bg color support
+ *
+ * Revision 1.1  2002/10/18 01:18:25  ericn
  * -Initial import
  *
  *
@@ -24,6 +27,7 @@
 #include "fbDev.h"
 #include <ctype.h>
 
+/*
 static FT_Library library ;
 
 static void initFreeType( void )
@@ -44,12 +48,30 @@ static void initFreeType( void )
       }
    }
 }
+*/
 
 static void render( fbDevice_t      &fb,
                     FT_Bitmap const &bmp,
                     int              startX,
-                    int              startY )
+                    int              startY,
+                    unsigned long    fgColor,         // 0xRRGGBB
+                    unsigned long    bgColor )        // 0xRRGGBB
 {
+   unsigned char fgRed   = ( fgColor >> 16 ) & 0xFF ;
+   unsigned char fgGreen = ( fgColor >> 8 )  & 0xFF ;
+   unsigned char fgBlue  = ( fgColor ) & 0xFF ;
+
+   unsigned char bgRed   = ( bgColor >> 16 ) & 0xFF ;
+   unsigned char bgGreen = ( bgColor >> 8 )  & 0xFF ;
+   unsigned char bgBlue  = ( bgColor ) & 0xFF ;
+
+
+/*
+printf( "colors == fg %u/%u/%u, bg %u/%u/%u\n", 
+        fgRed, fgGreen, fgBlue,
+        bgRed, bgGreen, bgBlue );
+*/
+
    if( ( 0 < bmp.rows ) && ( 0 < bmp.width ) )
    {
       if( 256 == bmp.num_grays )
@@ -65,12 +87,19 @@ static void render( fbDevice_t      &fb,
                {
                   if( 0 <= penX )
                   {
-                     unsigned char const alias = *rasterCol++ ;
-                     if( 0 < alias )
+                     unsigned const charCov = *rasterCol++ ;
+                     if( 0 < charCov )
                      {
-                        unsigned short color = fb.get16( alias, alias, alias );
+                        // convert to 1..256 to use shifts instead of div for mixing
+                        unsigned const alias = charCov + 1 ;
+                        unsigned const notAlias = 256 - alias ;
+                        unsigned mixRed = ((alias*fgRed)+(notAlias*bgRed))/256 ;
+                        unsigned mixGreen = ((alias*fgGreen)+(notAlias*bgGreen))/256 ;
+                        unsigned mixBlue = ((alias*fgBlue)+(notAlias*bgBlue))/256 ;
+   
+                        unsigned short color = fb.get16( mixRed, mixGreen, mixBlue );
                         fb.getPixel( penX, startY ) = color ;
-                     } // part of char
+                     } // don't draw background
                   } // is visible
                } // for each column
             } // on the screen
@@ -119,8 +148,7 @@ static JSType const jsTextParamTypes[] = {
    JSTYPE_NUMBER,    // 3 y position (baseline)
    JSTYPE_STRING,    // 4 string to render
    JSTYPE_NUMBER,    // 5 fg color (0xFFFFFFFF to invert)
-   JSTYPE_NUMBER,    // 6 fg color (0xFFFFFFFF for transparent)
-   JSTYPE_STRING,    // 7 string to render
+   JSTYPE_NUMBER     // 6 fg color (0xFFFFFFFF for transparent)
 };
 
 static unsigned char const jsTextRequired = 5 ;
@@ -149,17 +177,26 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       
       if( okay )
       {
-         initFreeType();
+         FT_Library library ;
+         int error = FT_Init_FreeType( &library );
+         if( 0 != error )
+         {
+            fprintf( stderr, "Error %d initializing freeType library\n", error );
+            exit( 3 );
+         }
+
+//         initFreeType();
+
          JSString *fontString = JS_ValueToString( cx, argv[0] );
          if( fontString )
          {
             FT_Face face;      /* handle to face object */
 
-            int error = FT_New_Memory_Face( library, 
-                                            (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
-                                            JS_GetStringLength(fontString),    /* size in bytes        */
-                                            0,                          /* face_index           */
-                                            &face );
+            error = FT_New_Memory_Face( library, 
+                                        (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
+                                        JS_GetStringLength(fontString),    /* size in bytes        */
+                                        0,                          /* face_index           */
+                                        &face );
             if( 0 == error )
             {
                int const pointSize = JSVAL_TO_INT( argv[1] );
@@ -173,6 +210,16 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                   {
                      penX = JSVAL_TO_INT( argv[2] );
                      penY = JSVAL_TO_INT( argv[3] );
+                     
+                     unsigned long fg = 0xFFFFFF ;
+                     unsigned long bg = 0 ;
+                     if( argc > 5 )
+                     {
+                        fg = (unsigned long)JSVAL_TO_INT( argv[5] );
+                        if( 6 < argc )
+                           bg = (unsigned long)JSVAL_TO_INT( argv[6] );
+                     }
+                     
                      fontHeight = FT_MulFix( face->height, face->size->metrics.y_scale ) / 64 ;
 
                      JSString *textString = JS_ValueToString( cx, argv[4] );
@@ -262,8 +309,9 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
                               render( fb, face->glyph->bitmap, 
                                       penX + face->glyph->bitmap_left, 
-                                      penY - face->glyph->bitmap_top );
-                              
+                                      penY - face->glyph->bitmap_top,
+                                      fg, bg );
+
                               penX += ( face->glyph->advance.x / 64 );
                               penY += ( face->glyph->advance.y / 64 );
 
@@ -294,6 +342,14 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          }
          else
             fprintf( stderr, "Error retrieving font data string\n" );
+         
+         error = FT_Done_FreeType( library );
+         if( 0 != error )
+         {
+            fprintf( stderr, "Error %d initializing freeType library\n", error );
+            exit( 3 );
+         }
+
       }
 
       *rval = JSVAL_FALSE ;
@@ -340,18 +396,27 @@ jsDumpFont( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    if( ( 1 == argc ) && ( JSTYPE_STRING == JS_TypeOfValue( cx, argv[0] ) ) )
    {
       printf( "params check out\n" );
-      initFreeType();
+      
+      FT_Library library ;
+      int error = FT_Init_FreeType( &library );
+      if( 0 != error )
+      {
+         fprintf( stderr, "Error %d initializing freeType library\n", error );
+         exit( 3 );
+      }
+
+//      initFreeType();
       printf( "freeType initialized\n" );
       JSString *fontString = JS_ValueToString( cx, argv[0] );
       if( fontString )
       {
          FT_Face face;      /* handle to face object */
 
-         int error = FT_New_Memory_Face( library, 
-                                         (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
-                                         JS_GetStringLength(fontString),    /* size in bytes        */
-                                         0,                          /* face_index           */
-                                         &face );
+         error = FT_New_Memory_Face( library, 
+                                     (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
+                                     JS_GetStringLength(fontString),    /* size in bytes        */
+                                     0,                          /* face_index           */
+                                     &face );
          if( 0 == error )
          {
             printf( "num_faces   %ld\n", face->num_faces );
@@ -456,6 +521,13 @@ for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
       else
          fprintf( stderr, "Error retrieving font data string\n" );
       
+      error = FT_Done_FreeType( library );
+      if( 0 != error )
+      {
+         fprintf( stderr, "Error %d freeing freeType library\n", error );
+         exit( 3 );
+      }
+      
       *rval = JSVAL_FALSE ;
       return JS_TRUE ;
    
@@ -466,7 +538,7 @@ for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
    return JS_FALSE ;
 }
 
-static JSFunctionSpec image_functions[] = {
+static JSFunctionSpec text_functions[] = {
     {"jsText",           jsText,        1 },
     {"jsDumpFont",       jsDumpFont,    1 },
     {0}
@@ -475,6 +547,6 @@ static JSFunctionSpec image_functions[] = {
 
 bool initJSText( JSContext *cx, JSObject *glob )
 {
-   return JS_DefineFunctions( cx, glob, image_functions);
+   return JS_DefineFunctions( cx, glob, text_functions);
 }
 
