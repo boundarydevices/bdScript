@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.31  2003-09-22 02:02:03  ericn
+ * Revision 1.32  2003-09-26 00:43:50  tkisky
+ * -fft stuff
+ *
+ * Revision 1.31  2003/09/22 02:02:03  ericn
  * -separated boost and changed record level params
  *
  * Revision 1.30  2003/09/15 02:22:49  ericn
@@ -229,42 +232,43 @@ void setVolume( unsigned char volParam )
 //
 // This number is magic and was determined by the scientific process
 // of trying to record something soft.
-// 
+//
 // It is used to keep the slightest bit of background noise from being
 // amplified to full-scale.
 //
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
-   signed short min = 0x7fff ;
-   signed short max = 0x8000 ;
-   signed short *next = samples ;
-   for( unsigned i = 0 ; i < numSamples ; i++ )
-   {
-      signed short s = *next++ ;
-      if( s > max )
-         max = s ;
-      if( s < min )
-         min = s ;
-   }
-   min = 0-min ;
-   max = max > min ? max : min ;
-   
-   printf( "max sample %d\n", max );
-   
-   //
-   // fixed point 16:16
-   //
-   unsigned long const ratio = ( 0x70000000UL / max );
-   printf( "ratio %lx\n", ratio );
+	unsigned long const maxNormalizeRatio = 0x800000 ;//* 128 max
+	signed short *next = samples ;
+	signed short min = *next;
+	signed short max = *next++;
+	unsigned i;
+	signed long ratio;
+	if (!numSamples) return;
 
-   next = samples ;
-   for( unsigned i = 0 ; i < numSamples ; i++ )
-   {
-      signed long x16 = ratio * *next ;
-      signed short s = (signed short)( x16 >> 16 );
-      *next++ = s ;
-   }
+	for( i = 1 ; i < numSamples ; i++ )
+	{
+		signed short s = *next++ ;
+		if( max < s) max = s ;
+		else if( min > s ) min = s ;
+	}
+	min = 0-min ;
+	max = max > min ? max : min ;
+   printf( "max sample %d\n", max );
+	if (!max) return;
+
+	ratio = ( 0x70000000UL / max );
+	if (ratio > 0x10000) {	//don't reduce volume
+		if( ratio > maxNormalizeRatio ) ratio = maxNormalizeRatio ;
+   printf( "ratio %lx\n", ratio );
+		next = samples ;
+		for( i = 0 ; i < numSamples ; i++ ) {
+			signed long x16 = ratio * ((signed long)*next) ;
+			x16 += 1<<15;	//round
+			*next++ = (signed short)( x16 >> 16 );
+		}
+	}
 }
 
 static void audioCallback( void *cbParam )
@@ -362,11 +366,105 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    printf( "%u pictures\n", picCount );
 }
 
+void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
+{
+	unsigned char *nextSample = (unsigned char *)header->samples_ ;
+	unsigned long const maxSamples = header->numSamples_ ;
+	unsigned long bytesLeft = maxSamples * sizeof( header->samples_[0] );
+	unsigned const maxRead = readFragSize_ ;
+	while( !( _cancel || shutdown_ ) && ( 0 < bytesLeft ) ) {
+		int const readSize = ( bytesLeft > maxRead ) ? maxRead : bytesLeft ;
+		int numRead = read( readFd, nextSample, readSize );
+		if( 0 < numRead ) {
+			bytesLeft -= numRead ;
+			nextSample += numRead ;
+		} else {
+			perror( "audio read" );
+			break;
+		}
+	}
+	header->numSamples_ = ( maxSamples*sizeof(header->samples_[0]) - bytesLeft ) / sizeof( header->samples_[0] );
+}
+
+void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
+{
+	const int logN=cnw->logN;	//1024 points
+	const int n=(1<<logN);
+	const int n_d2=(1<<(logN-1));
+	const int n_d4=(1<<(logN-2));
+	const int n3_d4=(3<<(logN-2));
+	int i;
+
+	unsigned char* inSamples;
+	short* outSamples = (short *)header->samples_;
+	int outSampleCntMax = header->numSamples_;
+
+	int blkSize=readFragSize_;
+	int readPos=0;
+	int writePos=0;
+	const unsigned int fmask = (n<<1)-1;
+	int outSampleCnt = 0;
+	if (readFd<0) return;
+
+
+	printf("blkSize:%i\r\n",blkSize);
+	blkSize = (blkSize+fmask) & ~fmask;	//round to multiple of fft
+	printf("blkSize:%i\r\n",blkSize);
+	inSamples = (unsigned char *)malloc(blkSize);
+	if (inSamples==NULL) return;
+
+	memset(outSamples,0,MAX_ADD_SIZE*sizeof(*outSamples));
+
+	while ( !( _cancel || shutdown_ ) && (outSampleCnt < outSampleCntMax) ) {
+		int numRead = 0;
+//		printf("readPos:%i outSampleCnt:%i, max:%i\r\n",readPos,outSampleCnt,outSampleCntMax);
+		while ((((writePos-readPos)& (blkSize-1))+numRead)<n) {
+			int max;
+			short* pSamples;
+
+			writePos=(writePos+numRead)& (blkSize-1);
+			numRead=0;
+
+			if (readPos > writePos) max = (readPos-writePos);
+			else max = blkSize-writePos;
+
+//			printf("max:%i\r\n",max);
+#if 1
+			numRead = read(readFd, &inSamples[writePos], max );
+#else
+			for (i=0,pSamples=(short*)(&inSamples[writePos]); i<(max>>1); i++) {*pSamples++ = 0x4000;}
+//			for (i=0,rSamples=(short*)(&inSamples[writePos]); i<(max>>1); i++) {printf("__%i %i\r\n",i,*rSamples++);}
+			numRead = max;
+#endif
+//			printf("numRead:%i\r\n",numRead);
+			if (numRead<=0 ) return;
+		}
+		writePos=(writePos+numRead)& (blkSize-1);
+
+
+		//shifts needed to convert from char oriented to short oriented
+		i = CleanNoise(outSamples+outSampleCnt,outSampleCntMax-outSampleCnt,(short*)inSamples,(readPos>>1),(blkSize>>1)-1,cnw);
+		if (i<0) break;
+		{
+			int max = outSampleCntMax - outSampleCnt;
+			if (max>i) max = i;
+			outSampleCnt += max;
+		}
+		readPos =(readPos+SAMPLE_ADVANCE)& (blkSize-1);
+//		printf("readPos:%i,outSampleCnt*2:%i\r\n",readPos,outSampleCnt<<1);
+	}
+	printf("\r\n");
+//	printf("%04x %04x %04x %04x\r\n",outSamples[0],outSamples[1],outSamples[2],outSamples[3]);
+//	WriteWavFile(outSamples,outSampleCnt);
+	free(inSamples);
+
+	header->numSamples_ = outSampleCnt;
+}
 
 //
 // Because I'm lazy and can't figure out the
-// right set of loops for putting audio out, 
-// I'm bailing out and making this a state 
+// right set of loops for putting audio out,
+// I'm bailing out and making this a state
 // machine of sorts based on four inputs:
 //
 //    deviceEmpty - set when fragments==fragstotal
@@ -603,7 +701,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   bool firstFrame = true ;
 
                   unsigned char state = DEVICEEMPTY ;
-                  while( !( _cancel || queue->shutdown_ ) 
+                  while( !( _cancel || queue->shutdown_ )
                          &&
                          ( state != MP3DONE ) )
                   {
@@ -679,7 +777,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                         filedes.events = POLLOUT ;
                         if( 0 < poll( &filedes, 1, 0 ) )
                         {
-                           if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                           if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) )
                            {
                               if( ai.fragments == ai.fragstotal )
                                  state |= DEVICEEMPTY ;
@@ -700,8 +798,8 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      else if( 0 == (state & (FRAGFULL|MP3AVAIL)) )
                      {
                         usleep( 10000 );
-      
-                        if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+
+                        if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) )
                         {
                            if( ai.fragments == ai.fragstotal )
                               state |= DEVICEEMPTY ;
@@ -724,7 +822,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      delete [] samples ;
 
                   _playing = false ;
-                  
+
                   if( !queue->shutdown_ )
                   {
                      if( _cancel )
@@ -738,7 +836,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                }
                else
                   perror( "GETOSPACE" );
-               
+
                closeWriteFd();
             }
             else
@@ -750,26 +848,26 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             if( 0 <= writeFd )
             {
                _playing = true ;
-   
+
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
                bool eof = false ;
-   
+
                spaceLeft = OUTBUFSIZE ;
                nextOut = outBuffer ;
-   
+
                if( header.sampleRate_ != lastSampleRate )
-               {   
+               {
                   lastSampleRate = header.sampleRate_ ;
                   if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastSampleRate );
                }
-   
+
                if( 1 == header.numChannels_ )
                {
                   unsigned short const *nextIn = header.samples_ ;
                   unsigned i ;
-                  for( i = 0 ; !( _cancel || queue->shutdown_ ) 
-                               && 
+                  for( i = 0 ; !( _cancel || queue->shutdown_ )
+                               &&
                                ( i < header.numSamples_ ) ; i++ )
                   {
                      unsigned short const sample = *nextIn++ ;
@@ -795,7 +893,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                         ( !_cancel )
                         &&
                         ( !queue->shutdown_ );
-                  
+
                   if( eof && ( spaceLeft != OUTBUFSIZE ) )
                   {
                      int const outSize = (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]);
@@ -813,28 +911,28 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                         &&
                         ( !queue->shutdown_ );
                } // stereo, we can write directly
-   
+
                _playing = false ;
-               
+
                if( !queue->shutdown_ )
                {
                   if( _cancel )
                   {
                      _cancel = false ;
-                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) )
                         fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                   }
                   else
                   {
-                     if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) ) 
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) )
                         fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
-                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
+                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SYNC, 0 ) )
                         fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
                      item->isComplete_ = true ;
                   }
                   queueCallback( audioCallback, item );
                }
-               
+
                closeWriteFd();
 
             }
@@ -846,43 +944,22 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             int const readFd = openReadFd();
             if( 0 <= readFd )
             {
-               audioQueue_t :: waveHeader_t &header = *( audioQueue_t :: waveHeader_t * )item->data_ ;
+               audioQueue_t :: waveHeader_t *header = ( audioQueue_t :: waveHeader_t * )item->data_ ;
                _recording = true ;
-               if( header.sampleRate_ != lastRecordRate )
-               {   
-                  lastRecordRate = header.sampleRate_ ;
+               if( header->sampleRate_ != lastRecordRate )
+               {
+                  lastRecordRate = header->sampleRate_ ;
                   if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
                }
-   
-               unsigned char *nextSample = (unsigned char *)header.samples_ ;
-               unsigned long const maxSamples = header.numSamples_ ;
-               unsigned long bytesLeft = maxSamples * sizeof( header.samples_[0] );
-               unsigned const maxRead = queue->readFragSize_ ;
-               while( !( _cancel || queue->shutdown_ ) 
-                      && 
-                      ( 0 < bytesLeft ) )
-               {
-                  int const readSize = ( bytesLeft > maxRead ) ? maxRead : bytesLeft ;
-                  int numRead = read( readFd, nextSample, readSize );
-                  if( 0 < numRead )
-                  {
-                     bytesLeft -= numRead ;
-                     nextSample += numRead ;
-                  }
-                  else
-                  {
-                     perror( "audio read" );
-                     break;
-                  }
-               }
 
-               header.numSamples_ = ( maxSamples*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
-               header.numChannels_ = 1 ;
+               header->numChannels_ = 1 ;
+               if (0) queue->GetAudioSamples(readFd,header);
+               else queue->GetAudioSamples2(readFd,header);
 
-                normalize( (short *)header.samples_, header.numSamples_ );
+                normalize( (short *)header->samples_, header->numSamples_ );
                _recording = false ;
-               
+
                if( !queue->shutdown_ )
                {
                   if( _cancel )
@@ -891,7 +968,7 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      item->isComplete_ = true ;
                   queueCallback( audioCallback, item );
                }
-               
+
                closeReadFd();
             }
             else
@@ -1172,16 +1249,19 @@ audioQueue_t :: audioQueue_t( void )
    numReadFrags_ = 16 ;
    readFragSize_ = 8192 ;
    maxReadBytes_ = numReadFrags_ * readFragSize_ ;
-   
+
+   cnw = new CleanNoiseWork;
+   Init_cnw(cnw,10);
+
    int readFd = openReadFd();
    if( 0 <= readFd )
    {
       ioctl( readFd, SNDCTL_DSP_SYNC, 0 );
 
       int const format = AFMT_S16_LE ;
-      if( 0 != ioctl( readFd, SNDCTL_DSP_SETFMT, &format) ) 
+      if( 0 != ioctl( readFd, SNDCTL_DSP_SETFMT, &format) )
          perror( "set record format" );
-      
+
       int const channels = 1 ;
       if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
@@ -1241,6 +1321,8 @@ audioQueue_t :: audioQueue_t( void )
 
 audioQueue_t :: ~audioQueue_t( void )
 {
+  Finish_cnw(cnw);
+  delete cnw;
 }
 
 bool audioQueue_t :: queuePlayback

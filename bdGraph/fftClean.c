@@ -2,6 +2,8 @@
 #include "fft.h"
 #include "fftClean.h"
 
+//#define DBGP(a) printf(a "\r\n");
+#define DBGP(a)
 
 static void printNpd_p1(char* s,npd_p1* p)
 {
@@ -55,101 +57,106 @@ static void printNpd_p1(char* s,npd_p1* p)
 //                                                    |______________________________________|                                |______________________________________|
 //                                                 |____________________________________________|                          |____________________________________________|
 //                                                                                                 |____________________________________________________________________________________________|  |____________________________________________________________________________________________________________________________________________________________________________________________|  |____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________|
-static void inline CalcPower(npd* power,npd_p1* powerSum,cmplx* vect,const int logN)
+static void inline SaveProfile(CleanNoiseWork* cnw,cmplx* vect)
 {
+	int i,k;
+	int logN = cnw->logN;
 	const int n_d2=(1<<(logN-1));
 	const int n_d4=(1<<(logN-2));
 	const int n3_d4=(3<<(logN-2));
-	int i,k;
+	int index = cnw->vIndex;
+	cmplx* v = cnw->v + (index * PROFILE_SIZE);
 	int cnt=0;
+	npd_p1* powerSum = &cnw->powerSum[index];
+#ifdef NOISE_ACCUM
+	npd_p1* pn = &cnw->noiseAccum[0];
+#endif
 	memset(powerSum,0,sizeof(*powerSum));
+	cnw->vIndex++;
+	if (cnw->vIndex >= CONSECUTIVE_CNT) cnw->vIndex = 0;
 #ifdef SKIP_REVERSAL_SORT
 	for (k=4; k<=n_d2; k <<= 1) {
 		int stop = k + (k>>1);
 		for (i=k; i<stop; i = (i&1)? (i+1) : (i+3)) {
 			if ((i & ~n3_d4) && ((i+1)& ~n3_d4)) {	//if not a zeroed low frequency
-				Magnitude2(power,&vect[i].r,&vect[i].i);
-//	printf("i:%03x k:%03x stop:%03x cnt:%03x, NOISE_SIZE:%03x ",i,k,stop,cnt,NOISE_SIZE);
-				AddNPD_P1(powerSum,power);
-				cnt++;
-				power++;
+				npd power;
+				*v = vect[i];
+				Magnitude2(&power,v);
+				AddNPD_P1(powerSum,&power);
+#ifdef NOISE_ACCUM
+				AddNPD_P1(pn,&power);
+				pn++;
+#endif
+				v++; cnt++;
 			}
 		}
 	}
+	if (cnt!=PROFILE_SIZE) printf("Error: SaveProfile, PROFILE_SIZE != cnt");
 #else
-	for (i=4; i<n_d4; i++) {
-		Magnitude2(power,&vect[i].r,&vect[i].i);
-		AddNPD_P1(powerSum,power);
-		power++;
+	memcpy(v,(&vect[4]),PROFILE_SIZE*sizeof(*v));
+	for (i=0; i<PROFILE_SIZE; i++) {
+		npd power;
+		Magnitude2(&power,v);
+		AddNPD_P1(powerSum,&power);
+#ifdef NOISE_ACCUM
+		AddNPD_P1(pn,&power);
+		pn++;
+#endif
+		v++;
 	}
 #endif
 }
-//Polar conversions
-//M = (A**2 + B**2) ** 1/2
-//Phase = arctan(B/A)
-
-//A = M * cos(Phase)
-//B = M * sin(Phase)
-static void SubtractNoise(npd* power,npd* noise,cmplx* vect,const int logN)
+static inline void LoadProfile(CleanNoiseWork* cnw,cmplx* vect)
 {
-	const int n_d2=(1<<(logN-1));
-	const int n_d4=(1<<(logN-2));
-	const int n3_d4=(3<<(logN-2));
-	int i;
-#ifdef SKIP_REVERSAL_SORT
-	int k;
-	for (k=4; k<=n_d2; k <<= 1) {
-		int stop = k + (k>>1);
-		for (i=k; i<stop; i = (i&1)? (i+1) : (i+3)) {
-			if ((i & ~n3_d4) && ((i+1)& ~n3_d4)) 	//if not a zeroed low frequency
-#else
-			for (i=4; i<=n_d4; i++)
-#endif
-			{
-				npd t,t1;
-				t = *power;
-				if (SubOrZero(&t,noise)) {
-					np temp1;
-					DivNpd(&t1,&t,power);	//t<power, so fraction is <1
-
-					Sqroot(&temp1,&t1);
-					MultSigned(&vect[i].r,&temp1);
-					MultSigned(&vect[i].i,&temp1);
-				} else {
-					memset(&vect[i],0,sizeof(vect[i]));	//below noise threshold
-				}
-				power++;
-				noise++;
-			}
-#ifdef SKIP_REVERSAL_SORT
-		}
-	}
-#endif
-}
-static inline void ZeroHighLowFrequencies(cmplx* vect,const int logN)
-{
-	const int n_d2=(1<<(logN-1));
-	const int n_d4=(1<<(logN-2));
-	const int n3_d4=(3<<(logN-2));
 	int i,k;
+	int logN = cnw->logN;
+	const int n_d2=(1<<(logN-1));
+	const int n_d4=(1<<(logN-2));
+	const int n3_d4=(3<<(logN-2));
+	cmplx* v = cnw->v;
+	int cnt=0;
+	int index = cnw->vIndex + 1;
+	if (index >= CONSECUTIVE_CNT) index = 0;
+	index *= PROFILE_SIZE;
+	v += index;
+
 	memset(vect,0,4*sizeof(*vect));		//zero 1st 4 entries
 #ifdef SKIP_REVERSAL_SORT
 	for (k=4; k<=n_d2; k <<= 1) {
 		int stop = k + (k>>1);
 		int i = k;
+		cmplx* a = &vect[i];
+		cmplx* b = &vect[(i<<1)-1];
 		while (i<stop) {
 			if ( ((i & ~n3_d4)==0) || (((i+1)& ~n3_d4)==0) ) {	//if a zeroed low frequency
-				memset(&vect[i],0,sizeof(*vect));
+				memset(a,0,sizeof(*a));
+				memset(b,0,sizeof(*b));
+			} else {
+				*a = *v++;
+				cnt++;
+				b->r = a->r;
+				Negate2(&b->i,&a->i);
 			}
+			a++;
 			i++;
 			if (i&1) {
-				memset(&vect[i],0,2*sizeof(*vect));
+				memset(a,0,2*sizeof(*a));
+				b-=2;
+				memset(b,0,2*sizeof(*b));
+				a+=2;
 				i += 2;
 			}
+			b--;
 		}
 	}
+	if (cnt!=PROFILE_SIZE) printf("Error: LoadProfile, PROFILE_SIZE != cnt");
 #else
-	memset(&vect[n_d4],0,(n_d4+1)*sizeof(*vect));
+	memcpy(&vect[4],v,PROFILE_SIZE*sizeof(*vect));
+	memset(&vect[PROFILE_SIZE+4],0,(n_d2+1-(PROFILE_SIZE+4))*sizeof(*vect));
+	for (i=1; i<n_d2; i++) {
+		vect[n-i].r = vect[i].r;
+		Negate2(&vect[n-i].i,&vect[i].i);
+	}
 #endif
 }
 static inline void DoSymmetry(cmplx * vect,const int n_d2,const int n)
@@ -173,6 +180,81 @@ static inline void DoSymmetry(cmplx * vect,const int n_d2,const int n)
 #endif
 }
 
+static inline int NonZero(cmplx* vPrev)
+{
+	int i;
+	for (i=0; i<NP_CNT; i++) if (vPrev->r.n[i] ||vPrev->i.n[i]) return 1;
+	return 0;
+}
+static inline int AllNonZero(cmplx* vect,cmplx* vPrev,cmplx* vStart,int index,int psize,npd* noise)
+{
+	do {
+		index++;
+		if (index >= CONSECUTIVE_CNT) {index = 0; vect = vStart;}
+		else vect += psize;
+		if (vect == vPrev) break;
+		if (CmpPower(vect,noise) < 0) return 0;
+	} while (1);
+	return 1;
+}
+//Polar conversions
+//M = (A**2 + B**2) ** 1/2
+//Phase = arctan(B/A)
+
+//A = M * cos(Phase)
+//B = M * sin(Phase)
+static void SubtractNoise(CleanNoiseWork* cnw,npd* noise,const int psize)
+{
+	int i;
+	int index = cnw->vIndex;
+	cmplx* vStart = cnw->v;
+	cmplx* vPrev = vStart + (index * psize);
+	cmplx* vect;
+	index++;
+	if (index >= CONSECUTIVE_CNT) index = 0;
+	vect = vStart + (index * psize);
+
+	for (i=0; i<psize; i++)
+	{
+		npd origPower;
+		npd newPower;
+		Magnitude2(&origPower,vect);
+		newPower = origPower;
+		if (SubOrZero(&newPower,noise) && (NonZero(vPrev) || AllNonZero(vect,vPrev,vStart,index,psize,noise))) {
+			np temp1;
+			npd t1;
+			DivNpd(&t1,&newPower,&origPower);	//newPower<origPower, so fraction is <1
+
+			Sqroot(&temp1,&t1);
+			MultSigned(&vect->r,&temp1);
+			MultSigned(&vect->i,&temp1);
+		} else {
+			memset(vect,0,sizeof(*vect));	//below noise threshold
+		}
+		vect++; vPrev++; vStart++;
+		noise++;
+	}
+}
+static inline npd_p1* GetPowerSum(CleanNoiseWork* cnw)
+{
+	int index = cnw->vIndex + 1;
+	if (index >= CONSECUTIVE_CNT) index = 0;
+	return &cnw->powerSum[index];
+}
+static inline int CheckAfterPowerSum(CleanNoiseWork* cnw)
+{
+	int stop = cnw->vIndex;
+	int i = stop+2;
+	int cnt = 0;
+	if (i >= CONSECUTIVE_CNT) i -= CONSECUTIVE_CNT;
+	while ((i!=stop) && (cnt<SILENCE_AFTER_UPDATE)) {
+		if (CmpNPD_P1(&cnw->powerSum[i],&cnw->noiseSum) > 0) return 1;
+		cnt++;
+		i++;
+		if (i >= CONSECUTIVE_CNT) i = 0;
+	}
+	return 0;
+}
 static inline void PrintFFT_Average(const npd_p1* noise,const int noiseCnt,const int size)
 {
 	int i,j;
@@ -250,6 +332,25 @@ static inline void UpdateNoise(npd* n,const npd* p)
 	ShiftRight4Signed(&temp1);
 	AddNpd(n,&temp1);
 }
+static inline void UpdateNoiseProfile(CleanNoiseWork* cnw,const int psize)
+{
+	int i;
+	npd* n = &cnw->noise[0];
+	int index = cnw->vIndex + 1;
+	cmplx* vect;
+	if (index >= CONSECUTIVE_CNT) index = 0;
+	vect = cnw->v + (index * psize);
+
+	memset(&cnw->noiseSum,0,sizeof(cnw->noiseSum));
+	for (i=0; i<psize; i++) {
+		npd power;
+		Magnitude2(&power,vect);
+		UpdateNoise(n,&power);
+		AddNPD_P1(&cnw->noiseSum,n);
+		n++; vect++;
+	}
+//	printNpd_p1("noiseSum: 0x",&noiseSum);
+}
 
 
 int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,CleanNoiseWork* cnw)
@@ -263,24 +364,34 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 	cmplx vect[n];
 	short outputBuffer[n];
 	short* pSamples;
-	npd power[NOISE_SIZE];
-	npd_p1 powerSum;
 
+	DBGP("a");
 	fft_forward_overlap(vect,src,startPos,srcBufMask,logN);
 //	PrintTable(vect,logN,AFTER_FFT_SHIFT,1);
-//	printf("e\r\n");
+	DBGP("b");
 //	printNpd_p1("a noiseSum: 0x",&cnw->noiseSum);
-	CalcPower(&power[0],&powerSum,vect,logN);
-//	printNpd_p1("b noiseSum: 0x",&cnw->noiseSum);
+
+	SaveProfile(cnw,vect);
+	DBGP("c");
 #ifdef NOISE_ACCUM
-	for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseAccum[i],&power[i]);
 	cnw->noiseCnt++;
-	if (cnw->noiseCnt >= REP_FFT_CNT) return 0;
+	if (cnw->noiseCnt >= REP_FFT_CNT) return -1;
 #endif
-	if (CmpNPD_P1(&powerSum,&cnw->noiseSum) > 0) cnw->silenceCnt=0;
+
+	if (cnw->state < (CONSECUTIVE_CNT-1)) {
+		DBGP("z");
+		cnw->state++;
+		return 0;
+	}
+	DBGP("d");
+//	printNpd_p1("b noiseSum: 0x",&cnw->noiseSum);
+	if (CmpNPD_P1(GetPowerSum(cnw),&cnw->noiseSum) > 0) cnw->silenceCnt=0;
 	else {
 //			printf("0x%08x %08x,  0x%08x %08x\r\n",powerSum.n[NPD_P1_CNT-1],powerSum.n[NPD_P1_CNT-2],cnw->noiseSum.n[NPD_P1_CNT-1],cnw->noiseSum.n[NPD_P1_CNT-2]);
 			cnw->silenceCnt++;
+			if (cnw->silenceCnt >= SILENCE_BEFORE_UPDATE) {
+				if (CheckAfterPowerSum(cnw) > 0) cnw->silenceCnt=SILENCE_BEFORE_UPDATE-1;
+			}
 	}
 
 	if (cnw->silenceCnt < SILENCE_BEFORE_UPDATE) {
@@ -289,9 +400,8 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 		short* p = dest;
 		if (max>MAX_ADD_SIZE) max = MAX_ADD_SIZE;
 		printf(".");
-		ZeroHighLowFrequencies(vect,logN);
-		SubtractNoise(&power[0],&cnw->noise[0],vect,logN);
-		DoSymmetry(vect,n_d2,n);
+		SubtractNoise(cnw,&cnw->noise[0],PROFILE_SIZE);
+		LoadProfile(cnw,vect);
 #if 0
 		PrintTable(vect,logN,AFTER_FFT_SHIFT,1);
 #endif
@@ -313,37 +423,31 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 	} else {
 		short* p = dest+MAX_ADD_SIZE;
 		int max = bufSize - MAX_ADD_SIZE;
-		npd* n = &cnw->noise[0];
-		npd* pow = &power[0];
 		if (max>n_d4) max = n_d4;
 		if (max > 0) memset(p,0,max*sizeof(*p));
 
 		//now update noise values
 		printf(" ");
-		for (i=0; i<NOISE_SIZE; i++) {
-			UpdateNoise(n,pow);
-			n++; pow++;
-		}
-		memset(&cnw->noiseSum,0,sizeof(cnw->noiseSum));
-		for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseSum,&cnw->noise[i]);
-
-//		printNpd_p1("noiseSum: 0x",&noiseSum);
+		UpdateNoiseProfile(cnw,PROFILE_SIZE);
 	}
 	return n_d4;
 }
+
 void Finish_cnw(CleanNoiseWork* cnw)
 {
 	free(cnw->noise);
 	cnw->noise = NULL;
+	free(cnw->v);
+	cnw->v = NULL;
 #ifdef NOISE_ACCUM
 	if (cnw->noiseAccum) {
 		const int logN=cnw->logN;
 		const int n_d2=(1<<(logN-1));
 		const int n_d4=(1<<(logN-2));
 #ifdef AVERAGE_FFT
-		PrintFFT_Average(cnw->noiseAccum,cnw->noiseCnt,NOISE_SIZE);
+		PrintFFT_Average(cnw->noiseAccum,cnw->noiseCnt,PROFILE_SIZE);
 #else
-		PrintNoise(cnw->noiseAccum,cnw->noiseCnt,NOISE_SIZE);
+		PrintNoise(cnw->noiseAccum,cnw->noiseCnt,PROFILE_SIZE);
 #endif
 		free(cnw->noiseAccum);
 		cnw->noiseAccum = NULL;
@@ -355,6 +459,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 	const int n_d2=(1<<(logN-1));
 	const int n_d4=(1<<(logN-2));
 	int i;
+	int size;
 #ifndef NOISE_ACCUM
 #ifdef ARM
 #include "noise_default-arm.c"
@@ -367,23 +472,32 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 	cnw->logN = logN;
 #ifdef NOISE_ACCUM
 	if (cnw->noiseAccum==NULL) {
-		cnw->noiseAccum = (npd_p1*)malloc(NOISE_SIZE*sizeof(*cnw->noiseAccum));
-		memset(cnw->noiseAccum,0,(NOISE_SIZE)*sizeof(cnw->noiseAccum[0]));
+		cnw->noiseAccum = (npd_p1*)malloc(PROFILE_SIZE*sizeof(*cnw->noiseAccum));
+		memset(cnw->noiseAccum,0,(PROFILE_SIZE)*sizeof(cnw->noiseAccum[0]));
 		cnw->noiseCnt = 0;
 	}
 #endif
 
 	if (cnw->noise==NULL) {
-		cnw->noise = (npd*)malloc(NOISE_SIZE*sizeof(*cnw->noise));
+		cnw->noise = (npd*)malloc(PROFILE_SIZE*sizeof(*cnw->noise));
 #ifdef NOISE_ACCUM
-		for (i=0; i<NOISE_SIZE; i++) SetNpd(&cnw->noise[i],90000,logN);
+		for (i=0; i<PROFILE_SIZE; i++) SetNpd(&cnw->noise[i],90000,logN);
 #else
-		memcpy(cnw->noise,noise_default,(NOISE_SIZE)*sizeof(cnw->noise[0]));
+		memcpy(cnw->noise,noise_default,(PROFILE_SIZE)*sizeof(cnw->noise[0]));
 #endif
 	}
+//we keep a buffer of 4 fft's. If the level is not above 1.5x silence for
+//4 consecutive frames, then the frequency is zeroed
+//this ensures that short duration noise spikes are removed
+	size= CONSECUTIVE_CNT*PROFILE_SIZE*sizeof(*cnw->v);
+	if (cnw->v==NULL) cnw->v = (cmplx*)malloc(size);
+	memset(cnw->v,0,size);
+	cnw->vIndex = 0;
+	cnw->state = 0;
+
 	cnw->silenceCnt = 0; //SILENCE_BEFORE_UPDATE-1;
 	memset(&cnw->noiseSum,0,sizeof(cnw->noiseSum));
-	for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseSum,&cnw->noise[i]);
+	for (i=0; i<PROFILE_SIZE; i++) AddNPD_P1(&cnw->noiseSum,&cnw->noise[i]);
 	printNpd_p1("noiseSum: 0x",&cnw->noiseSum);
 }
 void Init_cnw(CleanNoiseWork* cnw,int logN)
@@ -392,5 +506,6 @@ void Init_cnw(CleanNoiseWork* cnw,int logN)
 	cnw->noiseAccum = NULL;
 #endif
 	cnw->noise = NULL;
+	cnw->v = NULL;
 	Init1_cnw(cnw,logN);
 }

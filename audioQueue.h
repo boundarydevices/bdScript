@@ -1,10 +1,10 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.13 2003-09-22 02:02:01 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.14 2003-09-26 00:43:50 tkisky Exp $"
 
 /*
  * audioQueue.h
  *
- * This header file declares the audioQueue_t class, 
+ * This header file declares the audioQueue_t class,
  * the global accessor, and a shutdown routine. 
  *
  * Note that an audio input/output thread is created upon 
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.13  2003-09-22 02:02:01  ericn
+ * Revision 1.14  2003-09-26 00:43:50  tkisky
+ * -fft stuff
+ *
+ * Revision 1.13  2003/09/22 02:02:01  ericn
  * -separated boost and changed record level params
  *
  * Revision 1.12  2003/09/15 02:22:43  ericn
@@ -67,9 +70,11 @@
 #endif
 
 #include <string>
-
+#include "bdGraph/fft.h"
+#include "bdGraph/fftClean.h"
 extern unsigned char getVolume( void );
 extern void setVolume( unsigned char volume ); // range is 0-100
+
 
 class audioQueue_t {
 public:
@@ -82,7 +87,7 @@ public:
    };
 
    struct item_t {
-      itemType_e           type_ ;                 
+      itemType_e           type_ ;
       JSObject            *obj_ ;
       unsigned char const *data_ ;
       unsigned             length_ ;
@@ -190,9 +195,11 @@ private:
    //
    // read side interfaces
    //
-   
+
    // returns false if thread should shutdown
    bool pull( item_t *& );
+   void GetAudioSamples(const int readFd,waveHeader_t* header);
+   void GetAudioSamples2(const int readFd,waveHeader_t* header);
 
    friend void *audioThread( void *arg );
 
@@ -203,6 +210,7 @@ private:
    unsigned      numReadFrags_ ;
    unsigned      readFragSize_ ;
    unsigned      maxReadBytes_ ;
+   CleanNoiseWork* cnw;
 };
 
 #endif

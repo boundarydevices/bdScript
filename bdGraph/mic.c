@@ -176,12 +176,12 @@ static void inline CalcPowerSqroot(npd* power,npd_p1* powerSum,cmplx* vect,const
 	const int n3_d4=(3<<(logN-2));
 	int i,j,k;
 	memset(powerSum,0,sizeof(*powerSum));
-	for (i=0,j=0; i<NOISE_SIZE; i++,j=IncReversed(j,n_d2)) {
+	for (i=0,j=0; i<PROFILE_SIZE; i++,j=IncReversed(j,n_d2)) {
 #ifndef SKIP_REVERSAL_SORT
 		j = i;
 #endif
 		np temp1;
-		Magnitude(&temp1,&vect[j].r,&vect[j].i);
+		Magnitude(&temp1,&vect[j]);
 		memcpy(power,&temp1,sizeof(temp1));
 		memset(&power[NP_CNT],0,sizeof(temp1));
 		AddNPD_P1(powerSum,power);
@@ -200,7 +200,7 @@ int AverageFFT(short* src,int startPos,int srcBufMask,CleanNoiseWork* cnw)
 	cmplx vect[n];
 	short outputBuffer[n];
 	short* pSamples;
-	npd power[NOISE_SIZE];
+	npd power[PROFILE_SIZE];
 	npd_p1 powerSum;
 
 	fft_forward(vect,src,logN);
@@ -211,9 +211,9 @@ int AverageFFT(short* src,int startPos,int srcBufMask,CleanNoiseWork* cnw)
 //	printNpd_p1("b noiseSum: 0x",&cnw->noiseSum);
 
 #ifdef NOISE_ACCUM
-	for (i=0; i<NOISE_SIZE; i++) AddNPD_P1(&cnw->noiseAccum[i],&power[i]);
+	for (i=0; i<PROFILE_SIZE; i++) AddNPD_P1(&cnw->noiseAccum[i],&power[i]);
 	cnw->noiseCnt++;
-	if (cnw->noiseCnt >= 4096) return 0;
+	if (cnw->noiseCnt >= REP_FFT_CNT) return -1;
 #endif
 	return n;
 }
@@ -291,10 +291,10 @@ void test2(void)
 		//shifts needed to convert from char oriented to short oriented
 		i = CleanNoise(outSamples+outSampleCnt,outSampleCntMax-outSampleCnt,(short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);
 #endif
-		if (i==0) break;
+		if (i<0) break;
 		{
 			int max = outSampleCntMax - outSampleCnt;
-			if (max>n_d4) max = n_d4;
+			if (max>i) max = i;
 			outSampleCnt += max;
 		}
 		readPos =(readPos+SAMPLE_ADVANCE)& (blkSize-1);
@@ -363,6 +363,8 @@ static void normalize( short int *samples,
 	signed short max = *next++;
 	unsigned i;
 	signed long ratio;
+	if (!numSamples) return;
+
 	for( i = 1 ; i < numSamples ; i++ )
 	{
 		signed short s = *next++ ;
@@ -371,11 +373,13 @@ static void normalize( short int *samples,
 	}
 	min = 0-min ;
 	max = max > min ? max : min ;
+   printf( "max sample %d\n", max );
+	if (!max) return;
 
 	ratio = ( 0x70000000UL / max );
 	if (ratio > 0x10000) {	//don't reduce volume
 		if( ratio > maxNormalizeRatio ) ratio = maxNormalizeRatio ;
-
+   printf( "ratio %lx\n", ratio );
 		next = samples ;
 		for( i = 0 ; i < numSamples ; i++ ) {
 			signed long x16 = ratio * ((signed long)*next) ;
