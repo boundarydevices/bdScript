@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: memFile.cpp,v $
- * Revision 1.1  2002-10-07 04:38:20  ericn
+ * Revision 1.2  2002-10-09 01:09:11  ericn
+ * -added copy constructor
+ *
+ * Revision 1.1  2002/10/07 04:38:20  ericn
  * -Initial import
  *
  *
@@ -53,6 +56,19 @@ memFile_t :: memFile_t( char const *path )
    }
    else
       errno_ = errno ;
+}
+
+memFile_t :: memFile_t( memFile_t const &rhs )
+   : fd_( dup( rhs.fd_ ) ),
+     data_( ( 0 <= rhs.fd_ ) ? mmap( 0, rhs.length_, PROT_READ, MAP_PRIVATE, fd_, 0 ) : 0 ),
+     length_( rhs.length_ ),
+     errno_( errno )
+{
+   if( ( 0 == data_ ) && ( 0 <= fd_ ) )
+   {
+      close( fd_ );
+      fd_ = -1 ;
+   } // mmap failed
 }
 
 memFile_t :: ~memFile_t( void )
