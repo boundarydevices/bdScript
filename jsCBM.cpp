@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.12  2003-06-26 08:02:41  tkisky
+ * Revision 1.13  2003-06-29 17:36:54  tkisky
+ * -debug code
+ *
+ * Revision 1.12  2003/06/26 08:02:41  tkisky
  * -add error message data
  *
  * Revision 1.11  2003/06/22 23:04:49  ericn
@@ -60,6 +63,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 #include <linux/lp.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -167,6 +171,50 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                }
                const void *const p = image.getData();
                unsigned len = image.getLength();
+#if 1	//test code
+	       {
+			unsigned char* data = (unsigned char*)p;
+			int l = len;
+			printf("%i bytes to be printed\n",l);
+#if 1
+			int const fd = open( "/tmp/testNew.prt", O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR );
+			if (fd>=0) {
+				int const numWritten = write( fd, data, l );
+				close(fd);
+			}
+			else printf("error opening /tmp/testNew.prt\n");
+#endif			
+			while (l>4) {
+				int c1,c2,c3,c4;
+				int size;
+				c1 = *data++;
+				c2 = *data++;
+				c3 = *data++;
+				c4 = *data++;
+				l -= 4;
+				size = (c3*c4*8);
+				printf("%2x %2x %2x %2x header, data size %i\n",c1,c2,c3,c4,size);
+#if 0
+				while (size) {
+					int i = *data++;
+					printf("%2x",i);
+					size--;
+				}
+#else
+				data += size;
+#endif
+				l -= size;
+				if (l >= 3) {
+					c1 = *data++;
+					c2 = *data++;
+					c3 = *data++;
+					l -= 3;
+					printf("%2x %2x %2x trail\n",c1,c2,c3);
+				}
+			}
+			if (l!=0) printf("%i extra bytes",l);
+		}
+#endif
                int const numWritten = write( *pfd, p, len );
                if( numWritten == image.getLength() )
                {
@@ -221,6 +269,25 @@ jsCBMCut( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 }
 
 static JSBool
+jsCBMFlush( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsCBMClass_, NULL );
+   if( ( 0 != pfd ) && ( 0 <= *pfd ) )
+   {
+      struct pollfd ufds;
+      ufds.fd = *pfd;
+      ufds.events = POLLOUT;
+      ufds.revents = 0;
+      if (poll( &ufds, 1, 5000 )) *rval = JSVAL_TRUE ; //true if no timeout
+   }
+   else
+      JS_ReportError( cx, "Invalid printer handle" );
+   
+   return JS_TRUE ;
+}
+
+static JSBool
 jsCBMClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
@@ -244,6 +311,7 @@ static JSFunctionSpec cbm_methods[] = {
    { "print",        jsCBMPrint,      0,0,0 },
    { "cut",          jsCBMCut,        0,0,0 },
    { "close",        jsCBMClose,      0,0,0 },
+   { "flush",        jsCBMFlush,      0,0,0 },
    { 0 }
 };
 
