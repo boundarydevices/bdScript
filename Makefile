@@ -46,11 +46,8 @@ dirTest.o: dirByATime.cpp dirByATime.h Makefile
 dirTest: Makefile dirTest.o
 	$(CC) -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl
 
-curlGetMain.o: curlCache.h curlGet.h curlGet.cpp Makefile
-	$(CC) -c $(IFLAGS) -o curlGetMain.o -O2 -DSTANDALONE curlGet.cpp
-
-curlGet: curlGetMain.o $(LIB) 
-	$(CC) -o curlGet curlGetMain.o $(LIBS) -lCurlCache -lcurl -lstdc++ -lz
+curlGet: curlGet.cpp $(LIB) Makefile
+	$(CC) -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm
 
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
