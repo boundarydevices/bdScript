@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.1  2003-07-30 20:26:36  ericn
+ * Revision 1.2  2003-07-30 20:28:10  ericn
+ * -removed decoder debug parameter
+ *
+ * Revision 1.1  2003/07/30 20:26:36  ericn
  * -Initial import
  *
  *
@@ -224,7 +227,7 @@ printf( "decoding video to find dimensions\n" ); fflush( stdout ); sleep( 1 );
                      void const *picture ;
                      mpegDecoder_t::picType_e type ;
 // if( 10 < i ){ printf( "getPicture %u\n", i ); fflush( stdout ); sleep( 1 ); }
-                     while( decoder.getPicture( picture, type, 0, false ) )
+                     while( decoder.getPicture( picture, type, 0 ) )
                      {
                         if( decoder.haveHeader() )
                         {
