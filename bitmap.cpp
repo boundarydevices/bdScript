@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: bitmap.cpp,v $
- * Revision 1.2  2004-07-25 22:34:56  ericn
+ * Revision 1.3  2004-08-01 18:00:59  ericn
+ * -conditional debug prints
+ *
+ * Revision 1.2  2004/07/25 22:34:56  ericn
  * -added source offset param to bltFrom
  *
  * Revision 1.1  2004/07/04 21:35:14  ericn
@@ -19,8 +22,9 @@
 
 
 #include "bitmap.h"
-//#include "hexDump.h"
-#include <stdio.h>
+
+// #define DEBUGPRINT 1
+#include "debugPrint.h"
 
 bitmap_t :: bitmap_t
    ( unsigned char *bits,
@@ -48,7 +52,7 @@ void bitmap_t::setBits
       '\x03',
       '\x01'
    };
-//   printf( "set: %p, %u, %u\n", bitStart, startOffs, count );
+//   debugPrint( "set: %p, %u, %u\n", bitStart, startOffs, count );
 //   dumpHex( "before set:", bitStart, (startOffs+count-1+7)/8 );
    unsigned char *next = bitStart+(startOffs/8);
    unsigned char *stop = bitStart+((startOffs+count-1)/8);
@@ -82,7 +86,7 @@ void bitmap_t::clearBits
       '\xfe'
    };
 
-//   printf( "clear: %p, %u, %u\n", bitStart, startOffs, count );
+//   debugPrint( "clear: %p, %u, %u\n", bitStart, startOffs, count );
 //   dumpHex( "before clear:", bitStart, (startOffs+count-1+7)/8 );
    unsigned char *next = bitStart+(startOffs/8);
    unsigned char *stop = bitStart+((startOffs+count-1)/8);
@@ -148,7 +152,7 @@ void bitmap_t::line
    }
    else if( y1 == y2 )
    {
-      printf( "horizontal line at y: %u, x:%u-%u, width:%u, %s\n", 
+      debugPrint( "horizontal line at y: %u, x:%u-%u, width:%u, %s\n", 
               y1, x1, x2, penWidth, setNotClear ? "set" : "clear" );
       rect( x1, y1, x2-x1, penWidth, setNotClear );
    }
