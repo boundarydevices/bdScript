@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.6  2003-10-05 04:34:06  ericn
+ * Revision 1.7  2003-10-05 19:13:20  ericn
+ * -added barcode, touch, and GPIO
+ *
+ * Revision 1.6  2003/10/05 04:34:06  ericn
  * -modified to force Mono output
  *
  * Revision 1.5  2003/10/04 18:31:43  ericn
@@ -53,6 +56,10 @@
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include "barcodePoll.h"
+#include "touchPoll.h"
+#include "tickMs.h"
+#include "gpioPoll.h"
 
 extern "C" {
 #include <jpeglib.h>
@@ -248,12 +255,26 @@ bool imageToJPEG( unsigned char const *inRGB,
 
 typedef struct udpHeader_t {
    enum type_e {
-      audio = 0,
-      image = 1
+      audio     = 0,
+      image     = 1,
+      barcode   = 2,
+      touch     = 3,
+      release   = 4,
+      pinChange = 5
    };
 
    unsigned long type_ ;
    unsigned long length_ ;
+};
+
+typedef struct gpioPins_t {
+   enum {
+      guardShack_e   = 1,
+      gateOpen_e     = 2,
+      carDetect_e    = 4
+   };
+   
+   unsigned short pinState_ ;
 };
 
 typedef struct threadParam_t {
@@ -262,8 +283,9 @@ typedef struct threadParam_t {
    int         mediaFd_ ;
 };
 
-unsigned volatile audioBytesOut = 0 ;
-bool volatile     playingSomething = false ;
+unsigned volatile    audioBytesOut = 0 ;
+bool volatile        playingSomething = false ;
+gpioPins_t volatile  gpioPins_ = { 0 };
 
 static void *audioThread( void *arg )
 {
@@ -422,6 +444,210 @@ printf( "camera: %u x %u\n", vidwin.width, vidwin.height );
       perror( "VIDIOCGMBUF" );
 }
 
+class udpBarcode_t : public barcodePoll_t {
+public:
+   udpBarcode_t( pollHandlerSet_t  &set,
+                 int                udpSock,
+                 sockaddr_in const &remote )
+      : barcodePoll_t( set )
+      , udpSock_( udpSock )
+      , remote_( remote ){}
+
+   virtual void onBarcode( void );
+
+private:
+   int         udpSock_ ;
+   sockaddr_in remote_ ;
+};
+
+void udpBarcode_t :: onBarcode( void )
+{
+   printf( "barcode <%s>\n", getBarcode() );
+
+   unsigned const len = strlen( getBarcode() );
+   char data[sizeof(udpHeader_t)+sizeof(barcode_)];
+   udpHeader_t &header = *(udpHeader_t *)data ;
+   header.type_   = header.barcode ;
+   header.length_ = len + 1 ; // include trailing NULL
+   strcpy( data+sizeof(header), getBarcode() );
+
+   unsigned numToSend = sizeof(udpHeader_t)+len ;
+   int numSent = sendto( udpSock_, data, numToSend, 0, 
+                         (struct sockaddr *)&remote_, sizeof( remote_ ) );
+   if( numSent != numToSend )
+      perror( "barcode sendto" );
+}
+
+class udpTouch_t : public touchPoll_t {
+public:
+   udpTouch_t( pollHandlerSet_t  &set,
+               int                udpSock,
+               sockaddr_in const &remote )
+      : touchPoll_t( set )
+      , udpSock_( udpSock )
+      , remote_( remote )
+      , wasTouched_( true )
+      , prevTime_( 0LL ){}
+
+   // override this to perform processing of a touch
+   virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
+   // override this to perform processing of a release
+   virtual void onRelease( timeval const &tv );
+
+private:
+   int         udpSock_ ;
+   sockaddr_in remote_ ;
+   bool        wasTouched_ ;
+   long long   prevTime_ ;
+};
+
+void udpTouch_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
+{
+   bool send ;
+   if( !wasTouched_ )
+   {
+      wasTouched_ = true ;
+      send = true ; // first press
+   }
+   else 
+   {
+      long long nowMs = tickMs();
+      send = ( nowMs - prevTime_ ) > 500 ;
+   }
+
+   if( send )
+   {
+      udpHeader_t header ;
+      header.type_ = header.touch ;
+      header.length_ = 0 ;
+      int numSent = sendto( udpSock_, &header, sizeof( header ), 0, 
+                            (struct sockaddr *)&remote_, sizeof( remote_ ) );
+      if( sizeof( header ) != numSent )
+         perror( "touch sendto" );
+      prevTime_ = tickMs();
+   }
+}
+
+void udpTouch_t :: onRelease( timeval const &tv )
+{
+   if( wasTouched_ )
+   {
+      wasTouched_ = false ;
+      udpHeader_t header ;
+      header.type_ = header.release ;
+      header.length_ = 0 ;
+      int numSent = sendto( udpSock_, &header, sizeof( header ), 0, 
+                            (struct sockaddr *)&remote_, sizeof( remote_ ) );
+      if( sizeof( header ) != numSent )
+         perror( "release sendto" );
+      prevTime_ = tickMs();
+   }
+}
+
+class udpGPIO_t : public gpioPoll_t {
+public:
+   udpGPIO_t( pollHandlerSet_t  &set,
+              char const        *devName,
+              int                udpSock,
+              sockaddr_in const &remote,
+              unsigned char      mask )
+      : gpioPoll_t( set, devName )
+      , udpSock_( udpSock )
+      , remote_( remote )
+      , mask_( mask ){}
+
+   virtual void onHigh( void );
+   virtual void onLow( void );
+
+   void sendPinState( void );
+private:
+   int                 udpSock_ ;
+   sockaddr_in         remote_ ;
+   unsigned char const mask_ ;
+};
+
+
+void udpGPIO_t :: sendPinState( void )
+{
+   char data[sizeof(udpHeader_t)+sizeof(gpioPins_t)];
+   udpHeader_t &header = *( udpHeader_t * )data ;
+   header.type_ = header.pinChange ;
+   header.length_ = sizeof( gpioPins_ );
+   memcpy( data + sizeof( header ), (void const *)&gpioPins_, sizeof( gpioPins_ ) );
+
+   int numSent = sendto( udpSock_, data, sizeof( data ), 0, 
+                         (struct sockaddr *)&remote_, sizeof( remote_ ) );
+   if( sizeof( header ) != numSent )
+      perror( "pinState sendto" );
+}
+
+void udpGPIO_t :: onHigh( void )
+{
+   gpioPins_.pinState_ |= mask_ ;
+   sendPinState();
+}
+
+
+void udpGPIO_t :: onLow( void )
+{
+   gpioPins_.pinState_ &= ~mask_ ;
+   sendPinState();
+}
+
+
+struct pinData_t {
+   char const     *name_ ;
+   unsigned short  mask_ ;
+};
+
+static pinData_t const pins_[] = {
+   { "/dev/Feedback",  gpioPins_t::gateOpen_e },
+   { "/dev/Feedback2", gpioPins_t::guardShack_e },
+};
+
+static unsigned const pinCount_ = sizeof( pins_ )/sizeof( pins_[0] );
+
+static void *pollThread( void *arg )
+{
+   threadParam_t const &params = *( threadParam_t const *)arg ;
+   
+   pollHandlerSet_t handlers ;
+   udpBarcode_t     bcPoll( handlers, params.udpSock_, params.remote_ );
+   if( bcPoll.isOpen() )
+   {
+      printf( "opened bcPoll: fd %d, mask %x\n", bcPoll.getFd(), bcPoll.getMask() );
+
+      udpTouch_t touchPoll( handlers, params.udpSock_, params.remote_ );
+      if( touchPoll.isOpen() )
+      {
+         printf( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
+         
+         udpGPIO_t *pollPins[pinCount_] = {
+            0, 0
+         };
+
+         for( unsigned p = 0 ; p < pinCount_ ; p++ )
+         {
+            char const *devName = pins_[p].name_ ;
+            pollPins[p] = new udpGPIO_t( handlers, devName, params.udpSock_, params.remote_, pins_[p].mask_ );
+            if( pollPins[p]->isOpen() )
+               printf( "opened %s: fd %d, mask %x\n", devName, pollPins[p]->getFd(), pollPins[p]->getMask() );
+         }
+
+         int iterations = 0 ;
+         while( 1 )
+         {
+            handlers.poll( -1 );
+            printf( "poll %d\n", ++iterations );
+         }
+      }
+      else
+         perror( "/dev/touchscreen/ucb1x00" );
+   }
+   else
+      perror( "/dev/ttyS2" );
+}
+
 struct deviceMsg_t {
    enum type_e {
       audio_e = 0
@@ -483,6 +709,7 @@ static void ctrlcHandler( int signo )
 {
    printf( "<ctrl-c>\n" );
 }
+
 
 #define VIDEO_PALETTE_BAYER	(('q'<<8) | 1)	/* Grab video in raw Bayer format */
 #define VIDEO_PALETTE_MJPEG	(('q'<<8) | 2)	/* Grab video in compressed MJPEG format */
@@ -580,30 +807,42 @@ int main( int argc, char const * const argv[] )
                               create = pthread_create( &udpHandle, 0, udpRxThread, &audioOutParams );
                               if( 0 == create )
                               {
-                                 if( 0 <= fdCamera )
+                                 pthread_t pollHandle ;
+                                 create = pthread_create( &pollHandle, 0, pollThread, &audioOutParams );
+                                 if( 0 == create )
                                  {
-                                    threadParam_t videoParams ; 
-                                    videoParams.remote_ = remote ;
-                                    videoParams.mediaFd_ = fdCamera ;
-                                    videoParams.udpSock_ = udpSock ;
-      
-                                    pthread_t videoHandle ;
-                                    create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
-                                    if( 0 == create )
+                                    if( 0 <= fdCamera )
                                     {
-                                       printf( "threads created... <ctrl-c> to stop\n" );
-                                       pause();
-                                       printf( "shutting down\n" );
-                                       pthread_cancel( videoHandle );
-                                       void *exitStat ;
-                                       pthread_join( videoHandle, &exitStat );
+                                       threadParam_t videoParams ; 
+                                       videoParams.remote_ = remote ;
+                                       videoParams.mediaFd_ = fdCamera ;
+                                       videoParams.udpSock_ = udpSock ;
+         
+                                       pthread_t videoHandle ;
+                                       create = pthread_create( &videoHandle, 0, videoThread, &videoParams );
+                                       if( 0 == create )
+                                       {
+                                          printf( "threads created... <ctrl-c> to stop\n" );
+                                          pause();
+                                          printf( "shutting down\n" );
+                                          pthread_cancel( videoHandle );
+                                          void *exitStat ;
+                                          pthread_join( videoHandle, &exitStat );
+                                       }
                                     }
+                                    else
+                                    {   
+                                       printf( "no video... sending audio\n" );
+                                       pause();
+                                    }
+                                    
+                                    pthread_cancel( pollHandle );
+                                    void *exitStat ;
+                                    pthread_join( pollHandle, &exitStat );
                                  }
                                  else
-                                 {   
-                                    printf( "no video... sending audio\n" );
-                                    pause();
-                                 }
+                                    perror( "pollThreadCreate" );
+                              
                                  pthread_cancel( udpHandle );
                                  void *exitStat ;
                                  pthread_join( udpHandle, &exitStat );
