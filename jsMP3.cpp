@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.7  2002-11-05 05:43:05  ericn
+ * Revision 1.8  2002-11-05 15:16:07  ericn
+ * -more implementation of mp3File class and function
+ *
+ * Revision 1.7  2002/11/05 05:43:05  ericn
  * -partial implementation of mp3File class
  *
  * Revision 1.6  2002/10/27 17:39:11  ericn
@@ -44,6 +47,7 @@
 #include "js/jscntxt.h"
 #include "curlThread.h"
 #include "mad.h"
+#include "madHeaders.h"
 
 typedef struct playListEntry_t {
    std::string url_ ;
@@ -248,15 +252,77 @@ JSClass jsMp3Class_ = {
 static JSPropertySpec mp3FileProperties_[] = {
   {"isLoaded",       MP3FILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"data",           MP3FILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"duration",       MP3FILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"frameCount",     MP3FILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"sampleRate",     MP3FILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"numChannels",    MP3FILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
 static void mp3OnComplete( jsCurlRequest_t &req, curlFile_t const &f )
 {
    //
-   // MP3 data is 
+   // MP3 data is loaded in f.getData(), validate and parse headers
    //
-   jsCurlOnComplete( req, f );
+   madHeaders_t headers( f.getData(), f.getSize() );
+   if( headers.worked() )
+   {
+      JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "data",
+                         STRING_TO_JSVAL( sData ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "duration",
+                         INT_TO_JSVAL( headers.lengthSeconds() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "frameCount",
+                         INT_TO_JSVAL( headers.frames().size() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "sampleRate",
+                         INT_TO_JSVAL( headers.playbackRate() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "numChannels",
+                         INT_TO_JSVAL( headers.numChannels() ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      jsCurlOnComplete( req, f );
+   }
+   else
+   {
+      JSString *errorStr = JS_NewStringCopyZ( req.cx_, "Invalid MP3 file" );
+      JS_DefineProperty( req.cx_, 
+                         req.lhObj_, 
+                         "loadErrorMsg",
+                         STRING_TO_JSVAL( errorStr ),
+                         0, 0, 
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+      jsCurlOnError( req, f );
+   }
 }
 
 static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -286,7 +352,7 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
          JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
          
          jsCurlRequest_t request ;
-         request.onComplete = jsCurlOnComplete ;
+         request.onComplete = mp3OnComplete ;
          request.onError    = jsCurlOnError ;
          request.lhObj_     = thisObj ;
          request.rhObj_     = rhObj ;
@@ -313,6 +379,16 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 
 bool initJSMP3( JSContext *cx, JSObject *glob )
 {
-   return JS_DefineFunctions( cx, glob, mp3_functions);
+   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsMp3Class_,
+                                  mp3File, 1,
+                                  mp3FileProperties_, 
+                                  0,
+                                  0, 0 );
+   if( rval )
+   {
+      return JS_DefineFunctions( cx, glob, mp3_functions);
+   }
+   else
+      return false ;
 }
 
