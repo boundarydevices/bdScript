@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.14  2003-01-06 04:29:18  ericn
+ * Revision 1.15  2003-01-08 15:20:49  ericn
+ * -modified to prevent trailing touch
+ *
+ * Revision 1.14  2003/01/06 04:29:18  ericn
  * -made callbacks return bool (false if system shutting down)
  *
  * Revision 1.13  2003/01/05 01:56:57  ericn
@@ -284,6 +287,7 @@ bool jsTouchScreenThread_t :: onTouch
       lastY_ = y ;
    
       flags_ |= queuedTouch_ ;
+      flags_ &= ~thread_->queuedRelease_ ; // make sure we get a subsequent release
       return queueCallback( doOnTouch, this );
    }
    else
@@ -297,6 +301,7 @@ bool jsTouchScreenThread_t :: onRelease( void )
    if( 0 == ( flags_ & queuedRelease_ ) )
    {
       flags_ |= queuedRelease_ ;
+      flags_ &= ~thread_->queuedTouch_ ; // make sure we get a subsequent touch
       return queueCallback( doOnRelease, this );
    }
    else
