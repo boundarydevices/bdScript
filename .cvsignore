@@ -8,4 +8,4 @@ mpeg2mp3
 jpegview
 backtrace
 ffTest videoQueue mpDemux mpDecode madDecode pcapTest sniffWLAN monitorWLAN ping
-*.sym
+*.sym openFds
