@@ -6,6 +6,7 @@ all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmSt
 
 -include config.mk
 
+KERNEL_BOARDTYPE ?= "BD2003"
 ifeq ("BD2003",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_BD2003
 else
@@ -174,7 +175,7 @@ endif
 # build empty version to avoid configuration
 #
 config.h:
-	echo "#define LIBMPEG2_OLD 1" > $@
+	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
@@ -211,6 +212,7 @@ testJS: testJS.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	$(STRIP) $@
