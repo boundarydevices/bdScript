@@ -1,5 +1,5 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.2 2002-10-31 02:04:42 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.3 2002-11-17 16:08:48 ericn Exp $"
 
 /*
  * semaphore.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.2  2002-10-31 02:04:42  ericn
+ * Revision 1.3  2002-11-17 16:08:48  ericn
+ * -fixed timed-out semaphore handling
+ *
+ * Revision 1.2  2002/10/31 02:04:42  ericn
  * -modified to compile on ARM
  *
  * Revision 1.1  2002/10/27 17:42:08  ericn
@@ -24,6 +27,7 @@
 
 #include <pthread.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 class mutex_t {
 public:
@@ -40,7 +44,7 @@ class mutexLock_t {
 public:
    mutexLock_t( mutex_t &m ) : handle_( m.handle_ ), result_( pthread_mutex_lock( &handle_ ) ){}
    mutexLock_t( pthread_mutex_t &m ) : handle_( m ), result_( pthread_mutex_lock( &handle_ ) ){}
-   ~mutexLock_t( void ){ if( 0 == result_ ) pthread_mutex_unlock( &handle_ ); }
+   inline ~mutexLock_t( void );
 
    bool worked( void ) const { return 0 == result_ ; }
 
@@ -84,6 +88,17 @@ private:
 };
 
 
+mutexLock_t :: ~mutexLock_t( void )
+{ 
+   if( 0 == result_ ) 
+   {
+//      int rval = 
+      pthread_mutex_unlock( &handle_ ); 
+//      if( 0 != rval )
+//         printf( "Error unlocking mutex!\n" );
+   }
+}
+
 bool condition_t :: wait( mutexLock_t &lock )
 { 
    if( 0 == pthread_cond_wait( &handle_, &lock.handle_ ) )
@@ -92,7 +107,7 @@ bool condition_t :: wait( mutexLock_t &lock )
    }
    else
    {
-      lock.result_ = -1 ; // don't re-lock
+      // note that pthread_cond_wait re-acquired lock before returning
       return false ;
    }
 }
@@ -119,7 +134,7 @@ inline bool condition_t :: wait
    }
    else
    {
-      lock.result_ = -1 ; // don't re-lock
+      // note that pthread_cond_timedwait re-acquired lock before returning
       return false ;
    }
 }
