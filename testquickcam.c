@@ -32,7 +32,7 @@
 #include <linux/videodev.h>
 
 
-#define VERSION "$Id: testquickcam.c,v 1.1 2003-04-02 01:48:02 tkisky Exp $"
+#define VERSION "$Id: testquickcam.c,v 1.2 2003-05-16 07:25:19 tkisky Exp $"
 
 int open_camera(const char *devicename,int* device_fd)
 {
@@ -174,7 +174,7 @@ void renderRgb24(unsigned short *fbMem,int fbWidth, int fbHeight,
 
    pixels += ((w*imageyPos)+imagexPos)*3;
 
-   minWidth = min(fbWidth-xPos,imageDisplayWidth) << 1;	//2 bytes/pixel
+   minWidth = min(fbWidth-xPos,imageDisplayWidth);	// << 1;	//2 bytes/pixel
    minHeight= min(fbHeight-yPos,imageDisplayHeight);
    if ((minWidth > 0) && (minHeight > 0))
    {
@@ -232,8 +232,8 @@ int mmap_test(int device_fd, struct video_capability* vidcap, int quiet)
 		printf("VIDIOCMCAPTURE ret:%d, errno:%d, width:%d, height:%d\n",err,errno,vm.width,vm.height);
 	}
 
-	left = (fbWidth-vm.width)>>2;
-	top = (fbHeight-vm.height)>>2;
+	left = (fbWidth-vm.width)>>1;
+	top = (fbHeight-vm.height)>>1;
         while (1) {
 	    if ( (err=ioctl(device_fd, VIDIOCSYNC, &numframe)) < 0 ) {
 		printf("VIDIOCSYNC ret:%d, errno:%d, frame:%d\n",err,errno,frameCnt);
