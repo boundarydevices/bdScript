@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.2  2002-11-08 13:57:02  ericn
+ * Revision 1.3  2002-11-21 14:08:13  ericn
+ * -modified to clamp at display bounds
+ *
+ * Revision 1.2  2002/11/08 13:57:02  ericn
  * -modified to use tslib
  *
  * Revision 1.1  2002/11/03 15:39:36  ericn
@@ -27,6 +30,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <tslib.h>
+#include "fbDev.h"
 
 static void *tsThread( void *arg )
 {
@@ -36,6 +40,10 @@ static void *tsThread( void *arg )
 //   struct input_event event ;
    ts_sample sample ;
    bool wasDown = false ;
+
+   fbDevice_t &fb = getFB();
+   unsigned const width  = fb.getWidth();
+   unsigned const height = fb.getHeight();
 
    int numRead ;
 //   while( sizeof( event ) == ( numRead = read( obj->fdDevice_, &event, sizeof( event ) ) ) )
@@ -48,6 +56,15 @@ static void *tsThread( void *arg )
          if( down != wasDown )
          {
 // fprintf( stderr, ", %s", down ? "down" : "up" );
+            if( 0 > sample.x )
+               sample.x = 0 ;
+            else if( width <= sample.x )
+               sample.x = width - 1 ;
+            if( 0 > sample.y )
+               sample.y = 0 ; 
+            else if( height <= sample.y )
+               sample.y = height - 1 ;
+
             if( down )
                obj->onTouch( sample.x, sample.y );
             else
