@@ -117,6 +117,10 @@ imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
 	$(CC) -D_REENTRANT=1 -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
 	$(STRIP) imgPNG
 
+bc : dummyBC.cpp
+	$(CC) -D_REENTRANT=1 -o bc dummyBC.cpp -lstdc++
+	$(STRIP) $@
+
 ccDiskCache: ccDiskCache.cpp memFile.o Makefile
 	$(CC) -D_REENTRANT=1 -D__STANDALONE__ -o ccDiskCache ccDiskCache.cpp memFile.o -lstdc++
 
