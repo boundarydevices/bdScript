@@ -1,5 +1,5 @@
 #ifndef __URLFILE_H__
-#define __URLFILE_H__ "$Id: urlFile.h,v 1.3 2002-11-30 17:32:14 ericn Exp $"
+#define __URLFILE_H__ "$Id: urlFile.h,v 1.4 2004-06-19 18:15:06 ericn Exp $"
 
 /*
  * urlFile.h
@@ -19,7 +19,10 @@
  * Change History : 
  *
  * $Log: urlFile.h,v $
- * Revision 1.3  2002-11-30 17:32:14  ericn
+ * Revision 1.4  2004-06-19 18:15:06  ericn
+ * -added failure flag
+ *
+ * Revision 1.3  2002/11/30 17:32:14  ericn
  * -modified to allow synchronous callbacks
  *
  * Revision 1.2  2002/11/30 00:30:12  ericn
@@ -49,6 +52,7 @@ public:
    unsigned long     size_ ;
    unsigned long     handle_ ;
    unsigned long     callingThread_ ;
+   bool              failed_ ;
 };
 
 
