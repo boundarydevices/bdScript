@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.18  2003-03-12 02:57:18  ericn
+ * Revision 1.19  2003-04-02 01:49:48  tkisky
+ * -inline min function
+ *
+ * Revision 1.18  2003/03/12 02:57:18  ericn
  * -added blend() method
  *
  * Revision 1.17  2003/02/26 12:19:14  tkisky
@@ -331,7 +334,7 @@ fbDevice_t :: fbDevice_t( char const *name )
    }
 }
 
-int min(int x,int y)
+static inline int min(int x,int y)
 {
    return (x<y)? x : y;
 }
@@ -780,7 +783,7 @@ int main( int argc, char const * const argv[] )
          unsigned short *mem = (unsigned short *)fb.getMem();
          if( 2 == argc )
          {
-            unsigned red = 0 ; 
+            unsigned red = 0 ;
             unsigned green = 0 ;
             unsigned blue = 0 ;
             
