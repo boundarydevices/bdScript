@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.2  2002-11-29 18:37:47  ericn
+ * Revision 1.3  2002-11-30 05:23:40  ericn
+ * -removed (dead)lock in openHandle()
+ *
+ * Revision 1.2  2002/11/29 18:37:47  ericn
  * -added file:// support
  *
  * Revision 1.1  2002/11/29 16:45:27  ericn
@@ -187,7 +190,7 @@ void curlCache_t :: openHandle
      unsigned long     &length,        // output
      unsigned long     &identifier )   // output : used to close file
 {
-   mutexLock_t lock( mutex_ );
+//   mutexLock_t lock( mutex_ );
    item_t *item = findItem( hashURL( url ), url );
    assert( item && ( ( open_ == item->state_ ) || ( pendingDelete_ == item->state_ ) ) );
       
