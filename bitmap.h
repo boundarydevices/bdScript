@@ -1,5 +1,5 @@
 #ifndef __BITMAP_H__
-#define __BITMAP_H__ "$Id: bitmap.h,v 1.2 2004-07-25 22:34:45 ericn Exp $"
+#define __BITMAP_H__ "$Id: bitmap.h,v 1.3 2004-09-25 21:49:07 ericn Exp $"
 
 /*
  * bitmap.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: bitmap.h,v $
- * Revision 1.2  2004-07-25 22:34:45  ericn
+ * Revision 1.3  2004-09-25 21:49:07  ericn
+ * -added getter methods
+ *
+ * Revision 1.2  2004/07/25 22:34:45  ericn
  * -added source offset param to bltFrom
  *
  * Revision 1.1  2004/07/04 21:35:14  ericn
@@ -43,7 +46,10 @@ public:
               unsigned penWidth,
               bool setNotClear );
 
+   inline unsigned getWidth( void ) const { return bitWidth_ ; }
+   inline unsigned getHeight( void ) const { return bitHeight_ ; }
    inline static unsigned bytesPerRow( unsigned bitWidth ){ return ((bitWidth+31)/32)*sizeof(long); }
+   inline unsigned bytesPerRow( void ) const { return bitmap_t::bytesPerRow( bitWidth_ ); }
 
    //
    // Routines to set or clear a range of adjacent bits.
@@ -65,6 +71,8 @@ public:
                         unsigned char const *src,
                         unsigned             count,
                         unsigned             srcOffs = 0 );
+
+   inline unsigned char const *getMem( void ) const { return bits_ ; }
 
 private:
    unsigned char *const bits_ ;
