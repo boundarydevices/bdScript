@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.26  2002-12-16 19:44:26  tkisky
+ * Revision 1.27  2002-12-27 23:30:23  ericn
+ * -added module jsTTY
+ *
+ * Revision 1.26  2002/12/16 19:44:26  tkisky
  * -leds and feedback
  *
  * Revision 1.25  2002/12/15 20:01:37  ericn
@@ -126,6 +129,7 @@
 #include "jsPopen.h"
 #include "jsEnviron.h"
 #include "jsTCP.h"
+#include "jsTTY.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -153,24 +157,6 @@ static JSClass global_class = {
     JS_EnumerateStandardClasses, (JSResolveOp) global_resolve,
     JS_ConvertStub,              JS_FinalizeStub
 };
-
-static JSBool
-Print(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{
-    uintN i, n;
-    JSString *str;
-
-    for (i = n = 0; i < argc; i++) {
-        str = JS_ValueToString(cx, argv[i]);
-        if (!str)
-            return JS_FALSE;
-        fprintf(stdout, "%s%s", i ? " " : "", JS_GetStringBytes(str));
-    }
-    n++;
-    if (n)
-        fputc('\n', stdout);
-    return JS_TRUE;
-}
 
 static JSBool
 jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
@@ -215,7 +201,6 @@ jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 static JSFunctionSpec shell_functions[] = {
-    {"print",           Print,          0},
     {"queueCode",       jsQueueCode,    0},
     {"nanosleep",       jsNanosleep,    0},
     {0}
@@ -274,6 +259,7 @@ int prMain(int argc, char **argv)
                      initJSGpio( cx, glob );
                      initJSEnv( cx, glob );
                      initJSTCP( cx, glob );
+                     initJSTTY( cx, glob );
 
                      getCurlCache();
 
@@ -336,6 +322,7 @@ int prMain(int argc, char **argv)
                            fprintf( stderr, "Error opening url %s\n", argv[1] );
                      } // limit scope of urlFile
 
+                     shutdownTTY();
                      shutdownGpio();
                      stopBarcodeThread();
 
