@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.5  2003-02-07 03:01:33  ericn
+ * Revision 1.6  2003-02-07 04:41:52  ericn
+ * -modified to only render once
+ *
+ * Revision 1.5  2003/02/07 03:01:33  ericn
  * -made freeTypeLibrary_t internal and persistent
  *
  * Revision 1.4  2003/01/20 06:49:10  ericn
@@ -28,6 +31,9 @@
 
 #include "ftObjs.h"
 #include <assert.h>
+#define obstack_chunk_alloc malloc
+#define obstack_chunk_free free
+#include <obstack.h>
 
 class freeTypeLibrary_t {
 public:
@@ -63,6 +69,19 @@ freeTypeFont_t :: ~freeTypeFont_t( void )
       FT_Done_Face( face_ );
 }
 
+typedef struct glyphData_t {
+   FT_Int         kern ;
+   FT_Int         glyphBitmap_left ;
+   FT_Int         glyphAdvanceX ;
+   FT_Int         glyphBitmap_top ;
+   FT_Int         glyphBitmapRows ;
+   int            bmpRows ;
+   int            bmpWidth ;
+   int            bmpPitch ;
+   unsigned char* bmpBuffer ;
+   short          bmpNum_grays ;
+};
+
 freeTypeString_t :: freeTypeString_t
    ( freeTypeFont_t &font,
      unsigned        pointSize,
@@ -91,11 +110,19 @@ freeTypeString_t :: freeTypeString_t
    int maxDescend = 0 ;
    unsigned leftMargin = 0 ;
 
+   struct obstack glyphStack ;
+   obstack_init( &glyphStack );
+   glyphData_t  **glyphs = new glyphData_t *[strLen];
+
    char const *sText = dataStr ;
    for( unsigned i = 0 ; i < strLen ; i++ )
    {
-      char const c = *sText++ ;
+      glyphs[i] = (glyphData_t *)obstack_alloc( &glyphStack, sizeof( glyphData_t ) );
+      glyphData_t &glyph = *( glyphs[i] );
+      memset( &glyph, 0, sizeof( glyph ) );
 
+      char const c = *sText++ ;
+      
       // three things can happen here:
       //    1. we can load the char index and glyph, at which point we can ask about kerning.
       //    2. we can't load the char index, but can render directly, which means we can't kern
@@ -103,7 +130,6 @@ freeTypeString_t :: freeTypeString_t
       //
 
       bool haveGlyph = false ;
-      int  kern = 0 ;
 
       FT_UInt glIndex = FT_Get_Char_Index( font.face_, c );
       if( 0 < glIndex )
@@ -121,7 +147,7 @@ freeTypeString_t :: freeTypeString_t
                   {
                      FT_Vector  delta;
                      FT_Get_Kerning( font.face_, prevGlyph, glIndex, ft_kerning_default, &delta );
-                     kern = delta.x / 64 ;
+                     glyph.kern = delta.x / 64 ;
                   }
                }
 //               else
@@ -145,6 +171,16 @@ freeTypeString_t :: freeTypeString_t
 
       if( haveGlyph )
       {
+         glyph.glyphBitmap_left = font.face_->glyph->bitmap_left ;
+         glyph.glyphAdvanceX    = font.face_->glyph->advance.x ;
+         glyph.glyphBitmap_top  = font.face_->glyph->bitmap_top ;
+         glyph.bmpRows          = font.face_->glyph->bitmap.rows ;
+         glyph.bmpWidth         = font.face_->glyph->bitmap.width ;
+         glyph.bmpPitch         = font.face_->glyph->bitmap.pitch ;
+         glyph.bmpBuffer        = (unsigned char *)obstack_copy( &glyphStack, 
+                                                                 font.face_->glyph->bitmap.buffer, 
+                                                                 glyph.bmpPitch * glyph.bmpRows );
+         glyph.bmpNum_grays     = font.face_->glyph->bitmap.num_grays ;
          // 
          // Whew! A lot of stuff was done to get here, but now
          // we have a bitmap (face->glyph->bitmap) (actually a 
@@ -171,7 +207,7 @@ freeTypeString_t :: freeTypeString_t
       }
       else
       {
-//         fprintf( stderr, "Undefined char <0x%02x>\n", (unsigned char)(c) );
+         glyphs[i] = 0 ;
       }
       
       prevGlyph = glIndex ;
@@ -197,98 +233,36 @@ freeTypeString_t :: freeTypeString_t
 
       for( unsigned i = 0 ; i < strLen ; i++ )
       {
-         char const c = *sText++ ;
-   
-         // three things can happen here:
-         //    1. we can load the char index and glyph, at which point we can ask about kerning.
-         //    2. we can't load the char index, but can render directly, which means we can't kern
-         //    3. everything failed
-         //
-   
-         bool haveGlyph = false ;
-         int  kern = 0 ;
-   
-         FT_UInt glIndex = FT_Get_Char_Index( font.face_, c );
-         if( 0 < glIndex )
+         glyphData_t const *glyph = glyphs[i];
+         if( glyph )
          {
-            int error = FT_Load_Glyph( font.face_, glIndex, FT_LOAD_DEFAULT );
-            if( 0 == error )
+            penX += glyph->kern ; // adjust for kerning
+            if( ( 0 < glyph->bmpRows ) && ( 0 < glyph->bmpWidth ) )
             {
-               if( font.face_->glyph->format != ft_glyph_format_bitmap )
+               if( 256 == glyph->bmpNum_grays )
                {
-                  error = FT_Render_Glyph( font.face_->glyph, ft_render_mode_normal );
-                  if( 0 == error )
+                  unsigned char const *rasterLine = glyph->bmpBuffer ;
+                  unsigned short nextY = penY - glyph->glyphBitmap_top ;
+                  for( int row = 0 ; row < glyph->bmpRows ; row++, nextY++ )
                   {
-                     haveGlyph = true ;
-                     if( useKerning && ( 0 != prevGlyph ) )
-                     {
-                        FT_Vector  delta;
-                        FT_Get_Kerning( font.face_, prevGlyph, glIndex, ft_kerning_default, &delta );
-                        kern = delta.x / 64 ;
-                     }
-                  }
-//                  else
-//                     fprintf( stderr, "Error %d rendering glyph\n", error );
-               }
-               else
-               {
-//                  fprintf( stderr, "Bitmap rendered directly\n" );
-                  haveGlyph = true ;
-               }
-            }
-            else
-            {
-//               fprintf( stderr, "Error %d loading glyph\n", error );
-            }
-         }
-         else
-         {
-            haveGlyph = ( 0 == FT_Load_Char( font.face_, c, FT_LOAD_RENDER ) );
-         }
-   
-         if( haveGlyph )
-         {
-            // 
-            // Whew! A lot of stuff was done to get here, but now
-            // we have a bitmap (font.face_->glyph->bitmap) (actually a 
-            // byte-map with the image data in 1/255ths
-            //
-            penX += kern ; // adjust for kerning
-            
-            FT_Bitmap const &bmp = font.face_->glyph->bitmap ;
-            if( ( 0 < bmp.rows ) && ( 0 < bmp.width ) )
-            {
-               if( 256 == bmp.num_grays )
-               {
-                  unsigned char const *rasterLine = bmp.buffer ;
-                  unsigned short nextY = penY - font.face_->glyph->bitmap_top ;
-                  for( int row = 0 ; row < bmp.rows ; row++, nextY++ )
-                  {
-/*
-                     if( nextY > height_ )
-                     {
-                        fprintf( stderr, "Invalid y : %d, penY = %d, height_ == %u\n", (short)nextY, penY, height_ );
-                        exit(3);
-                     }
-*/
                      assert( nextY < height_ );
                         
                      unsigned char const *rasterCol = rasterLine ;
                      unsigned short nextX ;
-                     if( ( 0 <= font.face_->glyph->bitmap_left ) 
+                     if( ( 0 <= glyph->glyphBitmap_left ) 
                          ||
-                         ( penX > ( 0 - font.face_->glyph->bitmap_left ) ) )
-                        nextX = penX + font.face_->glyph->bitmap_left ;
+                         ( penX > ( 0 - glyph->glyphBitmap_left ) ) )
+                        nextX = penX + glyph->glyphBitmap_left ;
                      else
                         nextX = 0 ;
                      
                      unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
-                     for( int col = 0 ; col < bmp.width ; col++, nextX++ )
+                     for( int col = 0 ; col < glyph->bmpWidth ; col++, nextX++ )
                      {
                         if( nextX >= width_ )
                         {
                            fprintf( stderr, "Invalid x : %d, penX = %d, width_ = %u\n", (short)nextX, penX, width_ );
-                           fprintf( stderr, "bitmap_left = %d\n", font.face_->glyph->bitmap_left );
+                           fprintf( stderr, "bitmap_left = %d\n", glyph->glyphBitmap_left );
                            continue ;
                         }
                         
@@ -303,20 +277,20 @@ freeTypeString_t :: freeTypeString_t
 
                         nextOut++ ;
                      } // for each column
-                     rasterLine += bmp.pitch ;
+                     rasterLine += glyph->bmpPitch ;
                   }
                } // anti-aliased
-               else if( 1 == bmp.num_grays )
+               else if( 1 == glyph->bmpNum_grays )
                {
-                  unsigned char const *rasterLine = bmp.buffer ;
-                  unsigned short nextY = penY - font.face_->glyph->bitmap_top ;
-                  for( int row = 0 ; row < bmp.rows ; row++, nextY++ )
+                  unsigned char const *rasterLine = glyph->bmpBuffer ;
+                  unsigned short nextY = penY - glyph->glyphBitmap_top ;
+                  for( int row = 0 ; row < glyph->bmpRows ; row++, nextY++ )
                   {
                      assert( nextY < height_ );
                      unsigned char const *rasterCol = rasterLine ;
                      unsigned char mask = 0x80 ;
-                     unsigned short nextX = penX + font.face_->glyph->bitmap_left ;
-                     for( int col = 0 ; col < bmp.width ; col++, nextX++ )
+                     unsigned short nextX = penX + glyph->glyphBitmap_left ;
+                     for( int col = 0 ; col < glyph->bmpWidth ; col++, nextX++ )
                      {
                         assert( nextX < width_ );
                         unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
@@ -330,21 +304,17 @@ freeTypeString_t :: freeTypeString_t
                            rasterCol++ ;
                         }
                      } // for each column
-                     rasterLine += bmp.pitch ;
+                     rasterLine += glyph->bmpPitch ;
                   }
                }
             } // non-blank
-            penX  += ( ( font.face_->glyph->advance.x + 63 ) / 64 );
+            penX  += ( ( glyph->glyphAdvanceX + 63 ) / 64 );
          }
-         else
-         {
-//            fprintf( stderr, "Undefined char <0x%02x>\n", (unsigned char)(c) );
-         }
-         
-         prevGlyph = glIndex ;
-   
-      } // walk string, calculating width and height
+      } // walk string, rendering into buffer
    }
+
+   delete [] glyphs ;
+   obstack_free( &glyphStack, 0 );
 }
 
 freeTypeString_t :: ~freeTypeString_t( void )
@@ -367,25 +337,19 @@ int main( int argc, char const * const argv[] )
       memFile_t fIn( argv[1] );
       if( fIn.worked() )
       {
-         freeTypeFont_t font( fIn.getData(), fIn.getLength() );
-         if( font.worked() )
-         {
-            char const *stringToRender = argv[3];
-            unsigned    stringLen = strlen( stringToRender );
+         char const *stringToRender = argv[3];
+         unsigned    stringLen = strlen( stringToRender );
 
-            time_t startTime ; 
-            startTime = time( &startTime );
-            for( unsigned i = 0 ; i < 100 ; i++ )
+         time_t startTime ; 
+         startTime = time( &startTime );
+         for( unsigned i = 0 ; i < 100 ; i++ )
+         {
+            freeTypeFont_t font( fIn.getData(), fIn.getLength() );
+            if( font.worked() )
             {
                freeTypeString_t render( font, atoi( argv[2] ), stringToRender, stringLen );
                if( 0 == i )
                   printf( "width %u, height %u, y advance %u\n", render.getWidth(), render.getHeight(), render.getFontHeight() );
-            }
-            
-            time_t endTime ; 
-            endTime = time( &endTime );
-            printf( "%u seconds\n", endTime - startTime );
-
 /*
             for( unsigned y = 0 ; y < render.getHeight(); y++ )
             {
@@ -397,9 +361,14 @@ int main( int argc, char const * const argv[] )
                printf( "\n" );
             }
 */
+            }
+            else
+               fprintf( stderr, "Error reading font file %s\n", argv[1] );
          }
-         else
-            fprintf( stderr, "Error reading font file %s\n", argv[1] );
+         
+         time_t endTime ; 
+         endTime = time( &endTime );
+         printf( "%u seconds\n", endTime - startTime );
       }
       else
          perror( argv[1] );
