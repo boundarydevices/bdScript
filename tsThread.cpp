@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.11  2003-07-03 13:34:57  ericn
+ * Revision 1.12  2003-11-24 19:41:40  ericn
+ * -modified to prevent blocking on touches
+ *
+ * Revision 1.11  2003/07/03 13:34:57  ericn
  * -modified ts handle to close-on-exec
  *
  * Revision 1.10  2003/02/01 18:13:19  ericn
@@ -149,6 +152,7 @@ touchScreenThread_t :: touchScreenThread_t( void )
       if( 0 == ts_config( tsDevice_ ) ) 
       {
          fcntl( ts_fd(tsDevice_), F_SETFD, FD_CLOEXEC ); 
+         fcntl( ts_fd(tsDevice_), F_SETFD, O_NONBLOCK ); 
       }
       else
       {
