@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.24  2004-06-27 14:50:44  ericn
+ * Revision 1.25  2004-09-25 21:48:46  ericn
+ * -added render(bitmap) method
+ *
+ * Revision 1.24  2004/06/27 14:50:44  ericn
  * -fix for game/suite controller
  *
  * Revision 1.23  2004/05/08 14:23:02  ericn
@@ -1183,6 +1186,69 @@ void fbDevice_t :: buttonize
    rect( b[0], b[1], b[2], b[3], bgColors[0], bgColors[1], bgColors[2] );
 }
 #endif
+
+#ifndef CONFIG_BD2003
+void fbDevice_t :: render
+   ( bitmap_t const &bmp,
+     unsigned        xStart,
+     unsigned        yStart )      // implicit 1 = black
+{
+   unsigned right = xStart + bmp.getWidth();
+   if( right > getWidth() )
+      right = getWidth();
+
+   unsigned bottom = yStart + bmp.getHeight();
+   if( bottom > getHeight() )
+      bottom = getHeight();
+
+   unsigned char const *inRow = bmp.getMem();
+   unsigned const inStride = bmp.bytesPerRow();
+   unsigned char *const outStart = (unsigned char *)getMem();
+
+printf( "inStride: %u\n"
+        "y: %u..%u\n"
+        "x: %u..%u\n"
+        , inStride, yStart, bottom, xStart, right );
+   for( unsigned y = yStart ; y < bottom ; y++, inRow += inStride )
+   {
+      unsigned char inMask = '\x80'  ;
+      unsigned char const *nextIn = inRow ;
+      unsigned char in = *nextIn++ ;
+      unsigned outOffs = y*getWidth()+xStart ;
+      unsigned char outMask = 1 << ( outOffs & 7 );
+      unsigned outByte = outOffs/8 ;
+      unsigned char *nextOut = outStart+outByte ;
+      unsigned char out = *nextOut ;
+      for( unsigned x = xStart ; x < right ; x++ )
+      {
+         if( in & inMask )
+         {
+            out |= outMask ;
+         }
+         else
+         {
+            out &= ~outMask ;
+         }
+
+         inMask >>= 1 ;
+         if( 0 == inMask )
+         {
+            inMask = '\x80' ;
+            in = *nextIn++ ;
+         }
+         outMask <<= 1 ;
+         if( 0 == outMask )
+         {
+            *nextOut++ = out ;
+            outMask = 1 ;
+            out = *nextOut ;
+         }
+      }
+   }
+   refresh();
+}
+
+#endif 
 
 fbDevice_t :: ~fbDevice_t( void )
 {

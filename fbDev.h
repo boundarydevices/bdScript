@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.15 2004-05-08 14:23:02 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.16 2004-09-25 21:48:44 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.15  2004-05-08 14:23:02  ericn
+ * Revision 1.16  2004-09-25 21:48:44  ericn
+ * -added render(bitmap) method
+ *
+ * Revision 1.15  2004/05/08 14:23:02  ericn
  * -added drawing primitives to image object
  *
  * Revision 1.14  2004/05/05 03:18:59  ericn
@@ -63,6 +66,9 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
+#ifndef __BITMAP_H__
+#include "bitmap.h"
+#endif 
 
 class fbDevice_t {
 public:
@@ -188,6 +194,14 @@ public:
                    unsigned short       yBottom,
                    unsigned char red, unsigned char green, unsigned char blue );
    unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)mem_ + ( y * ( 2*getWidth() ) ) ); }
+   void render( bitmap_t const &bmp,
+                unsigned        x,
+                unsigned        y,
+                unsigned        rgb );
+#else
+   void render( bitmap_t const &bmp,
+                unsigned        x,
+                unsigned        y );      // implicit 1 = black
 #endif 
 private:
    void           *getMem( void ) const { return mem_ ; }
