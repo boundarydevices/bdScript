@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.13  2002-12-16 14:25:41  ericn
+ * Revision 1.14  2002-12-26 19:04:26  ericn
+ * -lock touch flags, execute code directly from Javascript thread
+ *
+ * Revision 1.13  2002/12/16 14:25:41  ericn
  * -removed warning messages
  *
  * Revision 1.12  2002/12/15 20:01:44  ericn
@@ -185,8 +188,7 @@ static void doit( box_t         &box,
    jsval jsv ;
    if( JS_GetProperty( button->cx_, button->jsObj_, method, &jsv ) && JSVAL_IS_STRING( jsv ) )
    {
-      if( !queueUnrootedSource( button->jsObj_, jsv, "buttonTouch" ) )
-         JS_ReportError( button->cx_, "Error queueing button handler" );
+      executeCode( button->jsObj_, jsv, method );
    }
 }
 
@@ -285,10 +287,8 @@ static void buttonMove( box_t         &box,
    assert( 0 != button );
    assert( button->box_ == &box );
 
-   if( 0 != button->img_ )
+   if( 0 != button->moveImg_ )
       display( box.xLeft_, box.yTop_, button->moveImg_, button->moveImgAlpha_, button->moveImgWidth_, button->moveImgHeight_ );
-   else if( 0 != button->fontData_ )
-      drawButton( *button, false );
    
    doit( box, x, y, defaultTouchMove, "onMove" );
 }

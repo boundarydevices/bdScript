@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.9  2002-12-26 18:18:28  ericn
+ * Revision 1.10  2002-12-26 19:04:26  ericn
+ * -lock touch flags, execute code directly from Javascript thread
+ *
+ * Revision 1.9  2002/12/26 18:18:28  ericn
  * -modified to throttle touch events
  *
  * Revision 1.8  2002/12/15 20:01:04  ericn
@@ -43,6 +46,9 @@
 #include "js/jscntxt.h"
 #include "codeQueue.h"
 #include "zOrder.h"
+#include "semClasses.h"
+
+static mutex_t mutex_ ;
 
 class jsTouchScreenThread_t : public touchScreenThread_t {
 public:
@@ -51,6 +57,7 @@ public:
       : touchScreenThread_t(),
         lastX_( 0 ),
         lastY_( 0 ),
+        flags_( 0 ),
         cx_( cx ),
         scope_( scope ),
         curBox_( 0 ){}
@@ -152,16 +159,11 @@ jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
 static jsTouchScreenThread_t *thread_ = 0 ;
 
-//
-// These routines are called in the context of the Javascript
-// interpreter thread
-//
-void doOnTouch( void *data )
+static void doOnMove( void *data )
 {
-   assert( data == (void *)thread_ );
    int const x = thread_->lastX_ ;
    int const y = thread_->lastY_ ;
-
+   
    if( 0 != thread_->curBox_ )
    {
       if( ( x >= thread_->curBox_->xLeft_ )
@@ -172,16 +174,18 @@ void doOnTouch( void *data )
           &&
           ( y < thread_->curBox_->yBottom_ ) )
       {
-         thread_->curBox_->onTouch_( *thread_->curBox_, x, y );
-         return ;
+         thread_->curBox_->onTouchMove_( *thread_->curBox_, x, y );
+         mutexLock_t lock( mutex_ );
+         thread_->flags_ &= ~thread_->queuedTouch_ ;
+        return ;
       } // still on this button
       else
       {
          thread_->curBox_->onRelease_( *thread_->curBox_, x, y );
          thread_->curBox_ = 0 ;
       } // moved off of the button
-   } // already touching, move or release
-
+   } // have a box
+   
    std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
    if( 0 < boxes.size() )
    {
@@ -190,8 +194,8 @@ void doOnTouch( void *data )
    }
    else
    {
-      if( JSVAL_VOID != onTouchCode_ )
-         executeCode( thread_->scope_, onTouchCode_, "onTouch" );
+      if( JSVAL_VOID != onMoveCode_ )
+         executeCode( thread_->scope_, onMoveCode_, "onMove" );
       else
       {
          printf( "no touch handler %u/%u\n", x, y );
@@ -199,20 +203,49 @@ void doOnTouch( void *data )
       }
    } // no boxes... look for global handler
 
+   mutexLock_t lock( mutex_ );
    thread_->flags_ &= ~thread_->queuedTouch_ ;
 }
 
-void doOnMove( void *data )
+//
+// These routines are called in the context of the Javascript
+// interpreter thread
+//
+static void doOnTouch( void *data )
 {
-   if( 0 == thread_->curBox_ )
+   assert( data == (void *)thread_ );
+   int const x = thread_->lastX_ ;
+   int const y = thread_->lastY_ ;
+
+   if( 0 != thread_->curBox_ )
    {
-      if( JSVAL_VOID != onMoveCode_ )
-         executeCode( thread_->scope_, onMoveCode_, "onMove" );
+      doOnMove( data );
+   } // already touching, move or release
+   else
+   {
+      std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
+      if( 0 < boxes.size() )
+      {
+         thread_->curBox_ = boxes[0];
+         thread_->curBox_->onTouch_( *boxes[0], x, y );
+      }
+      else
+      {
+         if( JSVAL_VOID != onTouchCode_ )
+            executeCode( thread_->scope_, onTouchCode_, "onTouch" );
+         else
+         {
+            printf( "no touch handler %u/%u\n", x, y );
+   //         dumpZMaps();
+         }
+      } // no boxes... look for global handler
+   
+      mutexLock_t lock( mutex_ );
+      thread_->flags_ &= ~thread_->queuedTouch_ ;
    }
-   thread_->flags_ &= ~thread_->queuedTouch_ ;
 }
 
-void doOnRelease( void *data )
+static void doOnRelease( void *data )
 {
    if( 0 != thread_->curBox_ )
    {
@@ -223,6 +256,7 @@ void doOnRelease( void *data )
    if( JSVAL_VOID != onReleaseCode_ )
       executeCode( thread_->scope_, onReleaseCode_, "onRelease" );
    
+   mutexLock_t lock( mutex_ );
    thread_->flags_ &= ~thread_->queuedRelease_ ;
 }
 
@@ -230,6 +264,7 @@ void jsTouchScreenThread_t :: onTouch
    ( unsigned x, 
      unsigned y )
 {
+   mutexLock_t lock( mutex_ );
    if( 0 == ( flags_ & queuedTouch_ ) )
    {
       lastX_ = x ;
@@ -238,16 +273,21 @@ void jsTouchScreenThread_t :: onTouch
       flags_ |= queuedTouch_ ;
       queueCallback( doOnTouch, this );
    }
+   else
+      printf( "eatTouch\n" );
 }
 
 
 void jsTouchScreenThread_t :: onRelease( void )
 {
+   mutexLock_t lock( mutex_ );
    if( 0 == ( flags_ & queuedRelease_ ) )
    {
       flags_ |= queuedRelease_ ;
       queueCallback( doOnRelease, this );
    }
+   else
+      printf( "eatRelease\n" );
 }
 
 
@@ -255,6 +295,7 @@ void jsTouchScreenThread_t :: onMove
    ( unsigned x, 
      unsigned y )
 {
+   mutexLock_t lock( mutex_ );
    if( 0 == ( flags_ & queuedTouch_ ) )
    {
       lastX_ = x ;
@@ -263,6 +304,8 @@ void jsTouchScreenThread_t :: onMove
       flags_ |= queuedTouch_ ;
       queueCallback( doOnMove, this );
    }
+   else
+      printf( "eatMove\n" );
 }
 
 static JSFunctionSpec touch_functions[] = {
