@@ -82,6 +82,14 @@ ftRender: ftRender.o $(LIB)
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
+ftDump.o: ftObjs.h ftObjs.cpp Makefile
+	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o ftDump.o -O2 -D__DUMP__ $(IFLAGS) ftObjs.cpp
+
+ftDump: ftDump.o $(LIB)
+	$(CC) -D_REENTRANT=1 -o ftDump ftDump.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	arm-linux-nm ftDump >ftDump.map
+	$(STRIP) ftDump
+
 recordTest: recordTest.o $(LIB)
 	$(CC) -D_REENTRANT=1 -o recordTest recordTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm recordTest >recordTest.map
@@ -133,7 +141,7 @@ ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 tsTest: tsTest.cpp
 	$(CC) $(IFLAGS) -o tsTest tsTest.cpp $(LIBS) -lts
 
-all: curlGet dirTest urlTest jsExec ftRender tsTest tsThread madHeaders bc
+all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc
 
 .PHONY: install-libs install-headers
 
