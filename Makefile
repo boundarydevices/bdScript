@@ -1,15 +1,15 @@
 #
 # Makefile for curlCache library and utility programs
 #
-OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o curlGet.o \
-       curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
+OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
+       ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsBarcode.o jsButton.o jsCurl.o jsGlobals.o \
        jsHyperlink.o jsImage.o jsMP3.o jsProc.o jsScreen.o jsShell.o \
        jsText.o jsTimer.o jsTouch.o jsURL.o jsVolume.o \
        madDecode.o madHeaders.o memFile.o parsedURL.o \
-       relativeURL.o tsThread.o ultoa.o urlFile.o \
-       ultodd.o box.o zOrder.o \
+       relativeURL.o tsThread.o ultoa.o \
+       ultodd.o box.o urlFile.o zOrder.o \
        ccActiveURL.o ccDiskCache.o ccWorker.o
 
 
@@ -35,11 +35,6 @@ endif
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
-curlCacheMain.o: curlCache.h curlCache.cpp Makefile
-	$(CC) -c $(IFLAGS) -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
-curlCache: curlCacheMain.o $(LIB)
-	$(CC) -o curlCache curlCacheMain.o $(LIBS) -lCurlCache -lcurl -lstdc++ -lz
-
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
 	$(CC) -c $(IFLAGS) -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
 
@@ -53,7 +48,7 @@ urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
 urlTest: urlTest.o $(LIB) 
-	$(CC) -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz
+	$(CC) -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread
 
 mp3Play: mp3Play.o $(LIB) 
 	$(CC) -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
@@ -123,7 +118,7 @@ ccWorker: ccWorker.cpp memFile.o Makefile
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 	$(CC) -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
 
-all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
+all: curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
 .PHONY: install-libs install-headers
 
@@ -142,4 +137,4 @@ install-bin:
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a *.map curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a *.map curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)

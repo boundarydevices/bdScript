@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: madTest.cpp,v $
- * Revision 1.2  2002-11-24 19:07:34  ericn
+ * Revision 1.3  2002-11-30 00:31:01  ericn
+ * -removed curlCache and curlThread modules
+ *
+ * Revision 1.2  2002/11/24 19:07:34  ericn
  * -modified to use madDecoder_t
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -155,7 +158,6 @@ printf( "changing sample rate\n" );
 }
 
 
-#include "curlCache.h"
 #include <unistd.h>
 
 int main( int argc, char const *const argv[] )

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.4  2002-11-25 00:10:59  ericn
+ * Revision 1.5  2002-11-30 00:32:18  ericn
+ * -removed curlCache and curlThread modules
+ *
+ * Revision 1.4  2002/11/25 00:10:59  ericn
  * -modified to break through with sound effects
  *
  * Revision 1.3  2002/11/24 19:07:48  ericn
@@ -28,7 +31,6 @@
 #include "fbDev.h"
 #include "hexDump.h"
 #include "js/jscntxt.h"
-#include "curlThread.h"
 #include "jsGlobals.h"
 #include "box.h"
 #include "zOrder.h"

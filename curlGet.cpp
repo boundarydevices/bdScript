@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlGet.cpp,v $
- * Revision 1.2  2002-11-27 18:31:11  ericn
+ * Revision 1.3  2002-11-30 00:32:42  ericn
+ * -removed curlCache and curlThread modules
+ *
+ * Revision 1.2  2002/11/27 18:31:11  ericn
  * -removed use of curlCache module
  *
  * Revision 1.1  2002/10/06 16:52:32  ericn
@@ -20,7 +23,6 @@
 
 
 #include "curlGet.h"
-#include "curlCache.h"
 #include <string.h>
 #include <stdio.h>
 #include <curl/curl.h>

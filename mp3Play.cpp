@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.3  2002-10-26 14:13:36  ericn
+ * Revision 1.4  2002-11-30 00:30:55  ericn
+ * -removed curlCache and curlThread modules
+ *
+ * Revision 1.3  2002/10/26 14:13:36  ericn
  * -changed return value to indicate success
  *
  * Revision 1.2  2002/10/25 03:08:30  ericn
@@ -22,7 +25,6 @@
 
 #include <stdio.h>
 #include "mad.h"
-#include "curlCache.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/soundcard.h>

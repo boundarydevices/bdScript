@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.14  2002-10-31 02:03:17  ericn
+ * Revision 1.15  2002-11-30 00:30:49  ericn
+ * -removed curlCache and curlThread modules
+ *
+ * Revision 1.14  2002/10/31 02:03:17  ericn
  * -added curl thread startup/shutdown
  *
  * Revision 1.13  2002/10/27 17:38:40  ericn
@@ -69,13 +72,11 @@
 #include "jsScreen.h"
 #include "jsMP3.h"
 #include "jsURL.h"
-#include "curlCache.h"
 #include "relativeURL.h"
 #include "childProcess.h"
 #include "jsProc.h"
 #include "jsHyperlink.h"
 #include "jsGlobals.h"
-#include "curlThread.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
