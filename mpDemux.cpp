@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.5  2003-07-24 13:44:11  ericn
+ * Revision 1.6  2003-07-27 15:13:43  ericn
+ * -added time summary to bulk info
+ *
+ * Revision 1.5  2003/07/24 13:44:11  ericn
  * -updated to use ptr/length
  *
  * Revision 1.4  2003/07/20 19:06:12  ericn
@@ -453,6 +456,9 @@ void mpegDemux_t :: bulkInfo_t :: clear( mpegDemux_t :: bulkInfo_t const *bi )
 
 mpegDemux_t :: bulkInfo_t const *mpegDemux_t :: getFrames( void )
 {
+   long long startMs = 0x7fffffffffffffffLL ;
+   long long endMs = 0 ;
+
    if( ( 0 != startData_ ) && ( 0 != fileSize_ ) )
    {
       //
@@ -511,7 +517,17 @@ mpegDemux_t :: bulkInfo_t const *mpegDemux_t :: getFrames( void )
          f.data_    = fData ;
          f.length_  = length ;
          f.when_ms_ = when_ms ;
+         if( when_ms < startMs )
+         {
+            startMs = when_ms ;
+         }
+         if( when_ms > endMs )
+         {
+            endMs = when_ms ;
+         }
       }
+printf( "start %llx, end %llx\n", startMs, endMs );
+      bi->msTotal_ = endMs - startMs ;
 
       return bi ;
    }

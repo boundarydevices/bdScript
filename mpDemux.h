@@ -1,5 +1,5 @@
 #ifndef __MPDEMUX_H__
-#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.4 2003-07-24 13:44:09 ericn Exp $"
+#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.5 2003-07-27 15:13:40 ericn Exp $"
 
 /*
  * mpDemux.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: mpDemux.h,v $
- * Revision 1.4  2003-07-24 13:44:09  ericn
+ * Revision 1.5  2003-07-27 15:13:40  ericn
+ * -added time summary to bulk info
+ *
+ * Revision 1.4  2003/07/24 13:44:09  ericn
  * -updated to use ptr/length
  *
  * Revision 1.3  2003/07/20 19:03:56  ericn
@@ -75,6 +78,7 @@ public:
    };
 
    struct bulkInfo_t {
+      unsigned long long msTotal_ ;
       unsigned           count_ ;
       streamAndFrames_t *streams_[1];
 
