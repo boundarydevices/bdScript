@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.6  2002-11-14 14:55:48  ericn
+ * Revision 1.7  2002-11-15 14:40:10  ericn
+ * -modified to leave speed alone when possible
+ *
+ * Revision 1.6  2002/11/14 14:55:48  ericn
  * -fixed mono output
  *
  * Revision 1.5  2002/11/14 14:44:40  ericn
@@ -76,6 +79,8 @@ printf( "opened dsp device\n" );
       if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
 
+      int lastSampleRate = -1 ;
+
       unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
       unsigned short *       nextOut = outBuffer ;
       unsigned short         spaceLeft = OUTBUFSIZE ;
@@ -113,13 +118,18 @@ printf( "opened dsp device\n" );
                      if( 0 == frameId++ )
                      {
                         int sampleRate = frame.header.samplerate ;
-                        if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SPEED, &sampleRate ) )
-                        {
-                           fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
-                           break;
+                        if( sampleRate != lastSampleRate )
+                        {   
+                           lastSampleRate = sampleRate ;
+                           if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SPEED, &sampleRate ) )
+                           {
+                              fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
+                              break;
+                           }
                         }
-                        
+
                         nChannels = MAD_NCHANNELS(&frame.header) ;
+
                      } // first frame... check sample rate
                      else
                      {
@@ -211,6 +221,8 @@ printf( "opened dsp device\n" );
    }
    else
       fprintf( stderr, "Error %m opening audio device\n" );
+
+   return 0 ;
 }
 
 audioQueue_t :: audioQueue_t( void )
