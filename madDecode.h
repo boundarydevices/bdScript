@@ -1,16 +1,31 @@
 #ifndef __MADDECODE_H__
-#define __MADDECODE_H__ "$Id: madDecode.h,v 1.1 2002-11-24 19:08:55 ericn Exp $"
+#define __MADDECODE_H__ "$Id: madDecode.h,v 1.2 2003-07-20 15:42:29 ericn Exp $"
 
 /*
  * madDecode.h
  *
  * This header file declares the madDecoder_t class, which 
- * is used to decode an entire MP3 file in one fell swoop.
+ * is used to decode an MP3 file in pieces.
  *
+ * General usage is something like this:
+ *
+ *    madDecoder_t mp3Decode ;
+ *    while( more data in )
+ *       mp3Decode.feed( data, length ) )
+ *       unsigned short *samples ;
+ *       unsigned long   length ;
+ *       while( mp3Decode.getData( samples, length ) )
+ *       {
+ *          ... write data to audio driver ?
+ *       }
+ * 
  * Change History : 
  *
  * $Log: madDecode.h,v $
- * Revision 1.1  2002-11-24 19:08:55  ericn
+ * Revision 1.2  2003-07-20 15:42:29  ericn
+ * -separated feed from read
+ *
+ * Revision 1.1  2002/11/24 19:08:55  ericn
  * -Initial import
  *
  *
@@ -18,33 +33,40 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-#ifndef __MADHEADERS_H__
-#include "madHeaders.h"
-#endif
+#include "mad.h"
 
 class madDecoder_t {
 public:
-   madDecoder_t( void const   *mp3Data,
-                 unsigned long numBytes );
-   ~madDecoder_t( void ){ if( samples_ ) delete [] samples_ ; }
+   madDecoder_t( unsigned maxSamples = 16384 );
+   ~madDecoder_t( void );
 
-   bool worked( void ) const { return worked_ ; }
-
-   madHeaders_t const &headers( void ) const { return headers_ ; }
-
-   unsigned short const *getSamples( void ) const { return samples_ ; }
-   
    //
-   // if stereo, includes sum of right and left, 
-   // and they are interleaved in getSamples() return value
+   // returns true if output is available, false otherwise
    //
-   unsigned long         numSamples( void ) const { return numSamples_ ; }
+   void feed( void const *inData, unsigned long inBytes );
+
+   //
+   // don't expect data to stay the same between iterations
+   //
+   bool getData( unsigned short const *&outData, unsigned &numSamples );
+
+
+   inline bool haveHeader( void ) const { return haveHeader_ ; }
+   inline unsigned sampleRate( void ) const { return sampleRate_ ; }
+   inline unsigned numChannels( void ) const { return numChannels_ ; }
 
 private:
-   madHeaders_t          headers_ ;
-   bool                  worked_ ;
-   unsigned short const *samples_ ;
-   unsigned long         numSamples_ ;
+   struct mad_stream mp3Stream_ ;
+   struct mad_frame  mp3Frame_ ;
+   struct mad_synth  mp3Synth_ ;
+   bool              haveHeader_ ;
+   unsigned          numChannels_ ;
+   unsigned          sampleRate_ ; // HZ
+   unsigned char     assEnd_[4096];
+   unsigned short    assEndLength_ ;
+   unsigned short   *samples_ ;
+   unsigned const    maxSamples_ ;
+   unsigned          numSamples_ ;
 };
 
 #endif
