@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.16  2003-01-31 13:28:20  ericn
+ * Revision 1.17  2003-02-01 18:14:02  ericn
+ * -added touchScreen.reset() method
+ *
+ * Revision 1.16  2003/01/31 13:28:20  ericn
  * -modified to stay on button at edges, added touchScreen global
  *
  * Revision 1.15  2003/01/08 15:20:49  ericn
@@ -65,6 +68,7 @@
 #include "codeQueue.h"
 #include "zOrder.h"
 #include "semClasses.h"
+#include "tsThread.h"
 
 static mutex_t mutex_ ;
 
@@ -356,9 +360,18 @@ jsGetTouchY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+static JSBool
+jsTouchReset( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   touchReset_ = true ;
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec touchMethods_[] = {
     {"getX",         jsGetTouchX,           0 },
     {"getY",         jsGetTouchY,           0 },
+    {"reset",        jsTouchReset,          0 },
     {0}
 };
 
