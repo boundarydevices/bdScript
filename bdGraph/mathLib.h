@@ -1,4 +1,4 @@
-#if 0
+#if 1
 extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 //return (1<<32)/value and remainder
 extern "C" unsigned long uReciprocal(unsigned long value,unsigned long * rem);
