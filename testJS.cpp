@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.10  2002-10-25 03:07:16  ericn
+ * Revision 1.11  2002-10-25 04:48:39  ericn
+ * -limited Javascript memory to 1MB
+ *
+ * Revision 1.10  2002/10/25 03:07:16  ericn
  * -removed debug statements
  *
  * Revision 1.9  2002/10/25 02:20:05  ericn
@@ -166,7 +169,7 @@ static JSFunctionSpec shell_functions2[] = {
 int main(int argc, char **argv)
 {
    // initialize the JS run time, and return result in rt
-   JSRuntime * const rt = JS_NewRuntime(2L * 1024L * 1024L);
+   JSRuntime * const rt = JS_NewRuntime(1L * 1024L * 1024L);
  
    // if rt does not have a value, end the program here
    if (!rt)
