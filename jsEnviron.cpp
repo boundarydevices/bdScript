@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsEnviron.cpp,v $
- * Revision 1.2  2004-03-17 14:17:36  ericn
+ * Revision 1.3  2004-09-25 14:19:39  ericn
+ * -made return value from environ an object
+ *
+ * Revision 1.2  2004/03/17 14:17:36  ericn
  * -added environ() call
  *
  * Revision 1.1  2002/12/12 15:41:34  ericn
@@ -22,6 +25,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "jsGlobals.h"
 
 static JSBool
 jsGetEnv( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -65,11 +69,12 @@ jsEnviron( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
    if( 0 == argc )
    {
-      JSObject *arr = JS_NewArrayObject( cx, 0, 0 );
+      JSObject *arr = JS_NewObject( cx, &global_class, 0, obj );
       if( arr )
       {
          *rval = OBJECT_TO_JSVAL( arr );
-         for( unsigned i = 0 ; __environ[i]; i++ )
+         unsigned i ;
+         for( i = 0 ; __environ[i]; i++ )
          {
             char *envItem = __environ[i];
             char *value = strchr( envItem, '=' );
@@ -78,17 +83,13 @@ jsEnviron( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             memcpy( ntItem, envItem, len );
             ntItem[len] = 0 ;
 
+            JSString *sValue = 0 ;
             if( value )
-            {
-               JSString *sValue = JS_NewStringCopyZ( cx, value+1 );
-               if( sValue )
-               {
-                  if( !JS_DefineProperty( cx, arr, ntItem, STRING_TO_JSVAL( sValue ), 0, 0, JSPROP_ENUMERATE | JSPROP_READONLY ) )
-                     JS_ReportError( cx, "set env[%s]\n", ntItem );
-               }
-               else
-                  JS_ReportError( cx, "alloc envValue" );
-            }
+               sValue = JS_NewStringCopyZ( cx, value+1 );
+            
+            jsval jsv = (sValue ? STRING_TO_JSVAL( sValue ) : JSVAL_FALSE );
+            if( !JS_DefineProperty( cx, arr, ntItem, jsv, 0, 0, JSPROP_ENUMERATE | JSPROP_READONLY ) )
+               JS_ReportError( cx, "set env[%s]\n", ntItem );
          }
       }
       else
