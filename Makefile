@@ -170,7 +170,7 @@ cbmStat: cbmStat.cpp
 	$(CC) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS)
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay
+all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat
 
 .PHONY: install-libs install-headers
 
