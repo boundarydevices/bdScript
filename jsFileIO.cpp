@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
- * Revision 1.1  2003-03-04 14:45:18  ericn
+ * Revision 1.2  2003-08-31 15:06:32  ericn
+ * -added method stat
+ *
+ * Revision 1.1  2003/03/04 14:45:18  ericn
  * -added jsFileIO module
  *
  *
@@ -24,6 +27,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 /*    readFile( filename );   - returns string with file content
  *    writeFile( filename, data ); - writes data to filename, returns bool or errorMsg
@@ -191,6 +195,63 @@ jsRenameFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
 }
 
+static JSClass jsStatClass_ = {
+  "stat",
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+
+static JSBool
+jsStat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) )
+   {
+      JSString *sFileName = JSVAL_TO_STRING( argv[0] );
+      struct stat st ;
+      int const stResult = stat( JS_GetStringBytes( sFileName ), &st );
+      if( 0 == stResult )
+      {
+         JSObject *returnObj = JS_NewObject( cx, &jsStatClass_, NULL, NULL );
+         if( returnObj )
+         {
+            *rval = OBJECT_TO_JSVAL( returnObj ); // root
+   
+            JS_DefineProperty( cx, returnObj, "dev",     INT_TO_JSVAL( st.st_dev     ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "ino",     INT_TO_JSVAL( st.st_ino     ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "mode",    INT_TO_JSVAL( st.st_mode    ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "nlink",   INT_TO_JSVAL( st.st_nlink   ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "uid",     INT_TO_JSVAL( st.st_uid     ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "gid",     INT_TO_JSVAL( st.st_gid     ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "rdev",    INT_TO_JSVAL( st.st_rdev    ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "size",    INT_TO_JSVAL( st.st_size    ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "blksize", INT_TO_JSVAL( st.st_blksize ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "blocks",  INT_TO_JSVAL( st.st_blocks  ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "atime",   INT_TO_JSVAL( st.st_atime   ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "mtime",   INT_TO_JSVAL( st.st_mtime   ), 0, 0, JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, returnObj, "ctime",   INT_TO_JSVAL( st.st_ctime   ), 0, 0, JSPROP_ENUMERATE );
+         }
+         else
+            JS_ReportError( cx, "Allocating stat object" );
+      }
+      else
+      {
+         *rval = STRING_TO_JSVAL( JS_NewStringCopyZ( cx, strerror( errno ) ) );
+      }
+   }
+   else
+      JS_ReportError( cx, "Usage: stat( fileName )" );
+   
+   return JS_TRUE ;
+
+}
+
+
 
 static JSFunctionSpec _functions[] = {
     {"readFile",           jsReadFile,    0 },
@@ -198,6 +259,7 @@ static JSFunctionSpec _functions[] = {
     {"unlink",             jsUnlink,      0 },
     {"copyFile",           jsCopyFile,    0 },
     {"renameFile",         jsRenameFile,  0 },
+    {"stat",               jsStat,        0 },
     {0}
 };
 
