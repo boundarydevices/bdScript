@@ -9,7 +9,7 @@ else
 endif
 
 %.o : %.cpp
-	$(CC) -c -O2 $<
+	$(CC) -c -DXP_UNIX=1 -O2 $<
    
 curlCacheMain.o: curlCache.h curlCache.cpp Makefile
 	$(CC) -c -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
@@ -31,8 +31,8 @@ urlTest: urlTest.o curlCache.o dirByATime.o
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o dirByATime.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
+testJS: testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o Makefile
+	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o dirByATime.o $(LIBS) -lstdc++ -ljs -lcurl -lm
 
 all: curlCache dirTest urlTest testJS
 

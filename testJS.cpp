@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.3  2002-09-28 17:05:07  ericn
+ * Revision 1.4  2002-09-29 17:35:55  ericn
+ * -added curlFile class
+ *
+ * Revision 1.3  2002/09/28 17:05:07  ericn
  * -changed copyright tag
  *
  * Revision 1.2  2002/09/28 17:04:16  ericn
@@ -29,7 +32,7 @@
 /* include the JS engine API header */
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
-
+#include "jsCurl.h"
 #include "urlFile.h"
 
 static JSBool
@@ -118,6 +121,10 @@ UrlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
 static JSFunctionSpec shell_functions[] = {
     {"print",           Print,          0},
+    {0}
+};
+
+static JSFunctionSpec shell_functions2[] = {
     {"urlExec",         UrlExec,        0},
     {0}
 };
@@ -158,35 +165,43 @@ int main(int argc, char **argv)
          printf( "initialized builtins\n" );
          if( JS_DefineFunctions( cx, glob, shell_functions) )
          {
-            for( int arg = 1 ; arg < argc ; arg++ )
+            if( JS_DefineFunctions( cx, glob, shell_functions2) )
             {
-               char const *url = argv[arg];
-               printf( "evaluating %s\n", url );
-               urlFile_t f( url );
-               if( f.isOpen() )
+               initJSCurl( cx, glob );
+               printf( "initialized jsCurl\n" );
+
+               for( int arg = 1 ; arg < argc ; arg++ )
                {
-                  printf( "opened url\n" );
-                  
-                  JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), url, 1 );
-                  if( script )
+                  char const *url = argv[arg];
+                  printf( "evaluating %s\n", url );
+                  urlFile_t f( url );
+                  if( f.isOpen() )
                   {
-                     printf( "compiled script\n" );
-                     jsval rval; 
-                     JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
-                     if( exec )
+                     printf( "opened url\n" );
+                     
+                     JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), url, 1 );
+                     if( script )
                      {
-                        printf( "executed\n" );
+                        printf( "compiled script\n" );
+                        jsval rval; 
+                        JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
+                        if( exec )
+                        {
+                           printf( "executed\n" );
+                        }
+                        else
+                           printf( "exec error\n" );
+                        JS_DestroyScript( cx, script );
                      }
                      else
-                        printf( "exec error\n" );
-                     JS_DestroyScript( cx, script );
+                        printf( "Error compiling script\n" );
                   }
                   else
-                     printf( "Error compiling script\n" );
+                     printf( "Error opening url %s\n", url );
                }
-               else
-                  printf( "Error opening url %s\n", url );
             }
+            else
+               printf( "Error defining shell functions\n" );
          }
          else
             printf( "Error defining shell functions\n" );
