@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.67  2004-01-01 20:31:44  ericn
+ * Revision 1.68  2004-01-02 23:36:56  ericn
+ * -allow shebang
+ *
+ * Revision 1.67  2004/01/01 20:31:44  ericn
  * -no wait for goto in main body
  *
  * Revision 1.66  2003/12/27 18:38:31  ericn
@@ -270,6 +273,8 @@
 #include "jsUDP.h"
 #include "jsKernel.h"
 #include "pollTimer.h"
+#include "memFile.h"
+#include "debugPrint.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -470,79 +475,112 @@ static void myError( JSContext *cx, const char *message, JSErrorReport *report)
 
 int prMain(int argc, char **argv)
 {
-   if( 2 <= argc )
+   // initialize the JS run time, and return result in rt
+   JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
+   if( rt )
    {
-      // initialize the JS run time, and return result in rt
-      JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
-      if( rt )
+      // create a context and associate it with the JS run time
+      JSContext * const cx = JS_NewContext(rt, 8192);
+      
+      // if cx does not have a value, end the program here
+      if( cx )
       {
-         // create a context and associate it with the JS run time
-         JSContext * const cx = JS_NewContext(rt, 8192);
-         
-         // if cx does not have a value, end the program here
-         if( cx )
+         execContext_ = cx ;
+
+         // create the global object here
+         JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
+         if( 0 != glob )
          {
-            execContext_ = cx ;
-
-            // create the global object here
-            JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
-            if( 0 != glob )
+            // initialize the built-in JS objects and the global object
+            if( JS_InitStandardClasses(cx, glob) )
             {
-               // initialize the built-in JS objects and the global object
-               if( JS_InitStandardClasses(cx, glob) )
+               if( JS_DefineFunctions( cx, glob, shell_functions) )
                {
-                  if( JS_DefineFunctions( cx, glob, shell_functions) )
-                  {
-                     getTimerPoll( pollHandlers_ );
-                     initJSTimer( cx, glob );
-                     initJSScreen( cx, glob );
-                     initJSText( cx, glob );
-                     initializeCodeQueue( pollHandlers_, cx, glob );
-                     initJSCurl( cx, glob );
-                     initJSImage( cx, glob );
-                     initJSJPEG( cx, glob );
-                     initJSTransitions( cx, glob );
-                     initJSMP3( cx, glob );
-                     initJSAlphaMap( cx, glob );
-                     initJSHyperlink( cx, glob );
-                     initJSExit( cx, glob );
-                     initJSVolume( cx, glob );
-                     initJSBarcode( cx, glob );
-                     initJSShell( cx, glob );
-                     initJSButton( cx, glob );
-                     initJSPopen( cx, glob );
-                     initJSGpio( cx, glob );
-                     initJSEnv( cx, glob );
-                     initJSTCP( cx, glob );
-                     initJSTTY( cx, glob );
-                     initJSUse( cx, glob );
-                     initJSURL( cx, glob );
-                     initJSFileIO( cx, glob );
-                     initJSCamera( cx, glob );
-                     initJSCBM( cx, glob );
-                     initJSMPEG( cx, glob );
-                     initJSFlash( cx, glob );
-                     initSniffWLAN( cx, glob );
-                     initMonitorWLAN( cx, glob );
-                     initPing( cx, glob );
-                     initJSProcess( cx, glob );
-                     initJSDir( cx, glob );
-                     initJSUDP( cx, glob );
-                     initJSKernel( cx, glob );
+                  getTimerPoll( pollHandlers_ );
+                  initJSTimer( cx, glob );
+                  initJSScreen( cx, glob );
+                  initJSText( cx, glob );
+                  initializeCodeQueue( pollHandlers_, cx, glob );
+                  initJSCurl( cx, glob );
+                  initJSImage( cx, glob );
+                  initJSJPEG( cx, glob );
+                  initJSTransitions( cx, glob );
+                  initJSMP3( cx, glob );
+                  initJSAlphaMap( cx, glob );
+                  initJSHyperlink( cx, glob );
+                  initJSExit( cx, glob );
+                  initJSVolume( cx, glob );
+                  initJSBarcode( cx, glob );
+                  initJSShell( cx, glob );
+                  initJSButton( cx, glob );
+                  initJSPopen( cx, glob );
+                  initJSGpio( cx, glob );
+                  initJSEnv( cx, glob );
+                  initJSTCP( cx, glob );
+                  initJSTTY( cx, glob );
+                  initJSUse( cx, glob );
+                  initJSURL( cx, glob );
+                  initJSFileIO( cx, glob );
+                  initJSCamera( cx, glob );
+                  initJSCBM( cx, glob );
+                  initJSMPEG( cx, glob );
+                  initJSFlash( cx, glob );
+                  initSniffWLAN( cx, glob );
+                  initMonitorWLAN( cx, glob );
+                  initPing( cx, glob );
+                  initJSProcess( cx, glob );
+                  initJSDir( cx, glob );
+                  initJSUDP( cx, glob );
+                  initJSKernel( cx, glob );
 
-                     getCurlCache();
+                  getCurlCache();
 
-                     initJSTouch( cx, glob );
+                  initJSTouch( cx, glob );
 
-                     //
-                     // start up audio output 
-                     //
-                     audioQueue_t &audioOut = getAudioQueue(); 
+                  //
+                  // start up audio output 
+                  //
+                  audioQueue_t &audioOut = getAudioQueue(); 
 
-                     JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
-                     if( sArgv )
+                  JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
+                  if( sArgv )
+                  {                     
+                     if( JS_DefineProperty( cx, glob, "argv", OBJECT_TO_JSVAL( sArgv ), 0, 0, JSPROP_ENUMERATE ) ) // root
                      {
-                        if( JS_DefineProperty( cx, glob, "argv", OBJECT_TO_JSVAL( sArgv ), 0, 0, JSPROP_ENUMERATE ) ) // root
+                        JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
+
+                        JSScript *script = 0 ;
+                        
+                        if( ( 2 < argc ) && ( 0 == strcmp( "-", argv[1] ) ) )
+                        {
+                           argc-- ; argv++ ;
+                           memFile_t fIn( argv[1] );
+                           if( fIn.worked() )
+                           {
+                              char const *start = (char const *)fIn.getData();
+                              char const *const end = start + fIn.getLength();
+                              while( start < end )
+                              {
+                                 if( '\n' == *start++ )
+                                    break;
+                              }
+
+                              if( start < end )
+                                 script= JS_CompileScript( cx, glob, start, end-start, argv[1], 1 );
+                           }
+                        }
+                        else
+                        { // limit scope of urlFile
+                           urlFile_t f( argv[1] );
+                           if( f.isOpen() )
+                           {
+                              script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
+                           }
+                           else 
+                              fprintf( stderr, "Error opening url %s\n", argv[1] );
+                        }
+                        
+                        if( script )
                         {
                            for( int arg = 2 ; arg < argc ; arg++ )
                            {
@@ -551,28 +589,7 @@ int prMain(int argc, char **argv)
                               JS_SetElement( cx, sArgv, arg-2, &vArg );
                            }
                            JS_DefineProperty( cx, glob, "argc", INT_TO_JSVAL( argc-2 ), 0, 0, JSPROP_ENUMERATE );
-                        }
-                     }
-
-                     {
-                        JSScript *script = 0 ;
-                        
-                        { // limit scope of urlFile
-                           urlFile_t f( argv[1] );
-                           if( f.isOpen() )
-                           {
-                              JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
    
-                              script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
-                              if( !script )
-                                 fprintf( stderr, "Error compiling script %s\n", argv[1] );
-                           }
-                           else
-                              fprintf( stderr, "Error opening url %s\n", argv[1] );
-                        }
-                        
-                        if( script )
-                        {
                            pushURL( argv[1] );
                            
                            jsval rval;
@@ -583,53 +600,53 @@ int prMain(int argc, char **argv)
                               JS_DestroyScript( cx, script );
                               script = 0 ;
                            } // limit
-
+      
                            if( exec )
                            {
                               unsigned numEvents = 0 ;
-
+      
                               while( mainLoop( pollHandlers_, cx ) )
                                  ;
-//                                 printf( "in main loop\n" );
+      //                                 printf( "in main loop\n" );
                            }
                            else
                               fprintf( stderr, "exec error %s\n", argv[1] );
                               
                            popURL();
                         }
-                     } // limit scope of urlFile
-
-                     shutdownTTY();
-                     shutdownGpio();
-
-                     shutdownJSProcesses();
-                     shutdownCurlWorkers();
-                     shutdownCCDiskCache();
-                     audioQueue_t::shutdown();
+                        else
+                           fprintf( stderr, "Error compiling script %s\n", argv[1] );
+                     }
                   }
-                  else
-                     fprintf( stderr, "Error defining Javascript shell functions\n" );
+
+                  shutdownTTY();
+                  shutdownGpio();
+
+                  shutdownJSProcesses();
+                  shutdownCurlWorkers();
+                  shutdownCCDiskCache();
+                  audioQueue_t::shutdown();
                }
                else
-                  fprintf( stderr, "Error creating Javascript builtins\n" );
+                  fprintf( stderr, "Error defining Javascript shell functions\n" );
             }
             else
-               fprintf( stderr, "Error allocating Javascript global\n" );
-   
-            {
-               mutexLock_t lock( execMutex_ );
-               JS_DestroyContext( cx );
-            }
-   
+               fprintf( stderr, "Error creating Javascript builtins\n" );
          }
          else
-            fprintf( stderr, "Error initializing Javascript context\n" );
+            fprintf( stderr, "Error allocating Javascript global\n" );
+
+         {
+            mutexLock_t lock( execMutex_ );
+            JS_DestroyContext( cx );
+         }
+
       }
       else
-         fprintf( stderr, "Error initializing Javascript runtime\n" );
+         fprintf( stderr, "Error initializing Javascript context\n" );
    }
    else
-      fprintf( stderr, "Usage : jsExec url\n" );
+      fprintf( stderr, "Error initializing Javascript runtime\n" );
  
    return 0;
 
@@ -691,63 +708,68 @@ static char const *const defaultEnvVars[] = {
 
 int main( int argc, char *argv[] )
 {
-   // Initialize the sa structure
-   sa.sa_handler = handler;
-   sigemptyset(&sa.sa_mask);
-   sa.sa_flags = 0;
-   
-   // Set up the signal handler
-   sigaction(SIGSEGV, &sa, NULL);
-
-   for( unsigned i = 0 ; i < dim( requiredEnvVars ); i++ )
+   if( 2 <= argc )
    {
-      char const *env = getenv( requiredEnvVars[i] );
-      if( 0 == env )
-      {
-         setenv( requiredEnvVars[i], defaultEnvVars[i], 0 );
-      }
-   }
-   char *exePath = argv[0];
+      // Initialize the sa structure
+      sa.sa_handler = handler;
+      sigemptyset(&sa.sa_mask);
+      sa.sa_flags = 0;
+      
+      // Set up the signal handler
+      sigaction(SIGSEGV, &sa, NULL);
    
-   {
-      char temp[80];
-      sprintf( temp, "/proc/%d/exe", getpid() );
-      struct stat st ;
-      int stResult = stat( temp, &st );
-      if( 0 == stResult )
+      for( unsigned i = 0 ; i < dim( requiredEnvVars ); i++ )
       {
-         exePath = new char [ st.st_size + 1 ];
-         int numRead = readlink( temp, exePath, st.st_size + 1 );
-         if( 0 < numRead )
+         char const *env = getenv( requiredEnvVars[i] );
+         if( 0 == env )
          {
-            argv[0] = exePath ;
+            setenv( requiredEnvVars[i], defaultEnvVars[i], 0 );
+         }
+      }
+      char *exePath = argv[0];
+      
+      {
+         char temp[80];
+         sprintf( temp, "/proc/%d/exe", getpid() );
+         struct stat st ;
+         int stResult = stat( temp, &st );
+         if( 0 == stResult )
+         {
+            exePath = new char [ st.st_size + 1 ];
+            int numRead = readlink( temp, exePath, st.st_size + 1 );
+            if( 0 < numRead )
+            {
+               argv[0] = exePath ;
+            }
+            else
+               fprintf( stderr, "Error resolving path2:%m\n" );
          }
          else
-            fprintf( stderr, "Error resolving path2:%m\n" );
-      }
-      else
+         {
+            fprintf( stderr, "Error resolving exe:%m\n" );
+         }
+      } // limit scope of temporaries
+   
+      debugPrint( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
+      do
       {
-         fprintf( stderr, "Error resolving exe:%m\n" );
-      }
-   } // limit scope of temporaries
-
-   printf( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
-   do
-   {
-      int result = PR_Initialize( prMain, argc, argv, 0 );
-      if( gotoCalled_ )
-      {
-         argv[1] = (char *)gotoURL_.c_str();
-         execv( argv[0], argv ); // start next
-      }
-      else if( execCalled_ )
-      {
-         system( execCmd_.c_str() );
-         execv( argv[0], argv ); // start next
-      }
-      else
-         return exitStatus_ ;
-   } while( 1 );
-
+         int result = PR_Initialize( prMain, argc, argv, 0 );
+         if( gotoCalled_ )
+         {
+            argv[1] = (char *)gotoURL_.c_str();
+            execv( argv[0], argv ); // start next
+         }
+         else if( execCalled_ )
+         {
+            system( execCmd_.c_str() );
+            execv( argv[0], argv ); // start next
+         }
+         else
+            return exitStatus_ ;
+      } while( 1 );
+   }
+   else
+      fprintf( stderr, "Usage : jsExec url\n" );
+   
    return 0 ;
 }
