@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.4 2002-11-30 00:52:59 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.5 2002-11-30 05:28:22 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.4  2002-11-30 00:52:59  ericn
+ * Revision 1.5  2002-11-30 05:28:22  ericn
+ * -fixed timed wait, added isEmpty()
+ *
+ * Revision 1.4  2002/11/30 00:52:59  ericn
  * -changed name to semClasses.h
  *
  * Revision 1.3  2002/11/29 16:42:21  ericn
@@ -56,10 +59,14 @@ public:
    //
    inline bool abort( void );
 
+   inline bool isEmpty( void );
+
    mutex_t        mutex_ ;
    condition_t    cond_ ;
    std::list<T>   list_ ;
    bool volatile  abort_ ;
+private:
+   mtQueue_t( mtQueue_t const & ); // no copies
 };
 
 //
@@ -122,6 +129,7 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
             {
                item = list_.front();
                list_.pop_front();
+               return true ;
             }
             else if( abort_ )
                return false ;
@@ -169,6 +177,12 @@ bool mtQueue_t<T>::abort( void )
    }
    else
       return false ;
+}
+template <class T>
+bool mtQueue_t<T>::isEmpty( void )
+{
+   mutexLock_t lock( mutex_ );
+   return list_.empty();
 }
 
 #endif
