@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.16  2003-01-31 13:30:05  ericn
+ * Revision 1.17  2003-02-01 18:14:54  ericn
+ * -modified to use queuePlayback() instead of insert()
+ *
+ * Revision 1.16  2003/01/31 13:30:05  ericn
  * -modified to allow empty buttons
  *
  * Revision 1.15  2002/12/26 19:26:59  ericn
@@ -281,7 +284,7 @@ static void buttonTouch( box_t         &box,
       audioQueue_t &q = getAudioQueue();
       unsigned numCancelled ;
       q.clear( numCancelled );
-      q.insert( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
+      q.queuePlayback( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
    }
 
    doit( box, x, y, defaultTouch, "onTouch" );
@@ -335,7 +338,7 @@ static void buttonRelease( box_t         &box,
       audioQueue_t &q = getAudioQueue();
       unsigned numCancelled ;
       q.clear( numCancelled );
-      q.insert( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
+      q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
    }
 
    doit( box, x, y, defaultRelease, "onRelease" );
