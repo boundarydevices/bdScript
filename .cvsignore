@@ -15,3 +15,4 @@ barcodePoll pollHandlerTest touchPoll udpSpewTo udpRecvAll
 flashThread progFlash reboot pollTimerTest ttyPoll
 udpPoll timerTest unpacked
 urlPoll flashVar mkFlash
+tcpPoll tcpPollServer
