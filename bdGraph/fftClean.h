@@ -1,6 +1,13 @@
 //#define AVERAGE_FFT
 //#define NOISE_ACCUM
+#define REP_FFT_CNT 1024
+#ifdef AVERAGE_FFT
+#ifndef NOISE_ACCUM
+#define NOISE_ACCUM
+#endif
+#endif
 #define SILENCE_BEFORE_UPDATE 10		//# of silent frames to wait before updating noise profile
+#define MAX_ADD_SIZE n3_d4
 
 #ifdef AVERAGE_FFT
 #define SAMPLE_ADVANCE (n<<1)
@@ -15,7 +22,7 @@ typedef struct CLEAN_NOISE_WORK
 	int logN;
 	int silenceCnt;
 	npd_p1 noiseSum;
-#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 	int noiseCnt;
 	npd_p1* noiseAccum;	//NOISE_SIZE # of entries
 #endif

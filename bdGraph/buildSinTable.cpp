@@ -427,5 +427,5 @@ int main()
 #endif
 	CreateFile(sinTable,0,"sin","",_logN,0);
 	CreateFile(sinTable,1,"sin","r",_logN,0);
-	CreateFile(sinTable,0,"sin2","",_logN-1,1);
+	CreateFile(sinTable,0,"sin2","",_logN,1);
 }

@@ -138,8 +138,8 @@ static int openReadFd(int* pBlkSize,int channels)
 		perror( "get record level" );
 
 	recordLevel = 100 ;
-	if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
-		perror( "set record level" );
+//	if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &recordLevel ) )
+//		perror( "set record level" );
 
 //	if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
 //		perror( "get record level" );
@@ -225,6 +225,7 @@ void test2(void)
 	const int n=(1<<logN);
 	const int n_d2=(1<<(logN-1));
 	const int n_d4=(1<<(logN-2));
+	const int n3_d4=(3<<(logN-2));
 	int i;
 	CleanNoiseWork cnw;
 
@@ -252,7 +253,7 @@ void test2(void)
 	outputSpace = FMT_dwAvgBytesPerSec*10;	//get a 10 second buffer
 	outSamples = (short *)malloc(outputSpace);
 	outSampleCntMax = (outputSpace) / (sizeof(*outSamples));
-	memset(outSamples,0,n_d4*sizeof(*outSamples));
+	memset(outSamples,0,MAX_ADD_SIZE*sizeof(*outSamples));
 
 	while (outSampleCnt < outSampleCntMax) {
 		int numRead = 0;
@@ -271,7 +272,7 @@ void test2(void)
 #if 1
 			numRead = read(readFd, &inSamples[writePos], max );
 #else
-			for (i=0,pSamples=(short*)(&inSamples[writePos]); i<(max>>1); i++) {*pSamples++ = i;}
+			for (i=0,pSamples=(short*)(&inSamples[writePos]); i<(max>>1); i++) {*pSamples++ = 0x4000;}
 //			for (i=0,rSamples=(short*)(&inSamples[writePos]); i<(max>>1); i++) {printf("__%i %i\r\n",i,*rSamples++);}
 			numRead = max;
 #endif
@@ -280,14 +281,15 @@ void test2(void)
 		}
 		writePos=(writePos+numRead)& (blkSize-1);
 
-#if defined(NOISE_ACCUM) || defined (AVERAGE_FFT)
+#ifdef NOISE_ACCUM
 		outSampleCnt=0;
 #endif
 
 #ifdef AVERAGE_FFT
 		i = AverageFFT((short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);
 #else
-		i = CleanNoise(outSamples+outSampleCnt,outSampleCntMax-outSampleCnt,(short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);	//shifts needed to convert from char oriented to short oriented
+		//shifts needed to convert from char oriented to short oriented
+		i = CleanNoise(outSamples+outSampleCnt,outSampleCntMax-outSampleCnt,(short*)inSamples,(readPos>>1),(blkSize>>1)-1,&cnw);
 #endif
 		if (i==0) break;
 		{
@@ -300,7 +302,8 @@ void test2(void)
 	}
 	printf("\r\n");
 	close(readFd);
-#if !defined(NOISE_ACCUM) && !defined(AVERAGE_FFT)
+//	printf("%04x %04x %04x %04x\r\n",outSamples[0],outSamples[1],outSamples[2],outSamples[3]);
+#ifndef NOISE_ACCUM
 	WriteWavFile(outSamples,outSampleCnt);
 #endif
 	free(inSamples);

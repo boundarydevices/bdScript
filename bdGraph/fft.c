@@ -57,10 +57,10 @@
 #define ADJUST_PHASE(phase,inverse)	F_ADJUST_PHASE(phase)
 #endif
 
-#define LOG_SIN2_TABLE_SIZE 7	//where size the index of entry pi/2
-#include "sin2Table7.c"
+#define LOG_SIN2_TABLE_SIZE 8	//where size the index of entry pi/2
+#include "sin2Table8.c"
 #define SIN2_SE_PI_D2 (1<<LOG_SIN2_TABLE_SIZE)
-#define SIN2_TABLE(i)  &sin2Table7[(SIN2_SE_PI_D2&i) ? (SIN2_SE_PI_D2-(i&(SIN2_SE_PI_D2-1))) : (i&(SIN2_SE_PI_D2-1))]
+#define SIN2_TABLE(i)  &sin2Table8[(SIN2_SE_PI_D2&i) ? (SIN2_SE_PI_D2-(i&(SIN2_SE_PI_D2-1))) : (i&(SIN2_SE_PI_D2-1))]
 #define SIN2_TEST_USE_LOOKUP(i) (i&(SIN2_SE_PI_D2-1))
 
 
@@ -667,7 +667,9 @@ void fft_inverse(short* dest,cmplx* vect,const int logN)
 	int i;
 	const int n=(1<<logN);
 #if 1
+//	PrintTable(vect,logN,0,0);
 	Ifft(vect,logN);
+//	PrintTable(vect,logN,0,0);
 #else
 	ChangeImgSign(vect,logN);
 	INVERSE_FFT(vect,logN);
@@ -690,27 +692,27 @@ void fft_forward_overlap(cmplx* vect,const short* src,int start,const int bufMas
 {
 	const int n=(1<<logN);
 	const int n_d2=(1<<(logN-1));
+	const int n_d4=(1<<(logN-2));
 	int i,phase;
-	const int phaseAdvance = 1<<(LOG_SIN2_TABLE_SIZE+3-logN);
-	if (logN > (LOG_SIN_TABLE_SIZE+2)) {
-		printf("sin table is too small");
-		return;
-	}
-	if (logN > (LOG_SIN2_TABLE_SIZE+3)) {
+	const int phaseAdvance = 1<<(LOG_SIN2_TABLE_SIZE+2-logN);
+	if ((LOG_SIN2_TABLE_SIZE+2) < logN) {
 		printf("sin2 table is too small");
 		return;
 	}
+//	printf("LOG_SIN2_TABLE_SIZE:%i, logN:%i, phaseAdvance:%i",LOG_SIN2_TABLE_SIZE,logN,phaseAdvance);
 #if 1
 	for (i=0,phase=0; i<n_d2; i++,phase+=phaseAdvance) {
 		SetCmplxSin2(vect,i,src[start],phase);
 		start = (start+1)& bufMask;
 //		printf("%i %i\r\n",i,src[i]);
 	}
-	memset(&vect[n_d2],0,n_d2*sizeof(vect[0]));
+//	printf("n_d2 = %i    sizeof(vect[0]) = %i\r\n",n_d2,sizeof(vect[0]));
+	memset(&vect[n_d4],0,n_d4*sizeof(vect[0]));
 
-//	PrintTable(vect,logN,0,0);
+//	PrintTable(vect,logN-1,0,0);
 
 	fft_combine(vect,logN,0);
+//	PrintTable(vect,logN,0,1);
 
 #else
 	memset(vect,0,n*sizeof(vect[0]));

@@ -290,7 +290,7 @@ int CleanNoise(short* dest,int bufSize,short* src,int startPos,int srcBufMask,Cl
 		if (max>MAX_ADD_SIZE) max = MAX_ADD_SIZE;
 		printf(".");
 		ZeroHighLowFrequencies(vect,logN);
-//		SubtractNoise(&power[0],&cnw->noise[0],vect,logN);
+		SubtractNoise(&power[0],&cnw->noise[0],vect,logN);
 		DoSymmetry(vect,n_d2,n);
 #if 0
 		PrintTable(vect,logN,AFTER_FFT_SHIFT,1);
