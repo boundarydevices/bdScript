@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.23  2003-04-26 15:42:57  ericn
+ * Revision 1.24  2003-05-18 10:18:23  tkisky
+ * -add scaling function
+ *
+ * Revision 1.23  2003/04/26 15:42:57  ericn
  * -added method dither()
  *
  * Revision 1.22  2003/03/13 14:46:51  ericn
@@ -93,6 +96,7 @@
 #include "jsCurl.h"
 #include "jsGlobals.h"
 #include "jsAlphaMap.h"
+#include "bdGraph/Scale16.h"
 
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -439,12 +443,12 @@ jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
        &&
        JSVAL_IS_STRING( dataVal ) )
    {
-      int const width  = JSVAL_TO_INT( widthVal ); 
+      int const width  = JSVAL_TO_INT( widthVal );
       int const height = JSVAL_TO_INT( heightVal );
       JSString *pixStr = JSVAL_TO_STRING( dataVal );
       unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
       if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
-      {   
+      {
          JSObject *returnObj = JS_NewObject( cx, &jsAlphaMapClass_, 0, 0 );
          if( returnObj )
          {
@@ -475,17 +479,107 @@ jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    return JS_TRUE ;
 }
 
+JSBool
+jsImageScale( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   int destWidth  = 0;
+   int destHeight = 0;
+   int srcLeft    = 0;
+   int srcTop     = 0;
+   int srcWidth   = 0;
+   int srcHeight  = 0;
+
+   int i = (argc>>1) - 1;
+   if (i>=0) {
+       if ( JSVAL_IS_INT( argv[0] ) && JSVAL_IS_INT( argv[1] ) ) {
+               destWidth  = JSVAL_TO_INT( argv[0] );
+               destHeight = JSVAL_TO_INT( argv[1] );
+       } else i=-1;
+       if (i>=1) {
+           if (JSVAL_IS_INT( argv[2] ) && JSVAL_IS_INT( argv[3] ) ) {
+               srcLeft    = JSVAL_TO_INT( argv[2] );
+               srcTop     = JSVAL_TO_INT( argv[3] );
+           } else i=-1;
+       }
+       if (i>=2) {
+           if (JSVAL_IS_INT( argv[4] ) && JSVAL_IS_INT( argv[5] ) ) {
+               srcWidth   = JSVAL_TO_INT( argv[4] );
+               srcHeight  = JSVAL_TO_INT( argv[5] );
+           } else i=-1;
+       }
+   }
+   if ((argc & 1) || (i>2) || (i<0)) {
+      JS_ReportError( cx, "Usage: img.scale( desiredWidth, desiredHeight [,srcLeft,srcTop[,srcWidth, srcHeight]] );" );
+   }
+   else
+   {
+      jsval widthVal, heightVal, dataVal ;
+      if( JS_GetProperty( cx, obj, "width", &widthVal )
+          &&
+          JS_GetProperty( cx, obj, "height", &heightVal )
+          &&
+          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal ) )
+      {
+         int const width  = JSVAL_TO_INT( widthVal );
+         int const height = JSVAL_TO_INT( heightVal );
+         JSString *pixStr = JSVAL_TO_STRING( dataVal );
+         unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
+         {
+            JSObject *returnObj = JS_NewObject( cx, &jsImageClass_, 0, 0 );
+            if( returnObj )
+            {
+               *rval = OBJECT_TO_JSVAL( returnObj ); // root
+
+               if ((srcWidth <=0)||(srcWidth >(width-srcLeft))) srcWidth = width-srcLeft;
+               if ((srcHeight<=0)||(srcHeight>(height-srcTop))) srcHeight = height-srcTop;
+
+               unsigned const pixBytes = destWidth*destHeight*sizeof( short );
+               void *const pixMem = JS_malloc( cx, pixBytes );
+               if (pixMem)
+               {
+                  Scale16::scale( (unsigned short *)pixMem, destWidth, destHeight,pixMap, width,height, srcLeft,srcTop,srcWidth,srcHeight);
+
+                  JSString *sScaleMap = JS_NewString( cx, (char *)pixMem, pixBytes );
+                  if( sScaleMap )
+                  {
+                     JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sScaleMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                     JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(destWidth), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                     JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(destHeight), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                  }
+                  else
+                     JS_ReportError( cx, "Error building Scale map string" );
+               }
+               else
+                  JS_ReportError( cx, "Error allocating Scale map string" );
+            }
+            else
+               JS_ReportError( cx, "allocating array" );
+         }
+         else
+            JS_ReportError( cx, "Invalid width or height" );
+      }
+      else
+         JS_ReportError( cx, "Invalid image" );
+   }
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec imageMethods_[] = {
     {"draw",         jsImageDraw,           3 },
     {"dissolve",     jsImageDissolve,       3 },
     {"dither",       jsImageDither,         3 },
+    {"scale",        jsImageScale,          6,0,0 },
     {0}
 };
 
 enum jsImage_tinyId {
    IMAGE_ISLOADED,
-   IMAGE_WIDTH, 
-   IMAGE_HEIGHT, 
+   IMAGE_WIDTH,
+   IMAGE_HEIGHT,
    IMAGE_PIXBUF,
    IMAGE_ALPHA,
 };
