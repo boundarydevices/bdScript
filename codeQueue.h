@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.9 2003-07-06 01:21:37 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.10 2003-09-05 13:04:32 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.9  2003-07-06 01:21:37  ericn
+ * Revision 1.10  2003-09-05 13:04:32  ericn
+ * -made pollCodeQueue() return bool (not timed out)
+ *
+ * Revision 1.9  2003/07/06 01:21:37  ericn
  * -added method abortCodeQueue()
  *
  * Revision 1.8  2003/06/08 15:19:59  ericn
@@ -135,7 +138,9 @@ private:
 // when 'iterations' fragments of code have been executed,
 // or upon a 'gotoURL' call
 //
-void pollCodeQueue( JSContext *cx,
+// returns true if not timed out
+//
+bool pollCodeQueue( JSContext *cx,
                     unsigned   milliseconds,
                     unsigned   iterations );
 
