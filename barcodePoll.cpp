@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.cpp,v $
- * Revision 1.3  2003-12-27 22:58:51  ericn
+ * Revision 1.4  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.3  2003/12/27 22:58:51  ericn
  * -added terminator, timeout support
  *
  * Revision 1.2  2003/10/31 13:31:21  ericn
@@ -92,10 +95,7 @@ barcodePoll_t :: barcodePoll_t
 barcodePoll_t :: ~barcodePoll_t( void )
 {
    if( isOpen() )
-   {
-      close( fd_ );
-      fd_ = -1 ;
-   }
+      close();
 }
 
 char const *barcodePoll_t :: getBarcode( void ) const 

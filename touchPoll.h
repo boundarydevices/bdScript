@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.2 2003-11-24 19:09:07 ericn Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.3 2004-01-01 20:11:42 ericn Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.2  2003-11-24 19:09:07  ericn
+ * Revision 1.3  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.2  2003/11/24 19:09:07  ericn
  * -added deglitch
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -32,8 +35,6 @@ public:
                 char const       *devName = "/dev/touchscreen/ucb1x00" );
    ~touchPoll_t( void );
 
-   bool isOpen( void ) const { return 0 <= getFd(); }
-   
    // override this to perform processing of a touch
    virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
    // override this to perform processing of a release

@@ -68,8 +68,7 @@ gpioHandler_t :: ~gpioHandler_t( void )
    JS_RemoveRoot( cx_, &scope_ );
    JS_RemoveRoot( cx_, &handlers_[0] );
    JS_RemoveRoot( cx_, &handlers_[1] );
-   close( fd_ );
-   fd_ = -1 ;
+   close();
 }
 
 void gpioHandler_t :: onDataAvail( void )

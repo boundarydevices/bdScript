@@ -1,5 +1,5 @@
 #ifndef __GPIOPOLL_H__
-#define __GPIOPOLL_H__ "$Id: gpioPoll.h,v 1.1 2003-10-05 19:15:44 ericn Exp $"
+#define __GPIOPOLL_H__ "$Id: gpioPoll.h,v 1.2 2004-01-01 20:11:42 ericn Exp $"
 
 /*
  * gpioPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: gpioPoll.h,v $
- * Revision 1.1  2003-10-05 19:15:44  ericn
+ * Revision 1.2  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.1  2003/10/05 19:15:44  ericn
  * -Initial import
  *
  *
@@ -28,8 +31,6 @@ public:
                char const       *devName );      // "/dev/Feedback" et al
    ~gpioPoll_t( void );
 
-   bool isOpen( void ) const { return 0 <= getFd(); }
-   
    //
    // Override this to perform processing of any transition. 
    // Note that the state is set prior to this call

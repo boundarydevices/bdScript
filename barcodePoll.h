@@ -1,5 +1,5 @@
 #ifndef __BARCODEPOLL_H__
-#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.4 2003-12-28 00:35:57 ericn Exp $"
+#define __BARCODEPOLL_H__ "$Id: barcodePoll.h,v 1.5 2004-01-01 20:11:42 ericn Exp $"
 
 /*
  * barcodePoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.h,v $
- * Revision 1.4  2003-12-28 00:35:57  ericn
+ * Revision 1.5  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.4  2003/12/28 00:35:57  ericn
  * -removed secondary thread
  *
  * Revision 1.3  2003/12/27 22:58:49  ericn
@@ -45,8 +48,6 @@ public:
                   char              terminator = '\0' );    // end-of-barcode char
    ~barcodePoll_t( void );
 
-   bool isOpen( void ) const { return 0 <= getFd(); }
-   
    // override this to perform processing of a received barcode
    virtual void onBarcode( void );
 

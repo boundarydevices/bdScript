@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.4  2003-11-28 14:04:48  ericn
+ * Revision 1.5  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.4  2003/11/28 14:04:48  ericn
  * -removed debug msgs
  *
  * Revision 1.3  2003/11/24 19:42:05  ericn
@@ -63,10 +66,7 @@ touchPoll_t :: touchPoll_t
 touchPoll_t :: ~touchPoll_t( void )
 {
    if( isOpen() )
-   {
-      close( fd_ );
-      fd_ = -1 ;
-   }
+      close();
 }
 
 void touchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: udpPoll.cpp,v $
- * Revision 1.1  2003-12-28 20:56:07  ericn
+ * Revision 1.2  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.1  2003/12/28 20:56:07  ericn
  * -Initial import
  *
  *
@@ -46,8 +49,8 @@ udpPoll_t :: udpPoll_t
 
 udpPoll_t :: ~udpPoll_t( void )
 {
-   close( fd_ );
-   fd_ = -1 ;
+   if( isOpen() )
+      close();
 }
 
 void udpPoll_t :: onMsg

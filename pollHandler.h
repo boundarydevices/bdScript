@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.6 2004-01-01 16:02:15 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.7 2004-01-01 20:11:42 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.6  2004-01-01 16:02:15  ericn
+ * Revision 1.7  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.6  2004/01/01 16:02:15  ericn
  * -added close() method
  *
  * Revision 1.5  2003/12/28 20:54:35  ericn
@@ -37,6 +40,7 @@
  */
 
 #include <sys/poll.h>
+#include <unistd.h>
 
 class pollHandlerSet_t ;
 
@@ -59,7 +63,8 @@ public:
    void setMask( short events );
    short getMask( void ) const { return mask_ ; }
    int   getFd( void ) const { return fd_ ; }
-   void  close( void ){ close( fd_ ); fd_ = -1 ; }
+   bool isOpen( void ) const { return 0 <= fd_ ; }
+   void  close( void ){ ::close( fd_ ); fd_ = -1 ; }
 
 protected:
    int               fd_ ;

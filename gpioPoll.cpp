@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: gpioPoll.cpp,v $
- * Revision 1.2  2003-10-18 19:15:06  ericn
+ * Revision 1.3  2004-01-01 20:11:42  ericn
+ * -added isOpen() routine, and switched pollHandlers to use close()
+ *
+ * Revision 1.2  2003/10/18 19:15:06  ericn
  * -added comment
  *
  * Revision 1.1  2003/10/05 19:15:44  ericn
@@ -45,10 +48,7 @@ gpioPoll_t :: gpioPoll_t
 gpioPoll_t :: ~gpioPoll_t( void )
 {
    if( isOpen() )
-   {
-      close( fd_ );
-      fd_ = -1 ;
-   }
+      close();
    free( devName_ );
 }
 
