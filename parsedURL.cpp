@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.2  2002-11-30 18:00:30  ericn
+ * Revision 1.3  2003-01-31 13:26:44  ericn
+ * -added startsAtRoot flag and test program
+ *
+ * Revision 1.2  2002/11/30 18:00:30  ericn
  * -modified to include host always
  *
  * Revision 1.1  2002/11/29 18:38:05  ericn
@@ -35,13 +38,16 @@ void printURL( parsedURL_t const &url )
    printf( "\n" );
 
    printf( "file     : %s\n", url.getFile().c_str() );
+   printf( "relative ? %s\n", url.isRelative() ? "yes" : "no" );
+   printf( "fromRoot ? %s\n", url.startsAtRoot() ? "yes" : "no" );
 }
 
 parsedURL_t :: parsedURL_t( void )
    : protocol_( "" ),
      host_( "" ),
      port_( 0 ),
-     file_( "" )
+     file_( "" ),
+     startsAtRoot_( false )
 {
 }
 
@@ -49,7 +55,8 @@ parsedURL_t :: parsedURL_t( std::string const &url )
    : protocol_( "" ),
      host_( "" ),
      port_( 0 ),
-     file_( "" )
+     file_( "" ),
+     startsAtRoot_( false )
 {
    enum {
       stateProto_,
@@ -74,10 +81,15 @@ parsedURL_t :: parsedURL_t( std::string const &url )
             } // done with protocol
             else if( '/' == c )
             {
-               pathParts_.push_back( protocol_ );
-               if( 0 < protocol_.size() )
-                  pathParts_.push_back( "" );
-               protocol_ = "" ;
+               startsAtRoot_ = ( 0 == protocol_.size() );
+               if( !startsAtRoot_ )
+               {
+                  pathParts_.push_back( protocol_ );
+                  protocol_ = "" ;
+               }
+               
+               pathParts_.push_back( "" );
+
                state = statePath_ ;
             } // path name, no protocol or host
             else if( '.' == c )
@@ -140,6 +152,7 @@ parsedURL_t :: parsedURL_t( std::string const &url )
                state = stateError_ ;
             break;
          }
+
          case statePath_ :
          {
             if( '/' == c )
@@ -153,7 +166,7 @@ parsedURL_t :: parsedURL_t( std::string const &url )
          }
       }
    }
-   
+
    if( ( stateError_ != state ) && ( 0 < pathParts_.size() ) )
    {
       file_ = pathParts_.back();
@@ -170,27 +183,34 @@ void parsedURL_t :: fixup( parsedURL_t const &parent )
       {
          host_ = parent.getHost();
 
-         stringVector_t resolvedPath( parent.getPathParts() );
-
-         unsigned i ;
-         for( i = 0 ; ( i < pathParts_.size() ) && ( 0 < resolvedPath.size() ); i++ )
+         unsigned i = 0 ;
+         if( !startsAtRoot_ )
          {
-            std::string const &dir( pathParts_[i] );
-            if( 0 == strcmp( "..", dir.c_str() ) )
+            stringVector_t resolvedPath( parent.getPathParts() );
+   
+            for( ; ( i < pathParts_.size() ) && ( 0 < resolvedPath.size() ); i++ )
             {
-               if( 0 < resolvedPath.size() )
-                  resolvedPath.pop_back();
+               std::string const &dir( pathParts_[i] );
+               if( 0 == strcmp( "..", dir.c_str() ) )
+               {
+                  if( 0 < resolvedPath.size() )
+                     resolvedPath.pop_back();
+               }
+               else
+                  break;
             }
-            else
-               break;
-         }
 
-         for( ; i < pathParts_.size(); i++ )
-         {
-            resolvedPath.push_back( pathParts_[i] );
-         }
+            for( ; i < pathParts_.size(); i++ )
+            {
+               resolvedPath.push_back( pathParts_[i] );
+            }
+            
+            pathParts_ = resolvedPath ;
          
-         pathParts_ = resolvedPath ;
+         } // use parent's path
+      }
+      else
+      {
       }
    }
 }
@@ -232,3 +252,28 @@ void parsedURL_t :: getAbsolute( std::string &absolute ) const
 }
 
 
+#ifdef STANDALONE
+#include <stdio.h>
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 <= argc )
+   {
+      parsedURL_t first( argv[1] );
+      printURL( first );
+      for( int arg = 2 ; arg < argc ; arg++ )
+      {
+         parsedURL_t rel( argv[arg] );
+         printf( "---> %s before fixup\n", argv[arg] );
+         printURL( rel );
+         rel.fixup( first );
+         printf( "---> %s after fixup\n", argv[arg] );
+         printURL( rel );
+      }
+   }
+   else
+      fprintf( stderr, "Usage : parsedURL url\n" );
+
+   return 0 ;
+}
+#endif
