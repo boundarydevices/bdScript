@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.27  2002-12-27 23:30:23  ericn
+ * Revision 1.28  2003-01-05 01:51:45  ericn
+ * -stack dump exception handler
+ *
+ * Revision 1.27  2002/12/27 23:30:23  ericn
  * -added module jsTTY
  *
  * Revision 1.26  2002/12/16 19:44:26  tkisky
@@ -363,9 +366,42 @@ int prMain(int argc, char **argv)
 }
 
 #include <prinit.h>
+#include <signal.h>
+#include "hexDump.h"
+
+static struct sigaction sa;
+static struct sigaction oldint;
+
+void handler(int sig) 
+{
+   pthread_t me = pthread_self();
+   fprintf( stderr, "got signal, stack == %p (id %x)\n", &sig, me );
+   fprintf( stderr, "sighandler at %p\n", handler );
+
+   hexDumper_t dumpStack( &sig, 512 );
+   while( dumpStack.nextLine() )
+      fprintf( stderr, "%s\n", dumpStack.getLine() );
+
+   fflush( stderr );
+   if( oldint.sa_handler )
+      oldint.sa_handler( sig );
+
+   exit( 1 );
+}
+
 
 int main( int argc, char *argv[] )
 {
+   // Initialize the sa structure
+   sa.sa_handler = handler;
+   sigemptyset(&sa.sa_mask);
+   sa.sa_flags = 0;
+   
+   // Set up the signal handler
+   sigaction(SIGSEGV, &sa, NULL);
+
+   printf( "main thread %p (id %x)\n", &argc, pthread_self() );
+   
    int result = PR_Initialize( prMain, argc, argv, 0 );
    if( gotoCalled_ )
    {
