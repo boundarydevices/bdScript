@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.73  2004-04-18 16:11:21  ericn
+ * Revision 1.74  2004-05-05 03:19:20  ericn
+ * -added jsPrinter initialization
+ *
+ * Revision 1.73  2004/04/18 16:11:21  ericn
  * -allow flashVar on BD2004
  *
  * Revision 1.72  2004/03/27 20:22:48  ericn
@@ -292,6 +295,7 @@
 #include "jsVolume.h"
 #include "jsCamera.h"
 #include "jsCBM.h"
+#include "jsPrinter.h"
 #include "jsMP3.h"
 #include "jsMPEG.h"
 #include "jsFlash.h"
@@ -553,6 +557,7 @@ int prMain(int argc, char **argv)
                   initJSVolume( cx, glob );
                   initJSButton( cx, glob );
                   initJSCamera( cx, glob );
+                  initPrinter( cx, glob );
                   initJSCBM( cx, glob );
                   initJSMPEG( cx, glob );
                   initJSFlash( cx, glob );
