@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.46  2003-07-20 15:41:46  ericn
+ * Revision 1.47  2003-07-30 20:25:26  ericn
+ * -added jsMPEG reference
+ *
+ * Revision 1.46  2003/07/20 15:41:46  ericn
  * -removed debug msg
  *
  * Revision 1.45  2003/07/06 01:22:15  ericn
@@ -195,6 +198,7 @@
 #include "jsFileIO.h"
 #include "jsCamera.h"
 #include "jsCBM.h"
+#include "jsMPEG.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -333,6 +337,7 @@ int prMain(int argc, char **argv)
                      initJSFileIO( cx, glob );
                      initJSCamera( cx, glob );
                      initJSCBM( cx, glob );
+                     initJSMPEG( cx, glob );
 
                      getCurlCache();
 
