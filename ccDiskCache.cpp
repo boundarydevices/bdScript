@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.2  2002-11-29 16:44:54  ericn
+ * Revision 1.3  2003-07-31 04:30:52  ericn
+ * -modified to longword align data (by padding header)
+ *
+ * Revision 1.2  2002/11/29 16:44:54  ericn
  * -removed error message for normal occurrence
  *
  * Revision 1.1  2002/11/26 23:28:06  ericn
@@ -107,8 +110,9 @@ void ccDiskCache_t :: inUse
          header.fd_ = open( cachedFileName.c_str(), O_RDONLY );
          if( 0 <= header.fd_ )
          {
-            unsigned const urlLen = strlen( header.name_ );
-            unsigned const dataOffs = urlLen + sizeof( urlLen ) + sizeof( header.size_ );
+            unsigned const urlLen = strlen( header.name_ ) + 1 ;
+            unsigned const pad = ( 4 - ( urlLen & 3 ) ) & 3 ;
+            unsigned const dataOffs = urlLen + pad + sizeof( urlLen ) + sizeof( header.size_ );
             
             off_t const fileSize = lseek( header.fd_, 0, SEEK_END );
             if( fileSize == dataOffs + header.size_ )
@@ -373,13 +377,17 @@ void ccDiskCache_t :: storeData
             {
                bool failed = false ;
 
-               unsigned const nameLen = strlen( header.name_ );
+               unsigned const nameLen = strlen( header.name_ ) + 1 ;
                int numWritten = write( fd, &nameLen, sizeof( nameLen ) );
                if( sizeof( nameLen ) == numWritten )
                {
                   numWritten = write( fd, header.name_, nameLen );
                   if( nameLen == numWritten )
                   {
+                     unsigned pad = ( 4 - ( nameLen & 3 ) ) & 3 ;
+                     if( pad )
+                        write( fd, "\0\0\0\0", pad ); // pad to longword boundary
+
                      numWritten = write( fd, &size, sizeof( size ) );
                      if( sizeof( size ) == numWritten )
                      {
@@ -595,48 +603,55 @@ ccDiskCache_t :: ccDiskCache_t
                      {
                         unsigned long urlLen ;
                         memcpy( &urlLen, fIn.getData(), sizeof( urlLen ) );
-                        if( urlLen <= fIn.getLength() - sizeof( urlLen ) - 5 )
+                        unsigned const pad = ( 4 - ( fIn.getLength() & 3 ) ) & 3 ;
+
+                        if( urlLen <= fIn.getLength() - sizeof( urlLen ) - sizeof( unsigned long ) - 1 - pad ) // min 1 byte of data, 4 bytes of length
                         {
                            char const *url = (char const *)fIn.getData() + sizeof( urlLen );
-                           unsigned long dataSize ;
-                           memcpy( &dataSize, url + urlLen, sizeof( dataSize ) );
-                           if( fIn.getLength() - 8 == urlLen + dataSize )
+                           if( '\0' == url[urlLen] )
                            {
-                              unsigned long const freeSpace = maxSize_ - currentSize_ - reservedSize_ ;
-                              if( ( dataSize < freeSpace ) || makeSpace( dataSize-freeSpace ) )
+                              unsigned long dataSize ;
+                              memcpy( &dataSize, url + urlLen + pad, sizeof( dataSize ) );
+                              if( fIn.getLength() - 8 - pad == urlLen + dataSize )
                               {
-                                 header_t *newHeader = (header_t *)( new char [sizeof( header_t ) + urlLen] );
-                                 newHeader->size_      = dataSize ;
-                                 newHeader->sequence_  = sequence ;
-                                 newHeader->completed_ = true ;
-                                 newHeader->fd_        = -1 ;
-                                 newHeader->data_      = 0 ;
-                                 newHeader->temporary_ = false ;
-                                 memcpy( newHeader->name_, url, urlLen );
-                                 newHeader->name_[urlLen] = '\0' ;
-                                 count++ ;
-
-                                 //
-                                 // add to head of list
-                                 //
-                                 list_add( &newHeader->chain_, &mru_ );
-
-                                 //
-                                 // add to hashes
-                                 //
-                                 cacheEntries_[newHeader->sequence_] = newHeader ;
-                                 entriesByName_[newHeader->name_] = newHeader->sequence_ ;
-                                 currentSize_ += dataSize ;
-                                 continue;
-                              }
+                                 unsigned long const freeSpace = maxSize_ - currentSize_ - reservedSize_ ;
+                                 if( ( dataSize < freeSpace ) || makeSpace( dataSize-freeSpace ) )
+                                 {
+                                    header_t *newHeader = (header_t *)( new char [sizeof( header_t ) + urlLen] );
+                                    newHeader->size_      = dataSize ;
+                                    newHeader->sequence_  = sequence ;
+                                    newHeader->completed_ = true ;
+                                    newHeader->fd_        = -1 ;
+                                    newHeader->data_      = 0 ;
+                                    newHeader->temporary_ = false ;
+                                    memcpy( newHeader->name_, url, urlLen );
+                                    newHeader->name_[urlLen] = '\0' ;
+                                    count++ ;
+   
+                                    //
+                                    // add to head of list
+                                    //
+                                    list_add( &newHeader->chain_, &mru_ );
+   
+                                    //
+                                    // add to hashes
+                                    //
+                                    cacheEntries_[newHeader->sequence_] = newHeader ;
+                                    entriesByName_[newHeader->name_] = newHeader->sequence_ ;
+                                    currentSize_ += dataSize ;
+                                    continue;
+                                 }
+                                 else
+                                 {
+                                    fprintf( stderr, "Error allocating space\n" );
+                                    ABORT( 1 );
+                                 }
+                              } // file has reasonable sizes
                               else
-                              {
-                                 fprintf( stderr, "Error allocating space\n" );
-                                 ABORT( 1 );
-                              }
-                           } // file has reasonable sizes
+                                 fprintf( stderr, "%s:invalid name or data size:%lu/%lu/%lu\n", fullName.c_str(), urlLen, dataSize, fIn.getLength() );
+                           }
                            else
-                              fprintf( stderr, "%s:invalid name or data size:%lu/%lu/%lu\n", fullName.c_str(), urlLen, dataSize, fIn.getLength() );
+                              fprintf( stderr, "Invalid terminator in url:%s\n", fullName.c_str() );
                         }
                         else
                            fprintf( stderr, "%s:invalid url size:%lu/%lu\n", fullName.c_str(), urlLen, fIn.getLength() );
