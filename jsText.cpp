@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.2  2002-10-20 16:31:06  ericn
+ * Revision 1.3  2002-11-02 04:11:43  ericn
+ * -added font class
+ *
+ * Revision 1.2  2002/10/20 16:31:06  ericn
  * -added bg color support
  *
  * Revision 1.1  2002/10/18 01:18:25  ericn
@@ -26,6 +29,10 @@
 #include <stdio.h>
 #include "fbDev.h"
 #include <ctype.h>
+#include "jsCurl.h"
+#include "js/jscntxt.h"
+#include "jsGlobals.h"
+#include "curlThread.h"
 
 /*
 static FT_Library library ;
@@ -292,7 +299,7 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                               // 
                               // Whew! A lot of stuff was done to get here, but now
                               // we have a bitmap (face->glyph->bitmap) (actually a 
-                              // byte-map with the image data in 1/256ths
+                              // byte-map with the image data in 1/255ths
                               //
 /*
                               printf( "   rows  %d\n", face->glyph->bitmap.rows );
@@ -349,7 +356,6 @@ jsText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             fprintf( stderr, "Error %d initializing freeType library\n", error );
             exit( 3 );
          }
-
       }
 
       *rval = JSVAL_FALSE ;
@@ -388,6 +394,7 @@ static char const * const faceFlagNames_[] = {
    "FT_FACE_FLAG_MULTIPLE_MASTERS",
    "FT_FACE_FLAG_GLYPH_NAMES"
 };
+
 static unsigned const numFaceFlags_ = sizeof( faceFlagNames_ )/sizeof( faceFlagNames_[0] );
 
 static JSBool
@@ -396,137 +403,6 @@ jsDumpFont( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    if( ( 1 == argc ) && ( JSTYPE_STRING == JS_TypeOfValue( cx, argv[0] ) ) )
    {
       printf( "params check out\n" );
-      
-      FT_Library library ;
-      int error = FT_Init_FreeType( &library );
-      if( 0 != error )
-      {
-         fprintf( stderr, "Error %d initializing freeType library\n", error );
-         exit( 3 );
-      }
-
-//      initFreeType();
-      printf( "freeType initialized\n" );
-      JSString *fontString = JS_ValueToString( cx, argv[0] );
-      if( fontString )
-      {
-         FT_Face face;      /* handle to face object */
-
-         error = FT_New_Memory_Face( library, 
-                                     (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
-                                     JS_GetStringLength(fontString),    /* size in bytes        */
-                                     0,                          /* face_index           */
-                                     &face );
-         if( 0 == error )
-         {
-            printf( "num_faces   %ld\n", face->num_faces );
-            printf( "face_index    %ld\n", face->face_index );
-
-            printf( "face_flags  %ld:\n", face->face_flags );
-            for( int mask = 1, idx = 0 ; mask <= FT_FACE_FLAG_GLYPH_NAMES ; mask <<= 1, idx++ )
-            {
-               if( idx < numFaceFlags_ )
-               {
-                  if( 0 != ( face->face_flags & mask ) )
-                     printf( "   " );
-                  else
-                     printf( "   !" );
-                  printf( "%s\n", faceFlagNames_[idx] );
-               }
-               else
-                  fprintf( stderr, "How did we get here!\n" );
-            } 
-
-            printf( "style_flags  %ld\n", face->style_flags );
-
-            printf( "num_glyphs  %ld\n", face->num_glyphs );
-
-            printf( "family_name %s\n", face->family_name );
-            printf( "style_name  %s\n", face->style_name );
-
-            printf( "num_fixed_sizes   %d\n", face->num_fixed_sizes );
-            for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
-            {
-               printf( "   %d/%d\n", face->available_sizes[fs].width,
-                                     face->available_sizes[fs].height );
-            }
-//    FT_Bitmap_Size*   available_sizes;
-
-            printf( "num_charmaps   %d\n", face->num_charmaps );
-//    FT_CharMap*       charmaps;
-
-//    FT_Generic        generic;
-
-    // the following are only relevant to scalable outlines
-//    FT_BBox           bbox;
-
-            printf( "units_per_EM   %d\n", face->units_per_EM );
-            printf( "ascender;      %d\n", face->ascender );
-            printf( "descender      %d\n", face->descender );
-            printf( "height         %d\n", face->height );
-
-            printf( "max_advance_width %d\n", face->max_advance_width );
-            printf( "max_advance_height %d\n", face->max_advance_height );
-
-            printf( "underline_position   %d\n", face->underline_position );
-            printf( "underline_thickness  %d\n", face->underline_thickness );
-
-//    FT_GlyphSlot      glyph;
-//    FT_Size           size;
-//    FT_CharMap        charmap;
-
- // private begin
-
-//    FT_Driver         driver;
-//    FT_Memory         memory;
-//    FT_Stream         stream;
-
-//    FT_ListRec        sizes_list;
-
-//    FT_Generic        autohint;
-//    void*             extensions;
-
-//    FT_Face_Internal  internal;
-
-for( int cm = 0; cm < face->num_charmaps; cm++ )
-{
-   FT_CharMap charmap = face->charmaps[cm];
-   printf( "charmap %d =>\n", cm );
-   printf( "   encoding 0x%08x\n", charmap->encoding );
-   printf( "   platform 0x%02x\n", charmap->platform_id );
-   printf( "   encodeId 0x%02x\n", charmap->encoding_id );
-
-   FT_UInt   gindex;                                                
-   FT_ULong  charcode = FT_Get_First_Char( face, &gindex );
-   while( gindex != 0 )                                            
-   {                                                                
-      printf( "   -> charcode %lu, glyph %d\n", charcode, gindex );
-      charcode = FT_Get_Next_Char( face, charcode, &gindex );        
-   }                                                                
-}
-
-for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
-{
-   FT_Bitmap_Size const *bms = face->available_sizes + fs;
-   printf( "fixed bitmap size %d =>\n", fs );
-   printf( "   height %d\n", bms->height );
-   printf( "   width  %d\n", bms->width );
-}
-
-            FT_Done_Face( face );
-         }
-         else
-            fprintf( stderr, "Error %d loading face\n", error );
-      }
-      else
-         fprintf( stderr, "Error retrieving font data string\n" );
-      
-      error = FT_Done_FreeType( library );
-      if( 0 != error )
-      {
-         fprintf( stderr, "Error %d freeing freeType library\n", error );
-         exit( 3 );
-      }
       
       *rval = JSVAL_FALSE ;
       return JS_TRUE ;
@@ -538,6 +414,300 @@ for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
    return JS_FALSE ;
 }
 
+static JSBool
+jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   FT_Library library ;
+   int error = FT_Init_FreeType( &library );
+   if( 0 != error )
+   {
+      JS_ReportError( cx, "Error %d initializing freeType library\n", error );
+      exit( 3 );
+   }
+
+   jsval     dataVal ;
+   JSString *fontString ; 
+
+   if( JS_GetProperty( cx, obj, "data", &dataVal )
+       &&
+       JSVAL_IS_STRING( dataVal )
+       &&
+       ( 0 != ( fontString = JS_ValueToString( cx, dataVal ) ) ) )
+   {
+      FT_Face face;      /* handle to face object */
+
+      error = FT_New_Memory_Face( library, 
+                                  (FT_Byte *)JS_GetStringBytes( fontString ),   /* first byte in memory */
+                                  JS_GetStringLength(fontString),    /* size in bytes        */
+                                  0,                          /* face_index           */
+                                  &face );
+      if( 0 == error )
+      {
+         printf( "num_faces   %ld\n", face->num_faces );
+         printf( "face_index    %ld\n", face->face_index );
+
+         printf( "face_flags  %ld:\n", face->face_flags );
+         for( int mask = 1, idx = 0 ; mask <= FT_FACE_FLAG_GLYPH_NAMES ; mask <<= 1, idx++ )
+         {
+            if( idx < numFaceFlags_ )
+            {
+               if( 0 != ( face->face_flags & mask ) )
+                  printf( "   " );
+               else
+                  printf( "   !" );
+               printf( "%s\n", faceFlagNames_[idx] );
+            }
+            else
+               JS_ReportError( cx, "How did we get here!\n" );
+         } 
+
+         printf( "style_flags  %ld\n", face->style_flags );
+
+         printf( "num_glyphs  %ld\n", face->num_glyphs );
+
+         printf( "family_name %s\n", face->family_name );
+         printf( "style_name  %s\n", face->style_name );
+
+         printf( "num_fixed_sizes   %d\n", face->num_fixed_sizes );
+         for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
+         {
+            printf( "   %d/%d\n", face->available_sizes[fs].width,
+                                  face->available_sizes[fs].height );
+         }
+
+         printf( "num_charmaps   %d\n", face->num_charmaps );
+
+
+         // the following are only relevant to scalable outlines
+         //    FT_BBox           bbox;
+
+         printf( "units_per_EM   %d\n", face->units_per_EM );
+         printf( "ascender;      %d\n", face->ascender );
+         printf( "descender      %d\n", face->descender );
+         printf( "height         %d\n", face->height );
+
+         printf( "max_advance_width %d\n", face->max_advance_width );
+         printf( "max_advance_height %d\n", face->max_advance_height );
+
+         printf( "underline_position   %d\n", face->underline_position );
+         printf( "underline_thickness  %d\n", face->underline_thickness );
+
+         //    FT_GlyphSlot      glyph;
+         //    FT_Size           size;
+         //    FT_CharMap        charmap;
+
+         for( int cm = 0; cm < face->num_charmaps; cm++ )
+         {
+            FT_CharMap charmap = face->charmaps[cm];
+            printf( "charmap %d =>\n", cm );
+            printf( "   encoding 0x%08x\n", charmap->encoding );
+            printf( "   platform 0x%02x\n", charmap->platform_id );
+            printf( "   encodeId 0x%02x\n", charmap->encoding_id );
+         
+#define BADCHARCODE 0xFFFFaaaa
+            
+            FT_ULong  startCharCode = BADCHARCODE ;
+            FT_ULong  prevCharCode = BADCHARCODE ;
+
+            FT_UInt   gindex;                                                
+            FT_ULong  charcode = FT_Get_First_Char( face, &gindex );
+            while( gindex != 0 )                                            
+            {                                                                
+               if( charcode != prevCharCode + 1 )
+               {
+                  if( BADCHARCODE != prevCharCode )
+                  {
+                     printf( "   -> charcodes %lu->%lu\n", startCharCode, prevCharCode );
+                  }
+                  startCharCode = prevCharCode = charcode ;
+               }
+               else
+                  prevCharCode = charcode ;
+               charcode = FT_Get_Next_Char( face, charcode, &gindex );        
+            }                                                                
+            
+            if( BADCHARCODE != prevCharCode )
+            {
+               printf( "   -> charcodes %lu->%lu\n", startCharCode, prevCharCode );
+            }
+         }
+         
+         for( int fs = 0 ; fs < face->num_fixed_sizes ; fs++ )
+         {
+            FT_Bitmap_Size const *bms = face->available_sizes + fs;
+            printf( "fixed bitmap size %d =>\n", fs );
+            printf( "   height %d\n", bms->height );
+            printf( "   width  %d\n", bms->width );
+         }
+   
+         FT_Done_Face( face );
+      }
+      else
+         JS_ReportError( cx, "Error %d loading face\n", error );
+      
+      error = FT_Done_FreeType( library );
+      if( 0 != error )
+      {
+         JS_ReportError( cx, "Error %d freeing freeType library\n", error );
+         exit( 3 );
+      }
+   }
+   else
+      JS_ReportError( cx, "Error reading font data property" );
+      
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSBool
+jsFontNumFaces( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec fontMethods[] = {
+    {"dump",       jsFontDump,              0 },
+    {"numFaces",   jsFontNumFaces,          0 },
+    {0}
+};
+
+
+enum jsFont_tinyId {
+   FONTDATA,
+};
+
+
+extern JSClass jsFontClass_ ;
+
+JSClass jsFontClass_ = {
+  "font",
+   JSCLASS_HAS_PRIVATE,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+   JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSPropertySpec fontProperties_[] = {
+  {"data",        FONTDATA,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {0,0,0}
+};
+
+static void fontOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
+{
+   FT_Library library ;
+   int error = FT_Init_FreeType( &library );
+   if( 0 == error )
+   {
+      std::string sError ;
+      
+      FT_Face face;      /* handle to face object */
+      error = FT_New_Memory_Face( library, (FT_Byte *)f.getData(), f.getSize(), 0, &face );
+      if( 0 == error )
+      {
+         FT_Done_Face( face );
+
+         JSString *fontString = JS_NewStringCopyN( req.cx_, (char const *)f.getData(), f.getSize() );
+         if( fontString )
+         {
+            JS_DefineProperty( req.cx_, req.lhObj_, "data",
+                               STRING_TO_JSVAL( fontString ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            jsCurlOnComplete( req, f );
+         }
+         else
+            sError = "Error allocating font string" ;
+      }
+      else
+         sError = "Error loading font face" ;
+         
+      if( 0 < sError.size() )
+      {
+         jsCurlOnError( req, f );
+         JSString *errorStr = JS_NewStringCopyN( req.cx_, sError.c_str(), sError.size() );
+         JS_DefineProperty( req.cx_, 
+                            req.lhObj_, 
+                            "loadErrorMsg",
+                            STRING_TO_JSVAL( errorStr ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+      }
+      
+      error = FT_Done_FreeType( library );
+      if( 0 != error )
+      {
+         JS_ReportError( req.cx_, "Error %d initializing freeType library\n", error );
+         exit( 3 );
+      }
+   }
+   else
+   {
+      JS_ReportError( req.cx_, "Error %d initializing freeType library\n", error );
+      exit( 3 );
+   }
+
+}
+
+static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) 
+       && 
+       ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
+       &&
+       JSVAL_IS_OBJECT( argv[0] ) )
+   {
+      JSObject *thisObj = js_NewObject( cx, &jsFontClass_, NULL, NULL );
+
+      if( thisObj )
+      {
+         *rval = OBJECT_TO_JSVAL( thisObj ); // root
+         JS_DefineProperty( cx, thisObj, "isLoaded",
+                            JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, thisObj, "initializer",
+                            argv[0],
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
+         
+         jsCurlRequest_t request ;
+         request.onComplete = fontOnComplete ;
+         request.onError    = jsCurlOnError ;
+         request.lhObj_     = thisObj ;
+         request.rhObj_     = rhObj ;
+         request.cx_        = cx ;
+         request.mutex_     = &execMutex_ ;
+
+         if( queueCurlRequest( request ) )
+         {
+            return JS_TRUE ;
+         }
+         else
+         {
+            JS_ReportError( cx, "Error queueing curlRequest" );
+         }
+      }
+      else
+         JS_ReportError( cx, "Error allocating curlFile" );
+   }
+   else
+      JS_ReportError( cx, "Usage : new font( { url:\"something\" [,useCache:true] [,onLoad=\"doSomething();\"][,onLoadError=\"somethingElse();\"] } );" );
+      
+   return JS_TRUE ;
+
+}
+
 static JSFunctionSpec text_functions[] = {
     {"jsText",           jsText,        1 },
     {"jsDumpFont",       jsDumpFont,    1 },
@@ -547,6 +717,16 @@ static JSFunctionSpec text_functions[] = {
 
 bool initJSText( JSContext *cx, JSObject *glob )
 {
-   return JS_DefineFunctions( cx, glob, text_functions);
+   JSObject *rval = JS_InitClass( cx, glob, NULL, &jsFontClass_,
+                                  font, 1,
+                                  fontProperties_, 
+                                  fontMethods,
+                                  0, 0 );
+   if( rval )
+   {
+      return JS_DefineFunctions( cx, glob, text_functions);
+   }
+   
+   return false ;
 }
 
