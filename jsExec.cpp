@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.10  2002-11-17 03:17:11  ericn
+ * Revision 1.11  2002-11-17 03:31:48  ericn
+ * -temporary while checkin garbage collection
+ *
+ * Revision 1.10  2002/11/17 03:17:11  ericn
  * -added garbage collection, got rid of timeout
  *
  * Revision 1.9  2002/11/17 00:51:34  ericn
@@ -280,7 +283,12 @@ int main(int argc, char **argv)
                                     }
                                     else
                                     {
+/*
+                                       mutexLock_t lock( execMutex_ );
+                                       printf( "takin' out the trash\n" );
                                        JS_GC( cx );
+                                       printf( "done takin' out the trash\n" );
+*/                                       
                                     }
                                  }
                               }
