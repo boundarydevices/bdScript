@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.21  2003-02-02 19:38:26  ericn
+ * Revision 1.22  2003-09-15 02:22:25  ericn
+ * -updated to allow setting of recordLevel and record amplification
+ *
+ * Revision 1.21  2003/02/02 19:38:26  ericn
  * -removed debug msg
  *
  * Revision 1.20  2003/02/02 13:46:17  ericn
@@ -734,10 +737,47 @@ jsRecordStop( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    return JS_TRUE ;
 }
 
+static JSBool
+jsSetRecordLevel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc )
+       &&
+       ( JSVAL_IS_INT( argv[0] ) ) )
+   {
+      int newLevel = JSVAL_TO_INT( argv[0] );
+      getAudioQueue().setRecordLevel( newLevel );
+      *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "Usage: recordBuffer.setRecordLevel( 0-100 );\n" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetRecordAmp( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc )
+       &&
+       ( JSVAL_IS_INT( argv[0] ) ) )
+   {
+      audioQueue_t :: recordAmplifier_ = JSVAL_TO_INT( argv[0] );
+      *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "Usage: recordBuffer.setRecordLevel( 0-100 );\n" );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec recordBufferMethods_[] = {
-    {"record",       jsRecord,               0 },
-    {"playback",     jsRecordPlay,           0 },
-    {"stop",         jsRecordStop,           0 },
+    {"record",          jsRecord,               0 },
+    {"playback",        jsRecordPlay,           0 },
+    {"setRecordLevel",  jsSetRecordLevel,       0 },
+    {"setRecordAmp",    jsSetRecordAmp,         0 },
+    {"stop",            jsRecordStop,           0 },
     {0}
 };
 
