@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.22  2004-11-27 18:00:34  ericn
+ * Revision 1.23  2004-12-28 03:35:12  ericn
+ * -added shutdown routine
+ *
+ * Revision 1.22  2004/11/27 18:00:34  ericn
  * -only 6 params
  *
  * Revision 1.21  2004/11/26 15:33:51  ericn
@@ -104,7 +107,7 @@ class jsTouchPoll_t : public touchPoll_t {
 public:
    jsTouchPoll_t( void );
 
-   ~jsTouchPoll_t( void ){}
+   ~jsTouchPoll_t( void );
 
    virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
    virtual void onMove( int x, int y, unsigned pressure, timeval const &tv );
@@ -189,6 +192,10 @@ void jsTouchPoll_t :: translate( int &x, int &y ) const
       x = (coef_[0]*xIn + coef_[1]*yIn + coef_[2])/65536 ;
       y = (coef_[3]*xIn + coef_[4]*yIn + coef_[5])/65536 ;
    }
+}
+
+jsTouchPoll_t :: ~jsTouchPoll_t( void )
+{
 }
 
 void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
@@ -471,4 +478,11 @@ bool initJSTouch( JSContext *cx,
    return false ;
 }
 
-
+void shutdownTouch( void )
+{
+   if( touchPoll_ )
+   {
+      delete touchPoll_ ;
+      touchPoll_ = 0 ;
+   }
+}
