@@ -1,5 +1,5 @@
 #ifndef __JSPROCESS_H__
-#define __JSPROCESS_H__ "$Id: jsProcess.h,v 1.1 2003-08-24 17:32:17 ericn Exp $"
+#define __JSPROCESS_H__ "$Id: jsProcess.h,v 1.2 2003-08-24 22:01:01 ericn Exp $"
 
 /*
  * jsProcess.h
@@ -32,7 +32,10 @@
  * Change History : 
  *
  * $Log: jsProcess.h,v $
- * Revision 1.1  2003-08-24 17:32:17  ericn
+ * Revision 1.2  2003-08-24 22:01:01  ericn
+ * -added shutdown routine (atexit doesn't appear to work)
+ *
+ * Revision 1.1  2003/08/24 17:32:17  ericn
  * -Initial import
  *
  *
@@ -43,6 +46,8 @@
 #include "js/jsapi.h"
 
 bool initJSProcess( JSContext *cx, JSObject *glob );
+
+void shutdownJSProcesses( void );
 
 #endif
 
