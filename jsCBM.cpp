@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.11  2003-06-22 23:04:49  ericn
+ * Revision 1.12  2003-06-26 08:02:41  tkisky
+ * -add error message data
+ *
+ * Revision 1.11  2003/06/22 23:04:49  ericn
  * -modified to use constructor for initialization, private data for fd
  *
  * Revision 1.10  2003/06/06 01:48:46  ericn
@@ -162,13 +165,15 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                         image.setPixel( x, y );
                   }
                }
-               int const numWritten = write( *pfd, image.getData(), image.getLength() );
+               const void *const p = image.getData();
+               unsigned len = image.getLength();
+               int const numWritten = write( *pfd, p, len );
                if( numWritten == image.getLength() )
                {
                   *rval = JSVAL_TRUE ;
                }
                else
-                  JS_ReportError( cx, "%s sending print data", strerror( errno ) );
+                  JS_ReportError( cx, "%s(%i) sending print data, %p address, %i length, %i ret", strerror( errno ),errno, p, len,numWritten);
             }
             else
                JS_ReportError( cx, "Invalid pixMap" );
