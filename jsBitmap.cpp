@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.5  2004-09-25 21:50:07  ericn
+ * Revision 1.6  2004-11-16 07:34:59  tkisky
+ * -add return val setting to jsBitmapLine, make rect color same as line color
+ *
+ * Revision 1.5  2004/09/25 21:50:07  ericn
  * -added draw to screen method for BD2004
  *
  * Revision 1.4  2004/07/28 14:27:13  ericn
@@ -204,7 +207,7 @@ static JSBool
 jsBitmapRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 4 <= argc ) 
+   if( ( 4 <= argc )
        &&
        ( 5 >= argc )
        &&
@@ -216,7 +219,7 @@ jsBitmapRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
        &&
        JSVAL_IS_INT( argv[3] ) )
    {
-      bool const isSet = ( 5 <= argc ) ? ( 0 == JSVAL_TO_INT( argv[4] ) ) : true ;
+      bool const color = ( 5 <= argc ) ? (JSVAL_TO_INT( argv[4] ) ) : 0 ;
       unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
       unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
       unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
@@ -231,10 +234,10 @@ jsBitmapRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
           JSVAL_IS_STRING( dataVal ) )
       {
          bitmap_t bmp( (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
-                       JSVAL_TO_INT( widthVal ), 
+                       JSVAL_TO_INT( widthVal ),
                        JSVAL_TO_INT( heightVal ) );
-         bmp.rect( x1, y1, x2-x1+1, y2-y1+1, isSet );
-debugPrint( "bmp.rect:%u    %u:%u, %u:%u\n", isSet, x1, y1, x2, y2 );
+         bmp.rect( x1, y1, x2-x1+1, y2-y1+1, color );
+debugPrint( "bmp.rect:%u    %u:%u, %u:%u\n", color, x1, y1, x2, y2 );
          *rval = JSVAL_TRUE ;
       }
       else
@@ -249,7 +252,8 @@ debugPrint( "bmp.rect:%u    %u:%u, %u:%u\n", isSet, x1, y1, x2, y2 );
 static JSBool
 jsBitmapLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   if( ( 4 <= argc ) 
+   *rval = JSVAL_FALSE ;
+   if( ( 4 <= argc )
        &&
        ( 6 >= argc )
        &&
@@ -277,9 +281,10 @@ jsBitmapLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
           JSVAL_IS_STRING( dataVal ) )
       {
          bitmap_t bmp( (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
-                       JSVAL_TO_INT( widthVal ), 
+                       JSVAL_TO_INT( widthVal ),
                        JSVAL_TO_INT( heightVal ) );
          bmp.line( x1, y1, x2, y2, penWidth, 0 != color );
+         *rval = JSVAL_TRUE ;
       }
       else
          JS_ReportError( cx, "Invalid image" );
@@ -287,6 +292,7 @@ jsBitmapLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
    else
       JS_ReportError( cx, "Usage: bmp.line( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
 
+   return JS_TRUE ;
 }
 
 static JSBool
