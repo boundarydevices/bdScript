@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.80  2004-09-27 04:51:05  ericn
+ * Revision 1.81  2004-12-28 03:46:43  ericn
+ * -additional cleanup
+ *
+ * Revision 1.80  2004/09/27 04:51:05  ericn
  * -move md5 routine to its' own module
  *
  * Revision 1.79  2004/09/25 14:17:02  ericn
@@ -683,6 +686,8 @@ printf( "BD2004 board type\n" );
                   shutdownJSProcesses();
                   shutdownCurlWorkers();
                   shutdownCCDiskCache();
+                  shutdownTouch();
+                  abortCodeQueue();
 #ifdef CONFIG_BD2003
                   audioQueue_t::shutdown();
 #endif 
@@ -813,7 +818,6 @@ int main( int argc, char *argv[] )
          }
       } // limit scope of temporaries
    
-      debugPrint( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
       do
       {
          int result = prMain( argc, argv );
@@ -828,7 +832,9 @@ int main( int argc, char *argv[] )
             execv( argv[0], argv ); // start next
          }
          else
+         {
             return exitStatus_ ;
+         }
       } while( 1 );
    }
    else
