@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.25  2004-09-25 21:48:46  ericn
+ * Revision 1.26  2004-11-08 06:56:44  tkisky
+ * -640x240 comment
+ *
+ * Revision 1.25  2004/09/25 21:48:46  ericn
  * -added render(bitmap) method
  *
  * Revision 1.24  2004/06/27 14:50:44  ericn
@@ -111,7 +114,7 @@ static unsigned char *lcdRAM_ = 0 ;
 //15 14 13 10  9    8  4  3  2 12 11     7  6  5  1  0
 
 #if 1
-#define LCD_REORDER_BLUE  15,14,13,10, 9		//10.4 on new board
+#define LCD_REORDER_BLUE  15,14,13,10, 9		//10.4 on new board,and 640x240
 #define LCD_REORDER_GREEN  8, 4, 3, 2, 12, 11
 #define LCD_REORDER_RED    7, 6, 5, 1, 0
 #else
