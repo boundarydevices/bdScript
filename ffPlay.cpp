@@ -20,6 +20,7 @@ extern "C" {
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <linux/soundcard.h>
+#include <linux/input.h>
 #include <poll.h>
 #include "mad.h"
 #include "id3tag.h"
@@ -600,6 +601,23 @@ static void *outThread( void *param )
    return 0 ;
 }
 
+static bool haveTouch(  int fdTouch )
+{
+   pollfd filedes ;
+   filedes.fd = fdTouch ;
+   filedes.events = POLLIN ;
+   return ( 0 < poll( &filedes, 1, 0 ) );
+}
+
+static bool eatTouches( int fdTouch )
+{
+   while( haveTouch( fdTouch ) )
+   {
+      struct input_event events[1];
+      read( fdTouch, events, sizeof( events ) );
+   }
+}
+
 void main( int argc, char const * const argv[] )
 {
    yuv2rgb_c_init();
@@ -676,6 +694,13 @@ void main( int argc, char const * const argv[] )
                         if( 0 > ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
                            perror( "Error setting volume" );
 */
+                        char const *touchDevice = "/dev/touchscreen/ucb1x00" ;
+                        int fdTouch = open( touchDevice, O_RDONLY );
+                        if( 0 > fdTouch )
+                           fprintf( stderr, "Error opening touch screen\n" );
+
+                        eatTouches( fdTouch );
+
                         mmQueue_t outQueue( dspFd );
       
                         struct mad_stream stream;
@@ -700,7 +725,7 @@ void main( int argc, char const * const argv[] )
                         outQueue.ptsDenominator_ = ic_ptr->pts_den ;
                         INT64 ptsAdjustFrame = 0 ;
 
-                        while( 1 )
+                        while( !haveTouch( fdTouch ) )
                         {
                            int result = av_read_packet( ic_ptr, &pkt );
                            if( 0 <= result )
@@ -938,6 +963,8 @@ printf( "stream pts %lld: %lld/%lld\n",
                         unsigned elapsed = end-startSecs ;
                         printf( "%u seconds: %u pictures, %lu bytes of audio\n",
                                 elapsed, numDraw, audioBytesOut );
+
+                        eatTouches( fdTouch );
                      }
                      else
                         perror( "/dev/dsp" );
