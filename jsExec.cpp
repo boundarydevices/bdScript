@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.41  2003-06-08 15:20:48  ericn
+ * Revision 1.42  2003-06-22 23:03:54  ericn
+ * -removed closeCBM call
+ *
+ * Revision 1.41  2003/06/08 15:20:48  ericn
  * -added ffTest
  *
  * Revision 1.40  2003/06/07 16:41:52  ericn
@@ -378,7 +381,6 @@ int prMain(int argc, char **argv)
                            fprintf( stderr, "Error opening url %s\n", argv[1] );
                      } // limit scope of urlFile
 
-                     closeCBM( cx, glob );
                      shutdownTTY();
                      shutdownGpio();
 
