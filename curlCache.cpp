@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.10  2002-11-05 15:14:38  ericn
+ * Revision 1.11  2002-11-18 13:49:45  ericn
+ * -increased cache size to 3MB, 20 files
+ *
+ * Revision 1.10  2002/11/05 15:14:38  ericn
  * -oops, fixed param_t to use std::string
  *
  * Revision 1.9  2002/10/31 02:09:11  ericn
@@ -686,7 +689,7 @@ static curlCache_t *cache_ = 0 ;
 curlCache_t &getCurlCache( void )
 {
    if( 0 == cache_ )
-      cache_ = new curlCache_t( "/tmp/curl", (1<<20)+(1<<19), 5 );
+      cache_ = new curlCache_t( "/tmp/curl", (3<<20), 20 );
 
    return *cache_ ;
 }
