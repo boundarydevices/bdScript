@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgGIF.cpp,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-23 16:05:01  ericn
+ * -added placeholder for alpha channel
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -131,9 +134,10 @@ bool imageGIF( void const    *inData,     // input
                unsigned long  inSize,     // input
                void const    *&pixData,   // output
                unsigned short &width,     // output
-               unsigned short &height )   // output
+               unsigned short &height,    // output
+               void const    *&alpha )    // output : 0 if none, delete [] when done
 {
-   pixData = 0 ; width = height = 0 ;
+   pixData = alpha = 0 ; width = height = 0 ;
 
    gifSrc_t src ;
    src.data_    = (GifByteType *)inData ;
