@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.4  2003-08-02 19:28:57  ericn
+ * Revision 1.5  2003-08-04 03:13:56  ericn
+ * -added standalone test
+ *
+ * Revision 1.4  2003/08/02 19:28:57  ericn
  * -remove debug statement
  *
  * Revision 1.3  2003/07/27 15:14:28  ericn
@@ -28,6 +31,7 @@
 #include <mad.h>
 #include <stdio.h>
 #include <assert.h>
+#include "id3tag.h"
 
 inline unsigned short scale( mad_fixed_t sample )
 {
@@ -70,12 +74,14 @@ void madDecoder_t :: feed( void const *inData, unsigned long inBytes )
       assEndLength_ = 0 ;
    }
    else
+   {
       mad_stream_buffer( &mp3Stream_, (unsigned char const *)inData, inBytes );
+   }
 }
    
 bool madDecoder_t :: getData( void )
 {
-   if( !haveHeader_ )
+   while( !haveHeader_ )
    {
       struct mad_header header; 
       if( -1 != mad_header_decode( &header, &mp3Stream_ ) )
@@ -88,9 +94,44 @@ bool madDecoder_t :: getData( void )
       }
       else
       {
-         assEndLength_ = mp3Stream_.bufend-mp3Stream_.buffer ;
-         memcpy( assEnd_, mp3Stream_.buffer, assEndLength_ );
-         return false ;
+         if( MAD_RECOVERABLE( mp3Stream_.error ) )
+         {
+            if( MAD_ERROR_LOSTSYNC == mp3Stream_.error )
+            {
+               /* ignore LOSTSYNC due to ID3 tags */
+               int tagsize = id3_tag_query (mp3Stream_.this_frame, mp3Stream_.bufend - mp3Stream_.this_frame);
+               if (tagsize > 0)
+               {
+                  mad_stream_skip (&mp3Stream_, tagsize);
+                  continue;
+               }
+            }
+            printf("error decoding header: %s\n", 
+                   mad_stream_errorstr (&mp3Stream_));
+         }
+         else if( MAD_ERROR_BUFLEN == mp3Stream_.error )
+         {
+            assEndLength_ = mp3Stream_.bufend-mp3Stream_.buffer ;
+            if( assEndLength_ <= sizeof( assEnd_ ) )
+            {
+               if( assEndLength_ > 0 )
+                  memcpy( assEnd_, mp3Stream_.buffer, assEndLength_ );
+               else
+                  return false ;
+            }
+            else
+            {
+               fprintf( stderr, "buffer too large for ass-end:%u\n", assEndLength_ );
+               assEndLength_ = 0 ;
+               return false ;
+            }
+         }
+         else
+         {
+            printf( "unrecoverable error decoding header: %s\n", 
+                    mad_stream_errorstr( &mp3Stream_ ) );
+            return false ;
+         }
       }
    }
 
@@ -191,3 +232,38 @@ bool madDecoder_t :: readSamples( unsigned short samples[],
    numRead = nextOut - samples ;
    return 0 != numRead ;
 }
+
+#ifdef STANDALONE
+#include "memFile.h"
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 == argc )
+   {
+      memFile_t fIn( argv[1] );
+      if( fIn.worked() )
+      {
+         madDecoder_t decoder ;
+         decoder.feed( fIn.getData(), fIn.getLength() );
+         do {
+            enum { maxSamples = 512 };
+            unsigned short samples[maxSamples];
+            unsigned numRead ;
+            while( decoder.readSamples( samples, maxSamples, numRead ) )
+               printf( "%u samples\n", numRead );
+            if( !decoder.getData() )
+               break;
+            else
+               printf( "more data\n" );
+         } while( 1 );
+      }
+      else
+         perror( argv[1] );
+   }
+   else
+      fprintf( stderr, "Usage : madDecode fileName\n" );
+
+   return 0 ;
+}
+
+#endif
