@@ -1,5 +1,5 @@
 #ifndef __CODEQUEUE_H__
-#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.1 2002-10-27 17:42:08 ericn Exp $"
+#define __CODEQUEUE_H__ "$Id: codeQueue.h,v 1.2 2002-10-31 02:09:35 ericn Exp $"
 
 /*
  * codeQueue.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: codeQueue.h,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-10-31 02:09:35  ericn
+ * -added scope to code queue
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -33,13 +36,16 @@
 // returns true if compiled and queued successfully, 
 // false if the code couldn't be compiled 
 //
-bool queueSource( std::string const &sourceCode,
+bool queueSource( JSObject          *scope,
+                  std::string const &sourceCode,
                   char const        *sourceFile );
 
 //
 // returns a valid pointer if successful. 
 //
-JSScript *dequeueByteCode( unsigned long milliseconds = 0xFFFFFFFF );
+bool dequeueByteCode( JSScript    *&script,
+                      JSObject    *&scope,
+                      unsigned long milliseconds = 0xFFFFFFFF );
 
 //
 // This should be called after the initial script is 
