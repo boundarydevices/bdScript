@@ -1,7 +1,7 @@
 # 
 # Makefile for curlCache library and utility programs
 # 
-OBJS = childProcess.o codeQueue.o curlCache.o \
+OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        curlThread.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        imgGIF.o imgPNG.o imgJPEG.o \
        jsAlphaMap.o jsCurl.o jsGlobals.o jsHyperlink.o jsImage.o \
