@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.1  2003-07-20 15:43:38  ericn
+ * Revision 1.2  2003-07-20 18:35:38  ericn
+ * -added picType, decode timing
+ *
+ * Revision 1.1  2003/07/20 15:43:38  ericn
  * -Initial import
  *
  *
@@ -18,7 +21,10 @@
 #include "mpegDecode.h"
 
 extern "C" {
-#include <linux/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <time.h>
 #include <mpeg2dec/mpeg2.h>
 #include "mpeg2dec/video_out.h"
 #include "mpeg2dec/convert.h"
@@ -36,6 +42,7 @@ mpegDecoder_t :: mpegDecoder_t( void )
      mpegWidth_( 0 ),
      mpegHeight_( 0 ),
      mpegFrameType_( 0 ),
+     lastPicType_( ptUnknown_e ),
      skippedP_( false ),
      numSkipped_( 0 )
    , numParsed_( 0 )
@@ -64,6 +71,23 @@ void mpegDecoder_t :: feed
       unsigned char *bIn = (unsigned char *)inData ;
       mpeg2_buffer( DECODER, bIn, bIn + inBytes );
    }
+}
+
+inline void diffTime( timeval       &diff,
+                      timeval const &early,
+                      timeval const &late )
+{
+   long secs, usecs;
+   secs=late.tv_sec-early.tv_sec;
+   usecs=late.tv_usec-early.tv_usec;
+   if( usecs<0 ) 
+   {
+      usecs+=1000000;
+      --secs;
+   }
+
+   diff.tv_sec = secs ;
+   diff.tv_usec = usecs ;
 }
 
 bool mpegDecoder_t :: getPicture
@@ -100,14 +124,11 @@ fprintf( stderr, "----> sequence %dx%d\n", INFOPTR->sequence->width, INFOPTR->se
          }
          case STATE_PICTURE:
          {
-            printf( "mask %02x:", ptMask );
             int picType = ( INFOPTR->current_picture->flags & PIC_MASK_CODING_TYPE ) - 1;
             bool skip ;
-            static char const picTypes_[] = { 'I', 'P', 'B', 'D' };
-            if( picType < sizeof( picTypes_ ) )
+            if( picType <= ptD_e )
             {
-               printf( "%c", picTypes_[picType] );
-               type = (picType_e)picType ;
+               lastPicType_ = (picType_e)picType ;
                skip = ( 0 == ( ptMask & ( 1 << picType ) ) );
                if( PIC_FLAG_CODING_TYPE_I - 1 != picType ) 
                {
@@ -121,15 +142,17 @@ fprintf( stderr, "----> sequence %dx%d\n", INFOPTR->sequence->width, INFOPTR->se
                   skip = skippedP_ = false ;
             }
             else
+            {
+               fprintf( stderr, "unknown picType:%d", picType );
                skip = true ;
-
-            if( skip )
-               printf( "-\n" );
-            else
-               printf( "+\n" );
+            }
 
             numSkipped_ += skip ;
             mpeg2_skip( DECODER, skip );
+            if( !skip )
+            {
+               gettimeofday( &usStartDecode_, 0 );
+            }
             break;
          }
          case STATE_SLICE:
@@ -141,8 +164,13 @@ fprintf( stderr, "----> sequence %dx%d\n", INFOPTR->sequence->width, INFOPTR->se
                    && 
                    ( 0 == ( INFOPTR->current_picture->flags & PIC_FLAG_SKIP ) ) )
                {
+                  type = lastPicType_ ;
+                  lastPicType_ = ptUnknown_e ;
                   picture = INFOPTR->display_fbuf->buf[0];
-++numDraw_ ;
+                  gettimeofday( &usDecodeTime_, 0 );
+                  diffTime( usDecodeTime_, usStartDecode_, usDecodeTime_ );
+
+                  ++numDraw_ ;
                   return true ;
                }
                else
@@ -155,5 +183,17 @@ fprintf( stderr, "----> sequence %dx%d\n", INFOPTR->sequence->width, INFOPTR->se
    } while( -1 != mpState_ );
    
    return false ;
+}
+
+static char const cPicTypes[] = {
+   'I', 'P', 'B', 'D'
+};
+
+char mpegDecoder_t :: getPicType( picType_e t )
+{
+   if( (unsigned)t < sizeof( cPicTypes ) )
+      return cPicTypes[t];
+   else
+      return '?' ;
 }
 

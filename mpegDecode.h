@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.1 2003-07-20 15:43:35 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.2 2003-07-20 18:35:35 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.1  2003-07-20 15:43:35  ericn
+ * Revision 1.2  2003-07-20 18:35:35  ericn
+ * -added picType, decode timing
+ *
+ * Revision 1.1  2003/07/20 15:43:35  ericn
  * -Initial import
  *
  *
@@ -28,6 +31,7 @@
  * Copyright Boundary Devices, Inc. 2003
  */
 
+#include <sys/time.h>
 
 class mpegDecoder_t {
 public:
@@ -43,6 +47,8 @@ public:
       ptNoB_e     = 3,
       ptAll_e     = 15
    };
+   
+   static char getPicType( picType_e );
 
    void feed( void const   *inData, 
               unsigned long inBytes );
@@ -57,7 +63,7 @@ public:
    inline unsigned numSkipped( void ) const { return numSkipped_ ; }
    inline unsigned numParsed( void ) const { return numParsed_ ; }
    inline unsigned numDrawn( void ) const { return numDraw_ ; }
-
+   inline timeval const &usDecodeTime( void ) const { return usDecodeTime_ ; }
 private:
    typedef enum state_e {
       end_e,
@@ -72,6 +78,9 @@ private:
    unsigned short       mpegWidth_ ;
    unsigned short       mpegHeight_ ;
    unsigned char        mpegFrameType_ ; // 
+   picType_e            lastPicType_ ;
+   timeval              usStartDecode_ ;
+   timeval              usDecodeTime_ ;
    bool                 skippedP_ ;
    unsigned             numSkipped_ ;
    unsigned             numParsed_ ;
