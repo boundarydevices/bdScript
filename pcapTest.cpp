@@ -10,7 +10,10 @@
  * Change History : 
  *
  * $Log: pcapTest.cpp,v $
- * Revision 1.4  2003-08-10 19:06:39  ericn
+ * Revision 1.5  2003-08-10 21:21:29  ericn
+ * -modified to walk channels
+ *
+ * Revision 1.4  2003/08/10 19:06:39  ericn
  * -added AP to output
  *
  * Revision 1.3  2003/08/10 17:25:16  ericn
@@ -43,6 +46,7 @@
 #include <net/if_arp.h>
 #include "hexDump.h"
 #include <asm/types.h>
+#include <time.h>
 
 /*
  * Packet Types
@@ -283,262 +287,281 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
 	          if( -1 != bind(sock_fd, (struct sockaddr *) &sll, sizeof(sll))) 
                   {
                      printf( "bound\n" );
-                     p80211msg_lnxreq_wlansniff_t sniff ;
-                     memset( &sniff, 0, sizeof( sniff ) );
 
-                     sniff.msgcode = 0x83 ; // wlan sniff
-                     sniff.msglen  = sizeof( sniff );   // 120 == 96 body + 4 + 4 + 16
-                     strcpy( (char *)sniff.devname, "wlan0" );
+                     p80211msg_lnxreq_wlansniff_t sniffBase ;
+                     memset( &sniffBase, 0, sizeof( sniffBase ) );
 
-                     sniff.enable.did     = 0x00001083 ;
-                     sniff.enable.status  = 0x0000 ;
-                     sniff.enable.len     = 0x0004 ;
-                     sniff.enable.data    = 0x00000001 ;
+                     sniffBase.msgcode = 0x83 ; // wlan sniffBase
+                     sniffBase.msglen  = sizeof( sniffBase );   // 120 == 96 body + 4 + 4 + 16
+                     strcpy( (char *)sniffBase.devname, "wlan0" );
 
-                     sniff.channel.did     = 0x00002083 ;
-                     sniff.channel.status  = 0x0000 ;
-                     sniff.channel.len     = 0x0004 ;
-                     sniff.channel.data    = 0x0000000b ; // channel #11
+                     sniffBase.enable.did     = 0x00001083 ;
+                     sniffBase.enable.status  = 0x0000 ;
+                     sniffBase.enable.len     = 0x0004 ;
+                     sniffBase.enable.data    = 0x00000001 ;
 
-                     sniff.prismheader.did     = 0x00003083 ;
-                     sniff.prismheader.status  = 0x0000 ;
-                     sniff.prismheader.len     = 0x0004 ;
-                     sniff.prismheader.data    = 0x00000001 ;
+                     sniffBase.channel.did     = 0x00002083 ;
+                     sniffBase.channel.status  = 0x0000 ;
+                     sniffBase.channel.len     = 0x0004 ;
+                     sniffBase.channel.data    = 0 ; // channel # goes here
 
-                     sniff.wlanheader.did     = 0x00004083 ;
-                     sniff.wlanheader.status  = 0x0001 ;
-                     sniff.wlanheader.len     = 0x0004 ;
-                     sniff.wlanheader.data    = 0x00000000 ;
+                     sniffBase.prismheader.did     = 0x00003083 ;
+                     sniffBase.prismheader.status  = 0x0000 ;
+                     sniffBase.prismheader.len     = 0x0004 ;
+                     sniffBase.prismheader.data    = 0x00000001 ;
 
-                     sniff.keepwepflags.did     = 0x00005083 ;
-                     sniff.keepwepflags.status  = 0x0000 ;
-                     sniff.keepwepflags.len     = 0x0004 ;
-                     sniff.keepwepflags.data    = 0x00000000 ;
+                     sniffBase.wlanheader.did     = 0x00004083 ;
+                     sniffBase.wlanheader.status  = 0x0001 ;
+                     sniffBase.wlanheader.len     = 0x0004 ;
+                     sniffBase.wlanheader.data    = 0x00000000 ;
 
-                     sniff.stripfcs.did     = 0x00006083 ;
-                     sniff.stripfcs.status  = 0x0001 ;
-                     sniff.stripfcs.len     = 0x0004 ;
-                     sniff.stripfcs.data    = 0x00000000 ;
+                     sniffBase.keepwepflags.did     = 0x00005083 ;
+                     sniffBase.keepwepflags.status  = 0x0000 ;
+                     sniffBase.keepwepflags.len     = 0x0004 ;
+                     sniffBase.keepwepflags.data    = 0x00000000 ;
+
+                     sniffBase.stripfcs.did     = 0x00006083 ;
+                     sniffBase.stripfcs.status  = 0x0001 ;
+                     sniffBase.stripfcs.len     = 0x0004 ;
+                     sniffBase.stripfcs.data    = 0x00000000 ;
                      
-                     sniff.packet_trunc.did     = 0x00007083 ;
-                     sniff.packet_trunc.status  = 0x0001 ;
-                     sniff.packet_trunc.len     = 0x0004 ;
-                     sniff.packet_trunc.data    = 0x00000000 ;
+                     sniffBase.packet_trunc.did     = 0x00007083 ;
+                     sniffBase.packet_trunc.status  = 0x0001 ;
+                     sniffBase.packet_trunc.len     = 0x0004 ;
+                     sniffBase.packet_trunc.data    = 0x00000000 ;
 
-                     sniff.resultcode.did     = 0x00008083 ;
-                     sniff.resultcode.status  = 0x0000 ;
-                     sniff.resultcode.len     = 0x0004 ;
-                     sniff.resultcode.data    = 0x00000000 ; // output
-
-                     dump_msg( &sniff );
-                     p80211ioctl_req ioctlReq ;
-                     strcpy( ioctlReq.name, "wlan0" );
-                     ioctlReq.data = &sniff ;
-                     ioctlReq.magic = P80211_IOCTL_MAGIC ;
-                     ioctlReq.len  = sizeof( sniff );
-                     ioctlReq.result = 0 ;
-                     int ioctlRes = ioctl( sock_fd, P80211_IFREQ, &ioctlReq);
-                     if( 0 == ioctlRes )
+                     sniffBase.resultcode.did     = 0x00008083 ;
+                     sniffBase.resultcode.status  = 0x0000 ;
+                     sniffBase.resultcode.len     = 0x0004 ;
+                     sniffBase.resultcode.data    = 0x00000000 ; // output
+                     for( unsigned channel = 1 ; channel < 12 ; channel++ )
                      {
-                        while( 1 )
+                        printf( "----> channel %u\n", channel );
+                        p80211msg_lnxreq_wlansniff_t sniff = sniffBase ;
+                        sniff.channel.data = channel ;
+                        p80211ioctl_req ioctlReq ;
+                        strcpy( ioctlReq.name, "wlan0" );
+                        ioctlReq.data = &sniff ;
+                        ioctlReq.magic = P80211_IOCTL_MAGIC ;
+                        ioctlReq.len  = sizeof( sniff );
+                        ioctlReq.result = 0 ;
+                        int ioctlRes = ioctl( sock_fd, P80211_IFREQ, &ioctlReq);
+                        if( 0 == ioctlRes )
                         {
-                           fd_set rs;
-      
-                           FD_ZERO(&rs);
-                           FD_SET(sock_fd,&rs);
-                           FD_SET(0,&rs); /* Add stdin to it aswell */
-                           
-                           struct timeval tm;
-                           tm.tv_sec= 10 ;
-                           tm.tv_usec= 0 ;
-         	                int r = select(sock_fd+1,&rs,NULL,NULL,&tm);
-                           if( r <= 0 )
+                           time_t start ;
+                           time( &start );
+
+                           time_t now = start ;
+
+                           while( now < start + 2 )
                            {
-                              printf( "timeout: %u\n", r );
-                              break;
-                           }
-                           else
-                           {
-                              if( FD_ISSET( 0, &rs ) )
+                              fd_set rs;
+         
+                              FD_ZERO(&rs);
+                              FD_SET(sock_fd,&rs);
+                              FD_SET(0,&rs); /* Add stdin to it aswell */
+                              
+                              struct timeval tm;
+                              tm.tv_sec= 1 ;
+                              tm.tv_usec= 0 ;
+            	                int r = select(sock_fd+1,&rs,NULL,NULL,&tm);
+                              if( r > 0 )
                               {
-                                 char inChar ;
-                                 if( ( 1 == read( 0, &inChar, 1 ) )
-                                     && 
-                                     ( ( inChar == 'Q' ) 
-                                       ||
-                                       ( inChar == 'q') ) )
-                                    break;
-                              }
-   
-                              if( FD_ISSET( sock_fd, &rs ) ) 
-                              {
-                                 unsigned char buf[2048];
-                                 struct sockaddr_ll from;
-                                 socklen_t fromLen = sizeof( from );
-                                 unsigned const dataBytes = recvfrom( sock_fd, buf, sizeof( buf ), MSG_TRUNC, (struct sockaddr *)&from, &fromLen );
-                                 if( 0 <= dataBytes )
+                                 if( FD_ISSET( 0, &rs ) )
                                  {
-                                    unsigned char const *admbits = buf ;
-                                    unsigned char const *fixbits = buf+sizeof(AdmInfo_t); /* This is where the payload starts*/
-                                    AdmInfo_t const   *A = (AdmInfo_t *) admbits; /* First the frame from the card */
-                                    FixedMgmt_t       *M = (FixedMgmt_t *) fixbits; /*Then the actual data*/
-                                    ProbeFixedMgmt_t  *P = (ProbeFixedMgmt_t *) fixbits; /*Then the actual data*/
-   
-                                    ScanResult_t Res ;
-   	
-                                    memset(&Res,0,sizeof(Res));
-   
-                                    Res.FrameType = M->frametype;
-   
-                                    if( M->frametype  == MGT_PROBE_RESP || M->frametype == MGT_BEACON ){
-                                       Res.isAp   = IS_TO_DS(COOK_FLAGS(M->frametype)) != 0;
-                                       Res.isAp   += IS_FROM_DS(COOK_FLAGS(M->frametype)) != 0; // in this case we have more than one ap
-                                       Res.hasWep = IS_WEP(COOK_FLAGS(M->frametype)) != 0;
-                                       Res.hasWep += IS_WEP_REQUIRED(M->Capabilities) != 0;
-                                    }
-                                    if( M->frametype  == MGT_PROBE || M->frametype == MGT_BEACON ){
-                                       if(! ( M->DestAddr[0] == 0xff && M->DestAddr[1] == 0xff &&
-                                       M->DestAddr[2] == 0xff && M->DestAddr[3] == 0xff &&
-                                       M->DestAddr[4] == 0xff && M->DestAddr[5] == 0xff
-                                       )) printf( "non-broadcast beacon\n" );
-                                    }
-                                    
-                                    if( M->frametype  == MGT_PROBE  ){
-                                       Res.isAp   = AP_PROBE  ;
-                                       Res.hasWep =  0;
-                                       Res.Channel = 0;
-                                    }
-                                    
-                                    Res.Signal = A->signal.data;
-                                    Res.Noise = A->noise.data;
-   
-                                    if (M->frametype & DATA_PURE) // do we have a data packet?
+                                    char inChar ;
+                                    if( ( 1 == read( 0, &inChar, 1 ) )
+                                        && 
+                                        ( ( inChar == 'Q' ) 
+                                          ||
+                                          ( inChar == 'q') ) )
+                                       break;
+                                 }
+      
+                                 if( FD_ISSET( sock_fd, &rs ) ) 
+                                 {
+                                    unsigned char buf[2048];
+                                    struct sockaddr_ll from;
+                                    socklen_t fromLen = sizeof( from );
+                                    unsigned const dataBytes = recvfrom( sock_fd, buf, sizeof( buf ), MSG_TRUNC, (struct sockaddr *)&from, &fromLen );
+                                    if( 0 <= dataBytes )
                                     {
-                                       int const sdt = (M->frametype & 0x0300) >> 8 ;
-                                       static char const * const srcDest[] = {
-                                          "NN",    // node to node
-                                          "AN",    // AP to node
-                                          "NA",    // Node to AP
-                                          "AA"     // AP to AP
-                                       };
-                                       static unsigned const hdrLengths[] = {
-                                          DATA_SHORT_HDR_LEN,    // node to node
-                                          DATA_SHORT_HDR_LEN,    // AP to node
-                                          DATA_SHORT_HDR_LEN,    // Node to AP
-                                          DATA_LONG_HDR_LEN      // AP to AP
-                                       };
+                                       unsigned char const *admbits = buf ;
+                                       unsigned char const *fixbits = buf+sizeof(AdmInfo_t); /* This is where the payload starts*/
+                                       AdmInfo_t const   *A = (AdmInfo_t *) admbits; /* First the frame from the card */
+                                       FixedMgmt_t       *M = (FixedMgmt_t *) fixbits; /*Then the actual data*/
+                                       ProbeFixedMgmt_t  *P = (ProbeFixedMgmt_t *) fixbits; /*Then the actual data*/
+      
+                                       ScanResult_t Res ;
+      	
+                                       memset(&Res,0,sizeof(Res));
+      
+                                       Res.FrameType = M->frametype;
+      
+                                       if( M->frametype  == MGT_PROBE_RESP || M->frametype == MGT_BEACON ){
+                                          Res.isAp   = IS_TO_DS(COOK_FLAGS(M->frametype)) != 0;
+                                          Res.isAp   += IS_FROM_DS(COOK_FLAGS(M->frametype)) != 0; // in this case we have more than one ap
+                                          Res.hasWep = IS_WEP(COOK_FLAGS(M->frametype)) != 0;
+                                          Res.hasWep += IS_WEP_REQUIRED(M->Capabilities) != 0;
+                                       }
+                                       if( M->frametype  == MGT_PROBE || M->frametype == MGT_BEACON ){
+                                          if(! ( M->DestAddr[0] == 0xff && M->DestAddr[1] == 0xff &&
+                                          M->DestAddr[2] == 0xff && M->DestAddr[3] == 0xff &&
+                                          M->DestAddr[4] == 0xff && M->DestAddr[5] == 0xff
+                                          )) printf( "non-broadcast beacon\n" );
+                                       }
                                        
-                                       unsigned const hdrlen = hdrLengths[sdt];
-                                       unsigned char *iv = buf + hdrlen + sizeof( AdmInfo_t ) - 8 ;
-                                       bool const wep = IS_WEP(COOK_FLAGS(M->frametype));
-   
-                                       printf( "D:%u/%u:%s:%s\n", fromLen, dataBytes, srcDest[sdt], wepFlags[wep] );
+                                       if( M->frametype  == MGT_PROBE  ){
+                                          Res.isAp   = AP_PROBE  ;
+                                          Res.hasWep =  0;
+                                          Res.Channel = 0;
+                                       }
+                                       
+                                       Res.Signal = A->signal.data;
+                                       Res.Noise = A->noise.data;
+      
+                                       if (M->frametype & DATA_PURE) // do we have a data packet?
+                                       {
+                                          int const sdt = (M->frametype & 0x0300) >> 8 ;
+                                          static char const * const srcDest[] = {
+                                             "NN",    // node to node
+                                             "AN",    // AP to node
+                                             "NA",    // Node to AP
+                                             "AA"     // AP to AP
+                                          };
+                                          static unsigned const hdrLengths[] = {
+                                             DATA_SHORT_HDR_LEN,    // node to node
+                                             DATA_SHORT_HDR_LEN,    // AP to node
+                                             DATA_SHORT_HDR_LEN,    // Node to AP
+                                             DATA_LONG_HDR_LEN      // AP to AP
+                                          };
+                                          
+                                          unsigned const hdrlen = hdrLengths[sdt];
+                                          unsigned char *iv = buf + hdrlen + sizeof( AdmInfo_t ) - 8 ;
+                                          bool const wep = IS_WEP(COOK_FLAGS(M->frametype));
+      
+                                          printf( "D:%u/%u:%s:%s\n", fromLen, dataBytes, srcDest[sdt], wepFlags[wep] );
+                                       }
+                                       else
+                                       {
+                                          if( MGT_BEACON == M->frametype )
+                                          {
+                                             unsigned char *ap = M->SrcAddr ;
+                                             ap[0] = '\0' ;
+                                             char ssid[32];
+                                             ssid[0] = '\0' ; // flag not present
+                                             unsigned frameChannel = 0 ;
+                                             bool     hasWep  = IS_WEP_REQUIRED(M->Capabilities);
+                                             unsigned char const *varBits = &fixbits[sizeof(FixedMgmt_t)];
+                                             unsigned char const *end = buf + dataBytes ;
+                                             while( varBits < end )
+                                             {
+                                                unsigned const tagType = varBits[0];
+                                                unsigned const tagLen  = varBits[1];
+                                                varBits+=2;
+      
+                                                switch(tagType)
+                                                {
+                                                   case TAG_SSID:
+                                                      {
+                                                         unsigned const ssidLen = ( tagLen >= sizeof( ssid ) )
+                                                                                  ? sizeof( ssid ) - 1 
+                                                                                  : tagLen ;
+                                                         memcpy( ssid, varBits, ssidLen );
+                                                         ssid[ssidLen] = '\0' ;
+                                                         break;
+                                                      }
+                                                   case TAG_DS_PARAMETER:
+                                                      {
+                                                         if( 1 == tagLen )
+                                                            frameChannel = *varBits ;
+                                                         break;
+                                                      }
+                                                   /* Skip all other values for the moment */
+                                                   case TAG_SUPP_RATES:
+                                                      {
+                                                         break;
+                                                      }
+                                                   case TAG_TIM: // ?? beacon interval
+                                                      {
+                                                         break;
+                                                      }
+                                                   case TAG_FH_PARAMETER:
+                                                   case TAG_CF_PARAMETER:
+                                                   case TAG_IBSS_PARAMETER :
+                                                   case TAG_CHALLENGE_TEXT:
+                                                      {
+      /*
+                                                         printf( "   tag %u\n", tagType );
+                                                         hexDumper_t dumpTag( varBits, tagLen );
+                                                         while( dumpTag.nextLine() )
+                                                            printf( "   %s\n", dumpTag.getLine() );
+      */                                                      
+                                                         break;
+                                                      }
+                                                }	
+                                                varBits+=tagLen;
+                                             }
+                                             if( ssid[0] )
+                                             {
+                                                if( channel == frameChannel )
+                                                {
+                                                   printf( "BSS %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
+                                                           " AP %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
+                                                           " %s SSID %s, channel %u, signal %u, noise %u\n", 
+                                                           M->BssId[0], M->BssId[1],
+                                                           M->BssId[2], M->BssId[3],
+                                                           M->BssId[4], M->BssId[5],
+                                                           M->SrcAddr[0], M->SrcAddr[1],
+                                                           M->SrcAddr[2], M->SrcAddr[3],
+                                                           M->SrcAddr[4], M->SrcAddr[5],
+                                                           wepFlags[hasWep],
+                                                           ssid, frameChannel, A->signal.data, A->noise.data );
+                                                }
+                                                else
+                                                   printf( "leakCH %u, signal %u, noise %u\n", frameChannel, A->signal.data, A->noise.data );
+                                             }
+                                          }
+                                          else
+                                          {
+//                                             printf( "M:%04x\n", M->frametype );
+                                          }
+      
+                                       } // Mgmt frame
+      /*
+                                       hexDumper_t dumpHeader( &from, fromLen );
+                                       while( dumpHeader.nextLine() )
+                                          printf( "%s\n", dumpHeader.getLine() );
+                                       hexDumper_t dumpRx( buf, dataBytes );
+                                       while( dumpRx.nextLine() )
+                                          printf( "%s\n", dumpRx.getLine() );
+      */                                    
                                     }
                                     else
                                     {
-                                       if( MGT_BEACON == M->frametype )
-                                       {
-                                          unsigned char *ap = M->SrcAddr ;
-                                          ap[0] = '\0' ;
-                                          char ssid[32];
-                                          ssid[0] = '\0' ; // flag not present
-                                          unsigned channel = 0 ;
-                                          bool     hasWep  = IS_WEP_REQUIRED(M->Capabilities);
-                                          unsigned char const *varBits = &fixbits[sizeof(FixedMgmt_t)];
-                                          unsigned char const *end = buf + dataBytes ;
-                                          while( varBits < end )
-                                          {
-                                             unsigned const tagType = varBits[0];
-                                             unsigned const tagLen  = varBits[1];
-                                             varBits+=2;
-   
-                                             switch(tagType)
-                                             {
-                                                case TAG_SSID:
-                                                   {
-                                                      unsigned const ssidLen = ( tagLen >= sizeof( ssid ) )
-                                                                               ? sizeof( ssid ) - 1 
-                                                                               : tagLen ;
-                                                      memcpy( ssid, varBits, ssidLen );
-                                                      ssid[ssidLen] = '\0' ;
-                                                      break;
-                                                   }
-                                                case TAG_DS_PARAMETER:
-                                                   {
-                                                      if( 1 == tagLen )
-                                                         channel = *varBits ;
-                                                      break;
-                                                   }
-                                                /* Skip all other values for the moment */
-                                                case TAG_SUPP_RATES:
-                                                   {
-                                                      break;
-                                                   }
-                                                case TAG_TIM: // ?? beacon interval
-                                                   {
-                                                      break;
-                                                   }
-                                                case TAG_FH_PARAMETER:
-                                                case TAG_CF_PARAMETER:
-                                                case TAG_IBSS_PARAMETER :
-                                                case TAG_CHALLENGE_TEXT:
-                                                   {
-   /*
-                                                      printf( "   tag %u\n", tagType );
-                                                      hexDumper_t dumpTag( varBits, tagLen );
-                                                      while( dumpTag.nextLine() )
-                                                         printf( "   %s\n", dumpTag.getLine() );
-   */                                                      
-                                                      break;
-                                                   }
-                                             }	
-                                             varBits+=tagLen;
-                                          }
-                                          if( ssid[0] && ( 0 != channel ) )
-                                          {
-                                             printf( "BSS %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
-                                                     " AP %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
-                                                     " %s SSID %s, channel %u, signal %u, noise %u\n", 
-                                                     M->BssId[0], M->BssId[1],
-                                                     M->BssId[2], M->BssId[3],
-                                                     M->BssId[4], M->BssId[5],
-                                                     M->SrcAddr[0], M->SrcAddr[1],
-                                                     M->SrcAddr[2], M->SrcAddr[3],
-                                                     M->SrcAddr[4], M->SrcAddr[5],
-                                                     wepFlags[hasWep],
-                                                     ssid, channel, A->signal.data, A->noise.data );
-                                          }
-                                       }
-                                       else
-                                          printf( "M:%04x\n", M->frametype );
-   
-                                    } // Mgmt frame
-   /*
-                                    hexDumper_t dumpHeader( &from, fromLen );
-                                    while( dumpHeader.nextLine() )
-                                       printf( "%s\n", dumpHeader.getLine() );
-                                    hexDumper_t dumpRx( buf, dataBytes );
-                                    while( dumpRx.nextLine() )
-                                       printf( "%s\n", dumpRx.getLine() );
-   */                                    
-                                 }
-                                 else
-                                 {
-                                    perror( "recv" );
-                                    break;
+                                       perror( "recv" );
+                                       break;
+                                    }
                                  }
                               }
+
+                              time( &now );
                            }
                         }
-                           
-                        sniff.enable.data    = 0x00000000 ;
-                        ioctlRes = ioctl( sock_fd, P80211_IFREQ, &ioctlReq);
-                        if( 0 != ioctlRes )
-                           perror( "Turning off sniff" );
-                     }
-                     else
-                        perror( "P80211_IFREQ" );
+                        else
+                           perror( "P80211_IFREQ" );
+                     } // for each channel
 
+                     sniffBase.enable.data    = 0x00000000 ;
+                     p80211ioctl_req ioctlReq ;
+                     strcpy( ioctlReq.name, "wlan0" );
+                     ioctlReq.data = &sniffBase ;
+                     ioctlReq.magic = P80211_IOCTL_MAGIC ;
+                     ioctlReq.len  = sizeof( sniffBase );
+                     ioctlReq.result = 0 ;
+                     int ioctlRes = ioctl( sock_fd, P80211_IFREQ, &ioctlReq);
+                     if( 0 != ioctlRes )
+                        perror( "Turning off sniff" );
                      fcntl( 0, F_SETFL, oldFlags );
 
                   }
