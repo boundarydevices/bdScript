@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.8  2002-10-25 04:51:20  ericn
+ * Revision 1.9  2002-10-31 02:09:11  ericn
+ * -added default constructor for curlRequest_t, modified to use get() instead of post when no params
+ *
+ * Revision 1.8  2002/10/25 04:51:20  ericn
  * -modified to use only 1.5MB for cache
  *
  * Revision 1.7  2002/10/25 02:53:33  ericn
@@ -273,6 +276,10 @@ curlFile_t curlCache_t :: post( curlRequest_t const &req, bool useCache )
    if( useCache && ( 0 == statResult ) )
    {
    } // file in cache... return it
+   else if( 0 == req.parameters_.size() )
+   {
+      return get( req.getURL(), useCache );
+   }
    else
    {
       if( 0 == statResult )
@@ -306,6 +313,12 @@ curlFile_t curlCache_t :: post( curlRequest_t const &req, bool useCache )
    } // file not found, retrieve it
    
    return curlFile_t( cacheName.c_str() );
+}
+
+curlRequest_t :: curlRequest_t( void )
+   : url_( "" ),
+     hasFile_( false )
+{
 }
 
 curlRequest_t :: curlRequest_t( char const url[] )
