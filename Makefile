@@ -94,6 +94,8 @@ OBJS = \
        pollTimer.o \
        popen.o \
        relativeURL.o \
+       rollingMean.o \
+       rollingMedian.o \
        semClasses.o \
        serialPoll.o \
        sniffWLAN.o \
