@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.3  2002-11-30 05:23:40  ericn
+ * Revision 1.4  2002-11-30 16:31:40  ericn
+ * -changed work request url to char array from string
+ *
+ * Revision 1.3  2002/11/30 05:23:40  ericn
  * -removed (dead)lock in openHandle()
  *
  * Revision 1.2  2002/11/29 18:37:47  ericn
@@ -68,7 +71,7 @@ void curlCache_t :: get
    
             curlTransferRequest_t workReq ;
             workReq.opaque_   = item ;
-            workReq.url_      = url ;
+            strcpy( workReq.url_, url.c_str() );
             workReq.postHead_ = 0 ;
             workReq.cancel_   = &item->cancel_ ;
    
@@ -163,7 +166,7 @@ void curlCache_t :: post
 
       curlTransferRequest_t workReq ;
       workReq.opaque_   = item ;
-      workReq.url_      = url ;
+      strcpy( workReq.url_, url.c_str() );
       workReq.postHead_ = postHead ;
       workReq.cancel_   = &item->cancel_ ;
 
