@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.29  2003-08-06 13:24:14  ericn
+ * Revision 1.30  2003-09-15 02:22:49  ericn
+ * -added settable record amplification
+ *
+ * Revision 1.29  2003/08/06 13:24:14  ericn
  * -fixed audio playback for flash
  *
  * Revision 1.28  2003/08/04 12:37:51  ericn
@@ -227,37 +230,21 @@ void setVolume( unsigned char volParam )
 // It is used to keep the slightest bit of background noise from being
 // amplified to full-scale.
 //
-static unsigned long const maxNormalizeRatio = 0x243f6f ; 
+static unsigned long const maxNormalizeRatio = 7397827 ;
+static unsigned long const minNormalizeRatio = 943297 ;
+static unsigned long const ratioPer100 = (maxNormalizeRatio-minNormalizeRatio)/100 ;
+unsigned char audioQueue_t :: recordAmplifier_ = 0 ;
 
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
-   signed short min = 0x7fff ;
-   signed short max = 0x8000 ;
-   signed short *next = samples ;
-   for( unsigned i = 0 ; i < numSamples ; i++ )
-   {
-      signed short s = *next++ ;
-      if( s > max )
-         max = s ;
-      if( s < min )
-         min = s ;
-   }
-   min = 0-min ;
-   max = max > min ? max : min ;
-   
-   //
-   // fixed point 16:16
-   //
-   unsigned long ratio = ( 0x70000000UL / max );
-   if( ratio > maxNormalizeRatio )
-      ratio = maxNormalizeRatio ;
-
-   next = samples ;
+   unsigned long ratio = minNormalizeRatio + (audioQueue_t::recordAmplifier_*ratioPer100);
+printf( "ratio 0x%lx\n", ratio );
+   short *next = samples ;
    for( unsigned i = 0 ; i < numSamples ; i++ )
    {
       signed long x16 = ratio * *next ;
-      signed short s = (signed short)( x16 >> 16 );
+      signed short s = ((signed short const *)&x16)[1];
       *next++ = s ;
    }
 }
@@ -871,11 +858,11 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      break;
                   }
                }
-   
+
                header.numSamples_ = ( maxSamples*sizeof(header.samples_[0]) - bytesLeft ) / sizeof( header.samples_[0] );
                header.numChannels_ = 1 ;
-   
-               normalize( (short *)header.samples_, header.numSamples_ );
+
+                normalize( (short *)header.samples_, header.numSamples_ );
                _recording = false ;
                
                if( !queue->shutdown_ )
@@ -1394,6 +1381,21 @@ bool audioQueue_t :: stopRecording( void )
    }
    else
       return false ;
+}
+
+bool audioQueue_t :: setRecordLevel( int newLevel )
+{
+   int readFd = openReadFd();
+   if( 0 <= readFd )
+   {
+      if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &newLevel ) )
+         perror( "set record level" );
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &newLevel ) )
+         perror( "get record level" );
+      else
+         printf( "new record level %d\n", newLevel );
+      closeReadFd();
+   }
 }
 
 void audioQueue_t :: shutdown( void )

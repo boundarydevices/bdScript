@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.11 2003-08-04 12:37:48 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.12 2003-09-15 02:22:43 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.11  2003-08-04 12:37:48  ericn
+ * Revision 1.12  2003-09-15 02:22:43  ericn
+ * -added settable record amplification
+ *
+ * Revision 1.11  2003/08/04 12:37:48  ericn
  * -added raw MP3 (for flash)
  *
  * Revision 1.10  2003/08/02 19:30:00  ericn
@@ -157,14 +160,21 @@ public:
    bool clear( unsigned &numCancelled );
 
    //
-   //
+   // stop recording. returns true if we were recording
    //
    bool stopRecording( void );
+
+   //
+   // set input sensitivity for the microphone
+   //
+   bool setRecordLevel( int newLevel );
 
    //
    // shutdown audio output thread
    //
    static void shutdown( void );
+
+   static unsigned char recordAmplifier_ ; // 0-100
 
 private:
    //
