@@ -2,4 +2,4 @@
 build ftRender tsThread madHeaders madTest imgJPEG imgPNG ccDiskCache ccWorker ccActiveURL hexDump semClasses popen
 parsedURL recordTest ftDump
 *.lst *.out bc
-ffFormat ffFrames testffFormat
+ffPlay ffFormat ffFrames testffFormat

@@ -155,6 +155,10 @@ ffFrames: ffFrames.cpp $(LIB)
 	$(CC) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
 	$(STRIP) $@
 
+ffPlay: ffPlay.cpp $(LIB)
+	$(CC) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
+	$(STRIP) $@
+
 all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc
 
 .PHONY: install-libs install-headers
