@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.8 2003-04-24 11:16:44 tkisky Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.9 2003-07-30 20:26:00 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.8  2003-04-24 11:16:44  tkisky
+ * Revision 1.9  2003-07-30 20:26:00  ericn
+ * -added MPEG support
+ *
+ * Revision 1.8  2003/04/24 11:16:44  tkisky
  * -include js/jsapi.h
  *
  * Revision 1.7  2003/02/08 14:56:40  ericn
@@ -61,7 +64,8 @@ public:
    enum itemType_e {
       mp3Play_    = 0,
       wavRecord_  = 1,
-      wavPlay_    = 2
+      wavPlay_    = 2,
+      mpegPlay_   = 3
    };
 
    struct item_t {
@@ -72,6 +76,8 @@ public:
       jsval                onComplete_ ;
       jsval                onCancel_ ;
       bool                 isComplete_ ;
+      unsigned             xPos_ ;
+      unsigned             yPos_ ;
    };
 
    //
@@ -92,6 +98,17 @@ public:
                        unsigned             length,
                        jsval                onComplete = JSVAL_VOID,
                        jsval                onCancel = JSVAL_VOID );
+
+   //
+   // queue an MPEG video file for playback
+   //
+   bool queueMPEG( JSObject            *mpegObj,
+                   unsigned char const *data,
+                   unsigned             length,
+                   jsval                onComplete = JSVAL_VOID,
+                   jsval                onCancel = JSVAL_VOID,
+                   unsigned             xPos = 0,
+                   unsigned             yPos = 0 );
 
    //
    // queue a wave file for playback

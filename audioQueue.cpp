@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.23  2003-07-29 20:03:56  tkisky
+ * Revision 1.24  2003-07-30 20:26:03  ericn
+ * -added MPEG support
+ *
+ * Revision 1.23  2003/07/29 20:03:56  tkisky
  * -close dsp after successful getVolume call
  *
  * Revision 1.22  2003/02/24 03:37:49  ericn
@@ -93,6 +96,17 @@
 #include <sys/ioctl.h>
 #include "madHeaders.h"
 #include "jsGlobals.h"
+#include "mpegDecode.h"
+#include "madDecode.h"
+#include <zlib.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+#include <poll.h>
+#include "videoQueue.h"
+#include "tickMs.h"
+#include "videoFrames.h"
+#include <pthread.h>
+#include "fbDev.h"
 
 static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
@@ -282,6 +296,54 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
+struct playbackArgs_t {
+   unsigned xPos_ ;
+   unsigned yPos_ ;
+   unsigned width_ ;
+   unsigned height_ ;
+   mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
+   mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
+};
+
+struct videoParams_t {
+   videoFrames_t &frames_ ;
+   unsigned       x_ ;
+   unsigned       y_ ;
+};
+
+static void *videoThreadRtn( void *arg )
+{
+   videoParams_t const &params = *(videoParams_t const *)arg ;
+   videoFrames_t &frames = params.frames_ ;
+printf( "play video at %u:%u\n", params.x_, params.y_ );
+   fbDevice_t    &fb = getFB();
+   videoQueue_t :: entry_t *entry ;
+   unsigned picCount = 0 ;
+//   frames.setStart( tickMs() );
+   unsigned const rowStride = frames.getRowStride();
+   unsigned const height    = frames.getHeight();
+   unsigned const fbStride  = 2*fb.getWidth();
+   unsigned char *fbStart = (unsigned char *)fb.getMem() 
+                            + params.x_ * 2 
+                            + params.y_ * fbStride ;
+
+   while( !_cancel && frames.pull( entry ) )
+   {
+      unsigned char *fbMem = fbStart ;
+      unsigned char const *dataMem = entry->data_ ;
+      for( unsigned i = 0 ; i < height ; i++ )
+      {
+         memcpy( fbMem, dataMem, rowStride );
+         fbMem += fbStride ;
+         dataMem += rowStride ;
+      }
+//      memcpy( fb.getMem(), entry->data_, fb.getMemSize() );
+      picCount++ ;
+   }
+
+   printf( "%u pictures\n", picCount );
+}
+
 void *audioThread( void *arg )
 {
 printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
@@ -320,7 +382,6 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
       {
          if( audioQueue_t :: mp3Play_ == item->type_ )
          {
-//            fprintf( stderr, "mp3Play\n" );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
@@ -475,7 +536,6 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
          }
          else if( audioQueue_t::wavPlay_ == item->type_ )
          {
-//            fprintf( stderr, "wavPlay\n" );
             writeFd = openWriteFd();
             if( 0 <= writeFd )
             {
@@ -627,6 +687,284 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             else
                perror( "audioReadFd" );
          }
+         else if( audioQueue_t :: mpegPlay_ == item->type_ )
+         {
+            writeFd = openWriteFd();
+            if( 0 < writeFd )
+            {
+printf( "MPEG playback here at x:%u, y:%u\n", item->xPos_, item->yPos_ );
+               _playing = true ;
+               
+               mpegDemux_t demuxer( item->data_, item->length_ );
+      
+               mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
+               
+printf( "have %u streams\n", bi->count_ ); fflush( stdout );
+               playbackArgs_t playbackArgs = { 0, 0, 0, 0, 0, 0 };
+      
+               for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
+               {
+                  mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[sIdx];
+                  mpegDemux_t::frameType_e const ft = sAndF.sInfo_.type ;
+                  switch( ft )
+                  {
+                     case mpegDemux_t::videoFrame_e :
+                     {
+                        playbackArgs.videoFrames_ = bi->streams_[sIdx];
+                        break;
+                     }
+      
+                     case mpegDemux_t::audioFrame_e :
+                     {
+                        playbackArgs.audioFrames_ = bi->streams_[sIdx];
+                        break;
+                     }
+                  }
+               } // for each stream in the file
+      
+               if( ( 0 != playbackArgs.audioFrames_ )
+                   &&
+                   ( 0 != playbackArgs.videoFrames_ ) )
+               {
+                  printf( "0x%llx milli-seconds total\n", bi->msTotal_ );
+                  printf( "%llu.%03llu seconds total\n", bi->msTotal_ / 1000, bi->msTotal_ % 1000 );
+                  long long msStart = tickMs();
+                  audio_buf_info ai ;
+                  if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                  {
+                     fbDevice_t    &fb = getFB();
+                     videoFrames_t vFrames( *playbackArgs.videoFrames_, fb.getWidth(), fb.getHeight() );
+                     if( vFrames.preload() )
+                     {
+                        unsigned picCount = 0 ;
+                        //
+                        // Because I'm lazy and can't figure out the
+                        // right set of loops for this, I'm bailing out
+                        // and making this a state machine of sorts 
+                        // based on four inputs:
+                        //
+                        //    deviceEmpty - set when fragments==fragstotal
+                        //    deviceAvail - set when fragments > 0
+                        //    fragfull    - have a full PCM buffer to write
+                        //    mp3Avail    - set when we have more input frames
+                        //
+                        // deviceEmpty    deviceAvail   fragfull    mp3Avail
+                        //      0             0             0           0           wait for deviceEmpty
+                        //      0             0             0           1           pull into frag
+                        //      0             0             1           0           wait for deviceEmpty
+                        //      0             0             1           1           wait for fragsavail
+                        //      0             1             0           0           wait for deviceEmpty
+                        //      0             1             0           1           pull into frag
+                        //      0             1             1           0           write to device, wait for deviceEmpty
+                        //      0             1             1           1           write to device, pull into frag
+                        //      1             1             0           0           done
+                        //      1             1             0           1           pull into frag
+                        //      1             1             1           0           write to device
+                        //      1             1             1           1           write to device, pull into frag
+                        // 
+            #define DEVICEEMPTY  0x08
+            #define DEVICEAVAIL  0x04
+            #define FRAGFULL     0x02
+            #define MP3AVAIL     0x01
+            #define MP3DONE      (DEVICEEMPTY|DEVICEAVAIL)
+                  
+                        unsigned      frameIdx = 0 ;
+                        long long     startPTS = 0 ;
+                        mpegDemux_t::streamAndFrames_t const &audioFrames = *playbackArgs.audioFrames_ ;
+                        unsigned char state = (frameIdx < audioFrames.numFrames_)
+                                              ? MP3AVAIL   // this will force a check of the device (if data avail)
+                                              : MP3DONE ;
+                        madDecoder_t mp3Decode ;
+                        time_t startDecode ; time( &startDecode );
+                        unsigned short * samples = 0 ;
+                        unsigned         numFilled = 0 ;
+                        unsigned         maxSamples = 0 ;
+                        bool             firstFrame = true ;
+                        pthread_t        videoThread = 0 ;
+                        videoParams_t    videoParams = { vFrames, item->xPos_, item->yPos_ };
+
+                        while( !( _cancel || queue->shutdown_ ) 
+                               && 
+                               ( MP3DONE != state ) )
+                        {
+                           //
+                           // build a new fragment for output
+                           //
+                           while( MP3AVAIL == ( state & (FRAGFULL|MP3AVAIL) ) )
+                           {
+                              if( 0 == samples )
+                              {
+                                 maxSamples = ai.fragsize/sizeof( samples[0] );
+                                 samples = new unsigned short [maxSamples];
+                                 numFilled = 0 ;
+                              }
+                  
+                              if( 0 < mp3Decode.numSamples() )
+                              {
+                                 unsigned numRead ;
+                                 if( mp3Decode.readSamples( samples+numFilled, maxSamples-numFilled, numRead ) )
+                                 {
+                                    numFilled += numRead ;
+                                    if( maxSamples == numFilled )
+                                    {
+                                       state |= FRAGFULL ;
+                                       if( firstFrame )
+                                       {
+                                          firstFrame = false ;
+                                          unsigned nChannels = mp3Decode.numChannels();
+                                          unsigned sampleRate = mp3Decode.sampleRate();
+                                          printf( "mad header: %u channels, %u Hz\n", nChannels, sampleRate );
+                                          if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
+                                             fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+                                          if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
+                                             fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                       }
+                                    }
+                                 }
+                                 else
+                                 {
+                                 }
+                              } // tail end of previous buffer
+                              else if( mp3Decode.getData() )
+                              {
+                              } // synth next frame?
+                              else if( frameIdx < audioFrames.numFrames_ )
+                              {
+                                 mpegDemux_t::frame_t const &frame = audioFrames.frames_[frameIdx];
+                                 if( ( 0 == startPTS ) && ( 0 != frame.when_ms_ ) )
+                                    startPTS = frame.when_ms_ ;
+                                 mp3Decode.feed( frame.data_, frame.length_ );
+                                 frameIdx++ ;
+            
+                                 if( 0 == videoThread )
+                                 {
+                                    struct sched_param tsParam ;
+                                    tsParam.__sched_priority = 1 ;
+                                    pthread_setschedparam( pthread_self(), SCHED_FIFO, &tsParam );
+
+                                    vFrames.setStart( tickMs() - startPTS - 384 );
+
+                                    int const create = pthread_create( &videoThread, 0, videoThreadRtn, &videoParams );
+                                    if( 0 == create )
+                                       printf( "thread started at %lld\n", tickMs() );
+                                    else
+                                       perror( "vThread" );
+                  
+                                 }
+            
+                              } // feed mp3 decoder
+                              else
+                              {
+                                 state &= ~MP3AVAIL ;
+                                 if( 0 < numFilled )
+                                 {
+                                    memset( samples+numFilled, 0, (maxSamples-numFilled)*sizeof(samples[0]) );
+                                    numFilled = maxSamples ;
+                                    state |= FRAGFULL ;
+                                 }
+                              }
+                           } // read MP3 input
+                  
+                           if( (DEVICEAVAIL|FRAGFULL) == (state & (DEVICEAVAIL|FRAGFULL)) )
+                           {
+                              unsigned const bytesToWrite = numFilled*sizeof(samples[0]);
+                              int numWritten = write( writeFd, samples, bytesToWrite );
+                              if( numWritten != bytesToWrite )
+                              {
+                                 fprintf( stderr, "!!! short write !!!\n" );
+                                 return 0 ;
+                              }
+                  
+                              numFilled = 0 ;
+                              state &= ~FRAGFULL ;
+                           } // write data!!!
+                  
+                           if( FRAGFULL == (state & (DEVICEAVAIL|FRAGFULL)) )
+                           {
+                              pollfd filedes ;
+                              filedes.fd = writeFd ;
+                              filedes.events = POLLOUT ;
+                              if( 0 < poll( &filedes, 1, 0 ) )
+                              {
+                                 if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                                 {
+                                    if( ai.fragments == ai.fragstotal )
+                                       state |= DEVICEEMPTY ;
+                                    else
+                                       state &= ~DEVICEEMPTY ;
+                                    if( 0 < ai.fragments )
+                                       state |= DEVICEAVAIL ;
+                                    else
+                                       state &= ~DEVICEAVAIL ;
+                                 }
+                                 else
+                                 {
+                                    perror( "OSPACE2" );
+                                    return 0 ;
+                                 }
+                              }
+                              else
+                              {
+                                 perror( "POLL" );
+                                 return 0 ;
+                              }
+                           } // wait for device available
+                           else if( 0 == (state & (FRAGFULL|MP3AVAIL)) )
+                           {
+                              usleep( 10000 );
+            
+                              if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
+                              {
+                                 if( ai.fragments == ai.fragstotal )
+                                    state |= DEVICEEMPTY ;
+                                 else
+                                    state &= ~DEVICEEMPTY ;
+                                 if( 0 < ai.fragments )
+                                    state |= DEVICEAVAIL ;
+                                 else
+                                    state &= ~DEVICEAVAIL ;
+                              }
+                              else
+                              {
+                                 perror( "OSPACE3" );
+                                 return 0 ;
+                              }
+                           } // no more data, wait for empty
+                        } // while !done
+                        
+                        printf( "%u pictures\n", picCount );
+                        if( videoThread )
+                        {
+                           void *exitStat ;
+                           pthread_join( videoThread, &exitStat );
+                        }
+                     }
+                     else
+                        fprintf( stderr, "Error preloading video frames\n" );
+                  }
+                  else
+                     perror( "GETOSPACE" );
+                  long long msEnd = tickMs();
+                  unsigned long long msElapsed = msEnd-msStart ;
+                  printf( "%llu.%03llu seconds elapsed\n", msElapsed / 1000, msElapsed % 1000 );
+               }
+               
+               closeWriteFd();
+
+               mpegDemux_t::bulkInfo_t::clear( bi );
+
+               if( !queue->shutdown_ )
+               {
+                  if( _cancel )
+                     _cancel = false ;
+                  else
+                     item->isComplete_ = true ;
+                  queueCallback( audioCallback, item );
+               }
+            }
+            else
+               perror( "audioWriteFd" );
+         }
          else
             fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
       }
@@ -735,6 +1073,31 @@ bool audioQueue_t :: queuePlayback
    item->onComplete_ = onComplete ;
    item->onCancel_   = onCancel ;
    item->isComplete_ = false ;
+   JS_AddRoot( execContext_, &item->obj_ );
+   JS_AddRoot( execContext_, &item->onComplete_ );
+   JS_AddRoot( execContext_, &item->onCancel_ );
+   return queue_.push( item );
+}
+   
+bool audioQueue_t :: queueMPEG
+   ( JSObject            *mpegObj,
+     unsigned char const *data,
+     unsigned             length,
+     jsval                onComplete,
+     jsval                onCancel,
+     unsigned             xPos,
+     unsigned             yPos )
+{
+   item_t *item = new item_t ;
+   item->type_       = mpegPlay_ ;
+   item->obj_        = mpegObj ;
+   item->data_       = data ;
+   item->length_     = length ;
+   item->onComplete_ = onComplete ;
+   item->onCancel_   = onCancel ;
+   item->isComplete_ = false ;
+   item->xPos_       = xPos ;
+   item->yPos_       = yPos ;
    JS_AddRoot( execContext_, &item->obj_ );
    JS_AddRoot( execContext_, &item->onComplete_ );
    JS_AddRoot( execContext_, &item->onCancel_ );
@@ -874,3 +1237,4 @@ audioQueue_t &getAudioQueue( void )
    }
    return *audioQueue_ ;
 }
+

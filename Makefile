@@ -12,7 +12,8 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        ultodd.o box.o urlFile.o zOrder.o \
        cbmImage.o ccActiveURL.o ccDiskCache.o ccWorker.o semClasses.o \
        popen.o jsPopen.o jsCBM.o jsEnviron.o jsTCP.o jsTTY.o jsUse.o \
-       jsFileIO.o jsExit.o mpegDecode.o mpDemux.o videoQueue.o videoFrames.o
+       jsFileIO.o jsExit.o mpegDecode.o mpDemux.o videoQueue.o videoFrames.o \
+       jsMPEG.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
@@ -83,7 +84,7 @@ testJS: testJS.cpp $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH)
-	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
+	$(CC) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lmpeg2 -lvo -lCurlCache -lmpeg2 -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
