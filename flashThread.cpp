@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.3  2003-11-24 19:42:05  ericn
+ * Revision 1.4  2003-11-28 14:53:40  ericn
+ * -misc fixes, remove some debug code
+ *
+ * Revision 1.3  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.2  2003/11/22 19:51:27  ericn
@@ -33,17 +36,18 @@
 #include "flash/sound.h"
 #include "fbDev.h"
 #include "tickMs.h"
+#include "debugPrint.h"
 
 static void
 getUrl(char *url, char *target, void *client_data)
 {
-	printf("GetURL : %s\n", url);
+	debugPrint("GetURL : %s\n", url);
 }
 
 static void
 getSwf(char *url, int level, void *client_data)
 {
-	printf("GetSwf : %s\n", url);
+	debugPrint("GetSwf : %s\n", url);
 }
 
 
@@ -73,7 +77,7 @@ void flashSoundComplete( void *param )
 {
    ((flashThread_t *)param )->soundsCompleted_++ ;
 
-   printf( "flashSoundComplete:%p\n", param );
+   debugPrint( "flashSoundComplete:%p\n", param );
 }
 
 void flashSoundMixer :: startSound(Sound *sound)
@@ -143,6 +147,10 @@ flashThread_t :: flashThread_t
          unsigned short * const pixels = new unsigned short [ display_.width*display_.height ];
          display_.pixels = pixels ;
          display_.bpl    = display_.width*sizeof(pixels[0]);
+
+// uncomment these to blt directly to the fb 
+//unsigned short * const pixels = fb.getRow( 0 );
+//display_.bpl = 2*fb.getWidth();
          unsigned const videoBytes = display_.width*display_.height*sizeof(pixels[0]);
          unsigned short const bg = fb.get16( ( bgColor_ >> 16 ),
                                              ( bgColor_ >> 8 ) & 0xFF,
@@ -164,7 +172,7 @@ flashThread_t :: flashThread_t
          display_.clip_width = display_.width ;
          display_.clip_height = display_.height ;
       
-/*         printf( "   bpl %u\n"
+/*         debugPrint( "   bpl %u\n"
                  "   width %u\n"
                  "   height %u\n"
                  "   depth %u\n"
@@ -206,15 +214,14 @@ flashThread_t :: flashThread_t
 
 flashThread_t :: ~flashThread_t( void )
 {
-printf( "closing\n" );
    if( 0 <= fdReadCtrl_ ) { close( fdReadCtrl_ );  fdReadCtrl_ = -1 ; }
    if( 0 <= fdWriteCtrl_ ) { close( fdWriteCtrl_ );  fdWriteCtrl_ = -1 ; }
    if( 0 <= fdReadEvents_ ){ close( fdReadEvents_ ); fdReadEvents_ = -1 ; }
    if( 0 <= fdWriteEvents_ ){ close( fdWriteEvents_ ); fdWriteEvents_ = -1 ; }
-
    if( isAlive() )
    {
       void *exitStat ; 
+      pthread_cancel( threadHandle_ );
       pthread_join( threadHandle_, &exitStat ); 
       threadHandle_ = (pthread_t)-1 ; 
    }
@@ -235,7 +242,6 @@ printf( "closing\n" );
 
    if( mixer_ )
       delete mixer_ ;
-printf( "destructor done\n" ); fflush( stdout );
 }
 
 void flashThread_t :: sendCtrl( controlMsg_e type, unsigned param )
@@ -245,7 +251,8 @@ void flashThread_t :: sendCtrl( controlMsg_e type, unsigned param )
       controlMsg_t msg ;
       msg.type_  = type ;
       msg.param_ = param ;
-      write( fdWriteCtrl_, &msg, sizeof( msg ) );
+      if( sizeof( msg ) != write( fdWriteCtrl_, &msg, sizeof( msg ) ) )
+          perror( "sendCtrl" );
    }
 }
 
@@ -274,7 +281,6 @@ void *flashThread( void *param )
    bool running = false ;
    FlashMovie * const movie = (FlashMovie *)tObj.hFlash_ ;
    Program    * const prog = movie->main->program ;
-   printf( "movie %p, prog %p\n", movie, prog );
    unsigned msNext = 0 ;
 
    do {
@@ -288,7 +294,6 @@ void *flashThread( void *param )
          int const numRead = read( tObj.fdReadCtrl_, &msg, sizeof( msg ) );
          if( sizeof( msg ) == numRead )
          {
-            printf( "msg %u/%u\n", msg.type_, msg.param_ );
             switch( msg.type_ )
             {
                case flashThread_t::start_e :
@@ -326,7 +331,9 @@ void *flashThread( void *param )
                   prog->rewindMovie();
                   running = false ;
                   flashThread_t::event_e const endEvent = flashThread_t::cancel_e ;
-                  write( tObj.fdWriteEvents_, &endEvent, sizeof( endEvent ) );
+                  if( sizeof( endEvent ) != write( tObj.fdWriteEvents_, &endEvent, sizeof( endEvent ) ) )
+                      perror( "sendEvent" );
+
                   break;
                }
                case flashThread_t::rewind_e :
@@ -339,7 +346,7 @@ void *flashThread( void *param )
          else 
          {
             if( 0 != numRead ) // !broken pipe
-               fprintf( stderr, "flashReadCtrl:%u:%m\n", numRead );
+               debugPrint( "flashReadCtrl:%u:%m\n", numRead );
 
             break;
          }
@@ -367,7 +374,8 @@ void *flashThread( void *param )
           else
           {
              flashThread_t::event_e const endEvent = flashThread_t::complete_e ;
-             write( tObj.fdWriteEvents_, &endEvent, sizeof( endEvent ) );
+             if( sizeof( endEvent ) != write( tObj.fdWriteEvents_, &endEvent, sizeof( endEvent ) ) )
+                 perror( "sendEndEvent" );
              running = tObj.loop_ ;
              if( running )
              {
@@ -383,9 +391,7 @@ void *flashThread( void *param )
       }
    } while( 1 );
    
-   printf( "flashThread shutdown\n" );
-   close( tObj.fdWriteEvents_ ); tObj.fdWriteEvents_ = -1 ;
-   close( tObj.fdReadCtrl_ );    tObj.fdReadCtrl_ = -1 ;
+   debugPrint( "flashThread shutdown\n" );
 }
 
 
@@ -438,7 +444,7 @@ int main( int argc, char const * const argv[] )
          {
             struct FlashInfo fi;
             FlashGetInfo( hFlash, &fi );
-            printf( "   rate %lu\n"
+            debugPrint( "   rate %lu\n"
                     "   count %lu\n"
                     "   width %lu\n"
                     "   height %lu\n"
@@ -458,7 +464,7 @@ int main( int argc, char const * const argv[] )
                flashWidth  = fi.frameWidth/heightMult ;
                flashHeight = fi.frameHeight/heightMult ;
             }
-            printf( "display at %ux%u\n", flashWidth, flashHeight );
+            debugPrint( "display at %ux%u\n", flashWidth, flashHeight );
 
             flashThread_t flash( hFlash, 0, 0, flashWidth, flashHeight, 0xFFFFFF, true );
             while( 1 )
@@ -483,7 +489,7 @@ int main( int argc, char const * const argv[] )
                            unsigned cmdId ;
                            if( strTableLookup( cmd, commands, numCommands, cmdId ) )
                            {
-                              printf( "command %u\n", cmdId );
+                              debugPrint( "command %u\n", cmdId );
                               unsigned param = 0 ;
          
                               flash.sendCtrl( (flashThread_t::controlMsg_e) cmdId, param );
@@ -491,10 +497,10 @@ int main( int argc, char const * const argv[] )
                            }
                            else
                            {
-                              printf( "invalid command <%s>!\n"
+                              debugPrint( "invalid command <%s>!\n"
                                       "valid commands are:\n", cmd );
                               for( unsigned i = 0 ; i < numCommands ; i++ )
-                                 printf( "   %s\n", commands[i] );
+                                 debugPrint( "   %s\n", commands[i] );
                            }
                         }
                      }
@@ -507,7 +513,7 @@ int main( int argc, char const * const argv[] )
                      flashThread_t::event_e event ;
                      while( flash.readEvent( event ) )
                      {
-                        printf( "event %u\n", event );
+                        debugPrint( "event %u\n", event );
                      }
                   }
                }
@@ -515,18 +521,15 @@ int main( int argc, char const * const argv[] )
             }
          }
          else
-            fprintf( stderr, "Error 0x%x parsing flash\n", status );
+            debugPrint( "Error 0x%x parsing flash\n", status );
 
-         printf( "closing flash\n" ); fflush( stdout );
          FlashClose( hFlash );
-         printf( "done closing flash\n" ); fflush( stdout );
-
       }
       else
          perror( argv[1] );
    }
    else
-      fprintf( stderr, "Usage: %s fileName.swf\n", argv[0] );
+      debugPrint( "Usage: %s fileName.swf\n", argv[0] );
 
    return 0 ;
 }
