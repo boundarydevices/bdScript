@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.4  2002-10-13 14:36:13  ericn
+ * Revision 1.5  2002-10-13 15:52:28  ericn
+ * -made return value an object
+ *
+ * Revision 1.4  2002/10/13 14:36:13  ericn
  * -removed curlPost(), fleshed out variable handling
  *
  * Revision 1.3  2002/10/13 13:50:57  ericn
@@ -36,8 +39,7 @@
 #include "curlCache.h"
 
 enum jsCurl_tinyid {
-   CURLFILE_ISOPEN, 
-   CURLFILE_SIZE, 
+   CURLFILE_WORKED, 
    CURLFILE_DATA, 
    CURLFILE_URL, 
    CURLFILE_HTTPCODE, 
@@ -46,83 +48,6 @@ enum jsCurl_tinyid {
 };
 
 extern JSClass jsCurlClass_ ;
-
-static JSBool
-jsCurl_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
-{
-   if( JSVAL_IS_INT(id) )
-   {
-      jsint slot = JSVAL_TO_INT(id);
-
-      JS_LOCK_OBJ(cx, obj);
-      jsdouble lastIndex;
-      JSRegExp *re;
-   
-      urlFile_t *fURL = (urlFile_t *)JS_GetInstancePrivate( cx, obj, &jsCurlClass_, NULL );
-      if( fURL ) 
-      {
-         switch (slot) 
-         {
-            case CURLFILE_ISOPEN :  
-               *vp = BOOLEAN_TO_JSVAL( fURL->isOpen() ); 
-               break ;
-            case CURLFILE_SIZE : 
-               *vp = INT_TO_JSVAL( (int)fURL->getSize() ); 
-               break ;
-            case CURLFILE_DATA : 
-               if( fURL->isOpen() )
-               {
-                  JSString *str = JS_NewStringCopyN( cx, (char const *)fURL->getData(), fURL->getSize() );
-                  if( str )
-                     *vp = STRING_TO_JSVAL( str ); 
-               }
-               break ;
-            case CURLFILE_URL : 
-               {
-                  JSString *str = JS_NewStringCopyZ( cx, "url goes here" );
-                  if( str )
-                     *vp = STRING_TO_JSVAL( str ); 
-               }
-               break ;
-            case CURLFILE_HTTPCODE : 
-               *vp = INT_TO_JSVAL( 0x01020304 ); 
-               break ;
-            case CURLFILE_FILETIME : 
-               *vp = INT_TO_JSVAL( 0x02030405 ); 
-               break ;
-            case CURLFILE_MIMETYPE :
-               {
-                  JSString *str = JS_NewStringCopyZ( cx, "text/plain" );
-                  if( str )
-                     *vp = STRING_TO_JSVAL( str ); 
-               }
-               break ;
-         } // switch
-      }
-      else
-         printf( "NULL fURL\n" );
-
-      JS_UNLOCK_OBJ(cx, obj);
-   
-   }
-
-   return JS_TRUE;
-}
-
-static JSBool
-jsCurl_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
-{
-printf( "setting property for jsCurl object\n" );
-   if( JSVAL_IS_INT(id) )
-   {
-      jsint slot = JSVAL_TO_INT( id );
-      //
-      // all properties are read-only.. No need to set
-      //
-   }
-
-   return JS_TRUE ;
-}
 
 static void
 jsCurl_finalize(JSContext *cx, JSObject *obj)
@@ -140,14 +65,13 @@ jsCurl_finalize(JSContext *cx, JSObject *obj)
 JSClass jsCurlClass_ = {
   "curlFile",
    JSCLASS_HAS_PRIVATE,
-   JS_PropertyStub,  JS_PropertyStub,  jsCurl_getProperty,  jsCurl_setProperty,
+   JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
    JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsCurl_finalize,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
 static JSPropertySpec curlFileProperties_[] = {
-  {"isOpen",         CURLFILE_ISOPEN,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"size",           CURLFILE_SIZE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"worked",         CURLFILE_WORKED,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"data",           CURLFILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"url",            CURLFILE_URL,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"httpCode",       CURLFILE_HTTPCODE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
@@ -189,18 +113,60 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 
 static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
 {
-   if( f.isOpen() )
-   {
-      bool worked = false ;
-   
-      JSString *sReturn = JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() );
-      if( sReturn )
-         *rval = STRING_TO_JSVAL( sReturn );
-   }
-   else
-      *rval = JSVAL_FALSE ;
+   JSObject *obj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
 
-   return JS_TRUE ;
+   if( obj )
+   {
+      if( JS_DefineProperty( cx, obj, "worked", 
+                             BOOLEAN_TO_JSVAL( f.isOpen() ), 
+                             0, 0, 
+                             JSPROP_ENUMERATE
+                             |JSPROP_PERMANENT
+                             |JSPROP_READONLY ) )
+      {
+         if( f.isOpen() )
+         {
+            JS_DefineProperty( cx, obj, "data",
+                               STRING_TO_JSVAL( JS_NewStringCopyN( cx, (char const *)f.getData(), f.getSize() ) ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, obj, "url",
+                               STRING_TO_JSVAL( JS_NewStringCopyZ( cx, (char const *)f.getEffectiveURL() ) ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, obj, "httpCode",
+                               INT_TO_JSVAL( f.getHttpCode() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, obj, "fileTime",
+                               INT_TO_JSVAL( f.getFileTime() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( cx, obj, "mimeType",
+                               STRING_TO_JSVAL( JS_NewStringCopyZ( cx, (char const *)f.getMimeType() ) ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+
+            *rval = OBJECT_TO_JSVAL( obj );
+         }
+         else
+            *rval = JSVAL_FALSE ;
+      
+         return JS_TRUE ;
+      }
+   }
+   
+   return JS_FALSE ;
 }
 
 static JSBool
