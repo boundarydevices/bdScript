@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.8  2002-12-01 15:56:51  ericn
+ * Revision 1.9  2002-12-02 15:16:10  ericn
+ * -removed use of codeQueue's mutex and event by filter chain
+ *
+ * Revision 1.8  2002/12/01 15:56:51  ericn
  * -added filter support
  *
  * Revision 1.7  2002/12/01 14:58:51  ericn
@@ -58,6 +61,9 @@ typedef mtQueue_t<callbackAndData_t> codeList_t ;
 static JSContext  *context_ = 0 ;
 static JSObject   *global_ = 0 ;
 static codeList_t  codeList_ ;
+
+pthread_mutex_t filterMutex_ = PTHREAD_MUTEX_INITIALIZER ; 
+pthread_cond_t  filterCond_ = PTHREAD_COND_INITIALIZER ;
 
 LIST_HEAD(filters_);
 
@@ -109,21 +115,26 @@ static void runAndFree( void *scriptAndScope )
 bool queueCallback( callback_t callback,
                     void      *cbData )
 {
+   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
    {
-      mutexLock_t lock( codeList_.mutex_ );
       for( list_head *next = filters_.next ; next != &filters_ ; next = next->next )
       {
-         printf( "checking filter %p\n", next );
          char *address = (char *)next - offsetof(codeFilter_t,chain_);
          codeFilter_t *filter = (codeFilter_t *)address ;
          if( filter->isHandled( callback, cbData ) )
          {
             if( filter->isDone() )
-               codeList_.cond_.signal();
+            {
+               pthread_cond_signal( &filterCond_ );
+            }
+            pthread_mutex_unlock( &filterMutex_ );
             return true ;
          }
       } // walk filter chain
-   } // limit scope of lock
+      pthread_mutex_unlock( &filterMutex_ );
+   }
+   else
+      fprintf( stderr, "Error locking filter mutex in callback\n" );
    
    //
    // not handled by filter, post to queue
@@ -172,14 +183,24 @@ bool queueSource( JSObject   *scope,
 
 codeFilter_t :: codeFilter_t( void )
 {
-   mutexLock_t lock( codeList_.mutex_ );
-   list_add( &chain_, &filters_ );
+   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
+   {
+      list_add( &chain_, &filters_ );
+      pthread_mutex_unlock( &filterMutex_ );
+   }
+   else
+      fprintf( stderr, "Error locking filter mutex\n" );
 }
 
 codeFilter_t :: ~codeFilter_t( void )
 {
-   mutexLock_t lock( codeList_.mutex_ );
-   list_del( &chain_ );
+   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
+   {
+      list_del( &chain_ );
+      pthread_mutex_unlock( &filterMutex_ );
+   }
+   else
+      fprintf( stderr, "Error locking filter mutex\n" );
 }
 
 bool codeFilter_t :: isHandled
@@ -191,22 +212,19 @@ bool codeFilter_t :: isHandled
 
 void codeFilter_t :: wait( void )
 {
-   while( !isDone() )
+   if( 0 == pthread_mutex_lock( &filterMutex_ ) )
    {
-      mutexLock_t lock( codeList_.mutex_ );
-      if( lock.worked() )
+      while( !isDone() )
       {
-         if( !codeList_.abort_ )
-         {
-            if( !codeList_.cond_.wait( lock ) )
-               break;
-         }
-         else
-            break; // queue abort
-      }
-      else
-         break; // lock error
-   } // until app says done
+         bool ready = ( 0 == pthread_cond_wait( &filterCond_, &filterMutex_ ) );
+         if( !ready )
+            break;
+      } // until app says done
+
+      pthread_mutex_unlock( &filterMutex_ );
+   }
+   else
+      fprintf( stderr, "Error locking filter mutex for wait\n" );
 }
 
 bool codeFilter_t :: isDone( void )
