@@ -5,21 +5,24 @@ ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    STRIP=arm-linux-strip
    LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib
+   IFLAGS=-I/usr/local/arm/2.95.3/arm-linux/include/freetype2 
 else
    CC=gcc
+   LIBS=-L /usr/local/lib
+   IFLAGS=-I/usr/include/freetype2 
    STRIP=strip
 endif
 
 %.o : %.cpp
-	$(CC) -c -DXP_UNIX=1 -I/usr/local/arm/2.95.3/arm-linux/include/freetype2 -O2 $<
+	$(CC) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 %.o : ../boundary1/%.cpp
 	$(CC) -c -DXP_UNIX=1 -O2 $<
    
 curlCacheMain.o: curlCache.h curlCache.cpp Makefile
 	$(CC) -c -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
-curlCache: curlCacheMain.o dirByATime.o memFile.o Makefile
-	$(CC) -o curlCache curlCacheMain.o dirByATime.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
+curlCache: curlCacheMain.o dirByATime.o relativeURL.o ultoa.o memFile.o Makefile
+	$(CC) -o curlCache curlCacheMain.o dirByATime.o relativeURL.o ultoa.o memFile.o $(LIBS) -lcurl -lstdc++ -lz
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
 	$(CC) -c -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
