@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.12  2002-11-11 04:28:55  ericn
+ * Revision 1.13  2002-11-20 00:39:02  ericn
+ * -fixed memory leak
+ *
+ * Revision 1.12  2002/11/11 04:28:55  ericn
  * -moved headers
  *
  * Revision 1.11  2002/11/08 13:58:23  ericn
@@ -170,7 +173,7 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
    unsigned    size  = f.getSize();
 
    bool            worked = false ;
-   void const     *pixMap ;
+   void const     *pixMap = 0 ;
    unsigned short  width ;
    unsigned short  height ;
    std::string     sError ;
@@ -236,6 +239,9 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                          |JSPROP_READONLY );
       jsCurlOnError( req, f );
    }
+
+   if( pixMap )
+      delete [] (unsigned short *)pixMap ;
 }
 
 static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
