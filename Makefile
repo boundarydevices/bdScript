@@ -28,6 +28,7 @@ ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    NM=arm-linux-nm
+	LD=arm-linux-ld
    STRIP=arm-linux-strip
    OBJCOPY=arm-linux-objcopy
    LIBS=-L./ -L../install/arm-linux/lib
@@ -246,7 +247,17 @@ touchPoll: touchPoll.cpp $(LIB)
 	$(CC) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp pollHandler.o $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
 	$(STRIP) $@
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview
+start.o: start.c
+	$(CC) -fno-rtti -c -nodefaultlibs -o $@ $<
+
+progFlash.o: progFlash.cpp
+	$(CC) -fno-rtti -c -nodefaultlibs -o $@ $<
+
+progFlash: start.o progFlash.o
+	$(LD) -o $@ start.o progFlash.o -L../install/lib/gcc-lib/arm-linux/2.95.3 -lgcc
+	$(STRIP) $@
+
+all: curlGet dirTest urlTest jsExec ftRender ftDump tsTest tsThread madHeaders bc ffPlay cbmGraph cbmStat jpegview progFlash
 
 .PHONY: install-libs install-headers
 
