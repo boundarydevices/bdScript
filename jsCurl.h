@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.6 2002-11-30 05:27:32 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.7 2002-11-30 16:29:14 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.6  2002-11-30 05:27:32  ericn
+ * Revision 1.7  2002-11-30 16:29:14  ericn
+ * -fixed locking and allocation of requests
+ *
+ * Revision 1.6  2002/11/30 05:27:32  ericn
  * -moved async into request structure
  *
  * Revision 1.5  2002/11/30 00:32:05  ericn
@@ -163,6 +166,9 @@ struct jsCurlRequest_t {
                                     //    optionally urlParams[] array property
    JSContext           *cx_ ;       // context in which to run handlers (generally lhObj context)
    bool                 async_ ;
+   bool                 isComplete_ ;
+
+   pthread_t            callingThread_ ;
 
    //
    // one of these called when transfer terminates. Specify zero to use default
@@ -176,20 +182,32 @@ struct jsCurlRequest_t {
    //
    onSize_t     onSize_ ; 
    onProgress_t onProgress_ ;
+
+private:
+   jsCurlRequest_t( JSObject    *lhObj, 
+                    JSObject    *rhObj, 
+                    JSContext   *cx,
+                    bool         async,
+                    onComplete_t onComplete,
+                    onFailure_t  onFailure,
+                    onCancel_t   onCancel,
+                    onSize_t     onSize,
+                    onProgress_t onProgress );
+   ~jsCurlRequest_t( void );
+
+   friend void jsCurlOnComplete( jsCurlRequest_t &, void const *data, unsigned long numRead );
+   friend void jsCurlOnFailure( jsCurlRequest_t &, std::string const &errorMsg );
+   friend void jsCurlOnCancel( jsCurlRequest_t & );
+   friend bool queueCurlRequest( JSObject    *lhObj, 
+                                 JSObject    *rhObj, 
+                                 JSContext   *cx,
+                                 bool         async,
+                                 onComplete_t onComplete = 0,
+                                 onFailure_t  onFailure = 0,
+                                 onCancel_t   onCancel = 0,
+                                 onSize_t     onSize = 0,
+                                 onProgress_t onProgress = 0 );
 };
-
-//
-// If overridden, completion handlers should call these to execute code
-// specified by onLoad, onCancel, onLoadError, onSize, and onProgress
-// initializers, and to signal completion of synchronous calls.
-//
-void jsCurlOnComplete( jsCurlRequest_t &, void const *data, unsigned long numRead );
-void jsCurlOnFailure( jsCurlRequest_t &, std::string const &errorMsg );
-void jsCurlOnCancel( jsCurlRequest_t & );
-void jsCurlOnSize( jsCurlRequest_t &, unsigned long size );
-void jsCurlOnProgress( jsCurlRequest_t &, unsigned long numReadSoFar );
-
-bool queueCurlRequest( jsCurlRequest_t &request );
 
 bool initJSCurl( JSContext *cx, JSObject *glob );
 
