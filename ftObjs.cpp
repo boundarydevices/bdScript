@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.2  2002-11-02 18:38:48  ericn
+ * Revision 1.3  2002-11-17 22:23:48  ericn
+ * -rounding errors in render
+ *
+ * Revision 1.2  2002/11/02 18:38:48  ericn
  * -modified to initialize pixmap
  *
  * Revision 1.1  2002/11/02 04:13:07  ericn
@@ -142,6 +145,8 @@ freeTypeString_t :: freeTypeString_t
 
    height_ = maxAscend + maxDescend + 1 ;
 
+   ++width_ ;
+
    if( ( 0 != width_ ) && ( 0 != height_ ) )
    {
       unsigned const outBytes = width_*height_ ;
@@ -235,15 +240,15 @@ freeTypeString_t :: freeTypeString_t
                      unsigned char *nextOut = data_ + (nextY*width_) + nextX ;
                      for( int col = 0 ; col < bmp.width ; col++, nextX++ )
                      {
-/*
+
                         if( nextX >= width_ )
                         {
                            fprintf( stderr, "Invalid x : %d, penX = %d, width_ = %u\n", (short)nextX, penX, width_ );
                            fprintf( stderr, "bitmap_left = %d\n", font.face_->glyph->bitmap_left );
-                           exit(3);
+                           continue ;
                         }
-*/                        
-                        assert( nextX < width_ );
+                        
+//                        assert( nextX < width_ );
                         *nextOut++ = *rasterCol++ ;
                      } // for each column
                      rasterLine += bmp.pitch ;
