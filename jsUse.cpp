@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUse.cpp,v $
- * Revision 1.1  2003-01-20 06:24:01  ericn
+ * Revision 1.2  2004-01-02 23:36:16  ericn
+ * -remove debug stmt
+ *
+ * Revision 1.1  2003/01/20 06:24:01  ericn
  * -Initial import
  *
  *
@@ -104,7 +107,6 @@ use(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval* rval)
       *rval = JSVAL_FALSE ;
    }
 
-printf( "returning from library() call\n" );
    return JS_TRUE ;
 }
 

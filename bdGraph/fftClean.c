@@ -498,7 +498,7 @@ static void Init1_cnw(CleanNoiseWork* cnw,const int logN)
 	cnw->silenceCnt = 0; //SILENCE_BEFORE_UPDATE-1;
 	memset(&cnw->noiseSum,0,sizeof(cnw->noiseSum));
 	for (i=0; i<PROFILE_SIZE; i++) AddNPD_P1(&cnw->noiseSum,&cnw->noise[i]);
-	printNpd_p1("noiseSum: 0x",&cnw->noiseSum);
+//	printNpd_p1("noiseSum: 0x",&cnw->noiseSum);
 }
 void Init_cnw(CleanNoiseWork* cnw,int logN)
 {
