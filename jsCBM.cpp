@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.4  2003-05-18 21:52:26  ericn
+ * Revision 1.5  2003-05-24 15:03:35  ericn
+ * -updated to slice images to fit printer RAM
+ *
+ * Revision 1.4  2003/05/18 21:52:26  ericn
  * -added print( string ) method
  *
  * Revision 1.3  2003/05/10 19:16:43  ericn
@@ -58,6 +61,10 @@ static JSPropertySpec cbmProperties_[] = {
 };
 
 static int printerFd_ = -1 ;
+static unsigned const maxWidthBits  = 432 ;
+static unsigned const maxWidthBytes = maxWidthBits/8 ;
+static unsigned const maxN1xN2      = 1536 ;
+
 
 static JSBool
 jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -93,7 +100,7 @@ fprintf( stderr, "--> Printing something\n" );
           JSVAL_IS_INT( vHeight ) )
       {
          unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
-         unsigned const bmHeight   = JSVAL_TO_INT( vHeight );
+         unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
          if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight )
          {
             unsigned char const * const alphaData = (unsigned char const *)JS_GetStringBytes( sPixMap );
@@ -101,52 +108,76 @@ fprintf( stderr, "--> Printing something\n" );
             if( 0 <= printerFd_ )
             {
                unsigned const width = bmWidth ;
-               unsigned const wBits = ((width+7)/8)*8 ;
-               unsigned const height = bmHeight ;
-               unsigned const hBytes = (height+7)/8 ;
-               unsigned const headerLen = 4 ;
-               unsigned const trailerLen = 3 ;
-               char * const outBuf = new char [ headerLen+trailerLen + wBits*hBytes ];
-               char *nextOut = outBuf ;
-         
-               nextOut += sprintf( outBuf, "\x1d*%c%c", wBits/8, hBytes );
-         
-               for( unsigned x = 0 ; x < wBits ; x++ )
+               unsigned const wBytes = ((width+7)/8);
+               unsigned const wBits = wBytes*8 ;
+               if( wBits <= maxWidthBits )
                {
-                  if( x < bmWidth )
+                  unsigned const headerLen = 4 ;
+                  unsigned const trailerLen = 3 ;
+                  char * const outBuf = new char [ headerLen+trailerLen + maxN1xN2*8 ];
+                  
+                  unsigned char const *alphaSeg = alphaData ;
+
+                  while( 0 < bmHeight )
                   {
-                     for( unsigned y = 0 ; y < hBytes ; y++ )
+                     unsigned height = bmHeight ;
+                     unsigned maxN2 = maxN1xN2/wBytes ;
+                     unsigned maxHeight = maxN2*8 ;
+                     if( height > maxHeight )
                      {
-                        unsigned yPixel = 8*y ;
-                        unsigned char outMask = 0 ;
-                        unsigned const maxY = yPixel + 8 ;
-                        for( ; yPixel < maxY ; yPixel++ )
+                        height = maxHeight ;
+//                        JS_ReportError( cx, "clipping to %u pixels high", height );
+                     }
+   
+                     unsigned hBytes = (height+7)/8 ;
+                     char *nextOut = outBuf ;
+               
+                     nextOut += sprintf( outBuf, "\x1d*%c%c", wBits/8, hBytes );
+               
+                     for( unsigned x = 0 ; x < wBits ; x++ )
+                     {
+                        if( x < bmWidth )
                         {
-                           outMask <<= 1 ;
-                           if( ( yPixel < bmHeight ) && ( x < bmWidth ) )
+                           for( unsigned y = 0 ; y < hBytes ; y++ )
                            {
-                              if( 0 == alphaData[ yPixel*bmWidth+x ] )
-                                 outMask |= 1 ;
+                              unsigned yPixel = 8*y ;
+                              unsigned char outMask = 0 ;
+                              unsigned const maxY = yPixel + 8 ;
+                              for( ; yPixel < maxY ; yPixel++ )
+                              {
+                                 outMask <<= 1 ;
+                                 if( ( yPixel < bmHeight ) && ( x < bmWidth ) )
+                                 {
+                                    if( 0 == alphaSeg[ yPixel*bmWidth+x ] )
+                                       outMask |= 1 ;
+                                 }
+                              }
+                              *nextOut++ = outMask ;
                            }
                         }
-                        *nextOut++ = outMask ;
+                        else
+                        {
+                           memset( nextOut, 0, hBytes );
+                           nextOut += hBytes ;
+                        }
                      }
+      
+                     nextOut += sprintf( nextOut, "\x1d/%c", 0 );
+      
+                     int const numWritten = write( printerFd_, outBuf, nextOut-outBuf );
+                     printf( "wrote %d bytes\n", numWritten );
+                     bmHeight -= height ;
+                     alphaSeg += height * bmWidth ;
+//                     if( 0 < bmHeight )
+//                        sleep( 2 );
                   }
-                  else
-                  {
-                     memset( nextOut, 0, hBytes );
-                     nextOut += hBytes ;
-                  }
+                  
+                  delete [] outBuf ;
+   
+                  *rval = JSVAL_TRUE ;
                }
-
-               nextOut += sprintf( nextOut, "\x1d/%c", 0 );
-
-               int const numWritten = write( printerFd_, outBuf, nextOut-outBuf );
-               printf( "wrote %d bytes\n", numWritten );
-               
-               delete [] outBuf ;
-
-               *rval = JSVAL_TRUE ;
+               else
+                  JS_ReportError( cx, "print image too wide! max is %u", maxWidthBits );
             }
             else
                JS_ReportError( cx, "Invalid printer handle %d", printerFd_ );
