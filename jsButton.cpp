@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.9  2002-12-07 21:01:37  ericn
+ * Revision 1.10  2002-12-07 23:19:48  ericn
+ * -fixed msg termination and allocation, added changeText method
+ *
+ * Revision 1.9  2002/12/07 21:01:37  ericn
  * -added support for text buttons
  *
  * Revision 1.8  2002/12/01 02:42:44  ericn
@@ -108,10 +111,6 @@ void jsButtonFinalize(JSContext *cx, JSObject *obj)
    else
       printf( "no button data\n" );
 }
-
-static JSFunctionSpec buttonMethods_[] = {
-    {0}
-};
 
 enum jsImage_tinyId {
    BUTTON_ISLOADED,
@@ -419,7 +418,6 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   bottom = fb.getHeight();
 
                box_t *const box = buttonData->box_ = newBox( x, right, y, bottom, buttonData );
-               printf( "new box %p/%p/%p, %u-%u, %u-%u\n", box, box->objectData_, buttonData->box_, x, right, y, bottom );
                buttonData->cx_    = cx ;
                buttonData->jsObj_ = thisObj ;
                box->onTouch_     = buttonTouch ;
@@ -552,14 +550,14 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                         buttonData->pointSize_ = JSVAL_TO_INT( jsv );
                      }
                      
-                     if( JS_GetProperty( cx, rhObj, "bgColor_", &jsv ) 
+                     if( JS_GetProperty( cx, rhObj, "bgColor", &jsv ) 
                          &&
                          JSVAL_IS_INT( jsv ) )
                      {
                         buttonData->bgColor_ = JSVAL_TO_INT( jsv );
                      }
    
-                     if( JS_GetProperty( cx, rhObj, "textColor_", &jsv ) 
+                     if( JS_GetProperty( cx, rhObj, "textColor", &jsv ) 
                          &&
                          JSVAL_IS_INT( jsv ) )
                      {
@@ -599,6 +597,46 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
    return JS_TRUE ;
 
 }
+
+static JSBool
+jsButtonChangeText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   buttonData_t *const button = (buttonData_t *)JS_GetPrivate( cx, obj );
+   if( button )
+   {
+      JSString *sText ;
+      if( ( 1 == argc )
+          &&
+          JSVAL_IS_STRING( argv[0] )
+          &&
+          ( 0 != ( sText = JSVAL_TO_STRING( argv[0] ) ) ) )
+      {
+         JS_DefineProperty( cx, obj, "text", argv[0], 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+         unsigned const len = JS_GetStringLength( sText );
+         char *newMsg = new char[ len + 1 ];
+         memcpy( newMsg, JS_GetStringBytes( sText ), len );
+         newMsg[len] = '\0' ;
+         if( button->msgString_ )
+            delete (char *)button->msgString_ ;
+         button->msgString_= newMsg ;
+         drawButton( *button, false );
+         *rval = JSVAL_TRUE ;
+      }
+      else
+         JS_ReportError( cx, "usage: button.changeText( 'string' );" );
+   }
+   else
+      JS_ReportError( cx, "Invalid button data" );
+   
+   return JS_TRUE ;
+
+}
+
+static JSFunctionSpec buttonMethods_[] = {
+    {"changeText",         jsButtonChangeText,           0 },
+    {0}
+};
 
 bool initJSButton( JSContext *cx, JSObject *glob )
 {
