@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.70  2004-02-07 12:14:13  ericn
+ * Revision 1.71  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.70  2004/02/07 12:14:13  ericn
  * -added flashVar global
  *
  * Revision 1.69  2004/02/03 06:12:22  ericn
@@ -242,18 +245,14 @@
 #include "jsCurl.h"
 #include "jsImage.h"
 #include "jsJPEG.h"
-#include "jsTransitions.h"
 #include "jsGlobals.h"
 #include "jsScreen.h"
 #include "jsText.h"
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
-#include "jsMP3.h"
-#include "audioQueue.h"
-#include "jsVolume.h"
 #include "jsBarcode.h"
 #include "jsGpio.h"
-#include "jsShell.h"
+// #include "jsShell.h"
 #include "jsButton.h"
 #include "ccActiveURL.h"
 #include "ccDiskCache.h"
@@ -266,10 +265,6 @@
 #include "jsUse.h"
 #include "jsURL.h"
 #include "jsFileIO.h"
-#include "jsCamera.h"
-#include "jsCBM.h"
-#include "jsMPEG.h"
-#include "jsFlash.h"
 #include "jsSniffWLAN.h"
 #include "jsMonWLAN.h"
 #include "jsPing.h"
@@ -281,7 +276,19 @@
 #include "pollTimer.h"
 #include "memFile.h"
 #include "debugPrint.h"
+#include "jsBitmap.h"
+#include "fbDev.h"
+
+#ifdef CONFIG_BD2003
+#include "audioQueue.h"
+#include "jsVolume.h"
+#include "jsCamera.h"
+#include "jsCBM.h"
+#include "jsMP3.h"
+#include "jsMPEG.h"
+#include "jsFlash.h"
 #include "jsFlashVar.h"
+#endif 
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -511,15 +518,12 @@ int prMain(int argc, char **argv)
                   initJSCurl( cx, glob );
                   initJSImage( cx, glob );
                   initJSJPEG( cx, glob );
-                  initJSTransitions( cx, glob );
-                  initJSMP3( cx, glob );
                   initJSAlphaMap( cx, glob );
+                  initJSBitmap( cx, glob );
                   initJSHyperlink( cx, glob );
                   initJSExit( cx, glob );
-                  initJSVolume( cx, glob );
                   initJSBarcode( cx, glob );
-                  initJSShell( cx, glob );
-                  initJSButton( cx, glob );
+//                  initJSShell( cx, glob );
                   initJSPopen( cx, glob );
                   initJSGpio( cx, glob );
                   initJSEnv( cx, glob );
@@ -528,10 +532,6 @@ int prMain(int argc, char **argv)
                   initJSUse( cx, glob );
                   initJSURL( cx, glob );
                   initJSFileIO( cx, glob );
-                  initJSCamera( cx, glob );
-                  initJSCBM( cx, glob );
-                  initJSMPEG( cx, glob );
-                  initJSFlash( cx, glob );
                   initSniffWLAN( cx, glob );
                   initMonitorWLAN( cx, glob );
                   initPing( cx, glob );
@@ -539,16 +539,24 @@ int prMain(int argc, char **argv)
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );
                   initJSKernel( cx, glob );
+#ifdef CONFIG_BD2003
+                  initJSMP3( cx, glob );
+                  initJSVolume( cx, glob );
+                  initJSButton( cx, glob );
+                  initJSCamera( cx, glob );
+                  initJSCBM( cx, glob );
+                  initJSMPEG( cx, glob );
+                  initJSFlash( cx, glob );
                   initJSFlashVar( cx, glob );
-
-                  getCurlCache();
-
                   initJSTouch( cx, glob );
-
                   //
                   // start up audio output 
                   //
                   audioQueue_t &audioOut = getAudioQueue(); 
+#endif
+                  getCurlCache();
+
+
 
                   JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
                   if( sArgv )
@@ -637,7 +645,9 @@ int prMain(int argc, char **argv)
                   shutdownJSProcesses();
                   shutdownCurlWorkers();
                   shutdownCCDiskCache();
+#ifdef CONFIG_BD2003
                   audioQueue_t::shutdown();
+#endif 
                }
                else
                   fprintf( stderr, "Error defining Javascript shell functions\n" );
@@ -726,7 +736,11 @@ int main( int argc, char *argv[] )
       sa.sa_handler = handler;
       sigemptyset(&sa.sa_mask);
       sa.sa_flags = 0;
-      
+#ifdef CONFIG_BD2003
+      getFB( "/dev/fb0" );
+#else
+      getFB( "/dev/lcd" );
+#endif      
       // Set up the signal handler
       sigaction(SIGSEGV, &sa, NULL);
    
@@ -765,7 +779,7 @@ int main( int argc, char *argv[] )
       debugPrint( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
       do
       {
-         int result = PR_Initialize( prMain, argc, argv, 0 );
+         int result = prMain( argc, argv );
          if( gotoCalled_ )
          {
             argv[1] = (char *)gotoURL_.c_str();

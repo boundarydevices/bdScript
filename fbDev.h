@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.12 2003-11-24 19:42:05 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.13 2004-03-17 04:56:19 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.12  2003-11-24 19:42:05  ericn
+ * Revision 1.13  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.12  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.11  2003/03/12 02:57:14  ericn
@@ -58,15 +61,14 @@
 class fbDevice_t {
 public:
    bool isOpen( void ) const { return 0 != mem_ ; }
-   
+
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }
 
-   void         *getMem( void ) const { return mem_ ; }
    unsigned long getMemSize( void ) const { return memSize_ ; }
 
-   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)mem_ + ( y * ( 2*getWidth() ) ) ); }
-   unsigned short &getPixel( unsigned x, unsigned y ){ return getRow( y )[ x ]; }
+   unsigned short getPixel( unsigned x, unsigned y );
+   void           setPixel( unsigned x, unsigned y, unsigned short rgb );
 
    static unsigned short get16( unsigned char red, unsigned char green, unsigned char blue );
 
@@ -76,6 +78,11 @@ public:
    static unsigned char getRed( unsigned short screenRGB );
    static unsigned char getGreen( unsigned short screenRGB );
    static unsigned char getBlue( unsigned short screenRGB );
+
+   void clear( void ); // clear to default background color (Black for color displays, off for mono)
+   void clear( unsigned char red, unsigned char green, unsigned char blue );
+
+   void refresh( void );
 
    void render( int x, int y,
                 int w, int h,				 // width and height of image
@@ -90,12 +97,6 @@ public:
                 unsigned short w, unsigned short h,
                 unsigned short const *pixels,
                 unsigned char const  *alpha );
-
-   void blend( unsigned short x, unsigned short y,
-               unsigned short w, unsigned short h,
-               unsigned short const *srcPixels,
-               unsigned short const *destPixels,
-               unsigned char         _256ths );
 
    // draw a filled rectangle
    void rect( unsigned short x1, unsigned short y1,
@@ -127,6 +128,7 @@ public:
 
    // draw a box with specified background color and button highlighting.
    // pressed will highlight bottom-right and shade upper left
+#ifdef CONFIG_BD2003
    void buttonize( bool                 pressed,
                    unsigned char        borderWidth,
                    unsigned short       xLeft,
@@ -134,8 +136,10 @@ public:
                    unsigned short       xRight,
                    unsigned short       yBottom,
                    unsigned char red, unsigned char green, unsigned char blue );
-
+   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)mem_ + ( y * ( 2*getWidth() ) ) ); }
+#endif 
 private:
+   void           *getMem( void ) const { return mem_ ; }
    fbDevice_t( fbDevice_t const &rhs ); // no copies
    fbDevice_t( char const *name );
    ~fbDevice_t( void );
@@ -145,6 +149,8 @@ private:
    unsigned short width_ ;
    unsigned short height_ ;
    friend fbDevice_t &getFB( char const *devName );
+   friend void *flashThread( void *param );
+   friend class flashThread_t ;
 };
 
 fbDevice_t &getFB( char const *devName = "/dev/fb0" );

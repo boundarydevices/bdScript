@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.4  2003-05-26 22:07:20  ericn
+ * Revision 1.5  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.4  2003/05/26 22:07:20  ericn
  * -added method rotate()
  *
  * Revision 1.3  2003/01/12 03:04:41  ericn
@@ -85,7 +88,7 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
          {
             bmStartY = ( 0-screenStartY );
             screenStartY = 0 ;
-         } // starts off the screen, walk down
+         } // starts off the screen, walk down in alphaMap
 
          unsigned bmStartX = 0 ;
          int screenStartX = specX ;
@@ -93,66 +96,33 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
          {
             bmStartX = ( 0 - screenStartX );
             screenStartX  = 0 ;
-         } // starts off the screen, walk right
+         } // starts off the screen, walk right in alphaMap
 
-         if( ( bmWidth > bmStartX ) && ( screenStartX <= fb.getWidth() ) )
+         if( ( bmWidth > bmStartX ) 
+             && 
+             ( screenStartX <= fb.getWidth() ) 
+             && 
+             ( screenStartY < fb.getHeight() )
+             &&
+             ( bmStartY < bmWidth ) )
          {
             //
             // point row at start row/col
             //
             unsigned char const *inRow = (unsigned char const *)JS_GetStringBytes( sPixMap )
                                        + (bmWidth*bmStartY) + bmStartX ;
-            //
-            // draw every scanline
-            //
+            unsigned const maxHeight = bmHeight-bmStartY ;
             unsigned const red   = (unsigned char)( rgb >> 16 );
             unsigned const green = (unsigned char)( rgb >> 8 );
             unsigned const blue  = (unsigned char)rgb ;
-
-            unsigned screenY = screenStartY ;
-            unsigned short const fullColor = fb.get16( red, green, blue );
-            
-            for( unsigned bmY = bmStartY ; ( bmY < bmHeight ) && ( screenY < fb.getHeight() ) ; bmY++, screenY++, inRow += bmWidth )
-            {
-               unsigned char const *nextIn = inRow ;
-               unsigned screenX = screenStartX ;
-               for( unsigned bmx = bmStartX ; ( bmx < bmWidth ) && ( screenX < fb.getWidth() ) ; bmx++, screenX++ )
-               {
-                  unsigned char const alpha = *nextIn++ ;
-                  if( 0 == alpha )
-                  {
-                  } // nothing
-                  else if( 255 == alpha )
-                  {
-                     fb.getPixel( screenX, screenY ) = fullColor ;
-                  } // full color
-                  else
-                  {
-                     unsigned short const screen16 = fb.getPixel( screenX, screenY );
-                     unsigned const screenRed   = fb.getRed( screen16 );
-                     unsigned const screenGreen = fb.getGreen( screen16 );
-                     unsigned const screenBlue  = fb.getBlue( screen16 );
-                     unsigned char const bg255ths = ~alpha ;
-                     unsigned char mixRed = ( ( screenRed * bg255ths ) + ( alpha * red ) ) / 256 ;
-                     unsigned char mixGreen = ( ( screenGreen * bg255ths ) + ( alpha * green ) ) / 256 ;
-                     unsigned char mixBlue = ( ( screenBlue * bg255ths ) + ( alpha * blue ) ) / 256 ;
-                     unsigned short outColor = fb.get16( mixRed, mixGreen, mixBlue );
-                     fb.getPixel( screenX, screenY ) = outColor ;
-                  }
-//                  printf( "%02x", alpha );
-               } // draw entire row
-//               printf( "\n" );
-            }
-/*
-            printf( "\n\n" );
-            unsigned char const *byteMap = (unsigned char const *)JS_GetStringBytes( sPixMap );
-            for( unsigned y = 0 ; y < bmHeight ; y++ )
-            {
-               for( unsigned x = 0 ; x < bmWidth ; x++ )
-                  printf( "%02x", byteMap[ y * bmWidth + x ] );
-               printf( "\n" );
-            }
-*/            
+            fb.antialias( inRow,
+                          bmWidth,
+                          maxHeight,
+                          screenStartX,
+                          screenStartY,
+                          screenStartX+bmWidth-1,
+                          screenStartY+maxHeight-1,
+                          red, green, blue );
          } // room for something
       }
       else
@@ -325,7 +295,7 @@ static JSBool alphaMap( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
       }
       else
-         JS_ReportError( cx, "Error allocating curlFile" );
+         JS_ReportError( cx, "Error allocating alphaMap" );
    }
    else
       JS_ReportError( cx, "Usage : new alphaMap( { url:\"something\" } );" );

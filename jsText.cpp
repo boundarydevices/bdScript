@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.17  2003-02-10 01:16:49  ericn
+ * Revision 1.18  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.17  2003/02/10 01:16:49  ericn
  * -modified to allow truncation of text
  *
  * Revision 1.16  2003/02/09 02:58:52  ericn
@@ -150,7 +153,7 @@ printf( "colors == fg %u/%u/%u, bg %u/%u/%u\n",
                         unsigned mixBlue = ((alias*fgBlue)+(notAlias*bgBlue))/256 ;
    
                         unsigned short color = fb.get16( mixRed, mixGreen, mixBlue );
-                        fb.getPixel( penX, startY ) = color ;
+                        fb.setPixel( penX, startY, color );
                      } // don't draw background
                   } // is visible
                } // for each column
@@ -176,7 +179,7 @@ printf( "colors == fg %u/%u/%u, bg %u/%u/%u\n",
                                                  ? 0 
                                                  : 255 ;
                      unsigned short color = fb.get16( alias, alias, alias );
-                     fb.getPixel( penX, startY ) = color ;
+                     fb.setPixel( penX, startY, color );
                   } // is visible
                   
                   mask >>= 1 ;

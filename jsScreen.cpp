@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.13  2003-11-30 16:45:31  ericn
+ * Revision 1.14  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.13  2003/11/30 16:45:31  ericn
  * -use prototype for global instance
  *
  * Revision 1.12  2003/02/08 14:56:27  ericn
@@ -68,7 +71,7 @@ jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    
    if( 0 == argc )
    {
-      memset( fb.getMem(), 0, fb.getMemSize() );
+      fb.clear(); // clear to normal background color
    } // clear to black
    else
    {
@@ -76,11 +79,7 @@ jsClearScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
       unsigned char red   = (rgb>>16) & 0xFF ;
       unsigned char green = (rgb>>8) & 0xFF ;
       unsigned char blue  = rgb & 0xFF ;
-      unsigned short color16 = fb.get16( red, green, blue );
-      unsigned short *start = (unsigned short *)fb.getMem();
-      unsigned short *end   = start + fb.getHeight() * fb.getWidth();
-      while( start < end )
-         *start++ = color16 ;
+      fb.clear( red, green, blue );
    } // clear to specified color
          
    *rval = JSVAL_TRUE ;
@@ -145,7 +144,7 @@ jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          unsigned char green = ( rgb >> 8 ) & 0xFF ;
          unsigned char blue  = rgb & 0xFF ;
 
-         fb.getPixel( x, y ) = fb.get16( red, green, blue );
+         fb.setPixel( x, y, fb.get16( red, green, blue ) );
          *rval = JSVAL_TRUE ;
       }
       else
@@ -288,7 +287,7 @@ jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
                   int const screenX = x + startX ;
                   if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
                   {
-                     fb.getPixel( screenX, screenY ) = ~fb.getPixel( screenX, screenY );
+                     fb.setPixel( screenX, screenY, ~fb.getPixel( screenX, screenY ) );
                   } // visible column
                } // for each column
             } // visible row
@@ -399,6 +398,7 @@ jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+#ifdef CONFIG_BD2003
 static JSBool
 jsButtonize( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -436,6 +436,7 @@ jsButtonize( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 
    return JS_TRUE ;
 }
+#endif 
 
 enum jsScreen_tinyId {
    SCREEN_WIDTH, 
@@ -498,7 +499,9 @@ static JSFunctionSpec screen_methods[] = {
    { "rect",         jsRect,             0,0,0 },
    { "line",         jsLine,             0,0,0 },
    { "box",          jsBox,              0,0,0 },
+#ifdef CONFIG_BD2003
    { "buttonize",    jsButtonize,        0,0,0 },
+#endif 
    { 0 }
 };
 
@@ -521,7 +524,7 @@ bool initJSScreen( JSContext *cx, JSObject *glob )
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
          fbDevice_t &fb = getFB();
-         
+
          JS_DefineProperty( cx, obj, "width",
                             INT_TO_JSVAL( fb.getWidth() ),
                             0, 0, 

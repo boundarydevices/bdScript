@@ -1,13 +1,17 @@
 /*
  * Module fbDev.cpp
  *
- * This module defines ...
+ * This module defines the methods of the fbDevice_t class
+ * as declared in fbDev.h
  *
  *
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.20  2003-07-03 13:35:37  ericn
+ * Revision 1.21  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.20  2003/07/03 13:35:37  ericn
  * -modified file handle to close-on-exec
  *
  * Revision 1.19  2003/04/02 01:49:48  tkisky
@@ -80,10 +84,13 @@
 #include <stdio.h>
 #include <linux/fb.h>
 #include <string.h>
+#include <errno.h>
+#include "dither.h"
 
 static unsigned short rTable[32];
 static unsigned short gTable[64];
 static unsigned short bTable[32];
+static unsigned char *lcdRAM_ = 0 ;
 
 
 #if 0
@@ -197,6 +204,140 @@ unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
 #else
    return (screenRGB & 0x1f) << 3;
 #endif
+}
+
+void fbDevice_t :: clear( void )
+{
+#ifdef CONFIG_BD2003
+   memset( getMem(), 0, getMemSize() );
+#else
+   memset( getMem(), 0xFF, getMemSize() );
+   refresh();
+#endif
+}
+
+void fbDevice_t :: clear( unsigned char red, unsigned char green, unsigned char blue )
+{
+   unsigned short color16 = get16( red, green, blue );
+#ifdef CONFIG_BD2003
+   unsigned short *start = (unsigned short *)getMem();
+   unsigned short *end   = start + getHeight() * getWidth();
+   while( start < end )
+      *start++ = color16 ;
+#else
+   unsigned char const value = ( 0 == color16 ) ? 0xFF : 0 ;
+   memset( getMem(), value, getMemSize() );
+   refresh();
+#endif
+}
+
+void fbDevice_t :: refresh( void )
+{
+#ifndef CONFIG_BD2003
+
+   unsigned char const *const src = (unsigned char const *)getMem();
+   unsigned char *const dest = lcdRAM_ ;
+   unsigned const max = getMemSize();
+
+   unsigned offs = 0 ;
+   //
+   // skip matching bytes at the head
+   //
+   while( ( offs < max ) && ( src[offs] == dest[offs] ) )
+   {
+      offs++ ;
+   }
+
+   if( offs < max )
+   {
+      unsigned const mmOffs = offs ;
+      offs = max ;
+      while( offs > mmOffs + 1 )
+      {
+         --offs ;
+         if( src[offs] != dest[offs] )
+             break;
+      }
+
+      unsigned const numMM = offs-mmOffs ;
+      memcpy( dest+mmOffs, src+mmOffs, numMM );
+      lseek( fd_, mmOffs, SEEK_SET );
+      write( fd_, src+mmOffs, numMM );
+   }
+
+/*
+   unsigned char const *const src = (unsigned char const *)getMem();
+   unsigned char *const dest = lcdRAM_ ;
+   unsigned const max = getMemSize();
+
+   for( unsigned offs = 0 ; offs < max ; )
+   {
+      //
+      // find matching bytes
+      //
+      while( ( offs < max ) && ( src[offs] == dest[offs] ) )
+      {
+         offs++ ;
+      }
+      
+      if( offs < max )
+      {
+         unsigned const mmOffs = offs ;
+         while( ( offs < max ) && (src[offs] != dest[offs] ) )
+         {
+            offs++ ;
+         } // walk mis-matched bytes
+
+         unsigned const numMM = offs-mmOffs ;
+         memcpy( dest+mmOffs, src+mmOffs, numMM );
+         lseek( fd_, mmOffs, SEEK_SET );
+         write( fd_, src+mmOffs, numMM );
+      } // found mismatch
+   }
+   lseek( fd_, 0, SEEK_SET );
+   write( fd_, getMem(), getMemSize() );
+*/   
+#endif
+}
+
+unsigned short fbDevice_t :: getPixel( unsigned x, unsigned y )
+{ 
+   if( ( y < height_ ) && ( x < width_ ) )
+   {
+#ifdef CONFIG_BD2003
+      return getRow( y )[ x ]; 
+#else
+      unsigned const offs = y * width_ + x ;
+      unsigned char *bitMem = (unsigned char *)mem_ ;
+      unsigned char const mask = ( 1 << ( offs&7 ) );
+      unsigned char &thisByte = bitMem[offs/8];
+      if( thisByte & mask )
+         return 0 ;
+      else
+         return 0xFFFF ;
+#endif
+   }
+   else
+      return 0 ;
+}
+void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
+{ 
+   if( ( y < height_ ) && ( x < width_ ) )
+   {
+#ifdef CONFIG_BD2003
+      getRow( y )[ x ] = rgb ;
+#else
+      unsigned const offs = y * width_ + x ;
+      unsigned char *bitMem = (unsigned char *)mem_ ;
+      unsigned char const mask = ( 1 << ( offs&7 ) );
+      unsigned char &thisByte = bitMem[offs/8];
+      if( 0 == rgb ) // black
+         thisByte |= mask ;
+      else
+         thisByte &= ~mask ;
+      refresh();
+#endif
+   }
 }
 
 fbDevice_t :: fbDevice_t( char const *name )
@@ -322,7 +463,23 @@ fbDevice_t :: fbDevice_t( char const *name )
             perror( "FBIOGET_VSCREENINFO" );
       }
       else
-         perror( "FBIOGET_FSCREENINFO" );
+      {
+         if( 0 == strcmp( "/dev/lcd", name ) )
+         {
+            width_ = 122 ;
+            height_ = 32 ;
+            unsigned const bits = width_*height_ ;
+            memSize_ = (bits+7)/8 ;
+            mem_ = new unsigned char[ memSize_ ];
+            memset( mem_, 0, memSize_ );
+            lcdRAM_ = new unsigned char[memSize_];
+            memset( lcdRAM_, 0xFF, memSize_ );
+            refresh();
+            return ; // success
+         }
+         else
+            fprintf( stderr, "FBIOGET_FSCREENINFO:%d:%m", errno );
+      }
 
       close( fd_ );
       fd_ = -1 ;
@@ -342,6 +499,7 @@ static inline int min(int x,int y)
 {
    return (x<y)? x : y;
 }
+
 void fbDevice_t :: render
    ( int xPos,				//placement on screen
      int yPos,
@@ -371,16 +529,49 @@ void fbDevice_t :: render
 
    pixels += (w*imageyPos)+imagexPos;
 
-   int minWidth = min(getWidth()-xPos,imageDisplayWidth) << 1;	//2 bytes/pixel
+   int minWidth = min(getWidth()-xPos,imageDisplayWidth);
    int minHeight= min(getHeight()-yPos,imageDisplayHeight);
    if ((minWidth > 0) && (minHeight > 0))
    {
+#ifdef CONFIG_BD2003
+      // 16-bit color
+      minWidth *= sizeof( unsigned short ); //2 bytes/pixel
       do
       {
          unsigned short *pix = getRow( yPos++ ) + xPos;
          memcpy(pix,pixels,minWidth);
          pixels += w;
       } while (--minHeight);
+#else
+      dither_t dither( pixels, w, h );
+
+      // monochrome
+      unsigned char *const bits = (unsigned char *)getMem();
+      do
+      {
+         unsigned offs       = yPos*getWidth()+xPos ;
+         unsigned byteOffs   = offs/8 ;
+         unsigned char mask  = 1 << (offs&7);
+         for( unsigned x = 0 ; x < minWidth ; x++ )
+         {
+            if( dither.isBlack( xPos+x, yPos ) )
+               bits[byteOffs] |= mask ;
+            else
+               bits[byteOffs] &= ~mask ;
+            mask <<= 1 ;
+            if( 0 == mask )
+            {
+               mask = 1 ;
+               byteOffs++ ;
+            }
+         }
+         pixels += w ;
+         yPos++ ;
+      } while (--minHeight);
+
+      refresh();
+
+#endif
    }
 }
 
@@ -396,11 +587,13 @@ void fbDevice_t :: render
    {
       if( ( 0 < w ) && ( 0 < h ) && ( xPos < getWidth() ) && ( yPos < getHeight() ) )
       {
+#ifdef CONFIG_BD2003
          int const left = xPos ;
          for( unsigned y = 0 ; y < h ; y++, yPos++, alpha += w )
          {
             if( yPos < getHeight() )
             {
+               // 16-bit color
                unsigned short *pix = getRow( yPos ) + left ;
                xPos = left ;
                for( unsigned x = 0 ; x < w ; x++, xPos++ )
@@ -442,95 +635,16 @@ void fbDevice_t :: render
             else
                break; // only going further off the screen
          }
+#else
+printf( "!!!!!!!!!!!! ignoring transparency !!!!!!!!!!!\n" );
+   render( xPos, yPos, w, h, pixels );
+#endif 
       }
    }
    else
       render( xPos, yPos, w, h, pixels );
 }
 
-void fbDevice_t :: blend
-   ( unsigned short xPos, unsigned short yPos,
-     unsigned short w, unsigned short h,
-     unsigned short const *srcPixels,
-     unsigned short const *destPixels,
-     unsigned char         _256ths )
-{
-   int minWidth = min(getWidth()-xPos,w);
-   int minHeight= min(getHeight()-yPos,h);
-   if ((minWidth > 0) && (minHeight > 0))
-   {
-      unsigned short *const tempBuf = new unsigned short[ minWidth*minHeight ];
-      if( !tempBuf )
-         exit( 1 );
-      unsigned short *outPix = tempBuf ;
-
-      for( int row = 0 ; row < minHeight ; row++ )
-      {
-         unsigned short const *src  = srcPixels ;
-         unsigned short const *dest = destPixels ;
-         for( int i = 0 ; i < minWidth ; i++ )
-         {
-            unsigned short s = *src++ ;
-            unsigned short d = *dest++ ;
-            unsigned short result = 0 ;
-            
-            if( s != d )
-            {
-               //
-               // blue
-               //
-               unsigned short t1 = ( s & 0x1f );
-               unsigned short t2 = ( d & 0x1f );
-               int diff = t2 - t1 ;
-               unsigned short mask = t1 + (diff*_256ths)/255 ;
-               result |= mask ;
-   
-               s >>= 5 ;
-               d >>= 5 ;
-               
-               //
-               // green
-               //
-               t1 = ( s & 0x3f );
-               t2 = ( d & 0x3f );
-               diff = t2 - t1 ;
-               mask = ( t1 + (diff*_256ths)/255 );
-               mask <<= 5 ;
-               result |= mask ;
-               
-               s >>= 6 ;
-               d >>= 6 ;
-               //
-               // red
-               //
-               t1 = ( s & 0x3f );
-               t2 = ( d & 0x3f );
-               diff = t2 - t1 ;
-               mask = ( t1 + (diff*_256ths)/255 );
-               mask <<= 11 ;
-               result |= mask ;
-   
-            }
-            else
-               result = s ;
-
-            *outPix++ = result ;
-         }
-         srcPixels  += w;
-         destPixels += w ;
-      }
-      
-      minWidth <<= 1 ; // short to byte
-      unsigned char const *inPix = (unsigned char *)tempBuf ;
-      do
-      {
-         unsigned short *screenPix = getRow( yPos++ ) + xPos;
-         memcpy( screenPix, inPix, minWidth );
-         inPix += minWidth ;
-      } while (--minHeight);
-      delete [] tempBuf ;
-   }
-}
 
 #define swap( v1, v2 ) { unsigned short t = v1 ; v1 = v2 ; v2 = t ; }
 
@@ -539,8 +653,6 @@ void fbDevice_t :: rect
      unsigned short x2, unsigned short y2,
      unsigned char red, unsigned char green, unsigned char blue )
 {
-   unsigned short const rgb = get16( red, green, blue );
-
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )
@@ -555,6 +667,8 @@ void fbDevice_t :: rect
       if( y2 >= getHeight() )
          y2 = getHeight() - 1 ;
 
+      unsigned short const rgb = get16( red, green, blue );
+#ifdef CONFIG_BD2003
       unsigned short *row = getRow( y1 ) + x1 ;
       unsigned short *endRow = row + ( y2 - y1 ) * getWidth();
       while( row <= endRow )
@@ -565,6 +679,16 @@ void fbDevice_t :: rect
             *next++ = rgb ;
          row += getWidth();
       }
+#else 
+      for( unsigned y = y1 ; y <= y2 ; y++ )
+      {
+         for( unsigned x = x1 ; x <= x2 ; x++ )
+         {
+            setPixel( x, y, rgb );
+         }
+      }
+      refresh();
+#endif
    } // something is visible
 }
 
@@ -574,19 +698,22 @@ void fbDevice_t :: line
      unsigned char penWidth,
      unsigned char red, unsigned char green, unsigned char blue )
 {
-   unsigned short const rgb = get16( red, green, blue );
-   if( y1 == y2 )
+   if( 0 < penWidth )
    {
-      if( y1 < getHeight()  )
-         rect( x1, y1, x2, y1+penWidth-1, red, green, blue );
-   } // horizontal
-   else if( x1 == x2 )
-   {
-      if( x1 < getWidth() )
-         rect( x1, y1, x1+penWidth-1, y2, red, green, blue );
-   } // vertical
-   else
-      fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
+      unsigned short const rgb = get16( red, green, blue );
+      if( y1 == y2 )
+      {
+         if( y1 < getHeight()  )
+            rect( x1, y1, x2, y1+penWidth-1, red, green, blue );
+      } // horizontal
+      else if( x1 == x2 )
+      {
+         if( x1 < getWidth() )
+            rect( x1, y1, x1+penWidth-1, y2, red, green, blue );
+      } // vertical
+      else
+         fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
+   }
 }
 
 
@@ -643,6 +770,8 @@ void fbDevice_t :: antialias
       if( yTop < getHeight() )
       {
          unsigned char const *alphaCol = bmp + (row*bmpWidth);
+
+#ifdef CONFIG_BD2003
          unsigned short      *screenPix = getRow( yTop++ ) + xLeft ;
 
          unsigned short screenCol = xLeft ;
@@ -660,13 +789,12 @@ void fbDevice_t :: antialias
                      unsigned char const bgGreen = getGreen( bgColor );
                      unsigned char const bgBlue  = getBlue( bgColor );
 
-                     unsigned const alias = coverage + 1 ;
-                     unsigned const notAlias = 256 - alias ;
-                     
-                     unsigned mixRed = ((alias*red)+(notAlias*bgRed))/256 ;
-                     unsigned mixGreen = ((alias*red)+(notAlias*bgGreen))/256 ;
-                     unsigned mixBlue = ((alias*red)+(notAlias*bgBlue))/256 ;
-                     *screenPix = get16( mixRed, mixGreen, mixBlue );
+                     unsigned char const bg255ths = ~coverage ;
+                     unsigned char mixRed = ( ( bgRed * bg255ths ) + ( coverage * red ) ) / 256 ;
+                     unsigned char mixGreen = ( ( bgGreen * bg255ths ) + ( coverage * green ) ) / 256 ;
+                     unsigned char mixBlue = ( ( bgBlue * bg255ths ) + ( coverage * blue ) ) / 256 ;
+                     unsigned short outColor = get16( mixRed, mixGreen, mixBlue );
+                     *screenPix = outColor ;
                   } // not entirely background, need to mix
                } // not entirely foreground, need to mix
                else
@@ -675,12 +803,37 @@ void fbDevice_t :: antialias
             else
                break;
          }
+#else
+         unsigned short screenCol = xLeft ;
+         for( unsigned col = 0 ; col < width ; col++, screenCol++, alphaCol++ )
+         {
+            if( screenCol < getWidth() )
+            {
+               unsigned char const coverage = *alphaCol ;
+               if( 0x80 <= coverage )
+               {
+                  unsigned const offs = yTop * getWidth() + screenCol ;
+                  unsigned char *bitMem = (unsigned char *)mem_ ;
+                  unsigned char const mask = ( 1 << ( offs&7 ) );
+                  unsigned char &thisByte = bitMem[offs/8];
+                  thisByte |= mask ;
+               }
+            }
+            else
+               break;
+         }
+         yTop++ ;
+#endif 
       }
       else
          break;
    }
+#ifndef CONFIG_BD2003
+refresh();
+#endif 
 }
 
+#ifdef CONFIG_BD2003
 void fbDevice_t :: buttonize
    ( bool                 pressed,
      unsigned char        borderWidth,
@@ -740,12 +893,19 @@ void fbDevice_t :: buttonize
 
    rect( b[0], b[1], b[2], b[3], bgColors[0], bgColors[1], bgColors[2] );
 }
+#endif
 
 fbDevice_t :: ~fbDevice_t( void )
 {
    if( 0 <= fd_ )
    {
+#ifdef CONFIG_BD2003
       munmap( mem_, memSize_ );
+#else 
+      delete [] (unsigned char *)mem_ ;
+      delete [] lcdRAM_ ;
+      lcdRAM_ = 0 ;
+#endif
       close( fd_ );
    }
    else if( 0 != mem_ )

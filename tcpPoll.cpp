@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: tcpPoll.cpp,v $
- * Revision 1.1  2004-02-08 10:34:24  ericn
+ * Revision 1.2  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.1  2004/02/08 10:34:24  ericn
  * -Initial import
  *
  *
@@ -47,8 +50,6 @@ tcpHandler_t :: tcpHandler_t
    , state_( closed )
    , clients_( 0 )
 {
-   if( client )
-      addClient( *client );
    if( 0 < getFd() )
    {
       fcntl( getFd(), F_SETFD, FD_CLOEXEC );
@@ -82,6 +83,9 @@ tcpHandler_t :: tcpHandler_t
          close();
       }
    }
+
+   if( client )
+      addClient( *client );
 }
 
 tcpHandler_t :: ~tcpHandler_t( void )
@@ -105,6 +109,10 @@ void tcpHandler_t :: addClient( tcpClient_t &client )
    newClient->client_ = &client ;
    newClient->next_   = clients_ ;
    clients_ = newClient ;
+   if( connected == getState() )
+      client.onConnect( *this );
+   else if( closed == getState() )
+      client.onDisconnect( *this );
 }
 
 void tcpHandler_t :: removeClient( tcpClient_t &client )
@@ -186,7 +194,7 @@ void tcpHandler_t :: onHUP( void )           // POLLHUP
    client_t *cl = clients_ ;
    while( cl )
    {
-      cl->client_->onHUP( *this );
+      cl->client_->onDisconnect( *this );
       cl = cl->next_ ;
    }
    close();

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.25  2003-06-26 08:03:34  tkisky
+ * Revision 1.26  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.25  2003/06/26 08:03:34  tkisky
  * -add rotate90 function
  *
  * Revision 1.24  2003/05/18 10:18:23  tkisky
@@ -100,6 +103,7 @@
 #include "jsGlobals.h"
 #include "jsAlphaMap.h"
 #include "bdGraph/Scale16.h"
+#include "dither.h"
 
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -167,271 +171,6 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_FALSE ;
 }
 
-//
-// number of bits needed to represent n
-//
-static unsigned char bitWidth( unsigned long n )
-{
-   unsigned char width = 0 ; 
-   while( n > 0 )
-   {
-      width++ ;
-      n >>= 1 ;
-   }
-   return width ;
-}
-
-static unsigned long const randMasks[ 33 ] = {
-          0x0, 
-          0x0, 
-         0x03, 
-         0x06, 
-         0x0C, 
-         0x14, 
-         0x30, 
-         0x60, 
-         0xB8, 
-       0x0110, 
-       0x0240, 
-       0x0500, 
-       0x0CA0, 
-       0x1B00, 
-       0x3500, 
-       0x6000, 
-       0xB400, 
-   0x00012000, 
-   0x00020400, 
-   0x00072000, 
-   0x00090000, 
-   0x00140000, 
-   0x00300000, 
-   0x00400000, 
-   0x00D80000, 
-   0x01200000, 
-   0x03880000, 
-   0x07200000, 
-   0x09000000, 
-   0x14000000, 
-   0x32800000, 
-   0x48000000, 
-   0xA3000000
-};
-
-
-JSBool
-jsImageDissolve( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   //
-   // need x and y
-   //
-   if( 2 == argc )
-   {
-      int const xPos = JSVAL_TO_INT( argv[0] );
-      int const yPos = JSVAL_TO_INT( argv[1] );
-
-//      JS_ReportError( cx, "x:%d, y:%d", xPos, yPos );
-
-      jsval widthVal, heightVal, dataVal ;
-
-      if( JS_GetProperty( cx, obj, "width", &widthVal )
-          &&
-          JS_GetProperty( cx, obj, "height", &heightVal )
-          &&
-          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
-          &&
-          JSVAL_IS_STRING( dataVal ) )
-      {
-         int const width  = JSVAL_TO_INT( widthVal ); 
-         int const height = JSVAL_TO_INT( heightVal );
-         JSString *pixStr = JSVAL_TO_STRING( dataVal );
-         unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
-         if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
-         {   
-            jsval     alphaVal ;
-            JSString *sAlpha ;
-            unsigned char const *alpha ;
-            if( JS_GetProperty( cx, obj, "alpha", &alphaVal ) 
-                &&
-                JSVAL_IS_STRING( alphaVal )
-                &&
-                ( 0 != ( sAlpha = JSVAL_TO_STRING( alphaVal ) ) ) )
-            {
-               alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
-            } // have alpha channel... use it
-            else
-               alpha = 0 ;
-            
-            //
-            // now dissolve. Taken from Graphics Gems, dissolve2 algorithm
-            //
-            unsigned short const rwidth = bitWidth(height);
-            unsigned short const cwidth = bitWidth(width);
-            unsigned char regWidth = rwidth+cwidth ;
-            if( regWidth && ( regWidth <= 32 ) )
-            {
-               fbDevice_t &fb = getFB();
-               unsigned long const mask = randMasks[regWidth];
-               unsigned char const rowShift = cwidth ;
-               unsigned long const colMask = (1UL << cwidth)-1 ;
-               unsigned long element = 1 ;
-               do {
-                  unsigned long row = element >> rowShift ;
-                  unsigned long column = element & colMask ;
-                  unsigned long const targetX = xPos + column ;
-                  unsigned long const targetY = yPos + row ;
-                  if( ( row < height ) && ( column < width ) 
-                      &&
-                      ( targetX < fb.getWidth() ) && ( targetY < fb.getHeight() ) )
-                  {
-                     fb.getPixel( targetX, targetY ) = pixMap[row*width+column];
-                  } // copy pixel
-
-                  if( element & 1 )
-                     element = ( element >> 1 ) ^ mask ;
-                  else
-                     element = element >> 1 ;
-
-               } while( 1 != element );
-               
-               fb.getPixel( xPos, yPos ) = *pixMap ;
-
-            }
-         }
-         else
-            JS_ReportError( cx, "Invalid pixMap\n" );
-
-//         JS_ReportError( cx, "w:%d, h:%d", width, height );
-      }
-      else
-         JS_ReportError( cx, "Object not initialized, can't draw\n" );
-
-      *rval = JSVAL_TRUE ;
-      return JS_TRUE ;
-
-   } // need at least two params
-   else
-   {
-      JS_ReportError( cx, "Usage: image().draw( x, y )" );
-      JS_ReportError( cx, "#args == %d", argc );
-   }
-
-   return JS_FALSE ;
-}
-
-static unsigned char const downDithers[] = {
-   3,5,1
-};
-
-static unsigned char const rightDither = 7 ;
-
-#define MAX( _first, _second ) ( ((_first) > (_second))?(_first):(_second) )
-#define MIN( _first, _second ) ( ((_first) < (_second))?(_first):(_second) )
-
-static int luminance( int const colors[3] )
-{
-   int max = MAX( colors[0], MAX( colors[1], colors[2] ) );
-   int min = MIN( colors[0], MIN( colors[1], colors[2] ) );
-   return (max+min)/2 ;
-}
-
-#define REDERROR(x)    ((x)*3)
-#define GREENERROR(x)  (((x)*3)+1)
-#define BLUEERROR(x)   (((x)*3)+2)
-
-static void ditherToBlackAndWhite( unsigned short const *in16,
-                                   unsigned char        *out8,
-                                   unsigned              width,
-                                   unsigned              height )
-{
-   // 
-   // need 1 forward error value and three downward errors for 
-   // Floyd-Steinberg dither. Allocate two rows for down-errors,
-   // since we'll be building one and using the other
-   //
-   // 	    X     7/16
-   //       3/16   5/16  1/16    
-   //
-   
-   unsigned const downErrorMax = 3*width ;
-   int *const downErrors[2] = {
-      new int[downErrorMax],
-      new int[downErrorMax]
-   };
-
-   memset( downErrors[0], 0, downErrorMax * sizeof( downErrors[0][0] ) );
-   memset( downErrors[1], 0, downErrorMax * sizeof( downErrors[1][0] ) );
-   
-   int rightErrors[3];
-   
-   fbDevice_t &fb = getFB();
-
-   for( int y = 0 ; y < height ; y++ )
-   {
-      // not carrying errors from right-edge to left
-      memset( rightErrors, 0, sizeof( rightErrors ) );
-
-      int * const useDown   = downErrors[ y & 1];
-      int * const buildDown = downErrors[ (~y) & 1 ];
-
-      for( int x = 0 ; x < width ; x++ )
-      {
-         unsigned short inPix = in16[y*width+x];
-         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
-         for( unsigned c = 0 ; c < 3 ; c++ )
-         {
-            colors[c] += useDown[(x*3)+c] + rightErrors[c];
-         }
-
-         int const l = luminance( colors );
-
-         int actual[3];
-         int actualRed, actualGreen, actualBlue ;
-         if( l > 0x80 )
-         {
-            out8[y*width+x] = 0xFF ;
-            actual[0] = actual[1] = actual[2] = 0xFF ;
-         } // output white
-         else
-         {
-            out8[y*width+x] = 0 ;
-            actual[0] = actual[1] = actual[2] = 0 ;
-         } // output black
-
-         //
-         // now calculate and store errors
-         //
-         int buildStart = 3*x ;
-         for( unsigned c = 0 ; c < 3 ; c++ )
-         {
-            int const diff = colors[c] - actual[c];
-            int const sixteenths = diff/16 ;
-            
-            rightErrors[c] = 7*sixteenths ;
-
-            if( 0 < x )
-               buildDown[buildStart-3+c] = 3*sixteenths ;
-            buildDown[buildStart+c] = 5*sixteenths ;
-            if( x < width - 1 )
-               buildDown[buildStart+3+c] = sixteenths ;
-         }
-
-/*
-if( ( 2 >= y ) && ( 5 > x ) )
-{
-   printf( "---------> x %d, y %d\n", x, y );
-   printf( "desired %d/%d/%d\n", red, green, blue );
-   printf( "actual  %d/%d/%d\n", actualRed, actualGreen, actualBlue );
-   printf( "errors  %d/%d/%d\n", rightErrors[0], rightErrors[1], rightErrors[2] );
-}
-*/
-      }
-   }
-
-   delete [] downErrors[0];
-   delete [] downErrors[1];
-}
-
-
 JSBool
 jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -462,7 +201,15 @@ jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
             if( sAlphaMap )
             {
                JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
-               ditherToBlackAndWhite( pixMap, (unsigned char *)pixMem, width, height );
+               dither_t dither( pixMap, width, height );
+               unsigned char *const alphaOut = (unsigned char *)pixMem ;
+               for( unsigned y = 0 ; y < height ; y++ )
+               {
+                  for( unsigned x = 0 ; x < width ; x++ )
+                  {
+                     alphaOut[y*width+x] = dither.isBlack( x, y ) ? 0 : 0xFF ;
+                  }
+               }
             }
             else
                JS_ReportError( cx, "Error building alpha map string" );
@@ -633,7 +380,6 @@ jsImageRotate90( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 
 static JSFunctionSpec imageMethods_[] = {
     {"draw",         jsImageDraw,           3 },
-    {"dissolve",     jsImageDissolve,       3 },
     {"dither",       jsImageDither,         3 },
     {"scale",        jsImageScale,          6,0,0 },
     {"rotate90",     jsImageRotate90,       0,0,0 },

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: hexDump.cpp,v $
- * Revision 1.1  2002-11-11 04:30:45  ericn
+ * Revision 1.2  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.1  2002/11/11 04:30:45  ericn
  * -moved from boundary1
  *
  * Revision 1.2  2002/11/03 04:29:39  ericn
@@ -129,6 +132,7 @@ int main( int argc, char const * const argv[] )
          if( 0 <= fd )
          {
             off_t const fileSize = lseek( fd, 0, SEEK_END );
+printf( "fileSize: %u\n", fileSize );
             lseek( fd, 0, SEEK_SET );
             void *mem = mmap( 0, fileSize, PROT_READ, MAP_PRIVATE, fd, 0 );
             if( MAP_FAILED != mem )
@@ -138,19 +142,22 @@ int main( int argc, char const * const argv[] )
                while( dump.nextLine() )
                   printf( "%s\n", dump.getLine() );
 
+               char inBuf[256];
+               fgets( inBuf, sizeof(inBuf), stdin );
+
                munmap( mem, fileSize );
       
             } // mapped file
             else
-               perror( argv[1] );
+               fprintf( stderr, "Error %m mapping %s\n", argv[1] );
 
             close( fd );
          }
          else
-            perror( argv[1] );
+            fprintf( stderr, "Error %m opening %s\n", argv[1] );
       }
       else
-         perror( argv[1] );
+         fprintf( stderr, "Error %m finding %s\n", argv[1] );
    }
    else
       fprintf( stderr, "Usage : hexDump fileName\n" );

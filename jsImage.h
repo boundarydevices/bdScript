@@ -1,5 +1,5 @@
 #ifndef __JSIMAGE_H__
-#define __JSIMAGE_H__ "$Id: jsImage.h,v 1.4 2002-11-22 15:08:01 ericn Exp $"
+#define __JSIMAGE_H__ "$Id: jsImage.h,v 1.5 2004-03-17 04:56:19 ericn Exp $"
 
 /*
  * jsImage.h
@@ -7,13 +7,17 @@
  * This header file declares the initialization routine
  * for the javaScript image routines:
  *
+ *    imageGIF( data [, x, y ] )
  *    imagePNG( data [, x, y ] )
  *    imageJPEG( data [, x, y ] )
  *
  * Change History : 
  *
  * $Log: jsImage.h,v $
- * Revision 1.4  2002-11-22 15:08:01  ericn
+ * Revision 1.5  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.4  2002/11/22 15:08:01  ericn
  * -made jsImageDraw public
  *
  * Revision 1.3  2002/11/02 18:37:23  ericn

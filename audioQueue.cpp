@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.33  2004-01-02 23:37:13  ericn
+ * Revision 1.34  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.33  2004/01/02 23:37:13  ericn
  * -debugPrint()
  *
  * Revision 1.32  2003/09/26 00:43:50  tkisky
@@ -349,9 +352,8 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    unsigned const rowStride = frames.getRowStride();
    unsigned const height    = frames.getHeight();
    unsigned const fbStride  = 2*fb.getWidth();
-   unsigned char *fbStart = (unsigned char *)fb.getMem() 
-                            + params.x_ * 2 
-                            + params.y_ * fbStride ;
+   unsigned char *fbStart = (unsigned char *)fb.getRow(params.y_) 
+                            + params.x_ * 2 ;
 
    while( !_cancel && frames.pull( entry ) )
    {

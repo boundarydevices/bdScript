@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCamera.cpp,v $
- * Revision 1.3  2003-06-04 02:56:32  ericn
+ * Revision 1.4  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.3  2003/06/04 02:56:32  ericn
  * -modified to allocate camera even if unplugged
  *
  * Revision 1.2  2003/04/21 01:25:05  ericn
@@ -312,7 +315,7 @@ static void *displayThread( void *arg )
                {
                   for( unsigned x = 0 ; x < params->w_ ; x++, offs += 3 )
                   {
-                     fb.getPixel( x+params->x_, y+params->y_ ) = fb.get16( buf[offs+2], buf[offs+1], buf[offs] );
+                     fb.setPixel( x+params->x_, y+params->y_, fb.get16( buf[offs+2], buf[offs+1], buf[offs] ) );
                   }
                }
             }

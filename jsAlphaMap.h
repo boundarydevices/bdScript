@@ -1,5 +1,5 @@
 #ifndef __JSALPHAMAP_H__
-#define __JSALPHAMAP_H__ "$Id: jsAlphaMap.h,v 1.1 2002-11-02 18:39:42 ericn Exp $"
+#define __JSALPHAMAP_H__ "$Id: jsAlphaMap.h,v 1.2 2004-03-17 04:56:19 ericn Exp $"
 
 /*
  * jsAlphaMap.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.h,v $
- * Revision 1.1  2002-11-02 18:39:42  ericn
+ * Revision 1.2  2004-03-17 04:56:19  ericn
+ * -updates for mini-board (no sound, video, touch screen)
+ *
+ * Revision 1.1  2002/11/02 18:39:42  ericn
  * -Initial import
  *
  *
@@ -30,8 +33,6 @@ enum jsAlphaMap_tinyId {
    ALPHAMAP_PIXBUF,
    ALPHAMAP_NUMPROPERTIES
 };
-
-extern JSPropertySpec alphaMapProperties_[ALPHAMAP_NUMPROPERTIES+1]; // NULL-terminated
 
 bool initJSAlphaMap( JSContext *cx, JSObject *glob );
 
