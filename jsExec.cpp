@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.71  2004-03-17 04:56:19  ericn
+ * Revision 1.72  2004-03-27 20:22:48  ericn
+ * -added jsSerial
+ *
+ * Revision 1.71  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.70  2004/02/07 12:14:13  ericn
@@ -278,6 +281,7 @@
 #include "debugPrint.h"
 #include "jsBitmap.h"
 #include "fbDev.h"
+#include "jsSerial.h"
 
 #ifdef CONFIG_BD2003
 #include "audioQueue.h"
@@ -539,6 +543,7 @@ int prMain(int argc, char **argv)
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );
                   initJSKernel( cx, glob );
+                  initJSSerial( cx, glob );
 #ifdef CONFIG_BD2003
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
