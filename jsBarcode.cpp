@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.12  2003-12-27 15:09:29  ericn
+ * Revision 1.13  2003-12-28 00:36:03  ericn
+ * -removed secondary thread
+ *
+ * Revision 1.12  2003/12/27 15:09:29  ericn
  * -keep and use prototype
  *
  * Revision 1.11  2003/07/03 13:59:21  ericn
@@ -61,207 +64,76 @@
 #include <poll.h>
 #include <errno.h>
 #include "js/jscntxt.h"
+#include "barcodePoll.h"
 
 static JSObject *bcReaderProto = NULL ;
 
-struct bcrParams_t {
+class bcReader_t : public barcodePoll_t {
+public:
+   bcReader_t( pollHandlerSet_t &set,
+               char const       *devName,
+               int               baud,
+               int               databits,
+               char              parity,
+               int               outDelay,        // inter-character delay on output
+               char              terminator,      // end-of-barcode char
+               jsval             object,
+               JSObject          *scope );
+   virtual ~bcReader_t( void );
+
+   virtual void onBarcode( void );
+   
    jsval     object_ ;
    JSObject *scope_ ;
-   int       fd_ ;
-   char      terminator_ ;
    pthread_t threadHandle_ ;
-   unsigned  outputDelay_ ;
 };
 
-static void deliverBarcodeData( bcrParams_t const &params,
-                                std::string const &bcData )
+
+bcReader_t :: bcReader_t
+   ( pollHandlerSet_t &set,
+     char const       *devName,
+     int               baud,
+     int               databits,
+     char              parity,
+     int               outDelay,        // inter-character delay on output
+     char              terminator,      // end-of-barcode char
+     jsval             object,
+     JSObject          *scope )
+   : barcodePoll_t( set, devName, baud, databits, parity, outDelay, terminator )
+   , object_( object )
+   , scope_( scope )
 {
-   mutexLock_t lock( execMutex_ );
+   JS_AddRoot( execContext_, &object_ );
+   JS_SetPrivate( execContext_, scope_, this );
+}
+
+bcReader_t :: ~bcReader_t( void )
+{
+   JS_SetPrivate( execContext_, scope_, 0 );
+   JS_RemoveRoot( execContext_, &object_ );
+
+}
+
+void bcReader_t :: onBarcode( void )
+{
    jsval onData ;
-   if( JS_GetProperty( execContext_, params.scope_, "onData", &onData ) 
+   if( JS_GetProperty( execContext_, scope_, "onData", &onData ) 
        &&
        ( JSTYPE_FUNCTION == JS_TypeOfValue( execContext_, onData ) ) )
    {
-      JSString *jsBarcode = JS_NewStringCopyN( execContext_, bcData.c_str(), bcData.size() );
+      JSString *jsBarcode = JS_NewStringCopyZ( execContext_, getBarcode() );
       if( jsBarcode )
       {
+         JS_AddRoot( execContext_, &jsBarcode );
          jsval bcv[1] = { STRING_TO_JSVAL( jsBarcode ) };
-         queueSource( params.scope_, onData, "onData", 1, bcv );
+         executeCode( scope_, onData, "onData", 1, bcv );
+         JS_RemoveRoot( execContext_, &jsBarcode );
       }
       else
          fprintf( stderr, "Error allocating barcode\n" );
    }
    else
       printf( "no barcode handler\n" );
-}
-
-static void *barcodeThread( void *arg )
-{
-   bcrParams_t const *params = (bcrParams_t *)arg ;
-printf( "barcodeReader %p (id %x)\n", &arg, pthread_self() );   
-   struct termios oldTermState;
-   tcgetattr(params->fd_,&oldTermState);
-
-   /* set raw mode for keyboard input */
-   struct termios newTermState = oldTermState;
-   newTermState.c_cc[VMIN] = 1;
-
-   //
-   // Note that this doesn't appear to work!
-   // Reads always seem to be terminated at 16 chars!
-   //
-   newTermState.c_cc[VTIME] = 0; // 1/10th's of a second, see http://www.opengroup.org/onlinepubs/007908799/xbd/termios.html
-
-   newTermState.c_cflag &= ~(CSTOPB|CRTSCTS);           // Mask character size to 8 bits, no parity, Disable hardware flow control
-   newTermState.c_cflag |= (CLOCAL | CREAD);            // Select 8 data bits
-   newTermState.c_lflag &= ~(ICANON | ECHO | ISIG);     // set raw mode for input
-   newTermState.c_iflag &= ~(IXON | IXOFF | IXANY|INLCR|ICRNL|IUCLC);   //no software flow control
-   newTermState.c_oflag &= ~OPOST;                      //raw output
-   
-   int result = tcsetattr( params->fd_, TCSANOW, &newTermState );
-   if( 0 == result )
-   {
-      //
-      // outer loop:
-      //    wait forever (or until error) for data
-      //       if terminator
-      //          do
-      //             read what's there
-      //             if terminated
-      //                deliver
-      //             else
-      //                wait for timeout
-      //          while not terminated and end-of-input
-      //       else
-      //          do 
-      //             read what's there
-      //             wait up to 10ms for more
-      //          while( !timedout )
-      //
-      while( 1 )
-      {
-         pollfd filedes ;
-         filedes.fd = params->fd_ ;
-         filedes.events = POLLIN ;
-         
-         int pollRes = poll( &filedes, 1, 0xFFFFFFFF );
-         if( 0 < pollRes )
-         {
-            
-            if( params->terminator_ )
-            {
-               std::string sBarcode ;
-               while( 1 )
-               {
-                  char inBuf[256];
-                  int numRead = read( params->fd_, inBuf, sizeof( inBuf ) - 1 );
-                  if( 0 < numRead )
-                  {
-                     for( unsigned i = 0 ; i < numRead ; i++ )
-                     {
-                        sBarcode += inBuf[i];
-                        if( params->terminator_ == inBuf[i] )
-                        {
-                           if( 0 < sBarcode.size() )
-                           {
-                              deliverBarcodeData( *params, sBarcode );
-                              sBarcode = "" ;
-                           }
-                        }
-                     } // process input buffer
-
-                     if( 0 < sBarcode.size() )
-                     {
-                        pollRes = poll( &filedes, 1, 100 ); // 100 ms
-                        if( 0 == pollRes )
-                        {
-//                         fprintf( stderr, "timeout\n" );
-                           break;
-                        }
-                        else if( EINTR == errno )
-                        {
-//                         fprintf( stderr, "EINTR\n" );
-                        }
-                        else if( 0 == errno )
-                        {
-//                         fprintf( stderr, "bcPoll huh? %m\n" );
-                        }
-                        else
-                        {
-                           fprintf( stderr, "bcPoll err %m\n" );
-                           break;
-                        }
-                     } // tail-end data, wait for timeout
-                  }
-                  else
-                  {
-                     fprintf( stderr, "null read\n" );
-                  }
-               } // until timeout or terminated end of input
-               
-               if( 0 < sBarcode.size() )
-                  deliverBarcodeData( *params, sBarcode ); // un-terminated end of data
-
-            } // terminator
-            else
-            {
-               std::string sBarcode ;
-
-               while( 1 )
-               {
-                  char inBuf[256];
-                  int numRead = read( params->fd_, inBuf, sizeof( inBuf ) - 1 );
-                  if( 0 < numRead )
-                  {
-                     inBuf[numRead] = '\0' ;
-                     sBarcode += inBuf ;
-
-                     pollRes = poll( &filedes, 1, 10 ); // 10 ms
-                     if( 0 == pollRes )
-                     {
-//                        fprintf( stderr, "timeout\n" );
-                        break;
-                     }
-                     else if( EINTR == errno )
-                     {
-//                        fprintf( stderr, "EINTR\n" );
-                     }
-                     else if( 0 == errno )
-                     {
-//                        fprintf( stderr, "bcPoll huh? %m\n" );
-                     }
-                     else
-                     {
-                        fprintf( stderr, "bcPoll err %m\n" );
-                        break;
-                     }
-                  }
-                  else
-                  {
-                     fprintf( stderr, "null read\n" );
-                  }
-               } // until nothing more to read
-               
-               if( 0 < sBarcode.size() )
-                  deliverBarcodeData( *params, sBarcode );
-
-            } // timed out reads
-
-         } // have something to read
-         else if( 0 > pollRes )
-         {
-            fprintf( stderr, ":bcpoll:%m\n" );
-            break;
-         }
-         else
-         {
-         } // 
-      }
-   }
-   else
-      fprintf( stderr, "tcsetattr %m\n" );
-
-   return 0 ;
 }
 
 static void jsBarcodeReaderFinalize(JSContext *cx, JSObject *obj);
@@ -288,14 +160,14 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
        &&
        ( 0 != ( sDevice = JSVAL_TO_STRING( argv[0] ) ) ) )
    {
-      JSObject *reader = JS_NewObject( cx, &jsBarcodeReaderClass_, bcReaderProto, obj );
+      JSObject *readerObj = JS_NewObject( cx, &jsBarcodeReaderClass_, bcReaderProto, obj );
    
-      if( reader )
+      if( readerObj )
       {
-         *rval = OBJECT_TO_JSVAL(reader); // root
-         JS_SetPrivate( cx, reader, 0 );
+         *rval = OBJECT_TO_JSVAL(readerObj); // root
+         JS_SetPrivate( cx, readerObj, 0 );
 
-         JS_DefineProperty( cx, reader, "deviceName", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+         JS_DefineProperty( cx, readerObj, "deviceName", argv[0], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
 
          char terminator = '\0' ;
 
@@ -304,41 +176,15 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
             JSString *sTerminator = JSVAL_TO_STRING( argv[1] );
             if( sTerminator && ( 1 == JS_GetStringLength( sTerminator ) ) )
             {
-               JS_DefineProperty( cx, reader, "terminator", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, readerObj, "terminator", argv[1], 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                terminator = *JS_GetStringBytes( sTerminator );
             }
             else
                JS_ReportError( cx, "barcodeReader terminator must be single-character string" );
          } // have terminator property
-         
-         char const *deviceName = JS_GetStringBytes( sDevice );
-         int const fd = open( deviceName, O_RDWR | O_NOCTTY );
-         if( 0 <= fd )
-         {
-            fcntl( fd, F_SETFD, FD_CLOEXEC );
-            bcrParams_t *params = new bcrParams_t ;
 
-            params->object_       = *rval ;
-            params->scope_        = reader ;
-            params->fd_           = fd ;
-            params->terminator_   = terminator ;
-            params->outputDelay_  = 0 ;
-            JS_AddRoot( cx, &params->object_ );
-
-            int const create = pthread_create( &params->threadHandle_, 0, barcodeThread, params );
-            if( 0 == create )
-            {
-               JS_SetPrivate( cx, reader, params );
-            }
-            else
-            {
-               JS_ReportError( cx, "%s creating barcode reader thread\n", strerror( errno ) );
-               close( fd );
-               delete params ;
-            }
-         }
-         else
-            JS_ReportError( cx, "%s opening %s\n", strerror( errno ), deviceName );
+         (void )new bcReader_t( pollHandlers_, JS_GetStringBytes( sDevice ),
+                                9600, 8, 'N', 0, terminator, *rval, readerObj );
       }
       else
       {
@@ -398,7 +244,7 @@ static JSBool
 jsSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   bcReader_t *params = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
    if( params )
    {
       if( 1 == argc )
@@ -407,13 +253,13 @@ jsSend( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          char * p = JS_GetStringBytes( jsMsg );
          int len = JS_GetStringLength( jsMsg );
          int numWritten;
-         if (params->outputDelay_==0)
-            numWritten = write( params->fd_, p, len );
+         if (params->outputDelay()==0)
+            numWritten = write( params->getFd(), p, len );
          else {
             numWritten=0;
             while (len) {
-               usleep(params->outputDelay_);
-               numWritten += write( params->fd_, p, 1 );
+               usleep(params->outputDelay() );
+               numWritten += write( params->getFd(), p, 1 );
                p++;
                len--;
             }
@@ -431,7 +277,7 @@ static JSBool
 jsFake( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   bcReader_t *params = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
    if( params )
    {
       if( ( 2 == argc ) 
@@ -461,29 +307,9 @@ jsFake( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
-   {
-      JS_SetPrivate( cx, obj, 0 );
-      JS_RemoveRoot( cx, &params->object_ );
-
-      if( 0 <= params->fd_ )
-      {
-         printf( "closing file\n" );
-         close( params->fd_ );
-         params->fd_ = -1 ;
-      }
-      
-      pthread_t thread = params->threadHandle_ ;
-      if( thread )
-      {
-         printf( "shutting down thread\n" );
-         params->threadHandle_ = 0 ;
-         pthread_cancel( thread );
-         void *exitStat ;
-         pthread_join( thread, &exitStat );
-      }
-   }
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
+      delete reader ;
    
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
@@ -491,11 +317,12 @@ jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
 static void jsBarcodeReaderFinalize(JSContext *cx, JSObject *obj)
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
-      printf( "params %p\n", params );
-      jsval args[1];
+      jsval args[1] = { 
+         JSVAL_VOID 
+      };
       jsval rval ;
       jsClose( cx, obj, 0, args, &rval );
    } // have button data
@@ -504,11 +331,11 @@ static void jsBarcodeReaderFinalize(JSContext *cx, JSObject *obj)
 static JSBool
 jsGetBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       struct termios oldTermState;
-      tcgetattr(params->fd_,&oldTermState);
+      tcgetattr(reader->getFd(),&oldTermState);
       unsigned short baudIdx = cfgetispeed(&oldTermState);
       unsigned baud ;
       if( baudIdx < numStandardBauds )
@@ -540,8 +367,8 @@ static JSBool
 jsSetBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
    
       if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
@@ -577,11 +404,11 @@ jsSetBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          if( haveBaud )
          {
             struct termios termState;
-            tcgetattr(params->fd_,&termState);
+            tcgetattr(reader->getFd(),&termState);
             cfsetispeed( &termState, baudIdx );
             cfsetospeed( &termState, baudIdx );
          
-            int result = tcsetattr( params->fd_, TCSANOW, &termState );
+            int result = tcsetattr( reader->getFd(), TCSANOW, &termState );
             if( 0 == result )
             {
                *rval = JSVAL_TRUE ;
@@ -602,11 +429,11 @@ jsSetBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsGetParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       struct termios oldTermState;
-      tcgetattr(params->fd_,&oldTermState);
+      tcgetattr(reader->getFd(),&oldTermState);
       char const *parity ;
       if( oldTermState.c_cflag & PARENB )
       {
@@ -630,13 +457,13 @@ static JSBool
 jsSetParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
       {
          struct termios termState;
-         tcgetattr(params->fd_,&termState);
+         tcgetattr(reader->getFd(),&termState);
          
          JSString *sArg = JSVAL_TO_STRING( argv[0] );
          char const cParity = toupper( *JS_GetStringBytes( sArg ) );
@@ -662,7 +489,7 @@ jsSetParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    
          if( foundParity )
          {
-            int result = tcsetattr( params->fd_, TCSANOW, &termState );
+            int result = tcsetattr( reader->getFd(), TCSANOW, &termState );
             if( 0 == result )
             {
                *rval = JSVAL_TRUE ;
@@ -680,11 +507,11 @@ jsSetParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 static JSBool
 jsGetBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       struct termios oldTermState;
-      tcgetattr(params->fd_,&oldTermState);
+      tcgetattr(reader->getFd(),&oldTermState);
       unsigned csMask = oldTermState.c_cflag & CSIZE ;
       unsigned charLen = 0 ;
       if( CS8 == csMask )
@@ -715,8 +542,8 @@ jsSetBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
    
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
       {
@@ -724,12 +551,12 @@ jsSetBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          if( ( 5 <= bits ) && ( 8 >= bits ) )
          {
             struct termios termState;
-            tcgetattr(params->fd_,&termState);
+            tcgetattr(reader->getFd(),&termState);
             
             termState.c_cflag &= ~CSIZE ;
             termState.c_cflag |= csLengthMasks_[bits-5];
          
-            int result = tcsetattr( params->fd_, TCSANOW, &termState );
+            int result = tcsetattr( reader->getFd(), TCSANOW, &termState );
             if( 0 == result )
             {
                *rval = JSVAL_TRUE ;
@@ -750,10 +577,10 @@ jsSetBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsGetDelay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
-      *rval = INT_TO_JSVAL( params->outputDelay_ );
+      *rval = INT_TO_JSVAL( reader->outputDelay() );
    }
    else
       *rval = JSVAL_FALSE ;
@@ -765,15 +592,15 @@ static JSBool
 jsSetDelay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   bcrParams_t *params = (bcrParams_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
-   if( params )
+   bcReader_t *reader = (bcReader_t *)JS_GetInstancePrivate( cx, obj, &jsBarcodeReaderClass_, NULL );
+   if( reader )
    {
       if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
       {
          int const delay = JSVAL_TO_INT( argv[0] );
          if( ( 0 <= delay ) && ( delay <= 500000 ) )
          {
-            params->outputDelay_ = delay;
+            reader->setOutputDelay( delay );
             *rval = JSVAL_TRUE ;
          }
          else
