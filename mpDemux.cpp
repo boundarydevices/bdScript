@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.3  2003-07-20 18:43:04  ericn
+ * Revision 1.4  2003-07-20 19:06:12  ericn
+ * -fixed small leak
+ *
+ * Revision 1.3  2003/07/20 18:43:04  ericn
  * -fixed stand-alone program to match module interface
  *
  * Revision 1.2  2003/07/20 18:36:07  ericn
@@ -64,6 +67,11 @@ mpegDemux_t :: mpegDemux_t
 
 mpegDemux_t :: ~mpegDemux_t( void )
 {
+   if( 0 != packet_.size )
+   {
+      av_free_packet( &packet_ );
+      packet_.size = 0 ;
+   }
 }
 
 inline INT64 pts_to_ms( INT64 pts )
