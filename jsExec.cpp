@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.49  2003-08-06 13:51:33  ericn
+ * Revision 1.50  2003-08-12 01:20:27  ericn
+ * -added WLAN sniffing support
+ *
+ * Revision 1.49  2003/08/06 13:51:33  ericn
  * -modified to re-run same executable
  *
  * Revision 1.48  2003/08/03 03:25:31  ericn
@@ -207,6 +210,7 @@
 #include "jsCBM.h"
 #include "jsMPEG.h"
 #include "jsFlash.h"
+#include "jsSniffWLAN.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -347,6 +351,7 @@ int prMain(int argc, char **argv)
                      initJSCBM( cx, glob );
                      initJSMPEG( cx, glob );
                      initJSFlash( cx, glob );
+                     initSniffWLAN( cx, glob );
 
                      getCurlCache();
 

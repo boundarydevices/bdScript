@@ -7,5 +7,5 @@ testquickcam
 mpeg2mp3
 jpegview
 backtrace
-ffTest videoQueue mpDemux mpDecode madDecode pcapTest
+ffTest videoQueue mpDemux mpDecode madDecode pcapTest sniffWLAN
 *.sym
