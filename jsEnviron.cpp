@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsEnviron.cpp,v $
- * Revision 1.1  2002-12-12 15:41:34  ericn
+ * Revision 1.2  2004-03-17 14:17:36  ericn
+ * -added environ() call
+ *
+ * Revision 1.1  2002/12/12 15:41:34  ericn
  * -added environment routines
  *
  *
@@ -17,6 +20,8 @@
 
 #include "jsEnviron.h"
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 static JSBool
 jsGetEnv( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -53,9 +58,52 @@ jsSetEnv( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsEnviron( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_VOID ;
+
+   if( 0 == argc )
+   {
+      JSObject *arr = JS_NewArrayObject( cx, 0, 0 );
+      if( arr )
+      {
+         *rval = OBJECT_TO_JSVAL( arr );
+         for( unsigned i = 0 ; __environ[i]; i++ )
+         {
+            char *envItem = __environ[i];
+            char *value = strchr( envItem, '=' );
+            unsigned len = value-envItem ;
+            char ntItem[256];
+            memcpy( ntItem, envItem, len );
+            ntItem[len] = 0 ;
+
+            if( value )
+            {
+               JSString *sValue = JS_NewStringCopyZ( cx, value+1 );
+               if( sValue )
+               {
+                  if( !JS_DefineProperty( cx, arr, ntItem, STRING_TO_JSVAL( sValue ), 0, 0, JSPROP_ENUMERATE | JSPROP_READONLY ) )
+                     JS_ReportError( cx, "set env[%s]\n", ntItem );
+               }
+               else
+                  JS_ReportError( cx, "alloc envValue" );
+            }
+         }
+      }
+      else
+         JS_ReportError( cx, "Allocating environ array" );
+   }
+   else
+      JS_ReportError( cx, "Usage : setenv( 'varname', 'value' );" );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec _functions[] = {
     {"getenv",         jsGetEnv,      0 },
     {"setenv",         jsSetEnv,      0 },
+    {"environ",        jsEnviron,      0 },
     {0}
 };
 
