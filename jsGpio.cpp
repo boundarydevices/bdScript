@@ -19,6 +19,7 @@
 #include <string.h>
 #include "codeQueue.h"
 #include "jsGlobals.h"
+#include "linux/pxa-gpio.h"
 
 static int fdAmber =0;
 static int fdRed =0;
@@ -96,6 +97,7 @@ static void* FeedbackThread( void *arg )
       {
          if ( numRead > 0)
          {
+            printf( "feedback %02x", (unsigned char)ch );
             if (feedbackHandlerScope != 0)
             {
                if (ch&1)
@@ -115,6 +117,7 @@ static void* FeedbackThread( void *arg )
             fprintf( stderr, "feedback null read\n" );
             break;
          }
+         
       }
       close(fd);
    }
@@ -143,6 +146,69 @@ static JSBool jsOnFeedbackHigh( JSContext *cx, JSObject *obj, uintN argc, jsval 
 {
    return jsOnFeedback(&sFeedbackHandlerHigh,cx,obj,argc,argv,rval );
 }
+static JSBool jsGetDebounce( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, int ioctlVal )
+{
+   *rval = JSVAL_FALSE ;
+   int const fd = open( "/dev/Feedback", O_RDONLY);
+   if( 0 <= fd )
+   {
+      int result = 0 ;
+      if( 0 == ioctl( fd, ioctlVal, &result ) )
+      {
+         *rval = INT_TO_JSVAL( result );
+      }
+      else
+         JS_ReportError( cx, "%m reading Feedback debounce\n" );
+
+      close(fd);
+   }
+   else
+      JS_ReportError( cx, "%m opening Feedback device" );
+
+   return JS_TRUE ;
+}
+static JSBool jsSetDebounce( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, int ioctlVal )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
+   {
+      int const fd = open( "/dev/Feedback", O_RDONLY);
+      if( 0 <= fd )
+      {
+         int ms = JSVAL_TO_INT(argv[0]);
+         if( 0 == ioctl( fd, ioctlVal, &ms ) )
+         {
+            *rval = JSVAL_TRUE ;
+         }
+         else
+            JS_ReportError( cx, "%m setting Feedback debounce\n" );
+   
+         close(fd);
+      }
+      else
+         JS_ReportError( cx, "%m opening Feedback device" );
+   }
+   else
+      JS_ReportError( cx, "usage: setFBxDebounce ms" );
+
+   return JS_TRUE ;
+}
+static JSBool jsGetFBLowDB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   return jsGetDebounce( cx, obj, argc, argv, rval, GPIO_GET_DEBOUNCE_DELAY_LOW );
+}
+static JSBool jsSetFBLowDB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   return jsSetDebounce( cx, obj, argc, argv, rval, GPIO_SET_DEBOUNCE_DELAY_LOW );
+}
+static JSBool jsGetFBHighDB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   return jsGetDebounce( cx, obj, argc, argv, rval, GPIO_GET_DEBOUNCE_DELAY_HIGH );
+}
+static JSBool jsSetFBHighDB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   return jsSetDebounce( cx, obj, argc, argv, rval, GPIO_SET_DEBOUNCE_DELAY_HIGH );
+}
 
 static JSFunctionSpec gpio_functions[] = {
     {"setAmber",       jsSetAmber,       1 },
@@ -152,13 +218,17 @@ static JSFunctionSpec gpio_functions[] = {
     {"setTurnstile",   jsSetTurnstile,   1 },
     {"onFeedbackLow",  jsOnFeedbackLow,  1 },
     {"onFeedbackHigh", jsOnFeedbackHigh, 1 },
+    {"getFBLowDebounce", jsGetFBLowDB, 1 },
+    {"setFBLowDebounce", jsSetFBLowDB, 1 },
+    {"getFBHighDebounce", jsGetFBHighDB, 1 },
+    {"setFBHighDebounce", jsSetFBHighDB, 1 },
     {0}
 };
 
 
 bool initJSGpio( JSContext *cx, JSObject *glob )
 {
-   JS_AddRoot( cx, &sFeedbackHandlerLow);
+   JS_AddRoot( cx, &sFeedbackHandlerHigh);
    JS_AddRoot( cx, &sFeedbackHandlerHigh);
    feedbackHandlerScope = glob ;
    return JS_DefineFunctions( cx, glob, gpio_functions);
@@ -178,6 +248,6 @@ void shutdownGpio()
       pthread_join( feedbackThreadHandle, &exitStat );
    }
 
-   JS_RemoveRoot( execContext_, &sFeedbackHandlerLow);
+   JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh);
    JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh);
 }
