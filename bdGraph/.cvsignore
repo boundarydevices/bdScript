@@ -2,6 +2,7 @@ buildSinTable
 sinTable8.c
 sinTable8r.c
 sin2Table7.c
+sin2Table8.c
 mic
 mic-x86
 fftTest
