@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.23  2002-12-15 00:08:46  ericn
+ * Revision 1.24  2002-12-15 00:10:10  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.23  2002/12/15 00:08:46  ericn
  * -removed debug msgs
  *
  * Revision 1.22  2002/12/15 00:07:58  ericn
@@ -368,7 +371,6 @@ int main( int argc, char *argv[] )
    int result = PR_Initialize( prMain, argc, argv, 0 );
    if( gotoCalled_ )
    {
-      printf( "executing %s\n", gotoURL_.c_str() );
       argv[1] = (char *)gotoURL_.c_str();
       execv( argv[0], argv ); // start next
    }

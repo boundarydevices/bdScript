@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.12  2002-12-02 15:14:35  ericn
+ * Revision 1.13  2002-12-15 00:07:58  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.12  2002/12/02 15:14:35  ericn
  * -modified to use pull instead of twiddlin' internals of queue
  *
  * Revision 1.11  2002/12/01 03:13:52  ericn
@@ -357,8 +360,7 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       }
    } // limit scope of lock
       
-   if( 0 != ioctl( dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
-      fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+   ioctl( dspFd_, SNDCTL_DSP_SYNC, 0 );
 
    return true ;
 }
