@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.19  2003-01-06 04:30:00  ericn
+ * Revision 1.20  2003-03-23 01:10:03  ericn
+ * -added file upload from string variable
+ *
+ * Revision 1.19  2003/01/06 04:30:00  ericn
  * -modified to allow unlink() of filter before destruction
  *
  * Revision 1.18  2002/12/15 20:01:52  ericn
@@ -517,28 +520,45 @@ bool queueCurlRequest
 
                      jsval     propVal ;
                      JSString *sPropStr ;
-                     if( JS_GetProperty( request.cx_, paramArr, paramName.c_str(), &propVal ) 
-                         &&
-                         ( 0 != ( sPropStr = JS_ValueToString( request.cx_, propVal ) ) ) )
+                     if( JS_GetProperty( request.cx_, paramArr, paramName.c_str(), &propVal ) )
                      {
-                        char const *paramVal = JS_GetStringBytes( sPropStr );
-                        if( '@' != paramVal[0] )
+                        JSType const valType = JS_TypeOfValue( cx, propVal );
+                        if( ( JSTYPE_STRING == valType )
+                            &&
+                            ( 0 != ( sPropStr = JS_ValueToString( request.cx_, propVal ) ) ) )
                         {
-                           curl_formadd( &postHead, &paramTail, 
-                                         CURLFORM_COPYNAME, paramName.c_str(),
-                                         CURLFORM_COPYCONTENTS, paramVal,
-                                         CURLFORM_END );
-                        }
-                        else
+                           char const *paramVal = JS_GetStringBytes( sPropStr );
+                           if( '_' == paramName[0] )
+                           {
+                              curl_formadd( &postHead, &paramTail, 
+                                            CURLFORM_COPYNAME, paramName.c_str(),
+                                            CURLFORM_BUFFER, paramName.c_str(), 
+                                            CURLFORM_BUFFERPTR, paramVal, 
+                                            CURLFORM_BUFFERLENGTH, JS_GetStringLength( sPropStr ), 
+                                            CURLFORM_END ); 
+                           } // binary file from string
+                           else if( '@' == paramVal[0] )
+                           {
+                              curl_formadd( &postHead, &paramTail, 
+                                            CURLFORM_COPYNAME, paramName.c_str(),
+                                            CURLFORM_FILE, paramVal+1,
+                                            CURLFORM_END );
+                           } // string is file name
+                           else
+                           {
+                              curl_formadd( &postHead, &paramTail, 
+                                            CURLFORM_COPYNAME, paramName.c_str(),
+                                            CURLFORM_COPYCONTENTS, paramVal,
+                                            CURLFORM_END );
+                           } // string is value
+                        } // string value
+                        else 
                         {
-                           curl_formadd( &postHead, &paramTail, 
-                                         CURLFORM_COPYNAME, paramName.c_str(),
-                                         CURLFORM_FILE, paramVal+1,
-                                         CURLFORM_END );
+                           JS_ReportError( request.cx_, "Invalid urlParam value:must be string" );
                         }
                      }
                      else
-                        JS_ReportError( request.cx_, "Invalid urlParam value" );
+                        JS_ReportError( request.cx_, "reading urlParam value" );
                   }
                   else
                      JS_ReportError( request.cx_, "Invalid urlParam" );
