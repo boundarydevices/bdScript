@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.19  2004-01-01 16:02:39  ericn
+ * Revision 1.20  2004-01-01 20:11:12  ericn
+ * -report errors only if not shutting down
+ *
+ * Revision 1.19  2004/01/01 16:02:39  ericn
  * -added error message
  *
  * Revision 1.18  2003/11/24 19:42:05  ericn
@@ -230,10 +233,13 @@ bool queueCallback( callback_t callback,
    {
       return true ;
    }
-   else
+   else 
    {
-      perror( "queueCallback" );
-      JS_ReportError( context_, "queueing callback" );
+      if( -1 != codeListWrite_ )
+      {
+         perror( "queueCallback" );
+         JS_ReportError( context_, "queueing callback" );
+      }
       return false ;
    }
 }
