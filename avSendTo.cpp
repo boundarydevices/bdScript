@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.18  2003-11-04 13:09:32  ericn
+ * Revision 1.19  2003-11-24 22:49:43  ericn
+ * -max volume
+ *
+ * Revision 1.18  2003/11/04 13:09:32  ericn
  * -added keyence support, beep
  *
  * Revision 1.17  2003/11/04 00:40:12  tkisky
@@ -1226,7 +1229,7 @@ int main( int argc, char const * const argv[] )
                   if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
                      perror( "STEREO" );
 
-                  int const vol = 0x6060 ;
+                  int const vol = 0x6464 ;
                   if( 0 > ioctl( fdAudio, SOUND_MIXER_WRITE_VOLUME, &vol)) 
                      perror( "Error setting volume" );
 
@@ -1238,7 +1241,9 @@ int main( int argc, char const * const argv[] )
 
                      if( 0 > ioctl( fdAudioWrite, SOUND_MIXER_WRITE_VOLUME, &vol)) 
                         perror( "Error setting volume" );
-                     
+                     else
+                        printf( "set volume to %u\n", vol & 0xFF );
+
                      if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_SETFMT, &format) ) 
                         fprintf( stderr, "DSP_SETFMT:%m\n" );
 
