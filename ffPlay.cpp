@@ -25,7 +25,6 @@ extern "C" {
 #include "mad.h"
 #include "id3tag.h"
 #include "semClasses.h"
-#include "voQueue.h"
 #include "fbDev.h"
 #include "mtQueue.h"
 
@@ -669,308 +668,291 @@ void main( int argc, char const * const argv[] )
                int mpState = mpeg2_parse( mpeg2dec );
                if( -1 == mpState )
                {
-                  voQueue_t *voq = voQueueOpen();
-                  if( voq )
+                  int const dspFd = open( "/dev/dsp", O_WRONLY );
+                  if( 0 <= dspFd )
                   {
-                     vo_instance_t *output = &voq->vo ;
-
-                     int const dspFd = open( "/dev/dsp", O_WRONLY );
-                     if( 0 <= dspFd )
-                     {
-                        int const format = AFMT_S16_LE ;
-                        if( 0 != ioctl( dspFd, SNDCTL_DSP_SETFMT, &format) ) 
-                           fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+                     int const format = AFMT_S16_LE ;
+                     if( 0 != ioctl( dspFd, SNDCTL_DSP_SETFMT, &format) ) 
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
 
 /*
-                        int const qBytes = 0 ;
-                        if( 0 == ioctl( dspFd, SNDCTL_DSP_GETODELAY, &qBytes) ) 
-                           printf( "odelay %d bytes\n", qBytes );
-                        else
-                           fprintf( stderr, ":ioctl(SNDCTL_DSP_GETODELAY):%m\n" );
+                     int const qBytes = 0 ;
+                     if( 0 == ioctl( dspFd, SNDCTL_DSP_GETODELAY, &qBytes) ) 
+                        printf( "odelay %d bytes\n", qBytes );
+                     else
+                        fprintf( stderr, ":ioctl(SNDCTL_DSP_GETODELAY):%m\n" );
 */
 
 /*
-                        int const vol = 0x5a5a ;
-                        if( 0 > ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
-                           perror( "Error setting volume" );
+                     int const vol = 0x5a5a ;
+                     if( 0 > ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+                        perror( "Error setting volume" );
 */
-                        char const *touchDevice = "/dev/touchscreen/ucb1x00" ;
-                        int fdTouch = open( touchDevice, O_RDONLY );
-                        if( 0 > fdTouch )
-                           fprintf( stderr, "Error opening touch screen\n" );
+                     char const *touchDevice = "/dev/touchscreen/ucb1x00" ;
+                     int fdTouch = open( touchDevice, O_RDONLY );
+                     if( 0 > fdTouch )
+                        fprintf( stderr, "Error opening touch screen\n" );
 
-                        eatTouches( fdTouch );
+                     eatTouches( fdTouch );
 
-                        mmQueue_t outQueue( dspFd );
-      
-                        struct mad_stream stream;
-                        mad_stream_init(&stream);
-                        
-                        struct mad_header header; 
-                        bool haveMadHeader = false ;
-                        struct mad_frame	frame;
-                        struct mad_synth	synth;
-
-                        time_t startSecs ; time( &startSecs );
-                        unsigned long audioBytesOut = 0 ;
-                        bool firstPicture = true ;
-                        audioFrame_t *nextA = outQueue.nextAudioFrame();
-                        nextA->when_   = 0 ;
-                        nextA->length_ = 0 ;
-                        unsigned short *nextOut = (unsigned short *)nextA->data_ ;
-
-                        videoFrame_t *predFrames_[2];
-                        bool skippedP = false ;
-                        outQueue.ptsNumerator_   = ic_ptr->pts_num ;
-                        outQueue.ptsDenominator_ = ic_ptr->pts_den ;
-                        INT64 ptsAdjustFrame = 0 ;
-
-                        while( !haveTouch( fdTouch ) )
-                        {
-                           int result = av_read_packet( ic_ptr, &pkt );
-                           if( 0 <= result )
-                           {
-                              if( CODEC_TYPE_AUDIO == ic_ptr->streams[pkt.stream_index]->codec.codec_type )
-                              {
-                                 ++numAudio ;
-                                 nextA->when_ = pkt.pts ;
-                                 if( flags & ( 1<<CODEC_TYPE_AUDIO ) )
-                                 {
-                                    mad_stream_buffer( &stream, pkt.data, pkt.size );
-                                    if( !haveMadHeader )
-                                    {
-                                       haveMadHeader = ( -1 != mad_header_decode( &header, &stream ) );
-                                       if( haveMadHeader )
-                                       {
-                                          outQueue.numAudioChannels_ = MAD_NCHANNELS(&header);
-                                          printf( "mad header: %u channels, %u Hz\n", outQueue.numAudioChannels_, header.samplerate );
-                                          int const numChannels = 2 ;
-                                          if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &numChannels ) )
-                                             fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-                                          mad_frame_init(&frame);
-                                          mad_synth_init(&synth);
-                                       }
-                                    }
+                     mmQueue_t outQueue( dspFd );
    
+                     struct mad_stream stream;
+                     mad_stream_init(&stream);
+                     
+                     struct mad_header header; 
+                     bool haveMadHeader = false ;
+                     struct mad_frame	frame;
+                     struct mad_synth	synth;
+
+                     time_t startSecs ; time( &startSecs );
+                     unsigned long audioBytesOut = 0 ;
+                     bool firstPicture = true ;
+                     audioFrame_t *nextA = outQueue.nextAudioFrame();
+                     nextA->when_   = 0 ;
+                     nextA->length_ = 0 ;
+                     unsigned short *nextOut = (unsigned short *)nextA->data_ ;
+
+                     videoFrame_t *predFrames_[2];
+                     bool skippedP = false ;
+                     outQueue.ptsNumerator_   = ic_ptr->pts_num ;
+                     outQueue.ptsDenominator_ = ic_ptr->pts_den ;
+                     INT64 ptsAdjustFrame = 0 ;
+
+                     while( !haveTouch( fdTouch ) )
+                     {
+                        int result = av_read_packet( ic_ptr, &pkt );
+                        if( 0 <= result )
+                        {
+                           if( CODEC_TYPE_AUDIO == ic_ptr->streams[pkt.stream_index]->codec.codec_type )
+                           {
+                              ++numAudio ;
+                              nextA->when_ = pkt.pts ;
+                              if( flags & ( 1<<CODEC_TYPE_AUDIO ) )
+                              {
+                                 mad_stream_buffer( &stream, pkt.data, pkt.size );
+                                 if( !haveMadHeader )
+                                 {
+                                    haveMadHeader = ( -1 != mad_header_decode( &header, &stream ) );
                                     if( haveMadHeader )
                                     {
-                                       do {
-                                          if( -1 != mad_frame_decode(&frame, &stream ) )
+                                       outQueue.numAudioChannels_ = MAD_NCHANNELS(&header);
+                                       printf( "mad header: %u channels, %u Hz\n", outQueue.numAudioChannels_, header.samplerate );
+                                       int const numChannels = 2 ;
+                                       if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &numChannels ) )
+                                          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+                                       mad_frame_init(&frame);
+                                       mad_synth_init(&synth);
+                                    }
+                                 }
+
+                                 if( haveMadHeader )
+                                 {
+                                    do {
+                                       if( -1 != mad_frame_decode(&frame, &stream ) )
+                                       {
+                                          int sampleRate = frame.header.samplerate ;
+                                          if( sampleRate != outQueue.lastSampleRate_ )
+                                          {   
+                                             outQueue.lastSampleRate_ = sampleRate ;
+                                             if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &sampleRate ) )
+                                                fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
+                                          }
+                                          mad_synth_frame( &synth, &frame );
+                                          numAudioOut++ ;
+
+                                          if( 1 == outQueue.numAudioChannels_ )
                                           {
-                                             int sampleRate = frame.header.samplerate ;
-                                             if( sampleRate != outQueue.lastSampleRate_ )
-                                             {   
-                                                outQueue.lastSampleRate_ = sampleRate ;
-                                                if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &sampleRate ) )
-                                                   fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
-                                             }
-                                             mad_synth_frame( &synth, &frame );
-                                             numAudioOut++ ;
-   
-                                             if( 1 == outQueue.numAudioChannels_ )
+                                             mad_fixed_t const *left = synth.pcm.samples[0];
+
+                                             for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
                                              {
-                                                mad_fixed_t const *left = synth.pcm.samples[0];
-   
-                                                for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
+                                                unsigned short const sample = scale( *left++ );
+                                                *nextOut++ = sample ;
+                                                *nextOut++ = sample ;
+                                                nextA->length_ += 2*sizeof(sample) ;
+                                                if( nextA->length_ >= sizeof( nextA->data_ ) )
                                                 {
-                                                   unsigned short const sample = scale( *left++ );
-                                                   *nextOut++ = sample ;
-                                                   *nextOut++ = sample ;
-                                                   nextA->length_ += 2*sizeof(sample) ;
-                                                   if( nextA->length_ >= sizeof( nextA->data_ ) )
-                                                   {
-                                                      audioBytesOut += nextA->length_ ;
-                                                      outQueue.postAudioFrame();
-                                                      nextA = outQueue.nextAudioFrame();
-                                                      nextA->when_ = 0 ;
-                                                      nextA->length_ = 0 ;
-                                                      nextOut = (unsigned short *)nextA->data_ ;
-                                                   }
+                                                   audioBytesOut += nextA->length_ ;
+                                                   outQueue.postAudioFrame();
+                                                   nextA = outQueue.nextAudioFrame();
+                                                   nextA->when_ = 0 ;
+                                                   nextA->length_ = 0 ;
+                                                   nextOut = (unsigned short *)nextA->data_ ;
                                                 }
-                                             } // mono
-                                             else
-                                             {
-                                                mad_fixed_t const *left  = synth.pcm.samples[0];
-                                                mad_fixed_t const *right = synth.pcm.samples[1];
-   
-                                                for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
-                                                {
-                                                   *nextOut++ = scale( *left++ );
-                                                   *nextOut++ = scale( *right++ );
-                                                   nextA->length_ += 2*sizeof(*nextOut);
-                                                   if( nextA->length_ >= sizeof( nextA->data_ ) )
-                                                   {
-                                                      audioBytesOut += nextA->length_ ;
-                                                      outQueue.postAudioFrame();
-                                                      nextA = outQueue.nextAudioFrame();
-                                                      nextA->when_ = 0 ;
-                                                      nextA->length_ = 0 ;
-                                                      nextOut = (unsigned short *)nextA->data_ ;
-                                                   }
-                                                }
-                                             } // stereo
-                                             if( 0 != nextA->length_ )
-                                             {
-                                                audioBytesOut += nextA->length_ ;
-                                                outQueue.postAudioFrame();
-                                                nextA = outQueue.nextAudioFrame();
-                                                nextA->when_ = 0 ;
-                                                nextA->length_ = 0 ;
-                                                nextOut = (unsigned short *)nextA->data_ ;
                                              }
-                                          } // frame decoded
+                                          } // mono
                                           else
                                           {
-                                             if( MAD_RECOVERABLE( stream.error ) )
-                                                ;
-                                             else 
-                                                break;
-                                          }
-                                       } while( 1 );
-                                    }
-                                 } // want audio?
-                              }
-                              else if( CODEC_TYPE_VIDEO == ic_ptr->streams[pkt.stream_index]->codec.codec_type )
-                              {
-/**/
-                                 ++numVideo ;
-                                 if( flags & ( 1<<CODEC_TYPE_VIDEO ) )
-                                 {
-                                    mpeg2_buffer( mpeg2dec, pkt.data, pkt.data + pkt.size );
+                                             mad_fixed_t const *left  = synth.pcm.samples[0];
+                                             mad_fixed_t const *right = synth.pcm.samples[1];
 
-                                    do {
-                                       ++numParse ;
-                                       mpState = mpeg2_parse( mpeg2dec );
-                                       switch( mpState )
-                                       {
-                                          case STATE_SEQUENCE:
-                                          {
-                                             vo_setup_result_t setup_result;
-                                             if( 0 == output->setup( output, info->sequence->width, info->sequence->height, &setup_result ) ) 
+                                             for( unsigned i = 0 ; i < synth.pcm.length ; i++ )
                                              {
-                                                outQueue.initVideo( info->sequence->width, info->sequence->height );
-                                                mpeg2_convert( mpeg2dec, convert_rgb16, NULL );
+                                                *nextOut++ = scale( *left++ );
+                                                *nextOut++ = scale( *right++ );
+                                                nextA->length_ += 2*sizeof(*nextOut);
+                                                if( nextA->length_ >= sizeof( nextA->data_ ) )
+                                                {
+                                                   audioBytesOut += nextA->length_ ;
+                                                   outQueue.postAudioFrame();
+                                                   nextA = outQueue.nextAudioFrame();
+                                                   nextA->when_ = 0 ;
+                                                   nextA->length_ = 0 ;
+                                                   nextOut = (unsigned short *)nextA->data_ ;
+                                                }
+                                             }
+                                          } // stereo
+                                          if( 0 != nextA->length_ )
+                                          {
+                                             audioBytesOut += nextA->length_ ;
+                                             outQueue.postAudioFrame();
+                                             nextA = outQueue.nextAudioFrame();
+                                             nextA->when_ = 0 ;
+                                             nextA->length_ = 0 ;
+                                             nextOut = (unsigned short *)nextA->data_ ;
+                                          }
+                                       } // frame decoded
+                                       else
+                                       {
+                                          if( MAD_RECOVERABLE( stream.error ) )
+                                             ;
+                                          else 
+                                             break;
+                                       }
+                                    } while( 1 );
+                                 }
+                              } // want audio?
+                           }
+                           else if( CODEC_TYPE_VIDEO == ic_ptr->streams[pkt.stream_index]->codec.codec_type )
+                           {
+/**/
+                              ++numVideo ;
+                              if( flags & ( 1<<CODEC_TYPE_VIDEO ) )
+                              {
+                                 mpeg2_buffer( mpeg2dec, pkt.data, pkt.data + pkt.size );
+
+                                 do {
+                                    ++numParse ;
+                                    mpState = mpeg2_parse( mpeg2dec );
+                                    switch( mpState )
+                                    {
+                                       case STATE_SEQUENCE:
+                                       {
+                                          vo_setup_result_t setup_result;
+                                          outQueue.initVideo( info->sequence->width, info->sequence->height );
+                                          mpeg2_convert( mpeg2dec, convert_rgb16, NULL );
 //                                                mpeg2_convert( mpeg2dec, null_convert, NULL );
-                                 		mpeg2_custom_fbuf (mpeg2dec, 0);
-                                                INT64 period = info->sequence->frame_period ;
+                                          mpeg2_custom_fbuf (mpeg2dec, 0);
+                                          INT64 period = info->sequence->frame_period ;
 printf( "video frame period == %llu\n", period );
 if( 0 != period )
-   ptsAdjustFrame = outQueue.ptsDenominator_ / ((27000000/period) * outQueue.ptsNumerator_);
+ptsAdjustFrame = outQueue.ptsDenominator_ / ((27000000/period) * outQueue.ptsNumerator_);
 printf( "num %lld/denom %lld\n", outQueue.ptsNumerator_, outQueue.ptsDenominator_ );
 printf( "frame adjust = %llu\n", ptsAdjustFrame );
 
-                                             }
-                                             else
-                                             {
-                                                fprintf (stderr, "display setup failed\n");
-                                                exit (1);
-                                             }
+                                          break;
+                                       }
+                                       case STATE_GOP:
+                                       {
+                                          
+                                          break;
+                                       }
+                                       case STATE_PICTURE:
+                                       {
+                                          int picType = ( info->current_picture->flags & PIC_MASK_CODING_TYPE ) - 1;
+                                          static char const picTypes_[] = { 'I', 'P', 'B', 'D' };
 
-                                             break;
-                                          }
-                                          case STATE_GOP:
+                                          bool skip = ( 0 == ( outQueue.displayFrames_ & (1 << picType ) ) );
+
+                                          if( PIC_FLAG_CODING_TYPE_P - 1 == picType ) 
                                           {
-                                             
-                                             break;
+                                             if( skip )
+                                                skippedP = true ;
+                                             else if( skippedP )
+                                                skip = true ;
                                           }
-                                          case STATE_PICTURE:
-                                          {
-                                             int picType = ( info->current_picture->flags & PIC_MASK_CODING_TYPE ) - 1;
-                                             static char const picTypes_[] = { 'I', 'P', 'B', 'D' };
+                                          else if( PIC_FLAG_CODING_TYPE_I - 1 == picType )
+                                             skippedP = false ;
 
-                                             bool skip = ( 0 == ( outQueue.displayFrames_ & (1 << picType ) ) );
-
-                                             if( PIC_FLAG_CODING_TYPE_P - 1 == picType ) 
-                                             {
-                                                if( skip )
-                                                   skippedP = true ;
-                                                else if( skippedP )
-                                                   skip = true ;
-                                             }
-                                             else if( PIC_FLAG_CODING_TYPE_I - 1 == picType )
-                                                skippedP = false ;
-
-                                             mpeg2_skip( mpeg2dec, skip );
-                                             break;
-                                          }
-                                          case STATE_SLICE:
+                                          mpeg2_skip( mpeg2dec, skip );
+                                          break;
+                                       }
+                                       case STATE_SLICE:
 //                                          case STATE_END:
+                                       {
+                                          ++numDraw ;
+                                          if (info->display_fbuf) 
                                           {
-                                             ++numDraw ;
-                                             if (info->display_fbuf) 
+                                             if( ( 0 != info->current_picture )
+                                                 && 
+                                                 ( 0 == ( info->current_picture->flags & PIC_FLAG_SKIP ) ) )
                                              {
-                                                if( ( 0 != info->current_picture )
-                                                    && 
-                                                    ( 0 == ( info->current_picture->flags & PIC_FLAG_SKIP ) ) )
+                                                firstPicture = false ;
+                                                videoFrame_t *vFrame = outQueue.nextVideoFrame();
+                                                if( vFrame )
                                                 {
-                                                   firstPicture = false ;
-                                                   videoFrame_t *vFrame = outQueue.nextVideoFrame();
-                                                   if( vFrame )
+                                                   unsigned char const *mpgData = info->display_fbuf->buf[0];
+                                                   unsigned char *frameData = vFrame->data_ ;
+                                                   for( unsigned i = 0 ; i < outQueue.height_ ; i++ )
                                                    {
-                                                      unsigned char const *mpgData = info->display_fbuf->buf[0];
-                                                      unsigned char *frameData = vFrame->data_ ;
-                                                      for( unsigned i = 0 ; i < outQueue.height_ ; i++ )
-                                                      {
-                                                         memcpy( frameData, mpgData, outQueue.imgStride_ );
-                                                         mpgData   += outQueue.mpgStride_ ;
-                                                         frameData += outQueue.imgStride_ ;
-                                                      }
+                                                      memcpy( frameData, mpgData, outQueue.imgStride_ );
+                                                      mpgData   += outQueue.mpgStride_ ;
+                                                      frameData += outQueue.imgStride_ ;
+                                                   }
 /*
 printf( "vPTS %lld\n", pkt.pts );
 if( info->current_picture->flags & PIC_FLAG_PTS )
-   printf( "%ld", info->current_picture->pts );
+printf( "%ld", info->current_picture->pts );
 else
-   printf( "<empty>" );
+printf( "<empty>" );
 printf( ", %ld, packet %ld, duration %d\n", info->current_picture->temporal_reference, numVideo, pkt.duration );
 printf( "stream pts %lld: %lld/%lld\n", 
-        ic_ptr->streams[pkt.stream_index]->pts.val,
-        ic_ptr->streams[pkt.stream_index]->pts.num,
-        ic_ptr->streams[pkt.stream_index]->pts.den );
+     ic_ptr->streams[pkt.stream_index]->pts.val,
+     ic_ptr->streams[pkt.stream_index]->pts.num,
+     ic_ptr->streams[pkt.stream_index]->pts.den );
 */        
-                                                      vFrame->when_ = pkt.pts ;
-                                                      outQueue.postVideoFrame();
-                                                      pkt.pts += ptsAdjustFrame ;
-                                                   }
+                                                   vFrame->when_ = pkt.pts ;
+                                                   outQueue.postVideoFrame();
+                                                   pkt.pts += ptsAdjustFrame ;
                                                 }
-                                                else
-                                                {
-                                                   ++numSkipped ;
-                                                } // skipping frame
                                              }
-                                             break;
+                                             else
+                                             {
+                                                ++numSkipped ;
+                                             } // skipping frame
                                           }
+                                          break;
                                        }
-                                    } while( -1 != mpState );
+                                    }
+                                 } while( -1 != mpState );
 
-                                 }
                               }
                            }
-                           else 
-                           {
-                              printf( "eof %d\n", result );
-                              break;
-                           }
                         }
-
-                        printf( "shutting down\n" );
-                        outQueue.shutdown();
-
-                        time_t end ; time( &end );
-
-                        mad_stream_finish(&stream);
-   
-                        close( dspFd );
-                        unsigned elapsed = end-startSecs ;
-                        printf( "%u seconds: %u pictures, %lu bytes of audio\n",
-                                elapsed, numDraw, audioBytesOut );
-
-                        eatTouches( fdTouch );
+                        else 
+                        {
+                           printf( "eof %d\n", result );
+                           break;
+                        }
                      }
-                     else
-                        perror( "/dev/dsp" );
+
+                     printf( "shutting down\n" );
+                     outQueue.shutdown();
+
+                     time_t end ; time( &end );
+
+                     mad_stream_finish(&stream);
+
+                     close( dspFd );
+                     unsigned elapsed = end-startSecs ;
+                     printf( "%u seconds: %u pictures, %lu bytes of audio\n",
+                             elapsed, numDraw, audioBytesOut );
+
+                     eatTouches( fdTouch );
                   }
                   else
-                     fprintf( stderr, "Error opening frame buffer driver\n" );
+                     perror( "/dev/dsp" );
                }
                else
                   fprintf( stderr, "mp2 initialization error\n" );
