@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.1 2002-11-02 04:13:07 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.2 2002-11-02 18:38:28 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.1  2002-11-02 04:13:07  ericn
+ * Revision 1.2  2002-11-02 18:38:28  ericn
+ * -added method getDataLength()
+ *
+ * Revision 1.1  2002/11/02 04:13:07  ericn
  * -Initial import
  *
  *
@@ -93,6 +96,8 @@ public:
    unsigned char getAlpha( unsigned x, unsigned y ) const 
       { return data_[(y*width_)+x]; }
    unsigned char const *getRow( unsigned y ) const { return data_+(y*width_); }
+
+   unsigned getDataLength( void ) const { return width_*height_ ; }
 
    unsigned        width_ ;
    unsigned        height_ ;
