@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.1  2002-11-27 18:35:41  ericn
+ * Revision 1.2  2002-11-29 16:42:55  ericn
+ * -changed function typedefs
+ *
+ * Revision 1.1  2002/11/27 18:35:41  ericn
  * -Initial import
  *
  *
@@ -45,7 +48,7 @@ static onCurlSize_t         onSize_ = 0 ;
 static onCurlProgress_t     onProgress_ = 0 ;
 
 struct progressData_t {
-   curlRequest_t *request_ ;
+   curlTransferRequest_t *request_ ;
    std::string   *data_ ;
    unsigned long  expectedBytes_ ;
 };
@@ -94,7 +97,7 @@ static void *readerThread( void *arg )
 
    while( 1 )
    {
-      curlRequest_t request ;
+      curlTransferRequest_t request ;
       if( queue.pull( request ) )
       {
          std::string data ;
@@ -102,7 +105,6 @@ static void *readerThread( void *arg )
          CURL *cHandle = curl_easy_init();
          if( 0 != cHandle )
          {
-
             char errorBuf[CURL_ERROR_SIZE];
             errorBuf[0] = '\0' ;
 
@@ -114,29 +116,34 @@ static void *readerThread( void *arg )
    
                if( 0 == result )
                {
-                  result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
+                  if( request.postHead_ )
+                     result = curl_easy_setopt( cHandle, CURLOPT_HTTPPOST, request.postHead_ );
                   if( 0 == result )
                   {
-                     progressData_t pd ;
-                     pd.request_ = &request ;
-                     pd.data_    = &data ;
-
-                     result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &pd );
+                     result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
                      if( 0 == result )
                      {
-                        result = curl_easy_setopt( cHandle, CURLOPT_FAILONERROR, (void *)1 );
+                        progressData_t pd ;
+                        pd.request_ = &request ;
+                        pd.data_    = &data ;
+   
+                        result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &pd );
                         if( 0 == result )
                         {
-                           result = curl_easy_setopt( cHandle, CURLOPT_NOPROGRESS, 0 );
+                           result = curl_easy_setopt( cHandle, CURLOPT_FAILONERROR, (void *)1 );
                            if( 0 == result )
                            {
-                              result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSFUNCTION, progress_callback );
+                              result = curl_easy_setopt( cHandle, CURLOPT_NOPROGRESS, 0 );
                               if( 0 == result )
                               {
-                                 result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSDATA, &pd );
+                                 result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSFUNCTION, progress_callback );
                                  if( 0 == result )
                                  {
-                                    result = curl_easy_perform( cHandle );
+                                    result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSDATA, &pd );
+                                    if( 0 == result )
+                                    {
+                                       result = curl_easy_perform( cHandle );
+                                    }
                                  }
                               }
                            }
@@ -239,33 +246,33 @@ void shutdownCurlWorkers(void)
 
 #ifdef __STANDALONE__
 
-static void onCurlComplete( curlRequest_t     &request,
-                            void const        *data,
-                            unsigned long      numRead )
+static void onCurlComplete( curlTransferRequest_t  &request,
+                            void const             *data,
+                            unsigned long           numRead )
 {
    printf( "url %s complete: %lu bytes\n", request.url_.c_str(), numRead );
 }
 
-static void onCurlFailure( curlRequest_t     &request,
-                           std::string const &errorMsg )
+static void onCurlFailure( curlTransferRequest_t &request,
+                           std::string const     &errorMsg )
 {
    printf( "url %s failed: %s\n", request.url_.c_str(), errorMsg.c_str() );
 }
 
-static void onCurlCancel( curlRequest_t &request )
+static void onCurlCancel( curlTransferRequest_t &request )
 {
    printf( "url %s cancelled\n", request.url_.c_str() );
 }
 
 
-static void onCurlSize( curlRequest_t &request,
-                        unsigned long  size )
+static void onCurlSize( curlTransferRequest_t &request,
+                        unsigned long          size )
 {
    printf( "url %s: expecting %lu bytes\n", request.url_.c_str(), size );
 }
 
-static void onCurlProgress( curlRequest_t &request,
-                            unsigned long  totalReadSoFar )
+static void onCurlProgress( curlTransferRequest_t &request,
+                            unsigned long          totalReadSoFar )
 {
    printf( "url %s: %lu bytes so far\n", request.url_.c_str(), totalReadSoFar );
 }
@@ -280,7 +287,7 @@ int main( void )
       printf( "url: " );
       if( fgets( inBuf, sizeof( inBuf ), stdin ) )
       {
-         curlRequest_t request ;
+         curlTransferRequest_t request ;
          
          request.opaque_ = 0 ;
          request.url_ = inBuf ;

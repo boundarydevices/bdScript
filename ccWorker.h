@@ -1,5 +1,5 @@
 #ifndef __CCWORKER_H__
-#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.1 2002-11-27 18:35:41 ericn Exp $"
+#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.2 2002-11-29 16:42:44 ericn Exp $"
 
 /*
  * ccWorker.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: ccWorker.h,v $
- * Revision 1.1  2002-11-27 18:35:41  ericn
+ * Revision 1.2  2002-11-29 16:42:44  ericn
+ * -changed function typedefs
+ *
+ * Revision 1.1  2002/11/27 18:35:41  ericn
  * -Initial import
  *
  *
@@ -28,14 +31,14 @@
 #include <string>
 #include "mtQueue.h"
 
-struct curlRequest_t {
+struct curlTransferRequest_t {
    void              *opaque_ ;     // app-specific data
    std::string        url_ ;        // url to request, should be absolute
    struct HttpPost   *postHead_ ;   // post with parameters or NULL. Deallocated by curl thread.
    bool volatile     *cancel_ ;     // used to tell curl thread to abort
 };
 
-typedef mtQueue_t<curlRequest_t> curlQueue_t ;
+typedef mtQueue_t<curlTransferRequest_t> curlQueue_t ;
 
 curlQueue_t &getCurlRequestQueue( void );
 
@@ -64,20 +67,20 @@ curlQueue_t &getCurlRequestQueue( void );
 // deallocate the associated memory when the call returns, so
 // the callback should make a copy if necessary.
 //
-typedef void (*onCurlComplete_t)( curlRequest_t     &request,
-                                  void const        *data,
-                                  unsigned long      numRead );
+typedef void (*onCurlComplete_t)( curlTransferRequest_t &request,
+                                  void const            *data,
+                                  unsigned long          numRead );
 
 //
 // called if transfer fails
 //
-typedef void (*onCurlFailure_t)( curlRequest_t     &request,
-                                 std::string const &errorMsg );
+typedef void (*onCurlFailure_t)( curlTransferRequest_t &request,
+                                 std::string const     &errorMsg );
 
 //
 // called if transfer cancelled
 //
-typedef void (*onCurlCancel_t)( curlRequest_t &request );
+typedef void (*onCurlCancel_t)( curlTransferRequest_t &request );
 
 
 //
@@ -86,13 +89,13 @@ typedef void (*onCurlCancel_t)( curlRequest_t &request );
 // If size isn't known until completion, this routine may never
 // be called.
 //
-typedef void (*onCurlSize_t)( curlRequest_t &request,
-                              unsigned long  size );
+typedef void (*onCurlSize_t)( curlTransferRequest_t &request,
+                              unsigned long          size );
 //
 // called during transfer to indicate progress
 //
-typedef void (*onCurlProgress_t)( curlRequest_t &request,
-                                  unsigned long  totalReadSoFar );
+typedef void (*onCurlProgress_t)( curlTransferRequest_t &request,
+                                  unsigned long          totalReadSoFar );
 
 
 void initializeCurlWorkers
