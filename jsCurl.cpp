@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.7  2002-10-25 04:49:05  ericn
+ * Revision 1.8  2002-10-31 02:10:46  ericn
+ * -modified curlFile() constructor to be multi-threaded, use rh object
+ *
+ * Revision 1.7  2002/10/25 04:49:05  ericn
  * -removed debug statements
  *
  * Revision 1.6  2002/10/15 05:00:39  ericn
@@ -43,78 +46,96 @@
 #include "urlFile.h"
 #include <stdio.h>
 #include "curlCache.h"
+#include "relativeURL.h"
+#include "curlThread.h"
+#include "jsGlobals.h"
 
 enum jsCurl_tinyid {
+   CURLFILE_ISLOADED, 
    CURLFILE_WORKED, 
    CURLFILE_DATA, 
    CURLFILE_URL, 
    CURLFILE_HTTPCODE, 
    CURLFILE_FILETIME, 
-   CURLFILE_MIMETYPE
+   CURLFILE_MIMETYPE,
+   CURLFILE_PARAMS
 };
 
 extern JSClass jsCurlClass_ ;
-
-static void
-jsCurl_finalize(JSContext *cx, JSObject *obj)
-{
-   urlFile_t *fURL = (urlFile_t *)JS_GetInstancePrivate( cx, obj, &jsCurlClass_, NULL);
-
-	if( fURL )
-   {
-      printf( "finalizing object %p/%p\n", obj, fURL );
-      delete fURL ;
-      JS_SetPrivate( cx, obj, 0 );
-	}
-}
 
 JSClass jsCurlClass_ = {
   "curlFile",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
-   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      jsCurl_finalize,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
 static JSPropertySpec curlFileProperties_[] = {
+  {"isLoaded",       CURLFILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"worked",         CURLFILE_WORKED,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"data",           CURLFILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"url",            CURLFILE_URL,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"httpCode",       CURLFILE_HTTPCODE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"fileTime",       CURLFILE_FILETIME,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"mimeType",       CURLFILE_MIMETYPE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"params",         CURLFILE_PARAMS,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   if( (argc == 1) && ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
+   if( ( 1 == argc ) 
+       && 
+       ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) 
+       &&
+       JSVAL_IS_OBJECT( argv[0] ) )
    {
-      if( JSVAL_IS_STRING( argv[0] ) )
+      JSObject *thisObj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
+
+      if( thisObj )
       {
-         obj = js_NewObject( cx, &jsCurlClass_, NULL, NULL );
+         *rval = OBJECT_TO_JSVAL( thisObj ); // root
+         
+         JS_DefineProperty( cx, thisObj, "isLoaded",
+                            JSVAL_FALSE,
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JS_DefineProperty( cx, thisObj, "initializer",
+                            argv[0],
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+         JSObject *const rhObj = JSVAL_TO_OBJECT( argv[0] );
+         
+         jsCurlRequest_t request ;
+         request.onComplete = jsCurlOnComplete ;
+         request.onError    = jsCurlOnError ;
+         request.lhObj_ = thisObj ;
+         request.rhObj_ = rhObj ;
+         request.cx_    = cx ;
+         request.mutex_ = &execMutex_ ;
 
-         if( obj )
+         if( queueCurlRequest( request ) )
          {
-            char const *url = JS_GetStringBytes( js_ValueToString( cx, argv[0]) );
-
-            urlFile_t *fURL = new urlFile_t( (char const *)url );
-            if( fURL )
-            {
-// printf( "new file %s/%p/%p\n", url, obj, fURL );
-               if( JS_SetPrivate( cx, obj, fURL ) )
-               {
-                  *rval = OBJECT_TO_JSVAL(obj);
-                  return JS_TRUE;
-               }
-               else
-                  delete fURL ;
-            }
+            return JS_TRUE ;
+         }
+         else
+         {
+            JS_ReportError( cx, "Error queueing curlRequest" );
          }
       }
+      else
+         JS_ReportError( cx, "Error allocating curlFile" );
    }
+   else
+      JS_ReportError( cx, "Usage: new curlFile( {url:\"something\"} );" );
       
    return JS_FALSE ;
+
 }
 
 static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
@@ -168,17 +189,17 @@ static JSBool returnFile( JSContext *cx, jsval *rval, curlFile_t &f )
          }
          else
          {
-            printf( "error opening file\n" );
+            JS_ReportError( cx, "error opening file\n" );
             *rval = JSVAL_FALSE ;
          }
       
          return JS_TRUE ;
       }
       else
-         printf( "Error defining property\n" );
+         JS_ReportError( cx, "Error defining property\n" );
    }
    else
-      printf( "Error allocating object\n" );
+      JS_ReportError( cx, "Error allocating object\n" );
    
    return JS_FALSE ;
 }
@@ -201,7 +222,7 @@ curlGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
        &&
        ( ( 1 == argc ) 
          || 
-         JSVAL_IS_BOOLEAN( argv[1] ) ) )   // second parameter must be boolean
+         JSVAL_IS_BOOLEAN( argv[1] ) ) )      // second parameter must be boolean
    {
       JSString *str = JS_ValueToString( cx, argv[0] );
       if( str )
