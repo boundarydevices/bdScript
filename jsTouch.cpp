@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.2  2002-11-08 13:57:35  ericn
+ * Revision 1.3  2002-11-21 14:09:30  ericn
+ * -preliminary button support
+ *
+ * Revision 1.2  2002/11/08 13:57:35  ericn
  * -removed debug msgs
  *
  * Revision 1.1  2002/11/03 15:39:36  ericn
@@ -21,6 +24,7 @@
 #include "jsTouch.h"
 #include "js/jscntxt.h"
 #include "codeQueue.h"
+#include "zOrder.h"
 
 class jsTouchScreenThread_t : public touchScreenThread_t {
 public:
@@ -30,7 +34,8 @@ public:
         lastX_( 0 ),
         lastY_( 0 ),
         cx_( cx ),
-        scope_( scope ){}
+        scope_( scope ),
+        curBox_( 0 ){}
    virtual ~jsTouchScreenThread_t( void ){}
 
    virtual void onTouch( unsigned        x, 
@@ -45,6 +50,7 @@ public:
 
    JSContext * const cx_ ;
    JSObject  * const scope_ ;
+   box_t            *curBox_ ;
 };
 
 static std::string onTouchCode_ ;
@@ -145,13 +151,54 @@ void jsTouchScreenThread_t :: onTouch
 {
    lastX_ = x ;
    lastY_ = y ;
-   if( 0 != onTouchCode_.size() )
-      queueSource( scope_, onTouchCode_, "onTouch" );
+
+   if( 0 != curBox_ )
+   {
+      if( ( x >= curBox_->xLeft_ )
+          &&
+          ( x < curBox_->xRight_ )
+          &&
+          ( y >= curBox_->yTop_ )
+          &&
+          ( y < curBox_->yBottom_ ) )
+      {
+         curBox_->onTouch_( *curBox_, x, y );
+         return ;
+      } // still on this button
+      else
+      {
+         curBox_->onRelease_( *curBox_, x, y );
+         curBox_ = 0 ;
+      } // moved off of the button
+   } // already touching, move or release
+
+   std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
+   if( 0 < boxes.size() )
+   {
+      curBox_ = boxes[0];
+      curBox_->onTouch_( *boxes[0], x, y );
+   }
+   else
+   {
+      if( 0 != onTouchCode_.size() )
+         queueSource( scope_, onTouchCode_, "onTouch" );
+      else
+      {
+         printf( "no touch handler %u/%u\n", x, y );
+//         dumpZMaps();
+      }
+   } // no boxes... look for global handler
 }
 
 
 void jsTouchScreenThread_t :: onRelease( void )
 {
+   if( 0 != curBox_ )
+   {
+      curBox_->onRelease_( *curBox_, lastX_, lastY_ );
+      curBox_ = 0 ;
+   } // touching, move or release box
+
    if( 0 != onReleaseCode_.size() )
       queueSource( scope_, onReleaseCode_, "onRelease" );
 }
