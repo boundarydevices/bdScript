@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.20  2003-02-08 14:56:42  ericn
+ * Revision 1.21  2003-02-08 19:52:43  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.20  2003/02/08 14:56:42  ericn
  * -added mixer fd (to no avail)
  *
  * Revision 1.19  2003/02/02 23:30:46  ericn
@@ -304,11 +307,6 @@ printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
-printf( "have write fd %d\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , writeFd
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
                unsigned long numWritten = 0 ;
                _playing = true ;
    
@@ -452,10 +450,6 @@ printf( "have write fd %d\n"
                   queueCallback( audioCallback, item );
                }
                closeWriteFd();
-printf( "closed write fd\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
             else
                perror( "audioWriteFd" );
@@ -467,11 +461,6 @@ printf( "closed write fd\n"
             writeFd = openWriteFd();
             if( 0 <= writeFd )
             {
-printf( "have write fd %d\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , writeFd
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
                _playing = true ;
    
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
@@ -560,10 +549,6 @@ printf( "have write fd %d\n"
                
                closeWriteFd();
 
-printf( "closed write fd\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
             else
                perror( "audioWriteFd" );
@@ -573,11 +558,6 @@ printf( "closed write fd\n"
             int const readFd = openReadFd();
             if( 0 <= readFd )
             {
-printf( "have read fd %d\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , readFd
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
                audioQueue_t :: waveHeader_t &header = *( audioQueue_t :: waveHeader_t * )item->data_ ;
                _recording = true ;
                if( header.sampleRate_ != lastRecordRate )
@@ -625,10 +605,6 @@ printf( "have read fd %d\n"
                }
                
                closeReadFd();
-printf( "closed read fd\n"
-        "readCount %d, writeFdCount %d\n"
-        "readFd %d, writeFd %d\n"
-        , readFdRefs_, writeFdRefs_, readFd_, writeFd_ );
             }
             else
                perror( "audioReadFd" );
