@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.5 2003-02-10 01:17:00 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.6 2004-07-04 21:30:32 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.5  2003-02-10 01:17:00  ericn
+ * Revision 1.6  2004-07-04 21:30:32  ericn
+ * -add monochrome(bitmap) support
+ *
+ * Revision 1.5  2003/02/10 01:17:00  ericn
  * -modified to allow truncation of text
  *
  * Revision 1.4  2003/02/09 02:58:52  ericn
@@ -86,6 +89,31 @@ public:
    unsigned        fontHeight_ ;
    unsigned char  *data_ ;
 };
+
+//
+// draw a string into a 
+//
+enum ftAlign_e {
+   ftLeft               = 0,
+   ftCenterHorizontal   = 1,
+   ftRight              = 2,
+   ftTop                = 0,
+   ftBottom             = 4,
+   ftCenterVertical     = 8
+};
+
+bool freeTypeToBitmapBox( freeTypeFont_t &font,
+                          unsigned        pointSize,
+                          unsigned        alignment,
+                          char const     *dataStr,
+                          unsigned        strLen,
+                          unsigned        x,
+                          unsigned        y,
+                          unsigned        w,
+                          unsigned        h,
+                          unsigned char  *bmp,
+                          unsigned        bmpStride, // bytes per row
+                          unsigned        bmpRows );
 
 #endif
 

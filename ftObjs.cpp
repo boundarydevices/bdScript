@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.9  2003-02-10 01:16:56  ericn
+ * Revision 1.10  2004-07-04 21:30:35  ericn
+ * -add monochrome(bitmap) support
+ *
+ * Revision 1.9  2003/02/10 01:16:56  ericn
  * -modified to allow truncation of text
  *
  * Revision 1.8  2003/02/09 03:44:44  ericn
@@ -43,6 +46,10 @@
 #define obstack_chunk_alloc malloc
 #define obstack_chunk_free free
 #include <obstack.h>
+#include "bitmap.h"
+
+// #define DEBUGPRINT 1
+#include "debugPrint.h"
 
 class freeTypeLibrary_t {
 public:
@@ -455,6 +462,219 @@ freeTypeString_t :: ~freeTypeString_t( void )
       delete [] data_ ;
 }
 
+bool freeTypeToBitmapBox( freeTypeFont_t &font,
+                          unsigned        pointSize,
+                          unsigned        alignment,
+                          char const     *dataStr,
+                          unsigned        strLen,
+                          unsigned        x,
+                          unsigned        y,
+                          unsigned        w,
+                          unsigned        h,
+                          unsigned char  *bmp,
+                          unsigned        bmpStride, // bytes per row
+                          unsigned        bmpRows )
+{
+   unsigned imageWidth = 0 ;
+   unsigned const bitWidth = bmpStride*8 ;
+
+   if( ( 0 != pointSize ) 
+       && 
+       ( font.face_->face_flags & FT_FACE_FLAG_SCALABLE ) )
+   {
+      FT_Set_Char_Size( font.face_, 0, pointSize*64, 80, 80 );
+   }
+   
+   FT_UInt prevGlyph = 0 ; // used for kerning
+   FT_Bool useKerning = FT_HAS_KERNING( font.face_ );
+
+   //
+   // have to measure ascend and descend separately
+   //
+   int maxAscend  = 0 ;
+   int maxDescend = 0 ;
+   unsigned leftMargin = 0 ;
+
+   struct obstack glyphStack ;
+   obstack_init( &glyphStack );
+   glyphData_t  **glyphs = new glyphData_t *[strLen];
+
+   char const *sText = dataStr ;
+   for( unsigned i = 0 ; i < strLen ; i++ )
+   {
+      glyphs[i] = (glyphData_t *)obstack_alloc( &glyphStack, sizeof( glyphData_t ) );
+      glyphData_t &glyph = *( glyphs[i] );
+      memset( &glyph, 0, sizeof( glyph ) );
+
+      char const c = *sText++ ;
+      
+      // three things can happen here:
+      //    1. we can load the char index and glyph, at which point we can ask about kerning.
+      //    2. we can't load the char index, but can render directly, which means we can't kern
+      //    3. everything failed
+      //
+
+      bool haveGlyph = false ;
+
+      FT_UInt glIndex = FT_Get_Char_Index( font.face_, c );
+      if( 0 < glIndex )
+      {
+         int error = FT_Load_Glyph( font.face_, glIndex, FT_LOAD_DEFAULT );
+         if( 0 == error )
+         {
+            if( font.face_->glyph->format != ft_glyph_format_bitmap )
+            {
+               error = FT_Render_Glyph( font.face_->glyph, ft_render_mode_mono );
+               if( 0 == error )
+               {
+                  haveGlyph = true ;
+                  if( useKerning && ( 0 != prevGlyph ) )
+                  {
+                     FT_Vector  delta;
+                     FT_Get_Kerning( font.face_, prevGlyph, glIndex, ft_kerning_default, &delta );
+                     glyph.kern = delta.x / 64 ;
+                  }
+               }
+//               else
+//                  fprintf( stderr, "Error %d rendering glyph\n", error );
+            }
+            else
+            {
+//               fprintf( stderr, "Bitmap rendered directly\n" );
+               haveGlyph = true ;
+            }
+         }
+         else
+         {
+//            fprintf( stderr, "Error %d loading glyph\n", error );
+         }
+      }
+      else
+      {
+         haveGlyph = ( 0 == FT_Load_Char( font.face_, c, FT_LOAD_RENDER ) );
+      }
+
+      if( haveGlyph )
+      {
+         glyph.glyphBitmap_left = font.face_->glyph->bitmap_left ;
+         glyph.glyphAdvanceX    = font.face_->glyph->advance.x ;
+         glyph.glyphBitmap_top  = font.face_->glyph->bitmap_top ;
+         glyph.bmpRows          = font.face_->glyph->bitmap.rows ;
+         glyph.bmpWidth         = font.face_->glyph->bitmap.width ;
+         glyph.bmpPitch         = font.face_->glyph->bitmap.pitch ;
+         glyph.bmpBuffer        = (unsigned char *)obstack_copy( &glyphStack, 
+                                                                 font.face_->glyph->bitmap.buffer, 
+                                                                 glyph.bmpPitch * glyph.bmpRows );
+         glyph.bmpNum_grays     = font.face_->glyph->bitmap.num_grays ;
+         // 
+         // Whew! A lot of stuff was done to get here, but now
+         // we have a bitmap (face->glyph->bitmap) (actually a 
+         // byte-map with the image data in 1/255ths
+         //
+         
+         // chars like "T" have negative value for bitmap_left... aargh!
+         if( 0 > font.face_->glyph->bitmap_left ) 
+         {
+             if( (0 - font.face_->glyph->bitmap_left ) > imageWidth )
+             {
+               leftMargin = (0 - font.face_->glyph->bitmap_left);
+               imageWidth += leftMargin ;
+             }
+         }
+
+         imageWidth += ( ( font.face_->glyph->advance.x + 63 ) / 64 )
+                       + glyph.kern ;
+
+         if( maxAscend < font.face_->glyph->bitmap_top )
+            maxAscend = font.face_->glyph->bitmap_top ;
+         int const descend = font.face_->glyph->bitmap.rows - font.face_->glyph->bitmap_top ;
+         if( maxDescend < descend )
+            maxDescend = descend ;
+      }
+      else
+      {
+         glyphs[i] = 0 ;
+      }
+      
+      prevGlyph = glIndex ;
+
+   } // walk string, calculating width and height
+
+   unsigned const baseline = maxAscend ;
+   unsigned const imageHeight = maxAscend + maxDescend + 1 ;
+
+   ++imageWidth ;
+
+   //
+   // draw a single-line box around the entire area
+   //
+   bitmap_t outBmp( bmp, bitWidth, bmpRows );
+
+//   outBmp.rect( x-3, y-3, w+4, h+4, 1 );
+   outBmp.rect( x,   y,   w,   h,   0 );
+
+   unsigned yOffs = 0 ;
+   if( imageHeight < h )
+   {
+      if( alignment & ftBottom )
+         yOffs = h - imageHeight ;
+      else if( alignment & ftCenterVertical )
+         yOffs = (h-imageHeight)/2 ;
+   }
+
+   unsigned xOffs = 0 ;
+   if( imageWidth < w )
+   {
+      if( alignment & ftRight )
+         xOffs = w - imageWidth ;
+      else if( alignment & ftCenterHorizontal )
+         xOffs = (w-imageWidth)/2 ;
+   }
+   
+   if( ( 0 != imageWidth ) && ( 0 != imageHeight ) )
+   {
+      sText = dataStr ;
+      unsigned penX = x + leftMargin + xOffs ;
+      unsigned penY = y + maxAscend + yOffs ;
+
+      for( unsigned i = 0 ; i < strLen ; i++, sText++ )
+      {
+         glyphData_t const *glyph = glyphs[i];
+         if( glyph )
+         {
+            penX += glyph->kern ; // adjust for kerning
+            if( ( 0 < glyph->bmpRows ) && ( 0 < glyph->bmpWidth ) )
+            {
+               unsigned short nextY = penY - glyph->glyphBitmap_top ;
+               unsigned char const *nextIn = glyph->bmpBuffer ;
+               unsigned const inBytesPerRow = ((glyph->bmpWidth+15)/16)*2 ;
+               unsigned char *nextOut = bmp + ( nextY * bmpStride );
+debugPrint( "rendering char: %c\n"
+            "top: %ld\n"
+            "width: %u\n"
+            "rows: %u\n", *sText, glyph->glyphBitmap_top, glyph->bmpWidth, glyph->bmpRows );
+               for( unsigned row = 0 ; ( row < glyph->bmpRows ) && ( nextY < bmpRows ); row++ )
+               {
+if( 1 == i )
+{
+   debugHex( "nextIn", nextIn, inBytesPerRow );
+}
+                  bitmap_t::bltFrom( nextOut, penX, nextIn, glyph->bmpWidth );
+                  nextIn += inBytesPerRow ;
+                  nextOut += bmpStride ;
+               }
+if( 1 == i )
+   debugHex( "nextOut", bmp + ( (penY - glyph->glyphBitmap_top) * bmpStride ), bmpStride );
+            } // non-blank
+            penX  += ( ( glyph->glyphAdvanceX + 63 ) / 64 );
+         }
+      } // walk string, rendering into buffer
+   }
+
+   delete [] glyphs ;
+   obstack_free( &glyphStack, 0 );
+   return true ;
+}
 
 
 #ifdef __MODULETEST__
