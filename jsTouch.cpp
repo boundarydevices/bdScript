@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.1  2002-11-03 15:39:36  ericn
+ * Revision 1.2  2002-11-08 13:57:35  ericn
+ * -removed debug msgs
+ *
+ * Revision 1.1  2002/11/03 15:39:36  ericn
  * -Initial import
  *
  *
@@ -140,7 +143,6 @@ void jsTouchScreenThread_t :: onTouch
    ( unsigned x, 
      unsigned y )
 {
-printf( "touch %u/%u\n", x, y );
    lastX_ = x ;
    lastY_ = y ;
    if( 0 != onTouchCode_.size() )
@@ -150,7 +152,6 @@ printf( "touch %u/%u\n", x, y );
 
 void jsTouchScreenThread_t :: onRelease( void )
 {
-printf( "release\n" );
    if( 0 != onReleaseCode_.size() )
       queueSource( scope_, onReleaseCode_, "onRelease" );
 }
