@@ -158,6 +158,7 @@ Use/case analysis
 
 Data structure linkages:
 
+
                               0/N:1      Active 
    app request             <---------> entity cache   <---->   worker request
          ^                         /        |          1:0/1
@@ -190,6 +191,9 @@ objects with protocol file://.
 So, I'll just place a flag (inUse/not) in the disk cache and keep the reference
 count in the active entity cache.
 
+Actually, I'll also put the file open/mmap calls into the disk cache to mask the
+fact that there's header information in the cache'd files.
+
 
                         In-depth data structure descriptions:
                         -------------------------------------
@@ -215,5 +219,21 @@ In order to allow mmap'd access to non-cached files (e.g. posts and CGI requests
 are stored in the disk cache along with persistent files, but are flagged for deletion
 when their reference count goes to zero. This requires that an application use and consume
 the content immediately during the 'oncomplete' handler.
+
+Worker Threads
+--------------
+
+On startup, some number of curl worker threads will be started and handed a queue of
+curl requests. Each of them will repeatedly pull requests from the queue until the queue
+says 'abort'.
+
+At startup, a number of callbacks are installed for use by all worker threads. 
+
+No references are made in the ccWorker module to the active entity or disk caches.
+This should happen inside the callbacks passed to the curl worker thread initialization
+routine.
+
+All of this allows the module to be developed and tested outside of the greater curl cache 
+structure.
 
 
