@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.15  2002-11-30 00:30:49  ericn
+ * Revision 1.16  2002-11-30 02:01:14  ericn
+ * -rewrote as jsExec minus touch and sound
+ *
+ * Revision 1.15  2002/11/30 00:30:49  ericn
  * -removed curlCache and curlThread modules
  *
  * Revision 1.14  2002/10/31 02:03:17  ericn
@@ -56,27 +59,35 @@
  *
  * Copyright Boundary Devices, Inc. 2002
  */
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
+#include <sys/time.h>
 
 /* include the JS engine API header */
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
+#include "relativeURL.h"
+#include "jsHyperlink.h"
+#include "codeQueue.h"
+#include "jsTimer.h"
 #include "jsCurl.h"
 #include "jsImage.h"
-#include "jsText.h"
-#include "jsScreen.h"
-#include "jsMP3.h"
-#include "jsURL.h"
-#include "relativeURL.h"
-#include "childProcess.h"
-#include "jsProc.h"
-#include "jsHyperlink.h"
 #include "jsGlobals.h"
+#include "jsScreen.h"
+#include "jsText.h"
+#include "jsAlphaMap.h"
+#include "jsTouch.h"
+#include "jsVolume.h"
+#include "jsBarcode.h"
+#include "jsShell.h"
+#include "jsButton.h"
+#include "ccActiveURL.h"
+#include "ccDiskCache.h"
+#include "ccWorker.h"
+#include "urlFile.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -124,173 +135,229 @@ Print(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 static JSBool
-urlExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
-    uintN i ;
-    
-    curlCache_t &cache = getCurlCache();
+   *rval = JSVAL_TRUE ;
+   for( int arg = 0 ; arg < argc ; arg++ )
+   {
+      JSString *str = JS_ValueToString(cx, argv[0]);
+      if( str )
+      {
+         if( queueSource( obj,
+                          std::string( JS_GetStringBytes( str ), JS_GetStringLength( str ) ), 
+                          "queueCode" ) )
+         {
+            printf( "code queued\n" );
+         }
+         else
+         {
+            fprintf( stderr, "error queuing code\n" );
+            *rval = JSVAL_FALSE ;
+         }
+      }
+      else
+         *rval = JSVAL_FALSE ;        
+   }
 
-    for (i = 0; i < argc; i++) {
-        JSString *str = JS_ValueToString(cx, argv[i]);
-        if( str )
-        {
-           char const *cURL = JS_GetStringBytes( str );
-           curlFile_t f( cache.get( cURL, false ) );
-           if( f.isOpen() )
-           {
-              pushURL( f.getEffectiveURL() );
-               JSScript *script= JS_CompileScript( cx, JS_GetGlobalObject( cx ), (char const *)f.getData(), f.getSize(), cURL, 1 );
-               if( script )
-               {
-                  printf( "compiled script for %s\n", cURL );
-                  jsval rval; 
-                  JSBool exec = JS_ExecuteScript( cx, JS_GetGlobalObject( cx ), script, &rval );
-                  if( exec )
-                  {
-                     printf( "executed\n" );
-                  }
-                  else
-                     printf( "exec error\n" );
-                  JS_DestroyScript( cx, script );
-               }
-               else
-                  printf( "Error compiling script\n" );
-               
-               popURL();
-           }
-           else
-              fprintf( stderr, "Error opening %s\n", cURL );
-        }
-        else
-           return JS_FALSE;
-    }
-    return JS_TRUE;
+   return JS_TRUE;
+}
+
+static JSBool
+jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   if( ( 1 == argc ) && JSVAL_IS_NUMBER( argv[0] ) )
+   {
+      double seconds ;
+      JS_ValueToNumber( cx, argv[0], &seconds );
+      struct timespec tv ;
+      tv.tv_sec = (unsigned)( floor( seconds ) );
+      tv.tv_nsec = (unsigned)( floor( fmod( seconds * 1000000000, 1000000000.0 ) ) );
+
+//      JS_ReportError( cx, "nanosleep %f : %u.%lu seconds\n", seconds, tv.tv_sec, tv.tv_nsec );
+
+      nanosleep( &tv, 0 );
+
+      *rval = JSVAL_TRUE ;
+   }
+   else
+   {
+      JS_ReportError( cx, "Usage : nanosleep( seconds )\n" );
+      *rval = JSVAL_FALSE ;
+   }
+
+   return JS_TRUE;
 }
 
 static JSFunctionSpec shell_functions[] = {
     {"print",           Print,          0},
+    {"queueCode",       jsQueueCode,    0},
+    {"nanosleep",       jsNanosleep,    0},
     {0}
 };
 
-static JSFunctionSpec shell_functions2[] = {
-    {"urlExec",         urlExec,        0},
-    {0}
-};
+
+static void myError( JSContext *cx, const char *message, JSErrorReport *report)
+{
+   fprintf( stderr, "Error %s\n", message );
+   fprintf( stderr, "file %s, line %u\n", report->filename, report->lineno );
+}
+
 
 /* main function sets up global JS variables, including run time,
  * a context, and a global object, then initializes the JS run time,
  * and creates a context. */
 
-int main(int argc, char **argv)
+int prMain(int argc, char **argv)
 {
-   // initialize the JS run time, and return result in rt
-   JSRuntime * const rt = JS_NewRuntime(1L * 1024L * 1024L);
- 
-   // if rt does not have a value, end the program here
-   if (!rt)
+   if( 2 == argc )
    {
-      fprintf( stderr, "Error initializing Javascript runtime\n" );
-      return 1;
-   }
- 
-   // create a context and associate it with the JS run time
-   JSContext * const cx = JS_NewContext(rt, 8192);
- 
-   // if cx does not have a value, end the program here
-   if(cx == NULL)
-   {
-      fprintf( stderr, "Error initializing Javascript context\n" );
-      return 1;
-   }
- 
-   execContext_ = cx ;
-
-   // create the global object here
-   JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
- 
-   if( 0 != glob )
-   {
-      // initialize the built-in JS objects and the global object
-      JSBool builtins = JS_InitStandardClasses(cx, glob);
-    
-      if( builtins )
+      // initialize the JS run time, and return result in rt
+      JSRuntime * const rt = JS_NewRuntime(1L * 1024L * 1024L);
+      if( rt )
       {
-         if( JS_DefineFunctions( cx, glob, shell_functions) )
+         // create a context and associate it with the JS run time
+         JSContext * const cx = JS_NewContext(rt, 8192);
+         
+         // if cx does not have a value, end the program here
+         if( cx )
          {
-            if( JS_DefineFunctions( cx, glob, shell_functions2) )
+            execContext_ = cx ;
+
+            // create the global object here
+            JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
+            if( 0 != glob )
             {
-               initJSCurl( cx, glob );
-               initJSImage( cx, glob );
-               initJSText( cx, glob );
-               initJSScreen( cx, glob );
-               initJSURL( cx, glob );
-               initJSMP3( cx, glob );
-               initJSProc( cx, glob );
-               initJSHyperlink( cx, glob );
-               startChildMonitor();
-               startCurlThreads();
-
-               curlCache_t &cache = getCurlCache();
-
-               for( int arg = 1 ; arg < argc ; arg++ )
+               // initialize the built-in JS objects and the global object
+               if( JS_InitStandardClasses(cx, glob) )
                {
-                  char const *url = argv[arg];
-//                  printf( "evaluating %s\n", url );
-                  curlFile_t f( cache.get( url, true ) );
-                  if( f.isOpen() )
+                  if( JS_DefineFunctions( cx, glob, shell_functions) )
                   {
-                     pushURL( f.getEffectiveURL() );
+                     initJSTimer( cx, glob );
+                     initJSScreen( cx, glob );
+                     initJSText( cx, glob );
+                     initializeCodeQueue( cx, glob );
+                     initJSCurl( cx, glob );
+                     initJSImage( cx, glob );
+                     initJSAlphaMap( cx, glob );
+                     initJSHyperlink( cx, glob );
+                     initJSVolume( cx, glob );
+                     initJSBarcode( cx, glob );
+                     initJSShell( cx, glob );
+                     initJSButton( cx, glob );
 
-//                     printf( "opened url\n" );
-                     
-                     JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), url, 1 );
-                     if( script )
+                     getCurlCache();
+
+                     urlFile_t f( argv[1] );
+                     if( f.isOpen() )
                      {
-//                        printf( "compiled script\n" );
-                        jsval rval; 
-                        JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
-                        if( exec )
+                        pushURL( argv[1] );
+         
+                        JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
+
+                        JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
+                        if( script )
                         {
-                           if( gotoCalled_ )
+                           jsval rval; 
+                           JSBool exec ;
                            {
-                              argv[2] = (char *)gotoURL_.c_str();
-                              argv[3] = 0 ;
-                              execv( argv[0], argv ); // start next
+                              mutexLock_t lock( execMutex_ );
+                              exec = JS_ExecuteScript( cx, glob, script, &rval );
+                              JS_DestroyScript( cx, script );
+                           } // limit 
+
+
+                           if( exec )
+                           {
+                              unsigned numEvents = 0 ;
+
+                              while( 1 )
+                              {
+                                 if( gotoCalled_ )
+                                 {
+                                    printf( "executing %s\n", gotoURL_.c_str() );
+                                    break;
+                                 }
+                                 else 
+                                 {
+                                    bool doGC = ( 0 == ( ++numEvents % 10 ) );
+
+                                    JSObject *scope ;
+                                    if( dequeueByteCode( script, scope, 5000 ) )
+                                    {
+                                       mutexLock_t lock( execMutex_ );
+                                       exec = JS_ExecuteScript( cx, scope, script, &rval );
+                                       if( !exec )
+                                          fprintf( stderr, "error executing code\n" );
+                                       JS_DestroyScript( cx, script );
+                                    }
+                                    else
+                                       doGC = true ;
+                                    
+                                    if( doGC )
+                                    {
+                                       printf( "collectin' garbage\n" );
+                                       mutexLock_t lock( execMutex_ );
+                                       JS_GC( cx );
+                                       printf( "done\n" );
+                                    }
+                                 }
+                              }
                            }
-//                           printf( "executed\n" );
+                           else
+                              fprintf( stderr, "exec error %s\n", argv[1] );
                         }
                         else
-                           fprintf( stderr, "exec error %s\n", f.getEffectiveURL() );
-                        JS_DestroyScript( cx, script );
+                           fprintf( stderr, "Error compiling script %s\n", argv[1] );
+                           
+                        popURL();
                      }
                      else
-                        fprintf( stderr, "Error compiling script %s\n", f.getEffectiveURL() );
-                     
-                     popURL();
+                        fprintf( stderr, "Error opening url %s\n", argv[1] );
+
+                     stopBarcodeThread();
+
+                     shutdownCurlWorkers();
+                     shutdownCCDiskCache();
                   }
                   else
-                     fprintf( stderr, "Error opening url %s\n", url );
+                     fprintf( stderr, "Error defining Javascript shell functions\n" );
                }
-
-               stopCurlThreads();
-               stopChildMonitor();  // stop trapping SIGCHLD signal
-            
+               else
+                  fprintf( stderr, "Error creating Javascript builtins\n" );
             }
             else
-               fprintf( stderr, "Error defining Javascript shell functions\n" );
+               fprintf( stderr, "Error allocating Javascript global\n" );
+   
+            {
+               mutexLock_t lock( execMutex_ );
+               JS_DestroyContext( cx );
+            }
+   
          }
          else
-            fprintf( stderr, "Error defining Javascript shell functions\n" );
+            fprintf( stderr, "Error initializing Javascript context\n" );
       }
       else
-         fprintf( stderr, "Error creating Javascript builtins\n" );
+         fprintf( stderr, "Error initializing Javascript runtime\n" );
    }
    else
-      fprintf( stderr, "Error allocating Javascript global\n" );
-
-   JS_DestroyContext( cx );
-
+      fprintf( stderr, "Usage : testEvents url\n" );
+ 
    return 0;
 
 }
 
+#include <prinit.h>
+
+int main( int argc, char *argv[] )
+{
+   int result = PR_Initialize( prMain, argc, argv, 0 );
+   if( gotoCalled_ )
+   {
+      printf( "executing %s\n", gotoURL_.c_str() );
+      argv[1] = (char *)gotoURL_.c_str();
+      execv( argv[0], argv ); // start next
+   }
+
+   return result ;
+}
