@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.31  2003-01-31 13:29:43  ericn
+ * Revision 1.32  2003-02-27 03:51:09  ericn
+ * -added exec routine
+ *
+ * Revision 1.31  2003/01/31 13:29:43  ericn
  * -added module jsURL
  *
  * Revision 1.30  2003/01/20 06:24:12  ericn
@@ -315,7 +318,7 @@ int prMain(int argc, char **argv)
                                  while( 1 )
                                  {
                                     pollCodeQueue( cx, 5000, 10 );
-                                    if( gotoCalled_ )
+                                    if( gotoCalled_ || execCalled_ )
                                     {
                                        break;
                                     }
@@ -417,13 +420,21 @@ int main( int argc, char *argv[] )
    sigaction(SIGSEGV, &sa, NULL);
 
    printf( "main thread %s %p (id %x)\n", argv[1], &argc, pthread_self() );
-   
-   int result = PR_Initialize( prMain, argc, argv, 0 );
-   if( gotoCalled_ )
-   {
-      argv[1] = (char *)gotoURL_.c_str();
-      execv( argv[0], argv ); // start next
-   }
 
-   return result ;
+   do
+   {
+      int result = PR_Initialize( prMain, argc, argv, 0 );
+      if( gotoCalled_ )
+      {
+         argv[1] = (char *)gotoURL_.c_str();
+         execv( argv[0], argv ); // start next
+      }
+      else if( execCalled_ )
+      {
+         system( execCmd_.c_str() );
+         execv( argv[0], argv ); // start next
+      }
+   } while( 1 );
+
+   return 0 ;
 }
