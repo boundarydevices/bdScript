@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.32  2003-09-26 00:43:50  tkisky
+ * Revision 1.33  2004-01-02 23:37:13  ericn
+ * -debugPrint()
+ *
+ * Revision 1.32  2003/09/26 00:43:50  tkisky
  * -fft stuff
  *
  * Revision 1.31  2003/09/22 02:02:03  ericn
@@ -131,6 +134,7 @@
 #include "videoFrames.h"
 #include <pthread.h>
 #include "fbDev.h"
+#include "debugPrint.h"
 
 static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
@@ -494,7 +498,7 @@ void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 
 void *audioThread( void *arg )
 {
-printf( "audioThread %p (id %x)\n", &arg, pthread_self() );
+debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
    audioQueue_t *queue = (audioQueue_t *)arg ;
 
    int writeFd = openWriteFd();

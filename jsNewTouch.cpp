@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsNewTouch.cpp,v $
- * Revision 1.3  2003-12-03 12:53:08  ericn
+ * Revision 1.4  2004-01-02 23:36:07  ericn
+ * -debugPrint()
+ *
+ * Revision 1.3  2003/12/03 12:53:08  ericn
  * -added swapXY support
  *
  * Revision 1.2  2003/11/25 00:07:49  ericn
@@ -78,6 +81,7 @@
 #include "zOrder.h"
 #include "jsGlobals.h"
 #include "touchPoll.h"
+#include "debugPrint.h"
 
 class jsTouchPoll_t : public touchPoll_t {
 public:
@@ -144,7 +148,7 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
       char inBuf[256];
       if( fgets( inBuf, sizeof( inBuf ), fCal ) )
       {
-         printf( "<%s>\n", inBuf );
+         debugPrint( "<%s>\n", inBuf );
          long scaleX, scaleY, originX, originY, rangeX, rangeY ;
          unsigned swap ;
          if( 7 == sscanf( inBuf, "%ld,%ld,%ld,%ld,%ld,%ld,%u", &scaleX, &scaleY, &originX, &originY, &rangeX, &rangeY, &swap ) )
@@ -404,7 +408,7 @@ jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
                         if( JS_GetProperty( cx, rhObj, "swapXY", &rhval ) && JSVAL_IS_BOOLEAN( rhval ) )
                         {
                            bool const swapXY = JSVAL_TO_BOOLEAN( rhval );
-                           printf( "scale: %u/%u, %u/%u, %u/%u\n", scaleX, scaleY, originX, originY, rangeX, rangeY );
+                           debugPrint( "scale: %u/%u, %u/%u, %u/%u\n", scaleX, scaleY, originX, originY, rangeX, rangeY );
                            touchPoll_->scaleX_  = scaleX ;
                            touchPoll_->scaleY_  = scaleY ;
                            touchPoll_->originX_ = originX ;

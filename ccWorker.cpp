@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.9  2003-11-22 13:26:36  ericn
+ * Revision 1.10  2004-01-02 23:37:06  ericn
+ * -debugPrint()
+ *
+ * Revision 1.9  2003/11/22 13:26:36  ericn
  * -modified to set size for chunked output
  *
  * Revision 1.8  2003/08/01 14:29:26  ericn
@@ -43,6 +46,7 @@
 #include "ccWorker.h"
 #include <stdio.h>
 #include <math.h>
+#include "debugPrint.h"
 
 static curlQueue_t *requestQueue_ = 0 ;
 
@@ -119,7 +123,7 @@ static int progress_callback
 
 static void *readerThread( void *arg )
 {
-printf( "curlReader %p (id %x)\n", &arg, pthread_self() );   
+debugPrint( "curlReader %p (id %x)\n", &arg, pthread_self() );   
    curlQueue_t &queue = getCurlRequestQueue();
 
    while( 1 )
@@ -275,36 +279,36 @@ static void onCurlComplete( curlTransferRequest_t  &request,
                             void const             *data,
                             unsigned long           numRead )
 {
-   printf( "url %s complete: %lu bytes\n", request.url_, numRead );
+   debugPrint( "url %s complete: %lu bytes\n", request.url_, numRead );
 }
 
 static void onCurlFailure( curlTransferRequest_t &request,
                            std::string const     &errorMsg )
 {
-   printf( "url %s failed: %s\n", request.url_, errorMsg.c_str() );
+   debugPrint( "url %s failed: %s\n", request.url_, errorMsg.c_str() );
 }
 
 static void onCurlCancel( curlTransferRequest_t &request )
 {
-   printf( "url %s cancelled\n", request.url_ );
+   debugPrint( "url %s cancelled\n", request.url_ );
 }
 
 
 static void onCurlSize( curlTransferRequest_t &request,
                         unsigned long          size )
 {
-   printf( "url %s: expecting %lu bytes\n", request.url_, size );
+   debugPrint( "url %s: expecting %lu bytes\n", request.url_, size );
 }
 
 static void onCurlProgress( curlTransferRequest_t &request,
                             unsigned long          totalReadSoFar )
 {
-   printf( "url %s: %lu bytes so far\n", request.url_, totalReadSoFar );
+   debugPrint( "url %s: %lu bytes so far\n", request.url_, totalReadSoFar );
 }
 
 int main( void )
 {
-   printf( "starting curl workers\n" );
+   debugPrint( "starting curl workers\n" );
    initializeCurlWorkers( onCurlComplete, onCurlFailure, onCurlCancel, onCurlSize, onCurlProgress );
 
    char inBuf[80];
