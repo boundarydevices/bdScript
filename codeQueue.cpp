@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.12  2003-06-08 15:20:02  ericn
+ * Revision 1.13  2003-06-10 23:53:31  ericn
+ * -made error message more explicit
+ *
+ * Revision 1.12  2003/06/08 15:20:02  ericn
  * -added support for queued function call
  *
  * Revision 1.11  2003/01/06 04:30:29  ericn
@@ -80,6 +83,16 @@ pthread_cond_t  filterCond_ = PTHREAD_COND_INITIALIZER ;
 
 LIST_HEAD(filters_);
 
+static char const *const jsTypeNames_[] = {
+    "JSTYPE_VOID",                /* undefined */
+    "JSTYPE_OBJECT",              /* object */
+    "JSTYPE_FUNCTION",            /* function */
+    "JSTYPE_STRING",              /* string */
+    "JSTYPE_NUMBER",              /* number */
+    "JSTYPE_BOOLEAN",             /* boolean */
+    "JSTYPE_LIMIT"
+};
+
 void executeCode( JSObject   *scope,
                   jsval       sourceCode,
                   char const *sourceFile,
@@ -132,7 +145,10 @@ void executeCode( JSObject   *scope,
          }
       default:
          {
-            JS_ReportError( context_, "Don't know how to execute type %d\n", jst );
+            JS_ReportError( context_, "Don't know how to execute type %d/%s\n", 
+                            jst, 
+                            (jst<(sizeof(jsTypeNames_)/sizeof(jsTypeNames_[0]))) 
+                            ? jsTypeNames_[jst] : "undefined" );
          }
    }
 }
