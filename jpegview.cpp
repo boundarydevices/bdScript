@@ -105,78 +105,79 @@ void CDataObj::Advance()
 
 int main(int argc, char *argv[])
 {
-    int fd;
-    unsigned short *fbMem = NULL;
-    int fbWidth,fbHeight,memSize;
-    int picWidth,picHeight;
-    int left,top;
-    char* filename = argv[1];
-    char* opts = argv[2];
-    int flags=0;
+	int fd;
+	unsigned short *fbMem = NULL;
+	int fbWidth,fbHeight,memSize;
+	int picWidth,picHeight;
+	int left=0;
+	int top=0;
+	char* filename = argv[1];
+	char* opts = argv[2];
+	int flags=0;
+	int stretch=0;
 
-    if (argc == 3)
-    {
-        if ((*opts != '-') && (*filename == '-')) {
-		filename = argv[2];
-		opts = argv[1];
-	}
-    	if (*opts = '-') {
-		opts++;
-		if ((*opts == 'r') || (*opts == 'R')) flags = 1;
-		if ((*opts == 'b') || (*opts == 'B')) flags = 2;
-		if (flags) argc = 2;
-	}
+	if (argc == 3) {
+		if ((*opts != '-') && (*filename == '-')) {
+			filename = argv[2];
+			opts = argv[1];
+		}
+		if (*opts = '-') {
+			opts++;
+			if ((*opts == 'r') || (*opts == 'R')) flags = 1;
+			if ((*opts == 'b') || (*opts == 'B')) flags = 2;
+			if ((*opts == 's') || (*opts == 'S')) stretch = 1;
+			if (flags || stretch) argc = 2;
+		}
     }
-    if (argc != 2)
-    {
-	printf(" *** Usage ***\n");
-	printf("./jpegview file [-r|-b]\n");
-	exit(1);
-    }
+	if (argc != 2) {
+		printf(" *** Usage ***\n");
+		printf("./jpegview file [-r|-b|-s]\n");
+		exit(1);
+	}
 
-    CDataObj data;
-    data.Init(filename);
-    Scale* pScaleObj = Scale::GetScalableImage(&data,flags);
+	CDataObj data;
+	data.Init(filename);
+	Scale* pScaleObj = Scale::GetScalableImage(&data,flags);
 
 //  pScaleObj->m_flags = flags;
-    if (pScaleObj)
-    {
-	if (pScaleObj->GetDimensions(&picWidth,&picHeight))
-	{
-		BYTE *pDib = NULL;
-		if (pDib= pScaleObj->GetDibBits(picWidth,picHeight,
-				0,0,picWidth,picHeight,
-				0,0,0,0))
-		{
-			int fbDev = open( "/dev/fb0", O_RDWR );
-			if (fbDev)
-			{
-			    struct fb_fix_screeninfo fixed_info;
-			    int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
-			    if( 0 == err ) {
-			        struct fb_var_screeninfo variable_info;
-			        err = ioctl( fbDev, FBIOGET_VSCREENINFO, &variable_info );
-			        if( 0 == err ) {
-				    fbWidth   = variable_info.xres ;
-				    fbHeight  = variable_info.yres ;
-				    memSize = fixed_info.smem_len ;
-				    printf("screen width:%d, Screen height:%d\n",fbWidth,fbHeight);
-				    printf("picture width:%d, picture height:%d\n",picWidth,picHeight);
-				    fbMem = (unsigned short *) mmap( 0, memSize, PROT_WRITE, MAP_SHARED, fbDev, 0 );
-				    if (fbMem) {
-					left = (fbWidth-picWidth)>>1;
-					top = (fbHeight-picHeight)>>1;
-				    	Scale16::render(fbMem,fbWidth,fbHeight,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
+	if (pScaleObj) if (pScaleObj->GetDimensions(&picWidth,&picHeight)) {
+		int fbDev = open( "/dev/fb0", O_RDWR );
+		if (fbDev) {
+			struct fb_fix_screeninfo fixed_info;
+			int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
+			if( 0 == err ) {
+				struct fb_var_screeninfo variable_info;
+				err = ioctl( fbDev, FBIOGET_VSCREENINFO, &variable_info );
+				if( 0 == err ) {
+					fbWidth   = variable_info.xres ;
+					fbHeight  = variable_info.yres ;
+					memSize = fixed_info.smem_len ;
+					printf("screen width:%d, Screen height:%d\n",fbWidth,fbHeight);
+					printf("picture width:%d, picture height:%d\n",picWidth,picHeight);
+
+					BYTE *pDib = NULL;
+					if (stretch) pDib = pScaleObj->GetDibBits(fbWidth,fbHeight,	0,0,fbWidth,fbHeight,		0,0,0,0);
+					else 		 pDib = pScaleObj->GetDibBits(picWidth,picHeight,	0,0,picWidth,picHeight,		0,0,0,0);
+					if (pDib) {
+						fbMem = (unsigned short *) mmap( 0, memSize, PROT_WRITE, MAP_SHARED, fbDev, 0 );
+						if (fbMem) {
+							if (stretch) {
+//								ResourceView::RenderStretch(fbMem,fbWidth,fbHeight,flags,resource,length);
+								Scale16::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
+							} else {
+								left = (fbWidth-picWidth)>>1;
+								top = (fbHeight-picHeight)>>1;
+//								ResourceView::RenderCenter(fbMem,fbWidth,fbHeight,flags,resource,length);
+								Scale16::render(fbMem,fbWidth,fbHeight,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
 //  Scale16::scale( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
-				    }
+							}
+				    	}
+					}
 				}
-			    }
-			    close(fbDev);
 			}
-	        }
-        }
-    }
-    exit(1);
+			close(fbDev);
+		}
+	}
+	exit(1);
 }
-
