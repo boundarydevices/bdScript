@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.56  2003-09-01 23:35:31  ericn
+ * Revision 1.57  2003-09-04 13:16:19  ericn
+ * -made command line arguments available to script
+ *
+ * Revision 1.56  2003/09/01 23:35:31  ericn
  * -added method garbageCollect()
  *
  * Revision 1.55  2003/08/31 16:53:00  ericn
@@ -331,7 +334,7 @@ static void myError( JSContext *cx, const char *message, JSErrorReport *report)
 
 int prMain(int argc, char **argv)
 {
-   if( 2 == argc )
+   if( 2 <= argc )
    {
       // initialize the JS run time, and return result in rt
       JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
@@ -398,6 +401,21 @@ int prMain(int argc, char **argv)
                      // start up audio output 
                      //
                      audioQueue_t &audioOut = getAudioQueue(); 
+
+                     JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
+                     if( sArgv )
+                     {
+                        if( JS_DefineProperty( cx, glob, "argv", OBJECT_TO_JSVAL( sArgv ), 0, 0, JSPROP_ENUMERATE ) ) // root
+                        {
+                           for( int arg = 2 ; arg < argc ; arg++ )
+                           {
+                              JSString *sArg = JS_NewStringCopyZ( cx, argv[arg] );
+                              jsval     vArg = ( 0 != sArg ) ? STRING_TO_JSVAL( sArg ) : JSVAL_NULL ;
+                              JS_SetElement( cx, sArgv, arg-2, &vArg );
+                           }
+                           JS_DefineProperty( cx, glob, "argc", INT_TO_JSVAL( argc-2 ), 0, 0, JSPROP_ENUMERATE );
+                        }
+                     }
 
                      {
                         JSScript *script = 0 ;
