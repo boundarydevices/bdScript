@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.2  2003-07-20 18:36:07  ericn
+ * Revision 1.3  2003-07-20 18:43:04  ericn
+ * -fixed stand-alone program to match module interface
+ *
+ * Revision 1.2  2003/07/20 18:36:07  ericn
  * -added PTS interface
  *
  * Revision 1.1  2003/07/20 15:43:16  ericn
@@ -130,101 +133,37 @@ static char const * const frameTypes_[] = {
    "endOfFile"
 };
 
-#include <zlib.h>
-#include "madDecode.h"
 #include <unistd.h>
 #include <fcntl.h>
-#include "mpegDecode.h"
-#include "fbDev.h"
 #include <string.h>
+#include <zlib.h>
 
 int main( int argc, char const * const argv[] )
 {
    if( 2 == argc )
    {
       mpegDemux_t decoder( argv[1] );
-      mpegDecoder_t videoDecode ;
       mpegDemux_t :: frameType_e ft ;
-      void const                 *data0 ;
-      unsigned long               length ;
-      unsigned long               numPackets[2] = { 0, 0 };
-      unsigned long               numBytes[2] = { 0, 0 };
-      unsigned long               crc[2] = { 0, 0 };
-      unsigned long               outBytes[2] = { 0, 0 };
-      unsigned long               outCRC[2] = { 0, 0 };
+      void const     *data0 ;
+      unsigned long   length ;
+      unsigned long   numPackets[2] = { 0, 0 };
+      unsigned long   numBytes[2] = { 0, 0 };
+      unsigned long   crc[2] = { 0, 0 };
+      unsigned long   outBytes[2] = { 0, 0 };
+      unsigned long   outCRC[2] = { 0, 0 };
 
-      int const dspFd = open( "/dev/dsp", O_WRONLY );
-      if( 0 > dspFd )
-      {
-         perror( "/dev/dsp" );
-         return 0 ;
-      }
+      INT64 when ;
 
-      madDecoder_t mp3Decode ;
-
-      fbDevice_t &fb = getFB();
-      unsigned char *fbStart = (unsigned char *)fb.getMem();
-      memset( fbStart, 0, fb.getMemSize() );
-      unsigned const fbStride = fb.getWidth() * sizeof( unsigned short );
-      unsigned imgStride = 0 ;
-      bool firstPicture = true ;
-
-      while( decoder.endOfFile_e != ( ft = decoder.getFrame( data0, length ) ) )
+      while( decoder.endOfFile_e != ( ft = decoder.getFrame( data0, length, when ) ) )
       {
          numPackets[ft]++ ;
          numBytes[ft] += length ;
          crc[ft] = adler32( crc[ft], (unsigned char const *)data0, length );
-//         printf( "%04x/%s/%p/%p %lu\n", ft, ( ft <= 4 ) ? frameTypes_[ft] : "invalid", data0, length );
-//         char inBuf[80];
-//         fgets( inBuf, sizeof( inBuf ), stdin );
-         if( mpegDemux_t::audioFrame_e == ft )
-         {
-            if( mp3Decode.feed( data0, length ) )
-            {
-               unsigned short const *samples ;
-               unsigned              numSamples ;
-               mp3Decode.getData( samples, numSamples );
-               unsigned long audioBytes = numSamples*sizeof(samples[0]);
-               outBytes[0] += audioBytes ;
-               outCRC[0] = adler32( outCRC[0], (unsigned char *)samples, audioBytes );
-               write( dspFd, (char *)samples, audioBytes );
-            }
-         }
-         else
-         {
-            videoDecode.feed( data0, length );
-            void const *picture ;
-            while( videoDecode.getPicture( picture ) )
-            {
-               if( firstPicture )
-               {
-                  firstPicture = false ;
-                  if( fb.getWidth() > videoDecode.width() )
-                     fbStart += (fb.getWidth()-videoDecode.width()) * 2 ;
-                  imgStride = videoDecode.width()*2 ;
-                  if( fb.getHeight() > videoDecode.height() )
-                     fbStart += ( ( fb.getHeight() - videoDecode.height() ) / 2 ) * fbStride ;
-               }
-               unsigned const numVideoOut = imgStride*videoDecode.height();
-               outBytes[1] += numVideoOut ;
-//               outCRC[1]   = adler32( outCRC[1], (unsigned char *)picture, numVideoOut );
-
-               unsigned char *dest = fbStart ;
-               unsigned char const *src = (unsigned char *)picture ;
-               for( unsigned i = 0 ; i < videoDecode.height() ; i++, dest += fbStride, src += imgStride )
-               {
-                  memcpy( dest, src, imgStride );
-               }
-            }
-         } // video frame
+         printf( "%6llu: %s/%p/%lu\n", when, ( ft <= 4 ) ? frameTypes_[ft] : "invalid", data0, length );
       }
+
       printf( "%4lu audio packets, %7lu bytes, crc 0x%08lx\n", numPackets[0], numBytes[0], crc[0] );
-      printf( "             output %7lu bytes, crc 0x%08lx\n", outBytes[0], outCRC[0] );
       printf( "%4lu video packets, %7lu bytes, crc 0x%08lx\n", numPackets[1], numBytes[1], crc[1] );
-      printf( "             output %7lu bytes, crc 0x%08lx\n", outBytes[1], outCRC[1] );
-      printf( "            skipped %7lu\n", videoDecode.numSkipped() );
-printf( "parsed %lu, draw %lu\n", videoDecode.numParsed_, videoDecode.numDraw_ );
-      close( dspFd );
    }
    else
       fprintf( stderr, "Usage: mpDemux fileName\n" );
