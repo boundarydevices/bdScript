@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.78  2004-07-04 21:32:38  ericn
+ * Revision 1.79  2004-09-25 14:17:02  ericn
+ * -made global_class global
+ *
+ * Revision 1.78  2004/07/04 21:32:38  ericn
  * -added alignment constants (generally useful)
  *
  * Revision 1.77  2004/06/28 02:57:09  ericn
@@ -334,7 +337,7 @@ global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
 }
 
 
-static JSClass global_class = {
+JSClass global_class = {
     "global",                    JSCLASS_NEW_RESOLVE,
     JS_PropertyStub,             JS_PropertyStub,
     JS_PropertyStub,             JS_PropertyStub,
@@ -611,6 +614,8 @@ int prMain(int argc, char **argv)
                   // start up audio output 
                   //
                   audioQueue_t &audioOut = getAudioQueue(); 
+#else
+printf( "BD2004 board type\n" );
 #endif
                   getCurlCache();
 
