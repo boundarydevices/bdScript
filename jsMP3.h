@@ -1,5 +1,5 @@
 #ifndef __JSMP3_H__
-#define __JSMP3_H__ "$Id: jsMP3.h,v 1.4 2002-11-07 02:14:18 ericn Exp $"
+#define __JSMP3_H__ "$Id: jsMP3.h,v 1.5 2002-11-14 14:24:17 ericn Exp $"
 
 /*
  * jsMP3.h
@@ -27,10 +27,17 @@
  *
  *    play( { onComplete:"handler", onCancel="handler" } );
  *
+ * It also defines the following functions:
+ *
+ *    mp3Cancel(); - stops playback of the current file, and clears any queued files
+ * 
  * Change History : 
  *
  * $Log: jsMP3.h,v $
- * Revision 1.4  2002-11-07 02:14:18  ericn
+ * Revision 1.5  2002-11-14 14:24:17  ericn
+ * -added mp3Cancel() routine
+ *
+ * Revision 1.4  2002/11/07 02:14:18  ericn
  * -updated comments
  *
  * Revision 1.3  2002/10/25 14:19:08  ericn

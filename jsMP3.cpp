@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.10  2002-11-07 14:51:07  ericn
+ * Revision 1.11  2002-11-14 14:24:19  ericn
+ * -added mp3Cancel() routine
+ *
+ * Revision 1.10  2002/11/07 14:51:07  ericn
  * -removed debug msg
  *
  * Revision 1.9  2002/11/07 02:14:34  ericn
@@ -273,6 +276,26 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 
 }
 
+static JSBool
+jsMP3Cancel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   unsigned numCancelled ;
+   if( getAudioQueue().clear( numCancelled ) )
+   {
+      *rval = INT_TO_JSVAL( numCancelled );
+   }
+   else
+      *rval = JSVAL_FALSE ;
+
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec _functions[] = {
+    {"mp3Cancel",           jsMP3Cancel,          0 },
+    {0}
+};
+
+
 bool initJSMP3( JSContext *cx, JSObject *glob )
 {
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsMp3Class_,
@@ -282,7 +305,7 @@ bool initJSMP3( JSContext *cx, JSObject *glob )
                                   0, 0 );
    if( rval )
    {
-      return true ;
+      return JS_DefineFunctions( cx, glob, _functions);
    }
    else
       return false ;
