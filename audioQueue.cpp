@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.3  2002-11-07 14:39:07  ericn
+ * Revision 1.4  2002-11-14 13:14:08  ericn
+ * -modified to expose dsp file descriptor
+ *
+ * Revision 1.3  2002/11/07 14:39:07  ericn
  * -added audio output, buffering and scheduler spec
  *
  * Revision 1.2  2002/11/07 02:18:13  ericn
@@ -43,23 +46,29 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
+int getDspFd( void )
+{
+   return getAudioQueue().dspFd_ ;
+}
+
 void *audioOutputThread( void *arg )
 {
-   int dspFd = open( "/dev/dsp", O_WRONLY );
-   if( 0 <= dspFd )
+   audioQueue_t *queue = (audioQueue_t *)arg ;
+   queue->dspFd_ = open( "/dev/dsp", O_WRONLY );
+   if( 0 <= queue->dspFd_ )
    {
-      if( 0 != ioctl(dspFd, SNDCTL_DSP_SYNC, 0 ) ) 
+printf( "opened dsp device\n" );
+      if( 0 != ioctl(queue->dspFd_, SNDCTL_DSP_SYNC, 0 ) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
             
       int const format = AFMT_S16_LE ;
-      if( 0 != ioctl( dspFd, SNDCTL_DSP_SETFMT, &format) ) 
+      if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
                
       unsigned short * const outBuffer = new unsigned short [ OUTBUFSIZE ];
       unsigned short *       nextOut = outBuffer ;
       unsigned short         spaceLeft = OUTBUFSIZE ;
 
-      audioQueue_t *queue = (audioQueue_t *)arg ;
       while( !queue->shutdown_ )
       {
          audioQueue_t :: item_t item ;
@@ -91,14 +100,14 @@ void *audioOutputThread( void *arg )
                      if( 0 == frameId++ )
                      {
                         int sampleRate = frame.header.samplerate ;
-                        if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &sampleRate ) )
+                        if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_SPEED, &sampleRate ) )
                         {
                            fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
                            break;
                         }
                         
                         int channels = nChannels = MAD_NCHANNELS(&frame.header) ;
-                        if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                        if( 0 != ioctl( queue->dspFd_, SNDCTL_DSP_CHANNELS, &channels ) )
                         {
                            fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
                            break;
@@ -117,7 +126,7 @@ void *audioOutputThread( void *arg )
                            *nextOut++ = scale( *left++ );
                            if( 0 == --spaceLeft )
                            {
-                              write( dspFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                              write( queue->dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                               nextOut = outBuffer ;
                               spaceLeft = OUTBUFSIZE ;
                            }
@@ -134,7 +143,7 @@ void *audioOutputThread( void *arg )
                            spaceLeft -= 2 ;
                            if( 0 == spaceLeft )
                            {
-                              write( dspFd, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
+                              write( queue->dspFd_, outBuffer, OUTBUFSIZE*sizeof(outBuffer[0]) );
                               nextOut = outBuffer ;
                               spaceLeft = OUTBUFSIZE ;
                            }
@@ -152,7 +161,7 @@ void *audioOutputThread( void *arg )
                {
                   if( OUTBUFSIZE != spaceLeft )
                   {
-                     write( dspFd, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
+                     write( queue->dspFd_, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
                      spaceLeft = OUTBUFSIZE ;
                      nextOut = outBuffer ;
                   } // flush tail end of output
@@ -179,7 +188,10 @@ void *audioOutputThread( void *arg )
          }
       }
       
-      close( dspFd );
+      int temp = queue->dspFd_ ;
+      queue->dspFd_ = -1 ;
+
+      close( temp );
 
       delete [] outBuffer ;
 

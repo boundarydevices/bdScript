@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.1 2002-11-07 02:16:31 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.2 2002-11-14 13:14:03 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.1  2002-11-07 02:16:31  ericn
+ * Revision 1.2  2002-11-14 13:14:03  ericn
+ * -modified to expose dsp file descriptor
+ *
+ * Revision 1.1  2002/11/07 02:16:31  ericn
  * -Initial import
  *
  *
@@ -68,6 +71,7 @@ private:
    ~audioQueue_t( void );
 
    friend audioQueue_t &getAudioQueue( void );
+   friend int getDspFd( void );
 
    //
    // read side interfaces
@@ -82,6 +86,7 @@ private:
    queue_t       queue_ ;
    void         *threadHandle_ ;
    bool volatile shutdown_ ;
+   int           dspFd_ ;
 };
 
 #endif
