@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: cbmStat.cpp,v $
- * Revision 1.1  2003-05-09 04:28:12  ericn
+ * Revision 1.2  2003-05-10 03:18:27  ericn
+ * -modified to USB status constants (not Posix)
+ *
+ * Revision 1.1  2003/05/09 04:28:12  ericn
  * -Initial import
  *
  *
@@ -49,6 +52,10 @@
 #define LPIOC_GET_VID_PID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_VID_PID, len)
 
 #define MAXDEVICE 1024
+
+#define USBLP_PAPEROUT  '\x20'
+#define USBLP_SELECT    '\x10'
+#define USBLP_NOERROR   '\x08'
 
 int main( void )
 {
@@ -92,17 +99,17 @@ int main( void )
       }
       else
          perror( "get vid pid" );
-            
+
       unsigned char status ;
       if( ioctl(fd, LPGETSTATUS, &status) == 0) 
       { 
          fprintf(stderr, "DEBUG: LPGETSTATUS returned a port status of %02X...\n", status); 
-         if (status & LP_NOPA) 
-            fputs("WARNING: Media tray empty!\n", stderr); 
-         if (status & LP_ERR) 
-            fputs("WARNING: Printer fault!\n", stderr); 
-         if (status & LP_OFFL) 
-            fputs("WARNING: Printer off-line.\n", stderr); 
+         if (status & USBLP_PAPEROUT) 
+            fputs("WARNING: Paper Out!\n", stderr); 
+         if (0 == (status & USBLP_SELECT) )
+            fputs("WARNING: Printer is off-line.\n", stderr); 
+         if (0 == (status & USBLP_NOERROR) )
+            fputs("WARNING: Printer Fault.\n", stderr); 
       } 
       
       printf( "closing port\n" );
