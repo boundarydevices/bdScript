@@ -4,7 +4,7 @@
 
 -include config.mk
 
-ifeq (BD2003,$(KERNEL_BOARDTYPE))
+ifeq ("BD2003",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_BD2003
 else
    HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
@@ -94,7 +94,7 @@ OBJS = \
        flashVar.o \
        jsFlashVar.o \
 
-ifeq (BD2003,$(KERNEL_BOARDTYPE))
+ifeq ("BD2003",$(KERNEL_BOARDTYPE))
 
 OBJS += \
        audioQueue.o \
@@ -107,6 +107,7 @@ OBJS += \
        jsMPEG.o \
        jsPrinter.o \
        jsStar.o \
+       jsStarUSB.o \
        jsVolume.o \
        madDecode.o \
        madHeaders.o \
@@ -207,7 +208,7 @@ testJS: testJS.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	$(STRIP) $@
 

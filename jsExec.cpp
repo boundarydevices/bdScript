@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.76  2004-05-22 18:02:14  ericn
+ * Revision 1.77  2004-06-28 02:57:09  ericn
+ * -add starUSB support
+ *
+ * Revision 1.76  2004/05/22 18:02:14  ericn
  * -removed reference to prinit.h
  *
  * Revision 1.75  2004/05/07 13:32:17  ericn
@@ -306,6 +309,7 @@
 #include "jsMP3.h"
 #include "jsMPEG.h"
 #include "jsFlash.h"
+#include "jsStarUSB.h"
 #endif 
 
 static JSBool
@@ -570,14 +574,14 @@ int prMain(int argc, char **argv)
                   initJSMPEG( cx, glob );
                   initJSFlash( cx, glob );
                   initJSTouch( cx, glob );
+                  initJSStarUSB( cx, glob );
+
                   //
                   // start up audio output 
                   //
                   audioQueue_t &audioOut = getAudioQueue(); 
 #endif
                   getCurlCache();
-
-
 
                   JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
                   if( sArgv )
@@ -587,10 +591,10 @@ int prMain(int argc, char **argv)
                         JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
 
                         JSScript *script = 0 ;
-                        
+
                         if( ( 2 <= argc ) && ( '-' == argv[1][0] ) )
                         {
-                           char fullpath[PATH_MAX];
+                           char fullpath[512];
                            argc-- ; argv++ ;
                            std::string url( "file://" );
                            url += realpath( argv[1], fullpath );
