@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsPrinter.cpp,v $
- * Revision 1.3  2004-05-12 03:42:26  ericn
+ * Revision 1.4  2004-05-12 03:46:17  ericn
+ * -added read() method
+ *
+ * Revision 1.3  2004/05/12 03:42:26  ericn
  * -added read() method
  *
  * Revision 1.2  2004/05/08 16:33:46  ericn
@@ -197,6 +200,7 @@ fprintf( stderr, "---> closing printer:fd %d\n", *pfd );
 static JSBool
 jsPrinterRead( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   *rval = JSVAL_FALSE ;
    int *const pfd = (int *)JS_GetInstancePrivate( cx, obj, &jsPrinterClass_, NULL );
    if( ( 0 != pfd ) && ( 0 <= *pfd ) )
    {
