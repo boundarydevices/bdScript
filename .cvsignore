@@ -4,6 +4,7 @@ parsedURL recordTest ftDump
 *.lst *.out bc
 ffPlay ffFormat ffFrames testffFormat dlopen cbmGraph cbmStat cbmReset cbmImage
 testquickcam
+mpeg2mp3
 jpegview
 backtrace
 ffTest
