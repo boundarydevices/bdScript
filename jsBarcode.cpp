@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.6  2003-01-12 03:04:12  ericn
+ * Revision 1.7  2003-02-08 16:09:26  ericn
+ * -added baud,parity,bits support
+ *
+ * Revision 1.6  2003/01/12 03:04:12  ericn
  * -added sendToScanner() and fakeBarcode()
  *
  * Revision 1.5  2003/01/05 01:58:15  ericn
@@ -140,6 +143,10 @@ static JSFunctionSpec _functions[] = {
     {0}
 };
 
+static JSPropertySpec scannerProperties_[] = {
+  {0,0,0}
+};
+
 static char const bcDeviceName_[] = {
    "/dev/ttyS2"
 };
@@ -158,11 +165,13 @@ printf( "barcodeReader %p (id %x)\n", &arg, pthread_self() );
       newTermState.c_cc[VMIN] = 1;
       newTermState.c_cc[VTIME] = 0;
       
-      cfsetispeed(&newTermState, B9600 );
-      cfsetospeed(&newTermState, B9600 );
+//      cfsetispeed(&newTermState, B9600 );
+//      cfsetospeed(&newTermState, B9600 );
 
-      newTermState.c_cflag &= ~(PARENB|CSTOPB|CSIZE|CRTSCTS);	// Mask character size to 8 bits, no parity, Disable hardware flow control
-      newTermState.c_cflag |= (CLOCAL | CREAD|CS8);		// Select 8 data bits
+//      newTermState.c_cflag &= ~(PARENB|CSTOPB|CSIZE|CRTSCTS);	// Mask character size to 8 bits, no parity, Disable hardware flow control
+//      newTermState.c_cflag |= (CLOCAL | CREAD|CS8);		// Select 8 data bits
+      newTermState.c_cflag &= ~(CSTOPB|CRTSCTS);	// Mask character size to 8 bits, no parity, Disable hardware flow control
+      newTermState.c_cflag |= (CLOCAL | CREAD);		// Select 8 data bits
       newTermState.c_lflag &= ~(ICANON | ECHO | ISIG);	// set raw mode for input
       newTermState.c_iflag &= ~(IXON | IXOFF | IXANY|INLCR|ICRNL|IUCLC);	//no software flow control
       newTermState.c_oflag &= ~OPOST;			//raw output
@@ -205,12 +214,327 @@ printf( "barcodeReader %p (id %x)\n", &arg, pthread_self() );
    return 0 ;
 }
 
+JSClass jsScannerClass_ = {
+  "scanner",
+  JSCLASS_HAS_PRIVATE,
+  JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
+  JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+//
+// constructor for the scanner object
+//
+static JSBool jsScanner( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   obj = JS_NewObject( cx, &jsScannerClass_, NULL, NULL );
+
+   if( obj )
+   {
+      *rval = OBJECT_TO_JSVAL(obj);
+   }
+   else
+      *rval = JSVAL_FALSE ;
+   
+   return JS_TRUE;
+}
+
+static unsigned const _standardBauds[] = {
+   0,
+   50,
+   75,
+   110,
+   134,
+   150,
+   200,
+   300,
+   600,
+   1200,
+   1800,
+   2400,
+   4800,
+   9600,
+   19200,
+   38400
+};
+static unsigned const numStandardBauds = sizeof( _standardBauds )/sizeof( _standardBauds[0] );
+
+static unsigned const _highSpeedMask = 0010000 ;
+static unsigned const _highSpeedBauds[] = {
+   0,
+   57600,  
+   115200, 
+   230400, 
+   460800, 
+   500000, 
+   576000, 
+   921600, 
+   1000000,
+   1152000,
+   1500000,
+   2000000,
+   2500000,
+   3000000,
+   3500000,
+   4000000 
+};
+
+static unsigned const numHighSpeedBauds = sizeof( _highSpeedBauds )/sizeof( _highSpeedBauds[0] );
+
+static JSBool
+jsGetScannerBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   struct termios oldTermState;
+   tcgetattr(bcDev_,&oldTermState);
+   unsigned short baudIdx = cfgetispeed(&oldTermState);
+   unsigned baud ;
+   if( baudIdx < numStandardBauds )
+   {
+      baud = _standardBauds[baudIdx];
+   }
+   else if( 0 != ( baudIdx & _highSpeedMask ) )
+   {
+      baudIdx &= ~_highSpeedMask ;
+      if( baudIdx < numHighSpeedBauds )
+      {
+         baud = _highSpeedBauds[baudIdx];
+      }
+      else
+         baud = 0xbeefdead ;
+   }
+   else
+      baud = 0xdeadbeef ;
+
+   *rval = INT_TO_JSVAL( baud );
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetScannerBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
+   {
+      unsigned baudIdx ;
+      bool haveBaud = false ;
+      
+      int const baud = JSVAL_TO_INT( argv[0] );
+      unsigned i ;
+      for( i = 0 ; i < numStandardBauds ; i++ )
+      {
+         if( _standardBauds[i] == baud )
+         {
+            haveBaud = true ;
+            baudIdx = i ;
+            break;
+         }
+      }
+      
+      if( !haveBaud )
+      {
+         for( i = 0 ; i < numHighSpeedBauds ; i++ )
+         {
+            if( _highSpeedBauds[i] == baud )
+            {
+               haveBaud = true ;
+               baudIdx = i | _highSpeedMask ;
+               break;
+            }
+         }
+      }
+
+      if( haveBaud )
+      {
+         struct termios termState;
+         tcgetattr(bcDev_,&termState);
+         cfsetispeed( &termState, baudIdx );
+         cfsetospeed( &termState, baudIdx );
+      
+         int result = tcsetattr( bcDev_, TCSANOW, &termState );
+         if( 0 == result )
+         {
+            *rval = JSVAL_TRUE ;
+         }
+         else
+            perror( "setBaud" );
+      }
+      else
+         JS_ReportError( cx, "unsupported baud rate" );
+   }
+   else
+      JS_ReportError( cx, "Usage: scanner.setBaud( 9600 );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsGetScannerParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   struct termios oldTermState;
+   tcgetattr(bcDev_,&oldTermState);
+   char const *parity ;
+   if( oldTermState.c_cflag & PARENB )
+   {
+      if( oldTermState.c_cflag & PARODD )
+         parity = "O" ;
+      else
+         parity = "E" ;
+   }
+   else
+      parity = "N" ;
+   
+   *rval = STRING_TO_JSVAL( JS_NewStringCopyN( cx, parity, 1 ) );
+   
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetScannerParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
+   {
+      struct termios termState;
+      tcgetattr(bcDev_,&termState);
+      
+      JSString *sArg = JSVAL_TO_STRING( argv[0] );
+      char const cParity = toupper( *JS_GetStringBytes( sArg ) );
+      bool foundParity = false ;
+      if( 'E' == cParity )
+      {
+         termState.c_cflag |= PARENB ;
+         termState.c_cflag &= ~PARODD ;
+         foundParity = true ;
+      }
+      else if( 'N' == cParity )
+      {
+         termState.c_cflag &= ~PARENB ;
+         foundParity = true ;
+      }
+      else if( 'O' == cParity )
+      {
+         termState.c_cflag |= PARENB | PARODD ;
+         foundParity = true ;
+      }
+      else
+         JS_ReportError( cx, "invalid parity <0x%02x>\n", cParity );
+
+      if( foundParity )
+      {
+         int result = tcsetattr( bcDev_, TCSANOW, &termState );
+         if( 0 == result )
+         {
+            *rval = JSVAL_TRUE ;
+         }
+         else
+            perror( "setParity" );
+      }
+   }
+   else
+      JS_ReportError( cx, "Usage: scanner.setParity( 'E'|'O'|'N' );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsGetScannerBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   struct termios oldTermState;
+   tcgetattr(bcDev_,&oldTermState);
+   unsigned csMask = oldTermState.c_cflag & CSIZE ;
+   unsigned charLen = 0 ;
+   if( CS8 == csMask )
+      charLen = 8 ;
+   else if( CS7 == csMask )
+      charLen = 7 ;
+   else if( CS6 == csMask )
+      charLen = 6 ;
+   else if( CS5 == csMask )
+      charLen = 5 ;
+   *rval = INT_TO_JSVAL( charLen );
+   return JS_TRUE ;
+}
+
+static unsigned csLengthMasks_[] = {
+   CS5,
+   CS6,
+   CS7,
+   CS8
+};
+
+static JSBool
+jsSetScannerBits( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( ( 1 == argc ) && JSVAL_IS_INT( argv[0] ) )
+   {
+      int const bits = JSVAL_TO_INT( argv[0] );
+      if( ( 5 <= bits ) && ( 8 >= bits ) )
+      {
+         struct termios termState;
+         tcgetattr(bcDev_,&termState);
+         
+         termState.c_cflag &= ~CSIZE ;
+         termState.c_cflag |= csLengthMasks_[bits-5];
+      
+         int result = tcsetattr( bcDev_, TCSANOW, &termState );
+         if( 0 == result )
+         {
+            *rval = JSVAL_TRUE ;
+         }
+         else
+            perror( "setBits" );
+      }
+      else
+         JS_ReportError( cx, "unsupported character length" );
+   }
+   else
+      JS_ReportError( cx, "Usage: scanner.setBits( 7|8 );" );
+   
+   *rval = JSVAL_FALSE ;
+   return JS_TRUE ;
+}
+
+
+static JSFunctionSpec scanner_methods[] = {
+   { "getBaud",      jsGetScannerBaud,   0,0,0 },
+   { "setBaud",      jsSetScannerBaud,   0,0,0 },
+   { "getParity",    jsGetScannerParity, 0,0,0 },
+   { "setParity",    jsSetScannerParity, 0,0,0 },
+   { "getBits",      jsGetScannerBits,   0,0,0 },
+   { "setBits",      jsSetScannerBits,   0,0,0 },
+   { 0 }
+};
+
 static pthread_t threadHandle_ = 0 ;
 
 bool initJSBarcode( JSContext *cx, JSObject *glob )
 {
    if( JS_DefineFunctions( cx, glob, _functions) )
    {
+      JSObject *rval = JS_InitClass( cx, glob, NULL, &jsScannerClass_,
+                                     jsScanner, 1,
+                                     scannerProperties_, 
+                                     scanner_methods,
+                                     0, 0 );
+      if( rval )
+      {
+         JSObject *obj = JS_NewObject( cx, &jsScannerClass_, NULL, NULL );
+         if( obj )
+         {
+            JS_DefineProperty( cx, glob, "scanner", 
+                               OBJECT_TO_JSVAL( obj ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+         }
+         else
+            JS_ReportError( cx, "initializing scanner global" );
+      }
+      else
+         JS_ReportError( cx, "initializing scanner class" );
+
       int const create = pthread_create( &threadHandle_, 0, barcodeThread, 0 );
       if( 0 == create )
       {
