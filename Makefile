@@ -10,11 +10,13 @@ LIB = curlCacheLib.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
+   AR=arm-linux-ar
    STRIP=arm-linux-strip
    LIBS=-L /usr/local/arm/2.95.3/arm-linux/lib
    IFLAGS=-I/usr/local/arm/2.95.3/arm-linux/include/freetype2 
 else
    CC=gcc
+   AR=ar
    LIBS=-L /usr/local/lib
    IFLAGS=-I/usr/include/freetype2 
    STRIP=strip
@@ -27,7 +29,7 @@ endif
 	$(CC) -c -DXP_UNIX=1 -O2 $<
    
 $(LIB): Makefile $(OBJS)
-	arm-linux-ar r $(LIB) $(OBJS)
+	$(AR) r $(LIB) $(OBJS)
 
 curlCacheMain.o: curlCache.h curlCache.cpp Makefile
 	$(CC) -c -o curlCacheMain.o -O2 -DSTANDALONE curlCache.cpp
@@ -68,7 +70,15 @@ testEvents: testEvents.o $(LIB)
 	arm-linux-nm testEvents >testEvents.map
 	$(STRIP) testEvents
 
+ftRender.o: ftObjs.h ftObjs.cpp Makefile
+	$(CC) -c -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
+
+ftRender: ftRender.o $(LIB)
+	$(CC) -o ftRender ftRender.o $(LIB) $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	arm-linux-nm ftRender >ftRender.map
+	$(STRIP) ftRender
+
 all: curlCache curlGet dirTest urlTest testEvents testJS mp3Play
 
 clean:
-	rm -f *.o curlCache curlGet dirTest urlTest testEvents testJS mp3Play
+	rm -f *.o *.a curlCache curlGet dirTest urlTest testEvents testJS mp3Play
