@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.18  2004-03-17 04:56:19  ericn
+ * Revision 1.19  2004-05-05 03:17:42  ericn
+ * -removed unused render()
+ *
+ * Revision 1.18  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.17  2003/02/10 01:16:49  ericn
@@ -104,97 +107,6 @@ static void initFreeType( void )
    }
 }
 */
-
-static void render( fbDevice_t      &fb,
-                    FT_Bitmap const &bmp,
-                    int              startX,
-                    int              startY,
-                    unsigned long    fgColor,         // 0xRRGGBB
-                    unsigned long    bgColor )        // 0xRRGGBB
-{
-   unsigned char fgRed   = ( fgColor >> 16 ) & 0xFF ;
-   unsigned char fgGreen = ( fgColor >> 8 )  & 0xFF ;
-   unsigned char fgBlue  = ( fgColor ) & 0xFF ;
-
-   unsigned char bgRed   = ( bgColor >> 16 ) & 0xFF ;
-   unsigned char bgGreen = ( bgColor >> 8 )  & 0xFF ;
-   unsigned char bgBlue  = ( bgColor ) & 0xFF ;
-
-
-/*
-printf( "colors == fg %u/%u/%u, bg %u/%u/%u\n", 
-        fgRed, fgGreen, fgBlue,
-        bgRed, bgGreen, bgBlue );
-*/
-
-   if( ( 0 < bmp.rows ) && ( 0 < bmp.width ) )
-   {
-      if( 256 == bmp.num_grays )
-      {
-         unsigned char const *rasterLine = bmp.buffer ;
-         for( int row = 0 ; ( row < bmp.rows ) && ( startY < fb.getHeight() ); row++, startY++ )
-         {
-            if( 0 <= startY )
-            {
-               unsigned char const *rasterCol = rasterLine ;
-               int penX = startX ;
-               for( int col = 0 ; ( col < bmp.width ) && ( penX < fb.getWidth() ); col++, penX++ )
-               {
-                  if( 0 <= penX )
-                  {
-                     unsigned const charCov = *rasterCol++ ;
-                     if( 0 < charCov )
-                     {
-                        // convert to 1..256 to use shifts instead of div for mixing
-                        unsigned const alias = charCov + 1 ;
-                        unsigned const notAlias = 256 - alias ;
-                        unsigned mixRed = ((alias*fgRed)+(notAlias*bgRed))/256 ;
-                        unsigned mixGreen = ((alias*fgGreen)+(notAlias*bgGreen))/256 ;
-                        unsigned mixBlue = ((alias*fgBlue)+(notAlias*bgBlue))/256 ;
-   
-                        unsigned short color = fb.get16( mixRed, mixGreen, mixBlue );
-                        fb.setPixel( penX, startY, color );
-                     } // don't draw background
-                  } // is visible
-               } // for each column
-            } // on the screen
-            rasterLine += bmp.pitch ;
-         }
-      } // anti-aliased
-      else if( 1 == bmp.num_grays )
-      {
-         unsigned char const *rasterLine = bmp.buffer ;
-         for( int row = 0 ; ( row < bmp.rows ) && ( startY < fb.getHeight() ); row++, startY++ )
-         {
-            if( 0 <= startY )
-            {
-               unsigned char const *rasterCol = rasterLine ;
-               unsigned char mask = 0x80 ;
-               int penX = startX ;
-               for( int col = 0 ; ( col < bmp.width ) && ( penX < fb.getWidth() ); col++, penX++ )
-               {
-                  if( 0 <= penX )
-                  {
-                     unsigned char const alias = ( 0 == ( *rasterCol & mask ) )
-                                                 ? 0 
-                                                 : 255 ;
-                     unsigned short color = fb.get16( alias, alias, alias );
-                     fb.setPixel( penX, startY, color );
-                  } // is visible
-                  
-                  mask >>= 1 ;
-                  if( 0 == mask )
-                  {
-                     mask = 0x80 ;
-                     rasterCol++ ;
-                  }
-               } // for each column
-            } // on the screen
-            rasterLine += bmp.pitch ;
-         }
-      }
-   } // sanity check
-}
 
 static JSBool
 jsFontDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
