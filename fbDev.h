@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.7 2002-12-04 13:12:55 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.8 2002-12-04 13:56:37 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.7  2002-12-04 13:12:55  ericn
+ * Revision 1.8  2002-12-04 13:56:37  ericn
+ * -changed line() to specify top/left of line instead of center
+ *
+ * Revision 1.7  2002/12/04 13:12:55  ericn
  * -added rect, line, box methods
  *
  * Revision 1.6  2002/11/23 16:09:14  ericn
@@ -81,7 +84,7 @@ public:
               unsigned short x2, unsigned short y2,
               unsigned char red, unsigned char green, unsigned char blue );
    
-   // draw a line of specified thickness, points specify center of line
+   // draw a line of specified thickness, points specify top or left of line
    void line( unsigned short x1, unsigned short y1, // only vertical and horizonta supported (for now)
               unsigned short x2, unsigned short y2,
               unsigned char penWidth,

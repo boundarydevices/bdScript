@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.12  2002-12-04 13:12:53  ericn
+ * Revision 1.13  2002-12-04 13:56:40  ericn
+ * -changed line() to specify top/left of line instead of center
+ *
+ * Revision 1.12  2002/12/04 13:12:53  ericn
  * -added rect, line, box methods
  *
  * Revision 1.11  2002/11/23 16:13:11  ericn
@@ -456,33 +459,15 @@ void fbDevice_t :: line
      unsigned char red, unsigned char green, unsigned char blue )
 {
    unsigned short const rgb = get16( red, green, blue );
-   unsigned char const halfWidth = penWidth/2 ;
-
    if( y1 == y2 )
    {
-      if( y1 < getHeight() + halfWidth )
-      {
-         int yStart = y1 - halfWidth ;
-         if( 0 <= yStart )
-            y1 = yStart ;
-         else
-            y1 = 0 ;
-         y2 = yStart + penWidth - 1 ;
-         rect( x1, y1, x2, y2, red, green, blue );
-      } // something visible
+      if( y1 < getHeight()  )
+         rect( x1, y1, x2, y1+penWidth-1, red, green, blue );
    } // horizontal
    else if( x1 == x2 )
    {
-      if( x1 < getWidth() + halfWidth )
-      {
-         int xStart = x1 - halfWidth ;
-         if( 0 <= xStart )
-            x1 = xStart ;
-         else
-            x1 = 0 ;
-         x2 = xStart + penWidth - 1 ;
-         rect( x1, y1, x2, y2, red, green, blue );
-      }
+      if( x1 < getWidth() )
+         rect( x1, y1, x1+penWidth-1, y2, red, green, blue );
    } // vertical
    else
       fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
@@ -496,28 +481,25 @@ void fbDevice_t :: box
      unsigned char red, unsigned char green, unsigned char blue )
 {
    unsigned short const rgb = get16( red, green, blue );
-   unsigned char const halfWidth = penWidth/2 ;
 
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )
       swap( y1, y2 );
 
-   if( ( y1 < getHeight() - halfWidth )
+   if( ( y1 < getHeight() )
        &&
-       ( x1 < getWidth() - halfWidth ) )
+       ( x1 < getWidth() ) )
    {
       // draw vertical lines
-      unsigned short const xLeft = ( x1 + halfWidth );
-      line( xLeft, y1, xLeft, y2, penWidth, red, green, blue );
-      unsigned short const xRight = ( x2 - halfWidth );
-      line( xRight, y1, xRight, y2, penWidth, red, green, blue );
+      line( x1, y1, x1, y2, penWidth, red, green, blue );
+      x2 = x2 - penWidth + 1 ;
+      line( x2, y1, x2, y2, penWidth, red, green, blue );
 
       // horizontal lines
-      unsigned short const yTop = ( y1 + halfWidth );
-      line( x1, yTop, x2, yTop, penWidth, red, green, blue );
-      unsigned short const yBottom = ( y2 - halfWidth );
-      line( x1, yBottom, x2, yBottom, penWidth, red, green, blue );
+      line( x1, y1, x2, y1, penWidth, red, green, blue );
+      y2 = y2 - penWidth + 1 ;
+      line( x1, y2, x2, y2, penWidth, red, green, blue );
    } // something is visible
 }
 
