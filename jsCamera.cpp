@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCamera.cpp,v $
- * Revision 1.1  2003-04-21 00:25:19  ericn
+ * Revision 1.2  2003-04-21 01:25:05  ericn
+ * -modified to use mmap
+ *
+ * Revision 1.1  2003/04/21 00:25:19  ericn
  * -Initial import
  *
  *
@@ -277,40 +280,53 @@ static void *displayThread( void *arg )
    ioctl( params->fd_, VIDIOCSWIN, &vidwin);
 
    unsigned const bufSize = params->h_ *params->w_ * 3 ;
-   unsigned char *const buf = new unsigned char [ bufSize ];
 
-   while( 1 )
-   {
-      int const numRead = read( params->fd_, buf, bufSize );
-      if( numRead == bufSize )
+   struct video_mbuf vidbuf;
+   if( 0 <= ioctl( params->fd_, VIDIOCGMBUF, &vidbuf) )
+   { 
+      unsigned char *const buf = (unsigned char *)mmap( NULL, vidbuf.size, PROT_READ, MAP_SHARED, params->fd_, 0);
+      if( buf )
       {
-         if( params->wantImage_ )
+         unsigned frameCnt = 0 ;
+         while( 1 )
          {
-            pthread_mutex_lock( &params->mutex_ );
-            params->imgBuf_ = new unsigned char [ bufSize ];
-            memcpy( params->imgBuf_, buf, bufSize );
-            params->wantImage_ = false ;
-            pthread_cond_signal( &params->condition_ );
-            pthread_mutex_unlock( &params->mutex_ );
+            int numframe = 0;
+	    if( 0 <= ioctl( params->fd_, VIDIOCSYNC, &numframe) )
+            {
+               frameCnt++ ;
+               if( params->wantImage_ )
+               {
+                  pthread_mutex_lock( &params->mutex_ );
+                  params->imgBuf_ = new unsigned char [ bufSize ];
+                  memcpy( params->imgBuf_, buf, bufSize );
+                  params->wantImage_ = false ;
+                  pthread_cond_signal( &params->condition_ );
+                  pthread_mutex_unlock( &params->mutex_ );
+               }
+      
+               unsigned offs = 0 ;
+               for( unsigned y = 0 ; y < params->h_ ; y++ )
+               {
+                  for( unsigned x = 0 ; x < params->w_ ; x++, offs += 3 )
+                  {
+                     fb.getPixel( x+params->x_, y+params->y_ ) = fb.get16( buf[offs+2], buf[offs+1], buf[offs] );
+                  }
+               }
+            }
+            else
+            {
+               printf("VIDIOCSYNC %m, frame:%d\n",frameCnt);
+               break;
+	    }
          }
 
-         unsigned offs = 0 ;
-         for( unsigned y = 0 ; y < params->h_ ; y++ )
-         {
-            for( unsigned x = 0 ; x < params->w_ ; x++, offs += 3 )
-            {
-               fb.getPixel( x+params->x_, y+params->y_ ) = fb.get16( buf[offs+2], buf[offs+1], buf[offs] );
-            }
-         }
+         munmap( buf, vidbuf.size );
       }
       else
-      {
-         perror( "vidRead" );
-         break;
-      }
+         perror( "mmap" );
    }
-
-   delete [] buf ;
+   else
+      perror( "VIDIOCGMBUF" );
 }
 
 static JSBool
@@ -411,35 +427,43 @@ static void *captureThread( void *arg )
    ioctl( params->fd_, VIDIOCSWIN, &vidwin);
 
    unsigned const bufSize = params->h_ *params->w_ * 3 ;
-   unsigned char *const buf = new unsigned char [ bufSize ];
-
-   unsigned framesRead = 0 ;
-   while( 1 )
-   {
-      int const numRead = read( params->fd_, buf, bufSize );
-      if( numRead == bufSize )
+   struct video_mbuf vidbuf;
+   if( 0 <= ioctl( params->fd_, VIDIOCGMBUF, &vidbuf) )
+   { 
+      unsigned char *const buf = (unsigned char *)mmap( NULL, vidbuf.size, PROT_READ, MAP_SHARED, params->fd_, 0);
+      if( buf )
       {
-         ++framesRead ;
-         if( 0 == ( framesRead % 10 ) )
-            printf( "%u frames read\n", framesRead );
-         if( params->wantImage_ )
+         unsigned frameCnt = 0 ;
+         while( 1 )
          {
-            pthread_mutex_lock( &params->mutex_ );
-            params->imgBuf_ = new unsigned char [ bufSize ];
-            memcpy( params->imgBuf_, buf, bufSize );
-            params->wantImage_ = false ;
-            pthread_cond_signal( &params->condition_ );
-            pthread_mutex_unlock( &params->mutex_ );
+            int numframe = 0;
+	    if( 0 <= ioctl( params->fd_, VIDIOCSYNC, &numframe) )
+            {
+               frameCnt++ ;
+               if( params->wantImage_ )
+               {
+                  pthread_mutex_lock( &params->mutex_ );
+                  params->imgBuf_ = new unsigned char [ bufSize ];
+                  memcpy( params->imgBuf_, buf, bufSize );
+                  params->wantImage_ = false ;
+                  pthread_cond_signal( &params->condition_ );
+                  pthread_mutex_unlock( &params->mutex_ );
+               }
+            }
+            else
+            {
+               printf("VIDIOCSYNC %m, frame:%d\n",frameCnt);
+               break;
+	    }
          }
+
+         munmap( buf, vidbuf.size );
       }
       else
-      {
-         perror( "vidRead" );
-         break;
-      }
+         perror( "mmap" );
    }
-
-   delete [] buf ;
+   else
+      perror( "VIDIOCGMBUF" );
 }
 
 static JSBool
