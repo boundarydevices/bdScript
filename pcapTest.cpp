@@ -10,7 +10,10 @@
  * Change History : 
  *
  * $Log: pcapTest.cpp,v $
- * Revision 1.3  2003-08-10 17:25:16  ericn
+ * Revision 1.4  2003-08-10 19:06:39  ericn
+ * -added AP to output
+ *
+ * Revision 1.3  2003/08/10 17:25:16  ericn
  * -modified to set/clear sniff mode
  *
  * Revision 1.2  2003/08/10 15:38:41  ericn
@@ -370,15 +373,15 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
                               if( FD_ISSET( sock_fd, &rs ) ) 
                               {
                                  unsigned char buf[2048];
-   	                      struct sockaddr_ll from;
+                                 struct sockaddr_ll from;
                                  socklen_t fromLen = sizeof( from );
                                  unsigned const dataBytes = recvfrom( sock_fd, buf, sizeof( buf ), MSG_TRUNC, (struct sockaddr *)&from, &fromLen );
                                  if( 0 <= dataBytes )
                                  {
-   	                         unsigned char const *admbits = buf ;
-   	                         unsigned char const *fixbits = buf+sizeof(AdmInfo_t); /* This is where the payload starts*/
-                                    AdmInfo_t const *A = (AdmInfo_t *) admbits; /* First the frame from the card */
-   	                         FixedMgmt_t     *M = (FixedMgmt_t *) fixbits; /*Then the actual data*/
+                                    unsigned char const *admbits = buf ;
+                                    unsigned char const *fixbits = buf+sizeof(AdmInfo_t); /* This is where the payload starts*/
+                                    AdmInfo_t const   *A = (AdmInfo_t *) admbits; /* First the frame from the card */
+                                    FixedMgmt_t       *M = (FixedMgmt_t *) fixbits; /*Then the actual data*/
                                     ProbeFixedMgmt_t  *P = (ProbeFixedMgmt_t *) fixbits; /*Then the actual data*/
    
                                     ScanResult_t Res ;
@@ -435,6 +438,8 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
                                     {
                                        if( MGT_BEACON == M->frametype )
                                        {
+                                          unsigned char *ap = M->SrcAddr ;
+                                          ap[0] = '\0' ;
                                           char ssid[32];
                                           ssid[0] = '\0' ; // flag not present
                                           unsigned channel = 0 ;
@@ -492,10 +497,14 @@ printf( "sizeof( FixedMgmt_t ) == %u\n", sizeof( FixedMgmt_t ) );
                                           if( ssid[0] && ( 0 != channel ) )
                                           {
                                              printf( "BSS %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
+                                                     " AP %.2X:%.2X:%.2X:%.2X:%.2X:%.2X"
                                                      " %s SSID %s, channel %u, signal %u, noise %u\n", 
                                                      M->BssId[0], M->BssId[1],
                                                      M->BssId[2], M->BssId[3],
                                                      M->BssId[4], M->BssId[5],
+                                                     M->SrcAddr[0], M->SrcAddr[1],
+                                                     M->SrcAddr[2], M->SrcAddr[3],
+                                                     M->SrcAddr[4], M->SrcAddr[5],
                                                      wepFlags[hasWep],
                                                      ssid, channel, A->signal.data, A->noise.data );
                                           }
