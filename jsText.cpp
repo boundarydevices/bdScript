@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.8  2002-11-30 00:31:29  ericn
+ * Revision 1.9  2002-11-30 05:30:16  ericn
+ * -modified to expect call from default curl hander to app-specific
+ *
+ * Revision 1.8  2002/11/30 00:31:29  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.7  2002/11/05 05:40:55  ericn
@@ -754,7 +757,6 @@ static void fontOnComplete( jsCurlRequest_t &req, void const *data, unsigned lon
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
-         jsCurlOnComplete( req, data, size );
       }
       else
          sError = "Error allocating font string" ;
@@ -764,7 +766,6 @@ static void fontOnComplete( jsCurlRequest_t &req, void const *data, unsigned lon
          
    if( 0 < sError.size() )
    {
-      jsCurlOnFailure( req, sError );
    }
 }
 
@@ -803,8 +804,9 @@ static JSBool font( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
          request.lhObj_      = thisObj ;
          request.rhObj_      = rhObj ;
          request.cx_         = cx ;
+         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
          
-         if( queueCurlRequest( request, 0 != ( cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
+         if( queueCurlRequest( request ) )
          {
             return JS_TRUE ;
          }

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.17  2002-11-30 00:31:24  ericn
+ * Revision 1.18  2002-11-30 05:30:16  ericn
+ * -modified to expect call from default curl hander to app-specific
+ *
+ * Revision 1.17  2002/11/30 00:31:24  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.16  2002/11/23 16:29:15  ericn
@@ -225,11 +228,9 @@ static void imageOnComplete( jsCurlRequest_t &req, void const *data, unsigned lo
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
       }
-      jsCurlOnComplete( req, data, size );
    }
    else
    {   
-      jsCurlOnFailure( req, sError );
    }
 
    if( alpha )
@@ -274,14 +275,17 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          request.onCancel_   = jsCurlOnCancel ;
          request.onSize_     = jsCurlOnSize ; 
          request.onProgress_ = jsCurlOnProgress ;
+         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
          
-         if( queueCurlRequest( request, 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) )
+printf( "loading image\n" );
+         if( queueCurlRequest( request ) )
          {
          }
          else
          {
             JS_ReportError( cx, "Error queueing curlRequest" );
          }
+printf( "done\n" );
       }
       else
          JS_ReportError( cx, "Error allocating image" );

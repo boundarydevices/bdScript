@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.12  2002-11-30 00:31:37  ericn
+ * Revision 1.13  2002-11-30 05:30:16  ericn
+ * -modified to expect call from default curl hander to app-specific
+ *
+ * Revision 1.12  2002/11/30 00:31:37  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.11  2002/11/14 14:24:19  ericn
@@ -209,11 +212,9 @@ static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
-      jsCurlOnComplete( req, data, size );
    }
    else
    {
-      jsCurlOnFailure( req, "Invalid MP3 file" );
    }
 }
 
@@ -252,8 +253,9 @@ static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
          request.lhObj_      = thisObj ;
          request.rhObj_      = rhObj ;
          request.cx_         = cx ;
+         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
 
-         if( queueCurlRequest( request, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) ) )
+         if( queueCurlRequest( request ) )
          {
             return JS_TRUE ;
          }
