@@ -406,6 +406,10 @@ flashVar: flashVar.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
 	$(STRIP) $@
 
+tsTest: tsTest.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o tsTest -DSTANDALONE -Xlinker -Map -Xlinker tsTest.map tsTest.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
+	$(STRIP) $@
+
 mpegDecodeMain.o: mpegDecode.o
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D__MODULETEST__ -c $(IFLAGS) -O2 -o mpegDecodeMain.o mpegDecode.cpp
 
@@ -416,6 +420,10 @@ mpegDecode: mpegDecodeMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 
 hexDump: hexDump.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o hexDump -D__STANDALONE__ -Xlinker -Map -Xlinker hexDump.map hexDump.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+rollingMedian: rollingMedian.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -D__STANDALONE__ -Xlinker -Map -Xlinker rollingMedian.map rollingMedian.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 start.o: start.c
