@@ -1,0 +1,219 @@
+                      ----------------------------
+                           Curl Cache Notes
+                      ----------------------------
+Curl request
+   put in ram disk
+   multi-threading
+      queue multiple for same file
+   allow file://protocol
+   callbacks during download
+      check cache size at:
+         start of download
+         after header if size known
+         on completion
+         when writing file
+      test for out-of-memory condition
+   download first to RAM?
+      out of memory checking
+   cleanup after aborts (including 404 with content)
+   cancel curl request (implies identifying the request)
+   signature to validate
+   time server to set clock?
+      otherwise, each reboot starts anew and newest can 
+      become oldest.
+      Not such a problem if cache is cleared (RAM disk)
+
+
+
+Calls into the 'cache'
+
+The curl cache can be thought of as a mutex-protected 
+shared memory blackboard, through which the application makes
+mostly asynchronous calls (with call-backs for completion
+status), and from which a set of curl worker threads
+pulls requests and posts status values.
+
+   Main application entry points
+   -----------------------------
+   get/put
+         details of request
+            url
+            post parameters
+         onprogress callback  - indicates forward movement
+         onfilesize callback  - indicates file size is known
+         oncomplete callback  - ref counted file ptr handed off here
+         oncancel callback
+         onfailure callback
+         ondelete callback (used if no cache specified and file exists in cache)
+
+   cancelLoad  - cancel a pending transfer
+      all instances or just this request?
+      oncancel callback
+
+   deleteFile
+      details of request
+         url
+         post params
+      ondelete callback
+
+   worker thread entry points
+   --------------------------
+   getRequest                 - called from reader thread
+   completedRequest           - called from reader thread
+   failedRequest              - called from reader thread
+   cancelledRequest           - called from reader thread
+
+Overview
+
+                         requests                   requests
+      application          ---->      Curl Cache      ---->     curl worker
+      thread(s)                                                  thread(s)
+                          <----                      <----
+                        completion                   status
+                       and progress                  values
+                         callbacks
+
+                                           ^
+                                           |
+                                           V
+                                           
+                                       disk cache
+
+
+Data structure notes
+   Cache consists of a handful of fairly separable things:
+
+      1. Disk cache. This is entirely passive, synchronous, and
+         controlled by the global curl cache lock.
+
+         Called by application threads to
+            clear some space for a pending transfer
+            open a handle and mmap a cached item (when get is cached)
+            close a handle and munmap a cached item
+            delete an item from the persistent store
+               (either synchronously in deleteFile call, or during
+                handle close for deferred delete)
+
+         Called by worker threads to
+            delete some space to make room for incoming data
+            store content of file
+
+      2. Curl Active Entity cache
+         Consists of an array of 'active' cache entries. These
+         entries may not yet have a disk/ram cache entry (not until
+         a successful retrieval), but have at least one of the following:
+
+            - an active worker request 
+            - one or more active application requests.
+            - one or more open file descriptors
+
+         Active cache entries are removed when the last reference to
+         them is invalidated from the list above. Their disk/ram entry 
+         may remain (until a 'delete' call is made)
+
+      3. Worker request queue
+
+         Simply a queue of file transfer requests to be performed. Each
+         worker queue request is pointed to from its 'active' cache 
+         entry. Active cache entries with an active worker request never
+         have a corresponding disk cache entry.
+
+      4. Application request list
+
+         A set of application entries for each pending request. Pending
+         here means the time between an initiating application call to
+         the curl cache (get,put,delete) and the corresponding final completion 
+         callback (oncomplete,onfailure,ondelete,oncancel). Note that 
+         cancel is not an initiating call, since it requires an active
+         entry, and does not generate an extra completion callback. Instead,
+         it alters (if not too late) the completion callback to 'oncancel' 
+         instead of 'oncomplete' or 'onfailure'.
+
+      5. Application file handles
+
+         These objects don't really live in the cache domain, but they are
+         used to control reference counting to open file handles (and mmaps).
+         Each of them has a pointer back to the Active Entity Cache
+
+Use/case analysis
+
+   app thread issues get request.
+   if in cache and 'no cache' flag
+      if file in use, wait for unused (asynchronous)
+      when unused, delete and callback if needed
+   if not in cache
+      clear some space based upon file type
+      add entry to curl cache
+         entry in scoreboard, status pending get/post
+      chain client request to cache entry (doubly-linked list)
+      insert new worker request
+      return client request identifier
+   else (in cache)
+      call any progress functions
+         file size
+         bytes read      
+      call oncomplete
+
+
+
+Data structure linkages:
+
+                              0/N:1      Active 
+   app request             <---------> entity cache   <---->   worker request
+         ^                         /        |          1:0/1
+         |                       /          |
+         V                   ----           |
+   next app req for file   /                |
+                          /                 |
+                         /                  |
+   file handle   -------- 0/N:1             |
+                                            | 1:0/1
+                                            |
+                                            V
+                                        Disk Cache
+
+
+I'm tempted to have file handles talk directly to the disk cache, but deferred
+delete makes this more appropriate for the Active entity cache. Deferred delete
+requires an application request entry, and if the file handle points to the 
+disk cache, either the disk cache needs to point back to the active entity cache
+or to a list of app requests, making life messy(er).
+
+The reason I'm tempted to have the file handle point to the disk cache is because
+the disk cache needs to know the reference count status (0/1-N) of each file when
+determining what it can throw out. I can accomplish the same thing by just keeping 
+the reference count in the disk cache data structure.
+
+But wait, I also need a reference count in the active entity cache for use by 
+objects with protocol file://.
+
+So, I'll just place a flag (inUse/not) in the disk cache and keep the reference
+count in the active entity cache.
+
+
+                        In-depth data structure descriptions:
+                        -------------------------------------
+
+Disk Cache
+----------
+
+The disk cache is a process-global object whose primary purpose is to keep track of
+how much disk space is in use, and manage a set of objects occupying that space.
+In normal operation, it is expected that the cache is always 'full', and that each
+failed request for an item in the cache will be followed by a set of requests for 
+space.
+
+The disk cache is passed a directory to be used for storage, which is normally /tmp/curl,
+but can be overridden by the environment variable 'CURLTMPDIR'. If the directory does
+not exist, it will be created.
+
+The disk cache has a fixed maximum size over its' lifetime. If the CURLTMPSIZE 
+environment variable is defined at startup, it will be used to define the size. 
+Otherwise, a default amount of space is used (see ccDiskCache.cpp for current default).
+
+In order to allow mmap'd access to non-cached files (e.g. posts and CGI requests), they
+are stored in the disk cache along with persistent files, but are flagged for deletion
+when their reference count goes to zero. This requires that an application use and consume
+the content immediately during the 'oncomplete' handler.
+
+
