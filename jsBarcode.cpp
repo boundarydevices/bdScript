@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.2  2002-11-30 18:52:57  ericn
+ * Revision 1.3  2002-12-01 00:02:50  ericn
+ * -rooted barcode handler code
+ *
+ * Revision 1.2  2002/11/30 18:52:57  ericn
  * -modified to queue jsval's instead of strings
  *
  * Revision 1.1  2002/11/17 00:51:34  ericn
@@ -24,6 +27,7 @@
 #include <unistd.h>
 #include <string>
 #include "codeQueue.h"
+#include "jsGlobals.h"
 
 static std::string sBarcode_ ;
 static std::string sSymbology_( "unknown" );
@@ -155,6 +159,7 @@ bool initJSBarcode( JSContext *cx, JSObject *glob )
       int const create = pthread_create( &threadHandle_, 0, barcodeThread, 0 );
       if( 0 == create )
       {
+         JS_AddRoot( cx, &sHandler_ );
          handlerScope_ = glob ;
          return true ;
       }
@@ -176,6 +181,8 @@ void stopBarcodeThread()
       void *exitStat ;
       pthread_join( threadHandle_, &exitStat );
    }
+   
+   JS_RemoveRoot( execContext_, &sHandler_ );
 }
 
 
