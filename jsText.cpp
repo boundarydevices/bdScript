@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsText.cpp,v $
- * Revision 1.4  2002-11-02 18:38:02  ericn
+ * Revision 1.5  2002-11-02 18:57:03  ericn
+ * -removed debug stuff
+ *
+ * Revision 1.4  2002/11/02 18:38:02  ericn
  * -added font.render()
  *
  * Revision 1.3  2002/11/02 04:11:43  ericn
@@ -671,33 +674,15 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
                JSString *sAlphaMap = JS_NewStringCopyN( cx, (char const *)ftString.getRow(0), ftString.getDataLength() );
                if( sAlphaMap )
                {
-                  if( JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-                     printf( "added pixBuf property\n" );
-                  else
-                     printf( "Error adding pixBuf property\n" );
+                  JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                }
                else
                   JS_ReportError( cx, "Error building alpha map string" );
    
-               if( JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(ftString.getWidth()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-                  printf( "added width property\n" );
-               else
-                  printf( "error adding width property\n" );
-   
-               if( JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(ftString.getHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-                  printf( "added height property\n" );
-               else
-                  printf( "error adding height property\n" );
-   
-               if( JS_DefineProperty( cx, returnObj, "baseline", INT_TO_JSVAL(ftString.getBaseline()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-                  printf( "added baseline property\n" );
-               else
-                  printf( "error adding baseline property\n" );
-   
-               if( JS_DefineProperty( cx, returnObj, "yAdvance", INT_TO_JSVAL(ftString.getFontHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
-                  printf( "added yAdvance property\n" );
-               else
-                  printf( "error adding yAdvance property\n" );
+               JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(ftString.getWidth()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(ftString.getHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, returnObj, "baseline", INT_TO_JSVAL(ftString.getBaseline()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, returnObj, "yAdvance", INT_TO_JSVAL(ftString.getFontHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
             }
             else
                JS_ReportError( cx, "Error allocating array" );
