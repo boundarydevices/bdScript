@@ -1,5 +1,5 @@
 #ifndef __IMAGE_H__
-#define __IMAGE_H__ "$Id: image.h,v 1.1 2003-10-18 19:16:16 ericn Exp $"
+#define __IMAGE_H__ "$Id: image.h,v 1.2 2005-01-01 16:11:49 ericn Exp $"
 
 /*
  * image.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: image.h,v $
- * Revision 1.1  2003-10-18 19:16:16  ericn
+ * Revision 1.2  2005-01-01 16:11:49  ericn
+ * -add image types
+ *
+ * Revision 1.1  2003/10/18 19:16:16  ericn
  * -Initial import
  *
  *
@@ -26,6 +29,13 @@
 
 class image_t {
 public:
+   enum type_e {
+      unknown = 0,
+      imgJPEG,
+      imgPNG,
+      imgGIF
+   };
+
    image_t( void )
       : pixData_( 0 )
       , width_( 0 )
