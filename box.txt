@@ -1,0 +1,38 @@
+Design notes for box, zOrder, touch areas, et cetera.
+11/19/2002
+
+
+1. Anything touchable and/or visible occupies rectangle in x/y
+   and is represented somehow by the box_t class.
+
+2. Draw and touch handling are both performed by the box.
+
+   Each box has a transparency mask, which can be opaque or fully
+   transparent.
+
+   Each box has handlers for touch, touchMove, release. 
+   
+   The default handlers do nothing
+
+3. Boxes are numbered in a way which allows 8-bit representations
+   when a small number of boxes are needed, and 16-bit representations
+   can be used as the default.
+   
+   To get a [set of] boxes for a given pixel location, you must traverse
+   the zOrderMap (either from background to foreground or the reverse)
+
+   Mostly, the box index should be transparent to applications
+
+4. a zOrderMap defines a mapping from pixel to box at a given level.
+
+5. the zOrderMapStack provides a set of maps from background to foreground
+   
+   This allows explicit overlays for things like pop-up menus.
+
+   If implemented as a doubly-linked list, it could also provide implicit
+   zOrderMap creation when two boxes try to occupy the same image area.
+   In the interest of speed, I'm not going to implement this (yet).
+   
+   Hope I don't paint myself in a corner!
+
+
