@@ -10,7 +10,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o curlGet.o \
        madDecode.o madHeaders.o memFile.o \
        relativeURL.o tsThread.o ultoa.o urlFile.o \
        ultodd.o box.o zOrder.o \
-       ccDiskCache.o ccWorker.o
+       ccActiveURL.o ccDiskCache.o ccWorker.o
 
 
 ifneq (,$(findstring arm, $(CC)))
@@ -119,6 +119,9 @@ ccDiskCache: ccDiskCache.cpp memFile.o Makefile
 
 ccWorker: ccWorker.cpp memFile.o Makefile
 	$(CC) -ggdb -D__STANDALONE__ -o ccWorker ccWorker.cpp memFile.o -lstdc++ -lcurl -lpthread
+
+ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
+	$(CC) -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
 
 all: curlCache curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
 
