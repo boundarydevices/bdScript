@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.5  2002-10-25 14:19:11  ericn
+ * Revision 1.6  2002-10-27 17:39:11  ericn
+ * -preliminary event-handling code
+ *
+ * Revision 1.5  2002/10/25 14:19:11  ericn
  * -added mp3Skip() and mp3Count() routines
  *
  * Revision 1.4  2002/10/25 03:00:56  ericn
@@ -36,23 +39,34 @@
 #include <unistd.h>
 #include <list>
 
-typedef std::list<std::string> playList_t ;
+typedef struct playListEntry_t {
+   std::string url_ ;
+   std::string onComplete_ ;
+   std::string onCancel_ ;
+   std::string onError_ ;
+};
+
+typedef std::list<playListEntry_t> playList_t ;
 
 static playList_t playList_ ;
 
 class mp3Process_t : public childProcess_t {
 public:
-   virtual void died( void );
+   virtual void    died( void );
+   playListEntry_t details_ ;
 };
 
 void mp3Process_t :: died( void )
 {
 //   printf( "mp3 process died\n" );
    pid_ = -1 ;
+   printf( "finished playback of %s\n", details_.url_.c_str() );
+
    if( !playList_.empty() )
    {
-      std::string const url = playList_.front();
+      details_ = playList_.front();
       playList_.pop_front();
+      std::string const url = details_.url_ ;
 //      printf( "starting %s\n", url.c_str() );
       char *args[3] = {
          "./mp3Play",
@@ -64,7 +78,7 @@ void mp3Process_t :: died( void )
    }
 }
 
-static mp3Process_t curProcess_ ;
+static mp3Process_t    curProcess_ ;
 
 static JSBool
 jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -78,14 +92,38 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       curlFile_t f( cache.get( cURL, true ) );
       if( f.isOpen() )
       {
+         std::string onComplete ;
+         std::string onCancel ;
+         std::string onError ;
+
+         if( ( 2 <= argc ) && JSVAL_IS_STRING( argv[1] ) )
+         {
+            onComplete = JS_GetStringBytes( JS_ValueToString( cx, argv[1] ) );
+            if( ( 3 <= argc ) && JSVAL_IS_STRING( argv[2] ) )
+            {
+               onCancel = JS_GetStringBytes( JS_ValueToString( cx, argv[2] ) );
+               if( ( 4 <= argc ) && JSVAL_IS_STRING( argv[3] ) )
+               {
+                  onError = JS_GetStringBytes( JS_ValueToString( cx, argv[3] ) );
+               }
+            }
+         }
 //         printf( "mime type %s\n", f.getMimeType() );
          childProcessLock_t lock ;
 
          std::string absolute ;
          absoluteURL( cURL, absolute );
+         
+         playListEntry_t next ;
+         next.url_        = absolute ;
+         next.onComplete_ = onComplete ;
+         next.onCancel_   = onCancel ;
+         next.onError_    = onError ;
 
          if( !curProcess_.isRunning() )
          {
+            curProcess_.details_ = next ;
+
             char *args[3] = {
                "./mp3Play",
                (char *)absolute.c_str(),
@@ -104,7 +142,7 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          else
          {
 //            printf( "queueing %s\n", absolute.c_str() );
-            playList_.push_back( absolute );
+            playList_.push_back( next );
          }
 
          *rval = JSVAL_TRUE ;
