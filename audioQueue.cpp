@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.25  2003-08-01 14:26:28  ericn
+ * Revision 1.26  2003-08-02 16:13:08  ericn
+ * -fixed memory leak for audio samples
+ *
+ * Revision 1.25  2003/08/01 14:26:28  ericn
  * -better error msg
  *
  * Revision 1.24  2003/07/30 20:26:03  ericn
@@ -699,9 +702,9 @@ printf( "MPEG playback here at x:%u, y:%u\n", item->xPos_, item->yPos_ );
                _playing = true ;
                
                mpegDemux_t demuxer( item->data_, item->length_ );
-      
+
                mpegDemux_t::bulkInfo_t const * const bi = demuxer.getFrames();
-               
+
 printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                playbackArgs_t playbackArgs = { 0, 0, 0, 0, 0, 0 };
       
@@ -935,6 +938,9 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                            } // no more data, wait for empty
                         } // while !done
                         
+                        if( samples )
+                           delete [] samples ;
+
                         printf( "%u pictures\n", picCount );
                         if( videoThread )
                         {
