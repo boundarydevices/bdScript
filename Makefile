@@ -5,6 +5,15 @@
 #HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
 HARDWARE_TYPE=-DCONFIG_BD2003
 
+-include config.mk
+
+MPEG2LIBS = -lmpeg2 -lvo
+
+#
+# These are needed with newer (0.4.0) mpeg2dec library
+#
+#MPEG2LIBS = -lmpeg2 -lmpeg2convert
+
 OBJS = \
        barcodePoll.o \
        baudRate.o \
@@ -150,7 +159,13 @@ else
    TSINPUTFLAG=1
 endif
 
-%.o : %.cpp
+#
+# build empty version to avoid configuration
+#
+config.h:
+	echo "#define LIBMPEG2_OLD 1" > $@
+
+%.o : %.cpp config.h
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
@@ -185,7 +200,7 @@ testJS: testJS.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lmpeg2 -lmpeg2convert -lflash -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	$(STRIP) $@
 
@@ -193,12 +208,12 @@ flashThreadMain.o : flashThread.cpp
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -DSTANDALONE=1 -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o flashThreadMain.o
 
 flashThread: flashThreadMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o flashThread flashThreadMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lmpeg2 -lflash -lpthread -lm -lz -lcrypto
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o flashThread flashThreadMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lpthread -lm -lz -lcrypto
 	arm-linux-nm flashThread >flashThread.map
 	arm-linux-strip flashThread
 
 madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag -lmpeg2 -lflash -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
 	arm-linux-nm madDecode >madDecode.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
@@ -274,24 +289,24 @@ ffFormat: ffFormat.cpp
 	$(STRIP) $@
 
 ffFrames: ffFrames.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread
 	$(STRIP) $@
 
 ffPlay: ffPlay.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lmpeg2 -lmad -lid3tag -lm -lz -lpthread 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) $(MPEG2LIBS) -lCurlCache -lmad -lid3tag -lm -lz -lpthread 
 	$(STRIP) $@
 
 ffTest: ffTest.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache -lmpeg2 -lmad -lm -lz -lpthread -lmpeg2 -lCurlCache -lstdc++ 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache $(MPEG2LIBS) -lmad -lm -lz -lpthread -lCurlCache -lstdc++ 
 	$(NM) --demangle $@ | sort >$@.sym
 #	$(STRIP) $@
 
 mpDemux: mpDemux.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread -lmpeg2
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread 
 	$(STRIP) $@
 
 mpeg2mp3: mpeg2mp3.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -ggdb -o mpeg2mp3 -Xlinker -Map -Xlinker mpeg2mp3.map mpeg2mp3.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -ggdb -o mpeg2mp3 -Xlinker -Map -Xlinker mpeg2mp3.map mpeg2mp3.cpp $(LIBS) -lavformat -lavcodec $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread -lstdc++
 	$(NM) --demangle $@ | sort >$@.sym
 	$(STRIP) $@
 
