@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.2  2003-07-20 18:35:38  ericn
+ * Revision 1.3  2003-07-28 13:36:08  ericn
+ * -removed debug statements
+ *
+ * Revision 1.2  2003/07/20 18:35:38  ericn
  * -added picType, decode timing
  *
  * Revision 1.1  2003/07/20 15:43:38  ericn
@@ -103,19 +106,31 @@ bool mpegDecoder_t :: getPicture
       {
          case STATE_SEQUENCE:
          {
-fprintf( stderr, "----> sequence %dx%d\n", INFOPTR->sequence->width, INFOPTR->sequence->height );
-            vo_setup_result_t setup_result;
-
+            sequence_t const &seq = *INFOPTR->sequence ;
             if( !haveVideoHeader_ )
             {
                haveVideoHeader_ = true ;
-               mpegWidth_ = INFOPTR->sequence->width ;
-               mpegHeight_ = INFOPTR->sequence->height ;
+               mpegWidth_ = seq.width ;
+               mpegHeight_ = seq.height ;
             }
 
             mpeg2_convert( DECODER, convert_rgb16, NULL );
             mpeg2_custom_fbuf (DECODER, 0);
-            
+/*
+            printf( "w: %u, h:%u\n", seq.width, seq.height );
+            printf( "chroma_width %u, chroma_height %u\n", seq.chroma_width, seq.chroma_height );
+            printf( "byte rate %u\n", seq.byte_rate );
+            printf( "vbv_buffer_size %u\n", seq.vbv_buffer_size );
+            printf( "flags: %u\n", seq.flags );
+            printf( "picw: %u, pich:%u\n", seq.picture_width, seq.picture_height );
+            printf( "dispw: %u, disph:%u\n", seq.display_width, seq.picture_height );
+            printf( "pixw: %u, pixh:%u\n", seq.pixel_width, seq.pixel_height );
+            printf( "period %u\n", seq.frame_period );
+            printf( "profile_level_id %u\n", seq.profile_level_id );
+            printf( "colour_primaries %u\n", seq.colour_primaries );
+            printf( "transfer_characteristics %u\n", seq.transfer_characteristics );
+            printf( "matrix_coefficients %u\n", seq.matrix_coefficients );
+*/
             break;
          }
          case STATE_GOP:
