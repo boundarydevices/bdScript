@@ -1,0 +1,49 @@
+/*
+ * Module jsHyperlink.cpp
+ *
+ * This module defines ...
+ *
+ *
+ * Change History : 
+ *
+ * $Log: jsHyperlink.cpp,v $
+ * Revision 1.1  2002-10-27 17:42:08  ericn
+ * -Initial import
+ *
+ *
+ * Copyright Boundary Devices, Inc. 2002
+ */
+
+
+#include "jsHyperlink.h"
+#include "relativeURL.h"
+
+bool        gotoCalled_ = false ;
+std::string gotoURL_( "" );
+
+static JSBool
+jsGoto( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( ( 1 <= argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) )
+   {
+      gotoCalled_ = true ;
+      absoluteURL( JS_GetStringBytes( JS_ValueToString( cx, argv[0] ) ), gotoURL_ );
+   }
+
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec text_functions[] = {
+    {"gotoURL",          jsGoto,       1 },
+    {0}
+};
+
+
+bool initJSHyperlink( JSContext *cx, JSObject *glob )
+{
+   return JS_DefineFunctions( cx, glob, text_functions);
+}
+
