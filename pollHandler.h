@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.8 2004-02-08 10:34:46 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.9 2004-04-09 03:14:10 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -30,7 +30,10 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
- * Revision 1.8  2004-02-08 10:34:46  ericn
+ * Revision 1.9  2004-04-09 03:14:10  ericn
+ * -bumped maxHandlers
+ *
+ * Revision 1.8  2004/02/08 10:34:46  ericn
  * -added pollClient_t declaration
  *
  * Revision 1.7  2004/01/01 20:11:42  ericn
@@ -106,7 +109,7 @@ public:
 class pollHandlerSet_t {
 public:
    enum {
-      maxHandlers_ = 8
+      maxHandlers_ = 64
    };
 
    pollHandlerSet_t( void );
