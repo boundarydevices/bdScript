@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.3  2003-08-06 13:23:56  ericn
+ * Revision 1.4  2003-11-15 17:45:03  ericn
+ * -modified to allow re-use
+ *
+ * Revision 1.3  2003/08/06 13:23:56  ericn
  * -fixed sound cancellation
  *
  * Revision 1.2  2003/08/04 12:39:01  ericn
@@ -202,7 +205,7 @@ static void *flashThreadRoutine( void *param )
          {
              struct timeval wd ;
              long wakeUp = FlashExec( priv.flashHandle_, FLASH_WAKEUP, 0, &wd);
-             
+
              if( display.flash_refresh )
              {
                 char *pixMem = (char *)fbMem ;
@@ -446,6 +449,26 @@ jsFlashPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
             
          } // have right-hand object
 
+FlashMovie *fh = (FlashMovie *)privData->flashHandle_ ;
+if( fh )
+{
+   CInputScript *scr = fh->main ;
+   if( scr )
+   {
+      Program *prog = scr->program ;
+      if( prog )
+      {
+prog->rewindMovie();
+prog->continueMovie();
+      }
+      else
+         printf( "jsFlash.play() no program\n" );
+   }
+   else
+      printf( "jsFlash.play() no script\n" );
+}
+else
+   printf( "jsFlash.play() no movie\n" );
          if( privData->start( onComplete, onCancel, xPos, yPos, width, height, bgColor ) )
             *rval = JSVAL_TRUE ;
       }
