@@ -1,5 +1,5 @@
 #ifndef __CCDISKCACHE_H__
-#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.1 2002-11-26 23:28:06 ericn Exp $"
+#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.2 2002-11-30 05:24:18 ericn Exp $"
 
 /*
  * ccDiskCache.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.h,v $
- * Revision 1.1  2002-11-26 23:28:06  ericn
+ * Revision 1.2  2002-11-30 05:24:18  ericn
+ * -modified to prevent copies of header_t
+ *
+ * Revision 1.1  2002/11/26 23:28:06  ericn
  * -Initial import
  *
  *
@@ -98,6 +101,9 @@ public:
       bool           completed_ ; // true when successfully stored
       bool           temporary_ ; // if true, removed in notInUse()
       char           name_[1];    // actually NULL-terminated string
+      header_t( void ){ memset( this, 0, sizeof( this ) ); }
+   private:
+      header_t( header_t const & ); // no copies
    };
 
    // size of committed cached entries
