@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.6  2002-10-31 02:10:58  ericn
+ * Revision 1.7  2002-11-02 18:38:14  ericn
+ * -made jsImageClass_ externally visible
+ *
+ * Revision 1.6  2002/10/31 02:10:58  ericn
  * -modified image() constructor to be multi-threaded, use rh object
  *
  * Revision 1.5  2002/10/25 13:47:28  ericn
@@ -718,8 +721,6 @@ enum jsImage_tinyId {
    IMAGE_HEIGHT, 
    IMAGE_PIXBUF,
 };
-
-extern JSClass jsImageClass_ ;
 
 JSClass jsImageClass_ = {
   "image",
