@@ -16,7 +16,7 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlGet.o \
        jsMPEG.o jsFlash.o jsSniffWLAN.o sniffWLAN.o jsMonWLAN.o monitorWLAN.o \
        ping.o jsPing.o jsProcess.o openFds.o jsDir.o md5.o jsUDP.o \
        pollHandler.o barcodePoll.o touchPoll.o gpioPoll.o image.o imgFile.o \
-       flashThread.o parsedFlash.o jsKernel.o
+       flashThread.o parsedFlash.o jsKernel.o pollTimer.o
 
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
@@ -238,6 +238,10 @@ avSendTo: avSendTo.cpp $(LIB)
 
 pollHandlerTest: pollHandler.cpp $(LIB)
 	$(CC) $(IFLAGS) -o pollHandlerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollHandlerTest.map pollHandler.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread
+	$(STRIP) $@
+
+pollTimerTest: pollTimer.cpp $(LIB)
+	$(CC) -fno-rtti $(IFLAGS) -o pollTimerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollTimerTest.map pollTimer.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 barcodePoll: barcodePoll.cpp $(LIB)
