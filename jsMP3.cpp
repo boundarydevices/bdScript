@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.22  2003-09-15 02:22:25  ericn
+ * Revision 1.23  2003-09-22 02:01:17  ericn
+ * -separated boost and changed record level params
+ *
+ * Revision 1.22  2003/09/15 02:22:25  ericn
  * -updated to allow setting of recordLevel and record amplification
  *
  * Revision 1.21  2003/02/02 19:38:26  ericn
@@ -741,33 +744,19 @@ static JSBool
 jsSetRecordLevel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 1 == argc )
+   if( ( 2 == argc )
        &&
-       ( JSVAL_IS_INT( argv[0] ) ) )
+       ( JSVAL_IS_BOOLEAN( argv[0] ) )
+       &&
+       ( JSVAL_IS_INT( argv[1] ) ) )
    {
-      int newLevel = JSVAL_TO_INT( argv[0] );
-      getAudioQueue().setRecordLevel( newLevel );
+      bool const boost = JSVAL_TO_BOOLEAN( argv[0] );
+      int const newLevel = JSVAL_TO_INT( argv[1] );
+      getAudioQueue().setRecordLevel( boost, newLevel );
       *rval = JSVAL_TRUE ;
    }
    else
-      JS_ReportError( cx, "Usage: recordBuffer.setRecordLevel( 0-100 );\n" );
-
-   return JS_TRUE ;
-}
-
-static JSBool
-jsSetRecordAmp( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   if( ( 1 == argc )
-       &&
-       ( JSVAL_IS_INT( argv[0] ) ) )
-   {
-      audioQueue_t :: recordAmplifier_ = JSVAL_TO_INT( argv[0] );
-      *rval = JSVAL_TRUE ;
-   }
-   else
-      JS_ReportError( cx, "Usage: recordBuffer.setRecordLevel( 0-100 );\n" );
+      JS_ReportError( cx, "Usage: recordBuffer.setRecordLevel( boost(bool), 0-31 );\n" );
 
    return JS_TRUE ;
 }
@@ -776,7 +765,6 @@ static JSFunctionSpec recordBufferMethods_[] = {
     {"record",          jsRecord,               0 },
     {"playback",        jsRecordPlay,           0 },
     {"setRecordLevel",  jsSetRecordLevel,       0 },
-    {"setRecordAmp",    jsSetRecordAmp,         0 },
     {"stop",            jsRecordStop,           0 },
     {0}
 };

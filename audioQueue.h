@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.12 2003-09-15 02:22:43 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.13 2003-09-22 02:02:01 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.12  2003-09-15 02:22:43  ericn
+ * Revision 1.13  2003-09-22 02:02:01  ericn
+ * -separated boost and changed record level params
+ *
+ * Revision 1.12  2003/09/15 02:22:43  ericn
  * -added settable record amplification
  *
  * Revision 1.11  2003/08/04 12:37:48  ericn
@@ -167,14 +170,13 @@ public:
    //
    // set input sensitivity for the microphone
    //
-   bool setRecordLevel( int newLevel );
+   bool setRecordLevel( bool boost20db,
+                        int  newLevel /* 0..31 */ );
 
    //
    // shutdown audio output thread
    //
    static void shutdown( void );
-
-   static unsigned char recordAmplifier_ ; // 0-100
 
 private:
    //

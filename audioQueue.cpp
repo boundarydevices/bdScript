@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.30  2003-09-15 02:22:49  ericn
+ * Revision 1.31  2003-09-22 02:02:03  ericn
+ * -separated boost and changed record level params
+ *
+ * Revision 1.30  2003/09/15 02:22:49  ericn
  * -added settable record amplification
  *
  * Revision 1.29  2003/08/06 13:24:14  ericn
@@ -230,21 +233,36 @@ void setVolume( unsigned char volParam )
 // It is used to keep the slightest bit of background noise from being
 // amplified to full-scale.
 //
-static unsigned long const maxNormalizeRatio = 7397827 ;
-static unsigned long const minNormalizeRatio = 943297 ;
-static unsigned long const ratioPer100 = (maxNormalizeRatio-minNormalizeRatio)/100 ;
-unsigned char audioQueue_t :: recordAmplifier_ = 0 ;
-
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
-   unsigned long ratio = minNormalizeRatio + (audioQueue_t::recordAmplifier_*ratioPer100);
-printf( "ratio 0x%lx\n", ratio );
-   short *next = samples ;
+   signed short min = 0x7fff ;
+   signed short max = 0x8000 ;
+   signed short *next = samples ;
+   for( unsigned i = 0 ; i < numSamples ; i++ )
+   {
+      signed short s = *next++ ;
+      if( s > max )
+         max = s ;
+      if( s < min )
+         min = s ;
+   }
+   min = 0-min ;
+   max = max > min ? max : min ;
+   
+   printf( "max sample %d\n", max );
+   
+   //
+   // fixed point 16:16
+   //
+   unsigned long const ratio = ( 0x70000000UL / max );
+   printf( "ratio %lx\n", ratio );
+
+   next = samples ;
    for( unsigned i = 0 ; i < numSamples ; i++ )
    {
       signed long x16 = ratio * *next ;
-      signed short s = ((signed short const *)&x16)[1];
+      signed short s = (signed short)( x16 >> 16 );
       *next++ = s ;
    }
 }
@@ -1383,17 +1401,30 @@ bool audioQueue_t :: stopRecording( void )
       return false ;
 }
 
-bool audioQueue_t :: setRecordLevel( int newLevel )
+bool audioQueue_t :: setRecordLevel( bool boost20db,
+                                     int  newLevel )
 {
    int readFd = openReadFd();
    if( 0 <= readFd )
    {
-      if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &newLevel ) )
+      int val = (int)boost20db ;
+      if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_MIC ), &val ) )
+         perror( "set boost" );
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &val ) )
+         perror( "get boost" );
+      else
+         printf( "boost is %d\n", val );
+
+printf( "set input gain to %d\n", newLevel );
+      val = newLevel*7 ;
+      val |= ( val << 8 );
+      if( 0 != ioctl( readFd, MIXER_WRITE( SOUND_MIXER_IGAIN ), &val ) )
          perror( "set record level" );
-      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &newLevel ) )
+      if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_IGAIN ), &val ) )
          perror( "get record level" );
       else
-         printf( "new record level %d\n", newLevel );
+         printf( "input gain is %d\n", val );
+
       closeReadFd();
    }
 }
