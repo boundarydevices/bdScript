@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.2  2002-10-27 17:48:57  ericn
+ * Revision 1.3  2002-10-31 02:07:14  ericn
+ * -modified to include scope in queueSource
+ *
+ * Revision 1.2  2002/10/27 17:48:57  ericn
  * -removed debug code
  *
  * Revision 1.1  2002/10/27 17:42:08  ericn
@@ -27,6 +30,7 @@
 #include "codeQueue.h"
 
 struct timerParam_t {
+   JSObject     *scope_ ;
    unsigned long milliseconds_ ;
    std::string   sourceCode_ ;
 };
@@ -46,7 +50,7 @@ static void *interval( void *arg )
       int result = nanosleep( &interval, &remaining );
       if( 0 == result )
       {
-         if( !queueSource( param->sourceCode_, "interval timer" ) )
+         if( !queueSource( param->scope_, param->sourceCode_, "interval timer" ) )
             fprintf( stderr, "Error queueing code from interval timer\n" );
       }
       else
@@ -74,7 +78,7 @@ static void *oneShot( void *arg )
    int const result = nanosleep( &tspec, &remaining );
    if( 0 == result )
    {
-      if( !queueSource( param->sourceCode_, "oneShot timer" ) )
+      if( !queueSource( param->scope_, param->sourceCode_, "oneShot timer" ) )
          fprintf( stderr, "Error queueing code from oneShot timer\n" );
    }
    else
@@ -96,6 +100,7 @@ jsTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *str = JS_ValueToString( cx, argv[1] );
       
       timerParam_t *param = new timerParam_t ;
+      param->scope_        = obj ;
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
       param->sourceCode_   = JS_GetStringBytes( str );
 
@@ -127,6 +132,7 @@ jsOneShot( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       JSString *str = JS_ValueToString( cx, argv[1] );
       
       timerParam_t *param = new timerParam_t ;
+      param->scope_        = obj ;
       param->milliseconds_ = JSVAL_TO_INT( argv[0] );
       param->sourceCode_   = JS_GetStringBytes( str );
 
