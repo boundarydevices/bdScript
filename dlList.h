@@ -103,7 +103,7 @@ static __inline__ void list_del_init(struct list_head *entry)
  * list_empty - tests whether a list is empty
  * @head: the list to test.
  */
-static __inline__ int list_empty(struct list_head *head)
+static __inline__ int list_empty(struct list_head const *head)
 {
 	return head->next == head;
 }
