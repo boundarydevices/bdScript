@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.11  2002-11-30 00:31:57  ericn
+ * Revision 1.12  2002-11-30 05:27:13  ericn
+ * -modified to call custom handlers from defaults, fixed locking
+ *
+ * Revision 1.11  2002/11/30 00:31:57  ericn
  * -implemented in terms of ccActiveURL module
  *
  * Revision 1.10  2002/11/05 15:15:39  ericn
@@ -59,6 +62,9 @@
 #include "codeQueue.h"
 #include "ccActiveURL.h"
 
+static mutex_t     syncMutex_ ;
+static condition_t syncSem_ ;
+
 enum jsCurl_tinyid {
    CURLFILE_ISLOADED, 
    CURLFILE_WORKED, 
@@ -95,7 +101,6 @@ static void curlFileOnComplete( jsCurlRequest_t &req, void const *data, unsigned
                       JSPROP_ENUMERATE
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
-   jsCurlOnComplete( req, data, size );
 }
 
 static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -133,8 +138,9 @@ static JSBool curlFile( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
          request.lhObj_      = thisObj ;
          request.rhObj_      = rhObj ;
          request.cx_         = cx ;
-
-         if( queueCurlRequest( request, ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) ) ) )
+         request.async_      = ( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) );
+         
+         if( queueCurlRequest( request ) ) 
          {
             return JS_TRUE ;
          }
@@ -168,10 +174,11 @@ bool initJSCurl( JSContext *cx, JSObject *glob )
    return false ;
 }
 
-static semaphore_t syncSem_ ;
-
 void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
+printf( "jsCurlOnComplete\n" );
+   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
+   
    jsval     handlerVal ;
    JSString *handlerCode ;
 
@@ -195,11 +202,15 @@ void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned long siz
          JS_ReportError( req.cx_, "Error queueing onLoad\n" );
    }
    
+   if( req.onComplete_ != jsCurlOnComplete )
+      req.onComplete_( req, data, size );
+
    syncSem_.signal();
 }
 
 void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
 {
+   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
    JSString *errorStr = JS_NewStringCopyN( req.cx_, errorMsg.c_str(), errorMsg.size() );
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
@@ -223,11 +234,15 @@ void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
          JS_ReportError( req.cx_, "Error queueing onLoadError\n" );
    }
    
+   if( req.onFailure_ != jsCurlOnFailure )
+      req.onFailure_( req, errorMsg );
+
    syncSem_.signal();
 }
 
 void jsCurlOnCancel( jsCurlRequest_t &req )
 {
+   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
    jsval     handlerVal ;
    JSString *handlerCode ;
 
@@ -241,11 +256,15 @@ void jsCurlOnCancel( jsCurlRequest_t &req )
          JS_ReportError( req.cx_, "Error queueing onCancel\n" );
    }
    
+   if( req.onCancel_ != jsCurlOnCancel )
+      req.onCancel_( req );
+
    syncSem_.signal();
 }
 
 void jsCurlOnSize( jsCurlRequest_t &req, unsigned long size )
 {
+   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "expectedSize",
@@ -268,11 +287,15 @@ void jsCurlOnSize( jsCurlRequest_t &req, unsigned long size )
          JS_ReportError( req.cx_, "Error queueing onSize\n" );
    }
    
-   syncSem_.signal();
+   if( req.onSize_ != jsCurlOnSize )
+      req.onSize_( req, size );
 }
 
+#include <unistd.h>
 void jsCurlOnProgress( jsCurlRequest_t &req, unsigned long numReadSoFar )
 {
+   mutexLock_t lock( req.async_ ? execMutex_ : syncMutex_ );
+
    JS_DefineProperty( req.cx_, 
                       req.lhObj_, 
                       "readSoFar",
@@ -294,8 +317,9 @@ void jsCurlOnProgress( jsCurlRequest_t &req, unsigned long numReadSoFar )
       if( !queueSource( req.lhObj_, JS_GetStringBytes( handlerCode ), "curlRequest::onProgress" ) )
          JS_ReportError( req.cx_, "Error queueing onProgress\n" );
    }
-   
-   syncSem_.signal();
+
+   if( req.onProgress_ != jsCurlOnProgress )
+      req.onProgress_( req, numReadSoFar );
 }
 
 static curlCallbacks_t const defaultCallbacks_ = {
@@ -306,8 +330,7 @@ static curlCallbacks_t const defaultCallbacks_ = {
    (curlCacheProgress_t)jsCurlOnProgress
 };
 
-bool queueCurlRequest( jsCurlRequest_t &request,
-                       bool             async )
+bool queueCurlRequest( jsCurlRequest_t &request )
 {
    jsval urlVal ;
    JSString *propStr ;
@@ -321,15 +344,9 @@ bool queueCurlRequest( jsCurlRequest_t &request,
       JSString *propStr = JS_ValueToString( request.cx_, urlVal );
       if( propStr )
       {
-         curlCallbacks_t callbacks = defaultCallbacks_ ;
-
-         callbacks.onComplete_ = (curlCacheComplete_t)request.onComplete_;
-         callbacks.onFailure_  = (curlCacheFailure_t)request.onFailure_ ;
-         callbacks.onCancel_   = (curlCacheCancel_t)request.onCancel_ ;
-         callbacks.onSize_     = (curlCacheSize_t)request.onSize_ ;
-         callbacks.onProgress_ = (curlCacheProgress_t)request.onProgress_ ;
-         
          std::string const url( JS_GetStringBytes( propStr ), JS_GetStringLength( propStr ) );
+         std::string absolute ;
+         absoluteURL( url, absolute );
 
          bool useCache = true ;
          jsval  useCacheVal ;
@@ -405,22 +422,29 @@ bool queueCurlRequest( jsCurlRequest_t &request,
          {
          }
 
+printf( "retrieving %s\n", absolute.c_str() );
+         mutexLock_t lock( request.async_ ? execMutex_ : syncMutex_ );
          if( 0 == postHead )
          {
-            getCurlCache().get( url, &request, callbacks );
+            getCurlCache().get( absolute, &request, defaultCallbacks_ );
          }
          else
          {
-            getCurlCache().post( url, postHead, &request, callbacks );
+            getCurlCache().post( absolute, postHead, &request, defaultCallbacks_ );
          }
-         
-         if( !async )
+
+         if( !request.async_ )
          {
-            bool complete = syncSem_.wait();
+printf( "waiting\n" );
+            bool complete = syncSem_.wait(lock);
+printf( "done : %s\n", complete ? "success" : "failure" );
             return complete ;
          }
          else
+         {
+printf( "async" );
             return true ;
+         }
       }
       else
          return false ;
