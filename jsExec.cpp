@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.63  2003-11-24 19:42:05  ericn
+ * Revision 1.64  2003-11-28 14:11:18  ericn
+ * -added method pollStat(), fixed backtrace
+ *
+ * Revision 1.63  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.62  2003/11/22 21:02:37  ericn
@@ -332,6 +335,7 @@ static bool mainLoop( pollHandlerSet_t &polls,
 {
    static unsigned iterations = 0 ;
    if( !polls.poll( 5000 ) || ( 15 == ( iterations++ & 15 ) ) )
+//   if( !polls.poll( 50 ) || ( 1 == ( iterations++ & 1 ) ) )
    {
       mutexLock_t lock( execMutex_ );
       JS_GC( cx );
@@ -408,11 +412,33 @@ jsGarbageCollect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
    return JS_TRUE;
 }
 
+static JSBool
+jsPollStat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   printf( "%u poll handlers installed\n", pollHandlers_.numHandlers() );
+   for( unsigned i = 0 ; i < pollHandlers_.numHandlers(); i++ )
+   {
+      pollHandler_t *handler = pollHandlers_[i];
+      printf( "[%u] == %p, fd %d, mask 0x%X:", i, handler, handler->getFd(), handler->getMask() );
+      unsigned short const mask = handler->getMask();
+      if( mask & POLLIN )  printf( "R" ); else printf( "r" );
+      if( mask & POLLOUT ) printf( "W" ); else printf( "w" );
+      if( mask & POLLERR ) printf( "E" ); else printf( "e" );
+      if( pollHandlers_.isDeleted(i) )
+         printf( "   deleted!" );
+      printf( "\n" );
+   }
+
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
     {"garbageCollect",  jsGarbageCollect, 0},
     {"md5",             jsMD5,            0},
+    {"pollStat",        jsPollStat,       0},
     {"waitFor",         jsWaitFor,        0},
     {0}
 };
@@ -615,21 +641,13 @@ void handler(int sig)
       fprintf( stderr, "%s\n", dumpStack.getLine() );
 
    void *btArray[128];
-   int btSize;
-   
+   int const btSize = backtrace(btArray, sizeof(btArray) / sizeof(void *) );
+
    fprintf( stderr, "########## Backtrace ##########\n"
-                    "Number of elements in backtrace: %u\n", backtrace(btArray, sizeof(btArray) / sizeof(void *) ) );
+                    "Number of elements in backtrace: %u\n", btSize );
 
    if (btSize > 0)
-   {
-      backtrace_symbols_fd( btArray, btSize, 1 );
-      char** btSymbols = backtrace_symbols( btArray, btSize );
-      if( btSymbols )
-      {
-         for (int i = btSize - 1; i >= 0; --i)
-            fprintf( stderr, "%s\n", btSymbols[i] );
-      }
-   }
+      backtrace_symbols_fd( btArray, btSize, fileno(stdout) );
 
    fprintf( stderr, "Handler done.\n" );
    fflush( stderr );
