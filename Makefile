@@ -54,14 +54,10 @@ mp3Play: mp3Play.o $(LIB)
 	$(CC) -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
 	$(STRIP) mp3Play
 
-testJS.o: testJS.cpp Makefile
-	$(CC) -c $(IFLAGS) -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
+testJS: $(LIB) Makefile
+	$(CC) -ggdb -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 
-testJS: testJS.o $(LIB)
-	$(CC) -o testJS testJS.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
-	$(STRIP) testJS
-
-jsExec: jsExec.o $(LIB)
+jsExec: jsExec.o $(LIB) Makefile
 	$(CC) -o jsExec jsExec.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lts -lpthread -lm -lz
 	arm-linux-nm jsExec >jsExec.map
 	$(STRIP) jsExec
