@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsProcess.cpp,v $
- * Revision 1.3  2003-08-24 22:01:51  ericn
+ * Revision 1.4  2003-08-25 18:16:39  ericn
+ * -oops. provided default finalize, not NULL
+ *
+ * Revision 1.3  2003/08/24 22:01:51  ericn
  * -added shutdown routine (atexit doesn't appear to work) and use SIGABRT, not SIGKILL
  *
  * Revision 1.2  2003/08/24 18:33:04  ericn
@@ -97,7 +100,7 @@ JSClass jsChildProcessClass_ = {
   "childProcess",
    JSCLASS_HAS_PRIVATE,
    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,     JS_PropertyStub,
-   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      0,
+   JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,      JS_FinalizeStub,
    JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
