@@ -115,7 +115,7 @@ ccWorker: ccWorker.cpp memFile.o Makefile
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 	$(CC) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
 
-all: curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders
+all: curlGet dirTest urlTest jsExec ftRender tsTest tsThread madHeaders
 
 .PHONY: install-libs install-headers
 
@@ -134,4 +134,4 @@ install-bin:
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a *.map curlGet dirTest urlTest jsExec testJS mp3Play ftRender tsTest tsThread madHeaders $(LIB)
+	rm -f *.o *.a *.map curlGet dirTest urlTest jsExec testJS ftRender tsTest tsThread madHeaders $(LIB)
