@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.77  2004-06-28 02:57:09  ericn
+ * Revision 1.78  2004-07-04 21:32:38  ericn
+ * -added alignment constants (generally useful)
+ *
+ * Revision 1.77  2004/06/28 02:57:09  ericn
  * -add starUSB support
  *
  * Revision 1.76  2004/05/22 18:02:14  ericn
@@ -504,6 +507,26 @@ static void myError( JSContext *cx, const char *message, JSErrorReport *report)
    fprintf( stderr, "file %s, line %u\n", report->filename, report->lineno );
 }
 
+struct namedConstant_t {
+   char const *name ;
+   int         value ;
+};
+
+static namedConstant_t constants_[] = {
+   { "centerHorizontal",  
+     alignCenterHorizontal },
+   { "alignRight",
+     alignRight },
+   { "alignLeft",
+     0 },
+   { "alignTop",
+     0 },
+   { "alignBottom",
+     alignBottom },
+   { "centerVertical",
+     alignCenterVertical },
+   { 0, 0 }
+};
 
 /* main function sets up global JS variables, including run time,
  * a context, and a global object, then initializes the JS run time,
@@ -532,6 +555,14 @@ int prMain(int argc, char **argv)
             {
                if( JS_DefineFunctions( cx, glob, shell_functions) )
                {
+                  namedConstant_t const *nextConst = constants_ ;
+                  for( ; nextConst->name ; nextConst++ )
+                  {
+                     JS_DefineProperty( cx, glob, nextConst->name, 
+                                        INT_TO_JSVAL( nextConst->value ), 
+                                        0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+                  }
+
                   getTimerPoll( pollHandlers_ );
                   initJSTimer( cx, glob );
                   initJSScreen( cx, glob );

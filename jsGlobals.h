@@ -1,5 +1,5 @@
 #ifndef __JSGLOBALS_H__
-#define __JSGLOBALS_H__ "$Id: jsGlobals.h,v 1.3 2003-11-22 21:02:37 ericn Exp $"
+#define __JSGLOBALS_H__ "$Id: jsGlobals.h,v 1.4 2004-07-04 21:32:07 ericn Exp $"
 
 /*
  * jsGlobals.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: jsGlobals.h,v $
- * Revision 1.3  2003-11-22 21:02:37  ericn
+ * Revision 1.4  2004-07-04 21:32:07  ericn
+ * -added alignment constants (generally useful)
+ *
+ * Revision 1.3  2003/11/22 21:02:37  ericn
  * -made code queue a pollHandler_t
  *
  * Revision 1.2  2002/11/30 00:53:09  ericn
@@ -42,6 +45,12 @@ extern mutex_t           execMutex_ ;
 extern JSContext        *execContext_ ;
 extern pollHandlerSet_t  pollHandlers_ ;
 
+enum {
+   alignCenterHorizontal   = 1,
+   alignRight              = 2,
+   alignBottom             = 4,
+   alignCenterVertical     = 8
+};
 
 #endif
 
