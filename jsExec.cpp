@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.1  2002-10-27 17:42:08  ericn
+ * Revision 1.2  2002-10-31 02:04:17  ericn
+ * -added nanosleep, modified queueCode to include scope
+ *
+ * Revision 1.1  2002/10/27 17:42:08  ericn
  * -Initial import
  *
  *
@@ -20,8 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
+#include <sys/time.h>
 
 /* include the JS engine API header */
+#include "testEvents.h"
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
 #include "curlCache.h"
@@ -29,6 +35,11 @@
 #include "jsHyperlink.h"
 #include "codeQueue.h"
 #include "jsTimer.h"
+#include "jsCurl.h"
+#include "curlThread.h"
+#include "jsImage.h"
+#include "jsGlobals.h"
+#include "jsScreen.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -84,8 +95,9 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
       JSString *str = JS_ValueToString(cx, argv[0]);
       if( str )
       {
-         if( queueSource( std::string( JS_GetStringBytes( str ), JS_GetStringLength( str ) ), 
-                                       "queueCode" ) )
+         if( queueSource( obj,
+                          std::string( JS_GetStringBytes( str ), JS_GetStringLength( str ) ), 
+                          "queueCode" ) )
          {
             printf( "code queued\n" );
          }
@@ -102,11 +114,46 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   if( ( 1 == argc ) && JSVAL_IS_NUMBER( argv[0] ) )
+   {
+      double seconds ;
+      JS_ValueToNumber( cx, argv[0], &seconds );
+      struct timespec tv ;
+      tv.tv_sec = (unsigned)( floor( seconds ) );
+      tv.tv_nsec = (unsigned)( floor( fmod( seconds * 1000000000, 1000000000.0 ) ) );
+
+//      JS_ReportError( cx, "nanosleep %f : %u.%lu seconds\n", seconds, tv.tv_sec, tv.tv_nsec );
+
+      nanosleep( &tv, 0 );
+
+      *rval = JSVAL_TRUE ;
+   }
+   else
+   {
+      JS_ReportError( cx, "Usage : nanosleep( ns )\n" );
+      *rval = JSVAL_FALSE ;
+   }
+
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"print",           Print,          0},
     {"queueCode",       jsQueueCode,    0},
+    {"nanosleep",       jsNanosleep,    0},
     {0}
 };
+
+
+static void myError( JSContext *cx, const char *message, JSErrorReport *report)
+{
+   fprintf( stderr, "Error %s\n", message );
+   fprintf( stderr, "file %s, line %u\n", report->filename, report->lineno );
+}
+
 
 /* main function sets up global JS variables, including run time,
  * a context, and a global object, then initializes the JS run time,
@@ -126,6 +173,8 @@ int main(int argc, char **argv)
          // if cx does not have a value, end the program here
          if( cx )
          {
+            execContext_ = cx ;
+
             // create the global object here
             JSObject  *glob = JS_NewObject(cx, &global_class, NULL, NULL);
             if( 0 != glob )
@@ -135,7 +184,12 @@ int main(int argc, char **argv)
                {
                   if( JS_DefineFunctions( cx, glob, shell_functions) )
                   {
-                     initJSTimer(cx, glob);
+                     initJSTimer( cx, glob );
+                     initJSScreen( cx, glob );
+                     initializeCodeQueue( cx, glob );
+                     initJSCurl( cx, glob );
+                     initJSImage( cx, glob );
+                     startCurlThreads();
 
                      curlCache_t &cache = getCurlCache();
                      curlFile_t f( cache.get( argv[1], false ) );
@@ -143,13 +197,19 @@ int main(int argc, char **argv)
                      {
                         pushURL( f.getEffectiveURL() );
          
+                        JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
+
                         JSScript *script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
                         if( script )
                         {
-                           initializeCodeQueue( cx, glob );
                            jsval rval; 
-                           JSBool exec = JS_ExecuteScript( cx, glob, script, &rval );
-                           JS_DestroyScript( cx, script );
+                           JSBool exec ;
+                           {
+                              mutexLock_t lock( execMutex_ );
+                              exec = JS_ExecuteScript( cx, glob, script, &rval );
+                              JS_DestroyScript( cx, script );
+                           } // limit 
+
 
                            if( exec )
                            {
@@ -163,10 +223,11 @@ int main(int argc, char **argv)
                                  }
                                  else 
                                  {
-                                    script = dequeueByteCode( 5000 );
-                                    if( script )
+                                    JSObject *scope ;
+                                    if( dequeueByteCode( script, scope, 5000 ) )
                                     {
-                                       exec = JS_ExecuteScript( cx, glob, script, &rval );
+                                       mutexLock_t lock( execMutex_ );
+                                       exec = JS_ExecuteScript( cx, scope, script, &rval );
                                        if( !exec )
                                           fprintf( stderr, "error executing code\n" );
                                        JS_DestroyScript( cx, script );
@@ -189,6 +250,8 @@ int main(int argc, char **argv)
                      }
                      else
                         fprintf( stderr, "Error opening url %s\n", argv[1] );
+
+                     stopCurlThreads();
                   }
                   else
                      fprintf( stderr, "Error defining Javascript shell functions\n" );
@@ -199,7 +262,10 @@ int main(int argc, char **argv)
             else
                fprintf( stderr, "Error allocating Javascript global\n" );
    
-            JS_DestroyContext( cx );
+            {
+               mutexLock_t lock( execMutex_ );
+               JS_DestroyContext( cx );
+            }
    
          }
          else
