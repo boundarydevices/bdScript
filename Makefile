@@ -1,6 +1,6 @@
-# 
+#
 # Makefile for curlCache library and utility programs
-# 
+#
 OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        curlThread.o ddtoul.o dirByATime.o fbDev.o ftObjs.o hexDump.o \
        hexDump.o imgGIF.o imgPNG.o imgJPEG.o \
@@ -9,19 +9,19 @@ OBJS = audioQueue.o childProcess.o codeQueue.o curlCache.o \
        jsVolume.o \
        madHeaders.o memFile.o relativeURL.o tsThread.o ultoa.o urlFile.o \
        ultodd.o
-LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
+LIB = $(INSTALL_LIB)/libCurlCache.a
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
    AR=arm-linux-ar
    STRIP=arm-linux-strip
-   LIBS=-L$(INSTALL_ROOT)/lib -L ./
-   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/freetype2 
+   LIBS=-L./ -L$(TOOLS_LIB) -L$(INSTALL_LIB)
+   IFLAGS=-I$(INSTALL_ROOT)/include -I$(INSTALL_ROOT)/include/freetype2
 else
    CC=gcc
    AR=ar
-   LIBS=-L /usr/local/lib -L ./
-   IFLAGS=-I/usr/include/freetype2 
+   LIBS=-L/usr/local/lib -L./
+   IFLAGS=-I/usr/include/freetype2
    STRIP=strip
 endif
 
