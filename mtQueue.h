@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.2 2002-10-31 02:05:54 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.3 2002-11-29 16:42:21 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.2  2002-10-31 02:05:54  ericn
+ * Revision 1.3  2002-11-29 16:42:21  ericn
+ * -modified to allow for unproductive wakes
+ *
+ * Revision 1.2  2002/10/31 02:05:54  ericn
  * -added abort method to wake up threads (pthread_cancel doesn't wake 'em)
  *
  * Revision 1.1  2002/10/27 17:42:08  ericn
@@ -69,7 +72,7 @@ bool mtQueue_t<T>::pull( T &item )
       if( !abort_ && list_.empty() )
       {
 //   printf( "waiting\n" );
-         if( cond_.wait( lock ) )
+         while( cond_.wait( lock ) )
          {
             if( !list_.empty() )
             {
@@ -78,18 +81,12 @@ bool mtQueue_t<T>::pull( T &item )
 //   printf( "returning\n" );
                return true ;
             }
-            else if( !abort_ )
-            {   
-               printf( "unproductive poll\n" );
-            }
-            else
+            else if( abort_ )
                return false ;
          }
-         else
-         {
-      printf( "aborting(wait)\n" );
-            return false ;
-         }
+         
+         printf( "aborting(wait)\n" );
+         return false ;
       }
       else if( !abort_ )
       {
@@ -116,7 +113,7 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
    {
       if( !abort_ && list_.empty() )
       {
-         if( cond_.wait( lock, milliseconds ) )
+         while( cond_.wait( lock, milliseconds ) )
          {
             if( !abort_ && !list_.empty() )
             {
@@ -126,10 +123,8 @@ bool mtQueue_t<T>::pull( T &item, unsigned long milliseconds )
             else if( abort_ )
                return false ;
          }
-         else
-         {
-            return false ;
-         }
+
+         return false ;
       }
       else
       {
