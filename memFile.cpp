@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: memFile.cpp,v $
- * Revision 1.2  2002-10-09 01:09:11  ericn
+ * Revision 1.3  2003-07-24 13:44:39  ericn
+ * -set CLOEXEC
+ *
+ * Revision 1.2  2002/10/09 01:09:11  ericn
  * -added copy constructor
  *
  * Revision 1.1  2002/10/07 04:38:20  ericn
@@ -25,6 +28,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <stdio.h>
 
 memFile_t :: memFile_t( char const *path )
    : fd_( open( path, O_RDONLY ) ),
@@ -34,6 +38,7 @@ memFile_t :: memFile_t( char const *path )
 {
    if( 0 <= fd_ )
    {
+      fcntl( fd_, F_SETFD, FD_CLOEXEC );
       off_t const fileSize = lseek( fd_, 0, SEEK_END );
       if( 0 <= fileSize )
       {
@@ -74,9 +79,13 @@ memFile_t :: memFile_t( memFile_t const &rhs )
 memFile_t :: ~memFile_t( void )
 {
    if( 0 != data_ )
+   {
       munmap( (void *)data_, length_ );
+   }
    if( 0 <= fd_ )
+   {
       close( fd_ );
+   }
 }
    
 char const *memFile_t :: getError( void ) const 
