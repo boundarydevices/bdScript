@@ -40,9 +40,9 @@ urlTest: urlTest.o curlCache.o dirByATime.o
 testJS.o: testJS.cpp Makefile
 	$(CC) -c -o testJS.o -DXP_UNIX=1 -I ../ testJS.cpp
 
-testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o fbDev.o hexDump.o Makefile
-	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsImage.o dirByATime.o fbDev.o hexDump.o \
-      $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lm -lz
+testJS: testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o dirByATime.o fbDev.o hexDump.o jsText.o Makefile
+	$(CC) -o testJS testJS.o urlFile.o curlCache.o jsCurl.o jsScreen.o jsImage.o jsText.o dirByATime.o fbDev.o hexDump.o \
+      $(LIBS) -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lm -lz
 
 ifneq (,$(findstring arm, $(CC)))
    all: curlCache curlGet dirTest urlTest testJS

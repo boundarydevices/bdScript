@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.5  2002-10-13 15:52:07  ericn
+ * Revision 1.6  2002-10-18 01:18:13  ericn
+ * -added text and screen clear support
+ *
+ * Revision 1.5  2002/10/13 15:52:07  ericn
  * -added ref to image module
  *
  * Revision 1.4  2002/09/29 17:35:55  ericn
@@ -37,6 +40,8 @@
 #include "js/jsapi.h"
 #include "jsCurl.h"
 #include "jsImage.h"
+#include "jsText.h"
+#include "jsScreen.h"
 #include "curlCache.h"
 
 static JSBool
@@ -175,6 +180,8 @@ int main(int argc, char **argv)
             {
                initJSCurl( cx, glob );
                initJSImage( cx, glob );
+               initJSText( cx, glob );
+               initJSScreen( cx, glob );
                printf( "initialized jsCurl and jsImage\n" );
 
                curlCache_t &cache = getCurlCache();
