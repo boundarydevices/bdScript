@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.3  2002-10-25 02:57:04  ericn
+ * Revision 1.4  2002-10-25 03:00:56  ericn
+ * -fixed return value
+ *
+ * Revision 1.3  2002/10/25 02:57:04  ericn
  * -removed debug print statements
  *
  * Revision 1.2  2002/10/25 02:53:14  ericn
@@ -133,6 +136,9 @@ jsMP3Wait( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       else
          break;
    }
+   
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
 }
 
 static JSFunctionSpec text_functions[] = {
