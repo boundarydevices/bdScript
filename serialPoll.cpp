@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: serialPoll.cpp,v $
- * Revision 1.1  2004-03-27 20:24:22  ericn
+ * Revision 1.2  2004-09-09 21:04:50  tkisky
+ * -explicit default of 8 bit, no parity
+ *
+ * Revision 1.1  2004/03/27 20:24:22  ericn
  * -Initial import
  *
  *
@@ -44,9 +47,9 @@ serialPoll_t :: serialPoll_t
      char              terminator,
      int               inputTimeout )
    : pollHandler_t( open( devName, O_RDWR ), set )
-   , timer_( ('\0' == terminator ) 
+   , timer_( ('\0' == terminator )
              ? ( ( 0 != inputTimeout )
-                 ? new serialPollTimer_t( *this ) 
+                 ? new serialPollTimer_t( *this )
                  : 0 )
              : 0 )
    , outDelay_( outDelay )
@@ -63,23 +66,23 @@ serialPoll_t :: serialPoll_t
 
       struct termios oldTermState;
       tcgetattr(fd_,&oldTermState);
-   
+
       /* set raw mode for keyboard input */
       struct termios newTermState = oldTermState;
       newTermState.c_cc[VMIN] = 1;
-   
+
       //
       // Note that this doesn't appear to work!
       // Reads always seem to be terminated at 16 chars!
       //
       newTermState.c_cc[VTIME] = 0; // 1/10th's of a second, see http://www.opengroup.org/onlinepubs/007908799/xbd/termios.html
-   
-      newTermState.c_cflag &= ~(CSTOPB|CRTSCTS);           // Mask character size to 8 bits, no parity, Disable hardware flow control
-      newTermState.c_cflag |= (CLOCAL | CREAD);            // Select 8 data bits
+
+      newTermState.c_cflag &= ~(PARENB|CSTOPB|CSIZE|CRTSCTS);           // Mask character size to 8 bits, no parity, Disable hardware flow control
+      newTermState.c_cflag |= (CLOCAL | CREAD |CS8);            // Select 8 data bits
       newTermState.c_lflag &= ~(ICANON | ECHO | ISIG);     // set raw mode for input
       newTermState.c_iflag &= ~(IXON | IXOFF | IXANY|INLCR|ICRNL|IUCLC);   //no software flow control
       newTermState.c_oflag &= ~OPOST;                      //raw output
-      
+
       unsigned baudConst ;
       if( baudRateToConst( baud, baudConst ) )
       {
@@ -185,19 +188,21 @@ void serialPoll_t :: onDataAvail( void )
 
          if( 0 != lines_ )
             onLineIn();
-         
+//		printf("onDataAvail with terminator\n");
       } // terminated
       else if( 0 != timer_ )
       {
          inLength_ += numRead ;
          inData_[inLength_] = '\0' ;
          timer_->set( 10 );
+//		printf("onDataAvail with timeout\n");
       }
       else
       {
          inLength_ += numRead ;
          inData_[inLength_] = '\0' ;
          onChar();
+//		printf("onDataAvail calling onChar\n");
       }
    }
 }
@@ -205,14 +210,14 @@ void serialPoll_t :: onDataAvail( void )
 void serialPoll_t :: timeout( void )
 {
    if( 0 < inLength_ )
-   {   
+   {
       addLine( inData_, inLength_ );
       inLength_ = 0 ;
    }
    onLineIn();
 }
 
-int serialPoll_t :: write( void const *data, int length ) const 
+int serialPoll_t :: write( void const *data, int length ) const
 {
    if( 0 == outDelay_ )
       return ::write( fd_, data, length );
