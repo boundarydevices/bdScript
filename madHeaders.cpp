@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.3  2002-11-07 02:13:55  ericn
+ * Revision 1.4  2002-11-14 13:12:44  ericn
+ * -modified to allow sounds < 1 second
+ *
+ * Revision 1.3  2002/11/07 02:13:55  ericn
  * -modified to check length, frequency, and channels
  *
  * Revision 1.2  2002/11/05 15:14:04  ericn
@@ -125,7 +128,15 @@ madHeaders_t :: madHeaders_t
    /* close input file */
    
    mad_stream_finish(&stream);
-   worked_ = eof && ( 0 < stats.length.seconds ) && ( 0 < stats.freq ) && ( 0 < stats.channels );
+   worked_ = eof 
+             && 
+             ( ( 0 < stats.length.seconds ) 
+               ||
+               ( 0 < stats.length.fraction ) )
+             && 
+             ( 0 < stats.freq ) 
+             && 
+             ( 0 < stats.channels );
    if( worked_ )
    {
       numSeconds_   = stats.length.seconds ;
