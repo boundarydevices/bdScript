@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.14  2002-11-22 15:08:03  ericn
+ * Revision 1.15  2002-11-22 21:31:43  tkisky
+ * -Optimize render and use it in jsImage
+ *
+ * Revision 1.14  2002/11/22 15:08:03  ericn
  * -made jsImageDraw public
  *
  * Revision 1.13  2002/11/20 00:39:02  ericn
@@ -93,38 +96,7 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
 
          fbDevice_t &fb = getFB();
-         if( ( 0 < width ) && ( 0 < height ) && ( xPos < fb.getWidth() ) && ( yPos < fb.getHeight() ) )
-         {
-            int const left = xPos ;
-
-            for( unsigned y = 0 ; y < height ; y++, yPos++ )
-            {
-               if( 0 <= yPos )
-               {
-                  if( yPos < fb.getHeight() )
-                  {
-                     unsigned short *pix = fb.getRow( yPos ) + left ;
-                     xPos = left ;
-                     for( unsigned x = 0 ; x < width ; x++, xPos++ )
-                     {
-                        if( 0 <= xPos )
-                        {
-                           if( xPos < fb.getWidth() )
-                           {
-                              *pix++ = pixMap[y*width+x];
-                           }
-                           else
-                              break; // only going further off the screen
-                        }
-                        else
-                           pix++ ;
-                     }
-                  }
-                  else
-                     break; // only going further off the screen
-               }
-            }
-         }
+         fb.render(xPos,yPos,width,height,pixMap);
 //         JS_ReportError( cx, "w:%d, h:%d", width, height );
       }
 

@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.9  2002-11-22 15:13:18  ericn
+ * Revision 1.10  2002-11-22 21:31:43  tkisky
+ * -Optimize render and use it in jsImage
+ *
+ * Revision 1.9  2002/11/22 15:13:18  ericn
  * -added method render()
  *
  * Revision 1.8  2002/11/22 10:58:55  tkisky
@@ -294,36 +297,49 @@ fbDevice_t :: fbDevice_t( char const *name )
    }
 }
 
-void fbDevice_t :: render
-   ( unsigned short xPos, 
-     unsigned short yPos,
-     unsigned short w, 
-     unsigned short h, // width and height of image
-     unsigned short const *pixels )
+int min(int x,int y)
 {
-   if( ( 0 < w ) && ( 0 < h ) && ( xPos < getWidth() ) && ( yPos < getHeight() ) )
+   return (x<y)? x : y;
+}
+void fbDevice_t :: render
+   ( int xPos,				//placement on screen
+     int yPos,
+     int w,
+     int h,	 			// width and height of image
+     unsigned short const *pixels,
+     int imagexPos,			//offset within image to start display
+     int imageyPos,
+     int imageDisplayWidth,		//portion of image to display
+     int imageDisplayHeight
+   )
+{
+   if (xPos<0)
    {
-      int const left = xPos ;
+      imagexPos -= xPos;		//increase offset
+      imageDisplayWidth += xPos;	//reduce width
+      xPos = 0;
+   }
+   if (yPos<0)
+   {
+      imageyPos -= yPos;
+      imageDisplayHeight += yPos;
+      yPos = 0;
+   }
+   if ((imageDisplayWidth <=0)||(imageDisplayWidth >(w-imagexPos))) imageDisplayWidth = w-imagexPos;
+   if ((imageDisplayHeight<=0)||(imageDisplayHeight>(h-imageyPos))) imageDisplayHeight = h-imageyPos;
 
-      for( unsigned y = 0 ; y < h ; y++, yPos++ )
+   pixels += (w*imageyPos)+imagexPos;
+
+   int minWidth = min(getWidth()-xPos,imageDisplayWidth) << 1;	//2 bytes/pixel
+   int minHeight= min(getHeight()-yPos,imageDisplayHeight);
+   if ((minWidth > 0) && (minHeight > 0))
+   {
+      do
       {
-         if( yPos < getHeight() )
-         {
-            unsigned short *pix = getRow( yPos ) + left ;
-            xPos = left ;
-            for( unsigned x = 0 ; x < w ; x++, xPos++ )
-            {
-               if( xPos < getWidth() )
-               {
-                  *pix++ = pixels[y*w+x];
-               }
-               else
-                  break; // only going further off the screen
-            }
-         }
-         else
-            break; // only going further off the screen
-      }
+         unsigned short *pix = getRow( yPos++ ) + xPos;
+	 memcpy(pix,pixels,minWidth);
+	 pixels += w;
+      } while (--minHeight);
    }
 }
 

@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.4 2002-11-22 15:08:41 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.5 2002-11-22 21:31:43 tkisky Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.4  2002-11-22 15:08:41  ericn
+ * Revision 1.5  2002-11-22 21:31:43  tkisky
+ * -Optimize render and use it in jsImage
+ *
+ * Revision 1.4  2002/11/22 15:08:41  ericn
  * -added method render()
  *
  * Revision 1.3  2002/11/02 18:39:16  ericn
@@ -53,9 +56,14 @@ public:
    static unsigned char getGreen( unsigned short screenRGB );
    static unsigned char getBlue( unsigned short screenRGB );
 
-   void render( unsigned short x, unsigned short y,
-                unsigned short w, unsigned short h, // width and height of image
-                unsigned short const *pixels );
+   void render( int x, int y,
+                int w, int h,				 // width and height of image
+                unsigned short const *pixels,
+                int imagexPos=0,			//offset within image to start display
+                int imageyPos=0,
+                int imageDisplayWidth=0,		//portion of image to display
+                int imageDisplayHeight=0
+              );
 
 private:
    fbDevice_t( char const *name );
