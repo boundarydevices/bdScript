@@ -108,11 +108,15 @@ OBJS += \
 
 endif
 
+ifndef INSTALL_ROOT
+INSTALL_ROOT=../install/arm-linux
+endif
+
 CC=arm-linux-gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
-LIBRARYREFS=../install/arm-linux/lib/libflash.a \
-            ../install/arm-linux/lib/libmpeg2.a \
-            ../install/arm-linux/lib/libmad.a 
+LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
+            $(INSTALL_ROOT)/lib/libmpeg2.a \
+            $(INSTALL_ROOT)/lib/libmad.a 
 
 ifneq (,$(findstring arm, $(CC)))
    CC=arm-linux-gcc
@@ -121,14 +125,14 @@ ifneq (,$(findstring arm, $(CC)))
 	LD=arm-linux-ld
    STRIP=arm-linux-strip
    OBJCOPY=arm-linux-objcopy
-   LIBS=-L./ -L../install/arm-linux/lib
+   LIBS=-L./ -L$(INSTALL_ROOT)/lib
    IFLAGS= \
-          -I../linux-2.4.19/include \
-          -I../install/arm-linux/include \
-          -I../install/arm-linux/include/nspr \
-          -I../install/arm-linux/include/freetype2 \
-          -I../install/arm-linux/include/libavcodec
-   LIB = ../install/arm-linux/lib/libCurlCache.a
+          -I$(INSTALL_ROOT)/include \
+          -I$(INSTALL_ROOT)/include/mad \
+          -I$(INSTALL_ROOT)/include/nspr \
+          -I$(INSTALL_ROOT)/include/freetype2 \
+          -I$(INSTALL_ROOT)/include/libavcodec
+   LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
 #   CC=g++
    AR=ar
@@ -165,23 +169,23 @@ dirTest: Makefile dirTest.o
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl -lz
 
 curlGet: curlGet.cpp $(LIB) Makefile
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl
 
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
 urlTest: urlTest.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl -lcrypto -ldl
 
 mp3Play: mp3Play.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
 	$(STRIP) mp3Play
 
 testJS: testJS.cpp $(LIB) Makefile
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lmpeg2 -lflash -lpthread -lm -lz -lLinuxWLAN -lcrypto -lssl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lmpeg2 -lmpeg2convert -lflash -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	$(STRIP) $@
 
@@ -189,19 +193,19 @@ flashThreadMain.o : flashThread.cpp
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -DSTANDALONE=1 -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o flashThreadMain.o
 
 flashThread: flashThreadMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o flashThread flashThreadMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lmpeg2 -lflash -lpthread -lm -lz -lLinuxWLAN -lcrypto
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o flashThread flashThreadMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lmpeg2 -lflash -lpthread -lm -lz -lcrypto
 	arm-linux-nm flashThread >flashThread.map
 	arm-linux-strip flashThread
 
 madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lvo -lCurlCache -lid3tag -lmpeg2 -lflash -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag -lmpeg2 -lflash -lpthread -lm -lz
 	arm-linux-nm madDecode >madDecode.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph
 
 madTest: madTest.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 	arm-linux-nm madTest >madTest.map
 	$(STRIP) madTest
 
@@ -209,7 +213,7 @@ ftRender.o: ftObjs.h ftObjs.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o ftRender.o -O2 -D__MODULETEST__ $(IFLAGS) ftObjs.cpp
 
 ftRender: ftRender.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
@@ -217,12 +221,12 @@ ftDump.o: ftObjs.h ftObjs.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o ftDump.o -O2 -D__DUMP__ $(IFLAGS) ftObjs.cpp
 
 ftDump: ftDump.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftDump ftDump.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftDump ftDump.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm ftDump >ftDump.map
 	$(STRIP) ftDump
 
 recordTest: recordTest.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o recordTest recordTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o recordTest recordTest.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
 	arm-linux-nm recordTest >recordTest.map
 	$(STRIP) recordTest
 
@@ -270,24 +274,24 @@ ffFormat: ffFormat.cpp
 	$(STRIP) $@
 
 ffFrames: ffFrames.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread
 	$(STRIP) $@
 
 ffPlay: ffPlay.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lvo -lmpeg2 -lmad -lid3tag -lm -lz -lpthread 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) -lmpeg2 -lCurlCache -lmpeg2 -lmad -lid3tag -lm -lz -lpthread 
 	$(STRIP) $@
 
 ffTest: ffTest.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache -lmpeg2 -lvo -lmad -lm -lz -lpthread -lmpeg2 -lCurlCache -lstdc++ -lvo 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache -lmpeg2 -lmad -lm -lz -lpthread -lmpeg2 -lCurlCache -lstdc++ 
 	$(NM) --demangle $@ | sort >$@.sym
 #	$(STRIP) $@
 
 mpDemux: mpDemux.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lmpeg2
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread -lmpeg2
 	$(STRIP) $@
 
 mpeg2mp3: mpeg2mp3.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -ggdb -o mpeg2mp3 -Xlinker -Map -Xlinker mpeg2mp3.map mpeg2mp3.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lvo -lmad -lm -lz -lpthread -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -ggdb -o mpeg2mp3 -Xlinker -Map -Xlinker mpeg2mp3.map mpeg2mp3.cpp $(LIBS) -lavformat -lavcodec -lmpeg2 -lCurlCache -lmad -lm -lz -lpthread -lstdc++
 	$(NM) --demangle $@ | sort >$@.sym
 	$(STRIP) $@
 
@@ -373,12 +377,15 @@ start.o: start.c
 progFlash.o: progFlash.cpp
 	$(CC) $(HARDWARE_TYPE) -fno-rtti -c -nodefaultlibs -o $@ $<
 
-progFlash: start.o progFlash.o
-	$(LD) -o $@ start.o progFlash.o -L../install/lib/gcc-lib/arm-linux/2.95.3 -lgcc
-	$(STRIP) $@
+#
+# This will need additional setup for location of gcc static lib (for udivsi3)
+#
+#progFlash: start.o progFlash.o
+#	$(LD) -o $@ start.o progFlash.o -L../install/lib/gcc-lib/arm-linux/2.95.3 -lgcc
+#	$(STRIP) $@
+#
 
-
-all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview progFlash flashVar
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
 
 .PHONY: install-libs install-headers
 
@@ -389,13 +396,13 @@ shared-headers = ddtoul.h dirByATime.h hexDump.h  \
    ultoa.h ultodd.h urlFile.h
 
 install-headers:
-	cp -f -v $(shared-headers) ../install/arm-linux/include
+	cp -f -v $(shared-headers) $(INSTALL_ROOT)/include
 
 install-bin: all
-	$(OBJCOPY) -S -v jsExec   ../install/arm-linux/bin/jsExec
-	$(OBJCOPY) -S -v jpegview ../install/arm-linux/bin/jpegview
-	$(OBJCOPY) -S -v flashVar ../install/arm-linux/bin/flashVar
-	cp wget ../install/arm-linux/bin
+	$(OBJCOPY) -S -v jsExec   $(INSTALL_ROOT)/bin/jsExec
+	$(OBJCOPY) -S -v jpegview $(INSTALL_ROOT)/bin/jpegview
+	$(OBJCOPY) -S -v flashVar $(INSTALL_ROOT)/bin/flashVar
+	cp wget $(INSTALL_ROOT)/bin
 
 install: install-bin install-headers
 
