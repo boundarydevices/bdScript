@@ -1,5 +1,5 @@
 #ifndef __PARSEDURL_H__
-#define __PARSEDURL_H__ "$Id: parsedURL.h,v 1.1 2002-11-29 18:38:05 ericn Exp $"
+#define __PARSEDURL_H__ "$Id: parsedURL.h,v 1.2 2003-01-31 13:26:28 ericn Exp $"
 
 /*
  * parsedURL.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: parsedURL.h,v $
- * Revision 1.1  2002-11-29 18:38:05  ericn
+ * Revision 1.2  2003-01-31 13:26:28  ericn
+ * -added startsAtRoot flag
+ *
+ * Revision 1.1  2002/11/29 18:38:05  ericn
  * -Initial import
  *
  *
@@ -40,7 +43,8 @@ public:
    std::string    const &getFile( void ) const { return file_ ; }
 
    inline bool isRelative( void ) const { return 0 == protocol_.size(); }
-   
+   inline bool startsAtRoot( void ) const { return startsAtRoot_ ; }
+
    void fixup( parsedURL_t const &parent );
    void getAbsolute( std::string & ) const ;
 
@@ -50,6 +54,7 @@ private:
    unsigned short port_ ;
    stringVector_t pathParts_ ;
    std::string    file_ ;
+   bool           startsAtRoot_ ;
 };
 
 void printURL( parsedURL_t const &url );
