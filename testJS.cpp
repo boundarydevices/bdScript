@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: testJS.cpp,v $
- * Revision 1.11  2002-10-25 04:48:39  ericn
+ * Revision 1.12  2002-10-26 14:13:54  ericn
+ * -removed debug stmt
+ *
+ * Revision 1.11  2002/10/25 04:48:39  ericn
  * -limited Javascript memory to 1MB
  *
  * Revision 1.10  2002/10/25 03:07:16  ericn
@@ -198,7 +201,6 @@ int main(int argc, char **argv)
     
       if( builtins )
       {
-         printf( "initialized builtins\n" );
          if( JS_DefineFunctions( cx, glob, shell_functions) )
          {
             if( JS_DefineFunctions( cx, glob, shell_functions2) )
