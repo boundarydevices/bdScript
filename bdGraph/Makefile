@@ -3,7 +3,8 @@
 #
 OBJS = Scale.o Scale16.o SImageData16.o ScaleUpObj.o ScaleYCbCrf1.o ScaleYf1.o SImageDataRLE.o SJpeg.o \
        ScaleHortObj.o ScaleVertObj.o ScaleYCbCrf2.o ScaleYf2.o SImagePositionBottom.o SRle.o \
-       ScaleRGB.o ScaleYCbCr.o ScaleY.o SImageDataJpeg.o SImagePosition.o invDCT_JQ.o fft.o fftClean.o
+       ScaleRGB.o ScaleYCbCr.o ScaleY.o SImageDataJpeg.o SImagePosition.o invDCT_JQ.o fft.o fftClean.o \
+       ResourceView.o
 
 
 
@@ -36,7 +37,14 @@ ifneq (,$(findstring arm, $(CC)))
    LIBS=-L./ -L$(INSTALL_ROOT)lib
    IFLAGS= -I$(KERNEL_DIR)/include
    CCAS=$(ARM_CCAS)
-   CCC_FLAGS=$(CC_BFLAGS) -mcpu=strongarm -DARM
+#SOFT_FLOAT=-msoft-float
+   CCC_FLAGS =  $(CC_BFLAGS) $(SOFT_FLOAT) -Os -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
+   			-fno-common -Uarm  -pipe -mno-apcs-frame \
+            -mno-sched-prolog -mapcs-32 -D__LINUX_ARM_ARCH__=5 -march=armv4 -mshort-load-bytes \
+            -fno-exceptions -fomit-frame-pointer -DARM -D__ARM_ARCH_4__ 
+
+   CCC_CPPFLAGS		= $(CCC_FLAGS) -fno-rtti
+
 else
    CCAS = gcc
    CC=g++
@@ -54,7 +62,7 @@ CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
 	$(CCASCOMPILE) -c `test -f '$<' || echo '$(srcdir)/'`$<
 
 %.o : %.cpp Makefile
-	$(CC) $(CCC_FLAGS) $<
+	$(CC) $(CCC_CPPFLAGS) $<
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
