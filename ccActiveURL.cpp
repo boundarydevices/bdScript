@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.5  2002-12-02 15:32:25  ericn
+ * Revision 1.6  2002-12-03 02:11:05  ericn
+ * -added onComplete parameter for file handle
+ *
+ * Revision 1.5  2002/12/02 15:32:25  ericn
  * -named mutex, removed double-removeItem(), added lock back to openHandle()
  *
  * Revision 1.4  2002/11/30 16:31:40  ericn
@@ -272,7 +275,7 @@ void curlCache_t :: transferComplete
          {
             request_t *req = (request_t *)nextReq ;
             ++item->diskInfo_.useCount_ ;
-            req->callbacks_.onComplete_( req->opaque_, item->diskInfo_.data_, item->diskInfo_.length_ );
+            req->callbacks_.onComplete_( req->opaque_, item->diskInfo_.data_, item->diskInfo_.length_, (unsigned long)item );
             nextReq = req->chain_.next ;
             removeRequest( *req );
          }
