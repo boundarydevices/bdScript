@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.15  2002-11-22 21:31:43  tkisky
+ * Revision 1.16  2002-11-23 16:29:15  ericn
+ * -added alpha channel support for PNG and GIF
+ *
+ * Revision 1.15  2002/11/22 21:31:43  tkisky
  * -Optimize render and use it in jsImage
  *
  * Revision 1.14  2002/11/22 15:08:03  ericn
@@ -96,7 +99,20 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
 
          fbDevice_t &fb = getFB();
-         fb.render(xPos,yPos,width,height,pixMap);
+
+         jsval     alphaVal ;
+         JSString *sAlpha ;
+         if( JS_GetProperty( cx, obj, "alpha", &alphaVal ) 
+             &&
+             JSVAL_IS_STRING( alphaVal )
+             &&
+             ( 0 != ( sAlpha = JSVAL_TO_STRING( alphaVal ) ) ) )
+         {
+            unsigned char const *alpha = (unsigned char const *)JS_GetStringBytes( sAlpha );
+            fb.render(xPos,yPos,width,height,pixMap, alpha );
+         } // have alpha channel... use it
+         else
+            fb.render(xPos,yPos,width,height,pixMap);
 //         JS_ReportError( cx, "w:%d, h:%d", width, height );
       }
 
@@ -123,6 +139,7 @@ enum jsImage_tinyId {
    IMAGE_WIDTH, 
    IMAGE_HEIGHT, 
    IMAGE_PIXBUF,
+   IMAGE_ALPHA,
 };
 
 JSClass jsImageClass_ = {
@@ -134,10 +151,11 @@ JSClass jsImageClass_ = {
 };
 
 static JSPropertySpec imageProperties_[] = {
-  {"isLoaded",      IMAGE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"isLoaded",      IMAGE_ISLOADED,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"width",         IMAGE_WIDTH,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"height",        IMAGE_HEIGHT,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"pixBuf",        IMAGE_PIXBUF,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"alpha",         IMAGE_ALPHA,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -149,6 +167,7 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
 
    bool            worked = false ;
    void const     *pixMap = 0 ;
+   void const     *alpha = 0 ;
    unsigned short  width ;
    unsigned short  height ;
    std::string     sError ;
@@ -156,7 +175,7 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
        ||
        ( 0 == strcmp( cMime, "image/x-png" ) ) )
    {
-      worked = imagePNG( cData, size, pixMap, width, height );
+      worked = imagePNG( cData, size, pixMap, width, height, alpha );
       if( !worked )
          sError = "error converting PNG" ;
    }
@@ -168,7 +187,7 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
    }
    else if( 0 == strcmp( cMime, "image/gif" ) )
    {
-      worked = imageGIF( cData, size, pixMap, width, height );
+      worked = imageGIF( cData, size, pixMap, width, height, alpha );
       if( !worked )
          sError = "error converting PNG" ;
    }
@@ -199,6 +218,16 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                          JSPROP_ENUMERATE
                          |JSPROP_PERMANENT
                          |JSPROP_READONLY );
+      if( alpha )
+      {
+         JSString *sAlpha = JS_NewStringCopyN( req.cx_, (char const *)alpha, width*height );
+         JS_DefineProperty( req.cx_, req.lhObj_, "alpha",
+                            STRING_TO_JSVAL( sAlpha ),
+                            0, 0, 
+                            JSPROP_ENUMERATE
+                            |JSPROP_PERMANENT
+                            |JSPROP_READONLY );
+      }
       jsCurlOnComplete( req, f );
    }
    else
@@ -214,6 +243,9 @@ static void imageOnComplete( jsCurlRequest_t &req, curlFile_t const &f )
                          |JSPROP_READONLY );
       jsCurlOnError( req, f );
    }
+
+   if( alpha )
+      delete [] (unsigned char *)alpha ;
 
    if( pixMap )
       delete [] (unsigned short *)pixMap ;
