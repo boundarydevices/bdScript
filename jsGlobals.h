@@ -1,5 +1,5 @@
 #ifndef __JSGLOBALS_H__
-#define __JSGLOBALS_H__ "$Id: jsGlobals.h,v 1.1 2002-10-31 02:13:08 ericn Exp $"
+#define __JSGLOBALS_H__ "$Id: jsGlobals.h,v 1.2 2002-11-30 00:53:09 ericn Exp $"
 
 /*
  * jsGlobals.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: jsGlobals.h,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-30 00:53:09  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -23,7 +26,7 @@
  */
 
 #ifndef __SEMAPHORE_H__
-#include "semaphore.h"
+#include "semClasses.h"
 #endif
 
 #include "js/jsapi.h"

@@ -1,5 +1,5 @@
 #ifndef __MTQUEUE_H__
-#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.3 2002-11-29 16:42:21 ericn Exp $"
+#define __MTQUEUE_H__ "$Id: mtQueue.h,v 1.4 2002-11-30 00:52:59 ericn Exp $"
 
 /*
  * mtQueue.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: mtQueue.h,v $
- * Revision 1.3  2002-11-29 16:42:21  ericn
+ * Revision 1.4  2002-11-30 00:52:59  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.3  2002/11/29 16:42:21  ericn
  * -modified to allow for unproductive wakes
  *
  * Revision 1.2  2002/10/31 02:05:54  ericn
@@ -28,7 +31,7 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-#include "semaphore.h"
+#include "semClasses.h"
 #include <list>
 
 template <class T>

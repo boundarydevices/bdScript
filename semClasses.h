@@ -1,17 +1,20 @@
 #ifndef __SEMAPHORE_H__
-#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.4 2002-11-30 00:30:30 ericn Exp $"
+#define __SEMAPHORE_H__ "$Id: semClasses.h,v 1.5 2002-11-30 00:52:51 ericn Exp $"
 
 /*
- * semaphore.h
+ * semClasses.h
  *
- * This header file declares a couple of semaphore
+ * This header file declares a handful of semaphore
  * wrappers for the pthread library.
  *
  *
  * Change History : 
  *
  * $Log: semClasses.h,v $
- * Revision 1.4  2002-11-30 00:30:30  ericn
+ * Revision 1.5  2002-11-30 00:52:51  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.4  2002/11/30 00:30:30  ericn
  * -added semaphore_t class
  *
  * Revision 1.3  2002/11/17 16:08:48  ericn
@@ -28,8 +31,8 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
-#include <pthread.h>
 #include <semaphore.h>
+#include <pthread.h>
 #include <sys/time.h>
 #include <stdio.h>
 

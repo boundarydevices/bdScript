@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.2 2002-11-29 18:37:43 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.3 2002-11-30 00:53:43 ericn Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.2  2002-11-29 18:37:43  ericn
+ * Revision 1.3  2002-11-30 00:53:43  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.2  2002/11/29 18:37:43  ericn
  * -added file:// support
  *
  * Revision 1.1  2002/11/29 16:45:27  ericn
@@ -28,7 +31,7 @@
  */
 
 
-#include "semaphore.h"
+#include "semClasses.h"
 #include <string>
 #include <curl/curl.h>
 #include "dlList.h"

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.8  2002-11-24 19:08:19  ericn
+ * Revision 1.9  2002-11-30 00:53:43  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.8  2002/11/24 19:08:19  ericn
  * -fixed output queueing
  *
  * Revision 1.7  2002/11/15 14:40:10  ericn
@@ -38,7 +41,7 @@
 
 
 #include "audioQueue.h"
-#include "semaphore.h"
+#include "semClasses.h"
 #include <unistd.h>
 #include "codeQueue.h"
 #include "mad.h"

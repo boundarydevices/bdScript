@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: madTest.cpp,v $
- * Revision 1.3  2002-11-30 00:31:01  ericn
+ * Revision 1.4  2002-11-30 00:53:18  ericn
+ * -changed name to semClasses.h
+ *
+ * Revision 1.3  2002/11/30 00:31:01  ericn
  * -removed curlCache and curlThread modules
  *
  * Revision 1.2  2002/11/24 19:07:34  ericn
@@ -29,7 +32,7 @@
 
 
 #include "audioQueue.h"
-#include "semaphore.h"
+#include "semClasses.h"
 #include <unistd.h>
 #include "mad.h"
 #include <fcntl.h>
