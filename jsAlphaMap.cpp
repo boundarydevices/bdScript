@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.6  2004-05-05 03:19:50  ericn
+ * Revision 1.7  2004-05-08 15:03:42  ericn
+ * -removed debug statement
+ *
+ * Revision 1.6  2004/05/05 03:19:50  ericn
  * -added draw into image
  *
  * Revision 1.5  2004/03/17 04:56:19  ericn
@@ -93,7 +96,6 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
             unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
             if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
             {
-printf( "render into image: %u/%u\n", bmWidth, bmHeight );
                imageMem = (unsigned short *)JS_GetStringBytes( sPixMap );
                imageWidth  = bmWidth ;
                imageHeight = bmHeight ;
