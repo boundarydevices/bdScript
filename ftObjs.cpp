@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.12  2004-07-28 14:26:59  ericn
+ * Revision 1.13  2004-08-01 18:01:22  ericn
+ * -fix alignment, table-driven (mostly)
+ *
+ * Revision 1.12  2004/07/28 14:26:59  ericn
  * -range check penX
  *
  * Revision 1.11  2004/07/25 23:56:25  ericn
@@ -57,7 +60,7 @@
 #define XRES 80
 #define YRES 80
 
-// #define DEBUGPRINT 1
+//#define DEBUGPRINT 1
 #include "debugPrint.h"
 
 class freeTypeLibrary_t {
@@ -498,6 +501,22 @@ static FT_Matrix const deg270 = {
   (FT_Fixed)( 0 )
 };
 
+FT_Matrix const * const matrices[] = {
+   0,
+   &deg90,
+   &deg180,
+   &deg270
+};
+
+/*
+      double _angle = (angle/360.0) * 3.14159 * 2 ;
+      _m.xx = (FT_Fixed)( cos( _angle ) * 0x10000L );
+      _m.xy = (FT_Fixed)(-sin( _angle ) * 0x10000L );
+      _m.yx = (FT_Fixed)( sin( _angle ) * 0x10000L );
+      _m.yy = (FT_Fixed)( cos( _angle ) * 0x10000L );
+      matrix = &_m ;
+*/      
+
 bool freeTypeToBitmapBox( freeTypeFont_t &font,
                           unsigned        pointSize,
                           unsigned        alignment,
@@ -512,39 +531,25 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
                           unsigned        bmpRows,
                           unsigned        angle ) // only zero, 90, 180, 270 supported
 {
+   if( 0 != ( angle % 90 ) )
+      return false ;
    debugPrint( "rect: x:%ld, y:%ld, w:%ld, h:%ld\n", x, y, w, h );
-   debugPrint( "bbox: yMin: %ld, yMax %ld\n"
-           "      xMin: %ld, xMax %ld\n", 
-           font.face_->bbox.yMin,
-           font.face_->bbox.yMax,
-           font.face_->bbox.xMin,
-           font.face_->bbox.xMax );
+
    //
    // Scale maximal bounding box from design (grid) units to pixels
    //
    // See http://freetype.sourceforge.net/freetype2/docs/glyphs/glyphs-2.html for details
    //
    long const pixelSize = ((long)pointSize * XRES+71) / 72 ; // should separate X/Y resolution
-
-   debugPrint( "pixelSize: %ld\n", pixelSize );
-
+   
    signed long emHeight = font.face_->bbox.yMax-font.face_->bbox.yMin ;
    signed long emWidth  = font.face_->bbox.xMax-font.face_->bbox.xMin ;
 
-   signed long heightPixels = ( emHeight * pixelSize + font.face_->units_per_EM - 1 ) / font.face_->units_per_EM ;
-   signed long widthPixels  = ( emWidth * pixelSize + font.face_->units_per_EM - 1 ) / font.face_->units_per_EM ;
-   debugPrint( "bbox in pixels: %lu x %lu\n", widthPixels, heightPixels );
+   signed long bboxHeight = ( emHeight * pixelSize + font.face_->units_per_EM - 1 ) / font.face_->units_per_EM ;
    signed long ascendPixels = ( font.face_->ascender * pixelSize 
                                 + font.face_->units_per_EM - 1 ) 
                               / font.face_->units_per_EM ;
-   debugPrint( "ascender in pixels: %lu\n", ascendPixels );
-   signed long maxBearingX  = ( ( (0L-font.face_->bbox.xMin) * pixelSize )
-                                - (font.face_->units_per_EM - 1) )
-                              / font.face_->units_per_EM ;
-   debugPrint( "maxBearingX = %ld\n", maxBearingX );
-
-   FT_Vector pen ;
-
+   signed long descendPixels = bboxHeight-ascendPixels ;
    if( ( 0 != pointSize ) 
        && 
        ( font.face_->face_flags & FT_FACE_FLAG_SCALABLE ) )
@@ -552,57 +557,12 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
       FT_Set_Char_Size( font.face_, 0, pointSize*64, XRES, YRES );
    }
 
-//   FT_Matrix _m ;
-   FT_Matrix const *matrix = 0 ;
-   if( 0 == angle )
-   {
-      debugPrint( "0 degree rotation\n" );
-      matrix = 0 ;
-      pen.x = x + maxBearingX ;
-      pen.y = y + (((signed long)h-heightPixels)/2) + ascendPixels ;
-   }
-   else if( 90 == angle )
-   {
-      debugPrint( "90 degree rotation\n" );
-      matrix = &deg90 ;
-      pen.y  = y + h - maxBearingX ;
-      pen.x  = x + (((signed long)w-heightPixels)/2) + ascendPixels ;
-   }
-   else if( 180 == angle )
-   {
-      debugPrint( "180 degree rotation\n" );
-      matrix = &deg180 ;
-      pen.x  = x + w - maxBearingX ;
-      pen.y  = (signed long)y + h - (((signed long)h-heightPixels)/2) - ascendPixels ;
-   }
-   else if( 270 == angle )
-   {
-      debugPrint( "270 degree rotation\n" );
-      matrix = &deg270 ;
-      pen.y  = y + maxBearingX ;
-      pen.x = (signed long)x + w - (((signed long)w-heightPixels)/2) - ascendPixels ;
-   }
-   else
-   {
-      debugPrint( "%ld degree rotation not supported\n", angle );
-      return false ;
-/*
-      double _angle = (angle/360.0) * 3.14159 * 2 ;
-      _m.xx = (FT_Fixed)( cos( _angle ) * 0x10000L );
-      _m.xy = (FT_Fixed)(-sin( _angle ) * 0x10000L );
-      _m.yx = (FT_Fixed)( sin( _angle ) * 0x10000L );
-      _m.yy = (FT_Fixed)( cos( _angle ) * 0x10000L );
-      matrix = &_m ;
-*/      
-   }
+   unsigned const angleIdx = angle / 90 ;
+   FT_Matrix const *matrix = matrices[angleIdx];
 
-   debugPrint( "penPix: %ld/%ld\n", pen.x, pen.y );
-   long const yBase = pen.y ;
+   FT_Vector pen ;
+   pen.x = 0 ;
    pen.y = 0 ;
-   pen.x *= 64 ;
-   pen.y *= 64 ;
-
-   FT_Vector const startPen = pen ;
 
    FT_GlyphSlot slot = font.face_->glyph ;
 
@@ -612,16 +572,28 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    FT_GlyphSlot  *glyphs = (FT_GlyphSlot *)
                            obstack_alloc( &glyphStack, glyphPtrSize );
    memset( glyphs, 0, glyphPtrSize );
-   
-   signed long minY = 0x7FFFFFFF ;
-   signed long maxY = 0x80000000 ;
-   signed long minX = 0x7FFFFFFF ;
-   signed long maxX = 0x80000000 ;
 
-   /* set transformation */
+   //
+   // Need to measure the 'width', or dimension along the text flow direction
+   //
+   // In order to keep this code table-driven based on angle, 
+   // I'll define a handful of flags to use as indeces.
+   //
+   bool const isVertical = ( 0 != ( angle % 180 ) );
+   bool const textFlow = isVertical ;
+   bool const perp     = !isVertical ;
+
+   signed long textMin = 0x7FFFFFFF ;
+   signed long textMax = 0x80000000 ;
+
+   FT_Int &bmpPos  = isVertical ? slot->bitmap_top : slot->bitmap_left ;
+   FT_Int  bmpMult = isVertical ? -1 : 1 ;      // rows ascend with y
+   int    &bmpMag  = isVertical ? slot->bitmap.rows : slot->bitmap.width ;
+
    char const *sText = dataStr ;
    for( unsigned i = 0 ; i < strLen ; i++ )
    {
+      /* set transformation */
       FT_Set_Transform( font.face_, (FT_Matrix *)matrix, &pen );
 
       /* load glyph image into the slot (erase previous one) */
@@ -639,117 +611,174 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
                                                slot->bitmap.rows * slot->bitmap.pitch );
       if( ( 0 < slot->bitmap.rows ) && ( 0 < slot->bitmap.width ) )
       {
-         int nextY = yBase - slot->bitmap_top ;
-         if( nextY < minY )
-            minY = nextY ;
-         if( nextY > maxY )
-            maxY = nextY ;
-         nextY += slot->bitmap.rows ;
-         if( nextY > maxY )
-            maxY = nextY ;
-         if( nextY < minY )
-            minY = nextY ;
-         
-         int penX  = slot->bitmap_left ;  
-         if( penX < minX )
-            minX = penX ;
-         if( penX > maxX )
-            maxX = penX ;
-         penX += slot->bitmap.width ;
-         if( penX < minX )
-            minX = penX ;
-         if( penX > maxX )
-            maxX = penX ;
+         int next = bmpMult*bmpPos ;
+         if( next < textMin )
+            textMin = next ;
+         if( next > textMax )
+            textMax = next ;
+
+         next += bmpMag ;
+         if( next < textMin )
+            textMin = next ;
+         if( next > textMax )
+            textMax = next ;
       }
 
       /* increment pen position */
       pen.x += slot->advance.x;
       pen.y += slot->advance.y;
-   } // walk string, calculating width and height
+   } // walk string, calculating width and height, creating bitmaps
 
-   signed long wActual = maxX-minX ;
-   signed long hActual = maxY-minY ;
+   signed long const textActual = textMax-textMin ;
+   debugPrint( "textActual: %lu\n", textActual );
 
-   debugPrint( "x: %ld..%ld, y: %ld..%ld\n", minX, maxX, minY, maxY );
-   debugPrint( "wActual: %lu, hActual: %lu\n", wActual, hActual );
+   //
+   // Okay, here we want to determine where to 
+   // put the 'pen' before rendering into bitmap space.
+   //
+   //    Input variables are:
+   //       x, y, w, h, textActual
+   //       alignment(text direction)
+   //
+   // This is done in two steps. The first step will 
+   // adjust one based on the bounding box size in the 
+   // direction perpendicular to the text direction.
+   //
+   // The equation for this is
+   //    
+   //    pos = targetPos
+   //        + (targetDimension-bboxHeight)/2 
+   //        + mult1*ascender
+   //        + mult2*descender
+   //       
+   //
+   FT_Pos * const positions[] = {
+      &pen.x,
+      &pen.y
+   };
+   
+   unsigned * const targets[] = {
+      &x,
+      &y
+   };
 
-   signed long xOffs ;
-   signed long yOffs ;
-   if( 0 == angle )
-   {
-      if( alignment & ftRight )
-      {
-         xOffs = (signed long)w-(signed long)wActual ;
-      }
-      else if( alignment & ftCenterHorizontal )
-      {
-         xOffs = ((signed long)w-(signed long)wActual)/2 ;
-         debugPrint( "xOffs = %ld\n", xOffs );
-      }
-      else
-      {
-         xOffs = 0 ;
-      }
-      xOffs -= maxBearingX ;
-      yOffs = 0 ;
-   }
-   else if( 90 == angle )
-   {
-      if( alignment & ftRight )
-      {
-         yOffs = (signed long)hActual-(signed long)h ;
-      }
-      else if( alignment & ftCenterHorizontal )
-      {
-         yOffs = ((signed long)hActual-(signed long)h)/2 ;
-      }
-      else
-      {
-         yOffs = 0 ;
-      }
-      yOffs += maxBearingX ;
-      xOffs = 0 ;
-   }
-   else if( 180 == angle )
-   {
-      if( alignment & ftRight )
-      {
-         xOffs = (signed long)wActual-(signed long)w ;
-      }
-      else if( alignment & ftCenterHorizontal )
-      {
-         xOffs = ((signed long)wActual-(signed long)w)/2 ;
-      }
-      else
-      {
-         xOffs = 0 ;
-      }
-      xOffs += maxBearingX ;
-      yOffs = 0 ;
-   }
-   else if( 270 == angle )
-   {
-      if( alignment & ftRight )
-      {
-         yOffs = (signed long)h-(signed long)hActual ;
-      }
-      else if( alignment & ftCenterHorizontal )
-      {
-         yOffs = ((signed long)h-(signed long)hActual)/2 ;
-      }
-      else
-      {
-         yOffs = 0 ;
-      }
-      yOffs -= maxBearingX ;
-      xOffs = 0 ;
-   }
+   int * const tdimensions[] = { // indexed by textFlow
+      (int *)&w,
+      (int *)&h
+   };
 
-debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
+   int const ascendMult[] = { // indexed by angle
+      1,
+      1,
+      0,
+      0
+   };
+   int const am = ascendMult[angleIdx];
+
+   int const descendMult[] = { // indexed by angle
+      0,
+      0,
+      1,
+      1
+   };
+   int const dm = descendMult[angleIdx];
+
+   debugPrint( "ascender: %ld\n"
+               "descender: %ld\n", 
+               ascendPixels,
+               descendPixels );
+
+   // since the target box is always right and down, 
+   // the offset is always added to the target dimension
+   FT_Pos pos = (signed long)*targets[perp] 
+                + (((signed long)*tdimensions[perp])-bboxHeight)/2
+                + am*ascendPixels 
+                + dm*descendPixels ;
+   
+   // done. store it
+   *positions[perp] = pos ;
+
+   //
+   // That was pretty easy. The next step is a bit harder because
+   // we have to take the alignment into account.
+   //
+   // The general equation is:
+   //
+   //    pos = targetPos 
+   //        + mult1*boxDimension
+   //        + mult2*(boxDimension-textDimension)/factor 
+   //        - startOffs ;
+   //
+   // mult1 is a function of the input angle, and is either 1 or zero
+   // to determine whether the left-aligned pen should be at the start
+   // or end of the box. Since the input x/y defines the lowest value,
+   // this is always an addition.
+   // 
+   // mult2 is a function of the alignment, and is used to determine 
+   // whether we should add or subtract the difference between the 
+   // box size and the actual text size. 
+   //
+   // factor is either 1 or 2 depending on whether we're centered or not, and
+   //
+   // startOffs is either textMin or textMax depending on the angle
+   //
+   // Ultimately, we also need to know three things:
+   //    Do we need to add the width or height to the target position?
+   //    Do we need adjustment at all?
+   //       (Left-aligned zero degrees and Right-aligned 270 degrees don't need adjustments)
+   //    Do we add or subtract from the target (Left/right, Up/Down)?
+   //    Do we scale by half? (are we centering?)
+   //
+   pos = (signed long)*targets[textFlow];
+
+   bool const boxMultipliers[] = {
+      0,                      //   0 degrees, increasing X
+      1,                      //  90 degrees, decreasing Y
+      1,                      // 180 degrees, decreasing X
+      0                       // 270 degrees, increasing Y
+   };
+
+   signed long const mult1 = boxMultipliers[angleIdx];
+
+   pos += mult1* (*tdimensions[textFlow]);
+
+   signed long const diffMultipliers[] = {
+//  left  center  right
+      0,     1,     1,        //   0 degrees, increasing X
+      0,    -1,    -1,        //  90 degrees, decreasing Y
+      0,    -1,    -1,        // 180 degrees, decreasing X
+      0,     1,     1,        // 270 degrees, increasing Y
+   };
+
+   signed long const mult2 = diffMultipliers[3*angleIdx+(alignment&3)];
+
+   bool const isCentered = ( 0 != ( alignment & ftCenterHorizontal ) );
+   
+   signed long const factors[] = { // indexed by isCentered
+      1L,
+      2L
+   };
+
+   signed long const textDim = *tdimensions[textFlow];
+   pos += mult2*(textDim-textActual)/factors[isCentered];
+
+   signed long *startOffsets[] = { // indexed by angleIdx
+      &textMin,        //   0 degrees, increasing X 
+      &textMax,        //  90 degrees, decreasing Y 
+      &textMax,        // 180 degrees, decreasing X 
+      &textMin         // 270 degrees, increasing Y 
+   };
+   pos -= *startOffsets[angleIdx];
+   
+   // done. store it
+   *positions[textFlow] = pos ;
+
+debugPrint( "pen.x: %ld, pen.y: %ld\n", pen.x, pen.y );
 
    sText = dataStr ;
    unsigned const bottomY = y + h ;
    unsigned const right = x + w ;
+   bool clipped = false ;
    for( unsigned i = 0 ; i < strLen ; i++ )
    {
       char const c = *sText++ ;
@@ -758,9 +787,9 @@ debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
       {
          if( ( 0 < slot->bitmap.rows ) && ( 0 < slot->bitmap.width ) )
          {
-            long nextY = yBase - slot->bitmap_top + yOffs ;
-            long penX  = slot->bitmap_left + xOffs ; 
-   debugPrint( "char %c, x:%ld, y:%ld, top %ld, left %ld\n", c, penX, nextY, slot->bitmap_top, slot->bitmap_left );
+            long nextY = pen.y - slot->bitmap_top ;
+            long penX  = slot->bitmap_left + pen.x ; 
+debugPrint( "char %c, x:%ld, y:%ld, top %ld, left %ld\n", c, penX, nextY, slot->bitmap_top, slot->bitmap_left );
             // convert to pixel positions
             // convert Y in direction as well
             unsigned char const *nextIn = slot->bitmap.buffer ;
@@ -768,15 +797,19 @@ debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
             unsigned inOffs = 0 ;
             if( penX < x )
             {
+debugPrint( "lclip: %u x %u, %u\n", penX, inPix, right );
                long diff = (long)x - penX ;
                penX += diff ;
                nextIn += (diff/8);
                inOffs  = diff&7 ;
                inPix  -= diff ;
+clipped = true ;
             }
             if( penX + inPix > right )
             {
+debugPrint( "rclip: x:%u, w:%u, r:%u, left:%ld\n", penX, inPix, right, slot->bitmap_left );
                inPix -= penX + inPix - right - 1 ;
+clipped = true ;
             }
             unsigned char *nextOut = bmp + ( nextY * bmpStride );
             for( unsigned row = 0 ; ( row < slot->bitmap.rows ) ; row++, nextY++ )
@@ -788,6 +821,11 @@ debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
                   if( 0 <= penX )
                      bitmap_t::bltFrom( nextOut, penX, nextIn, inPix, inOffs );
                } // row is in range
+               else
+               {
+debugPrint( "vclip: [%u,%u), %u, %ld, %ld\n", y, bottomY, nextY, slot->bitmap_top, slot->bitmap.rows );
+clipped = true ;
+               }
                nextIn += slot->bitmap.pitch ;
                nextOut += bmpStride ;
             }
@@ -796,6 +834,23 @@ debugPrint( "xOffs: %ld, yOffs: %ld\n", xOffs, yOffs );
       else
          debugPrint( "No glyph for char %c\n", c );
    } // walk string again, placing bits
+
+   if( clipped )
+   {
+      for( unsigned i = 0 ; i < strLen ; i++ )
+      {
+         slot = glyphs[i];
+         long nextY = slot->bitmap_top + pen.y ;
+         long penX  = slot->bitmap_left + pen.x ; 
+         debugPrint( "%u(%c) -> x:%ld, y:%ld, "
+                 "pen.y:%ld, top %ld, left %ld, %ld rows\n",
+                 i, dataStr[i], penX, nextY, 
+                 pen.y, slot->bitmap_top, slot->bitmap_left, slot->bitmap.rows );
+      }
+      debugPrint( "textActual:%u, w: %u, h:%u\n", 
+                  textActual, w, h );
+      debugPrint( "textMin: %ld, textMax: %ld\n", textMin, textMax );
+   }
 
    obstack_free( &glyphStack, 0 );
 
