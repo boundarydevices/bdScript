@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: relativeURL.cpp,v $
- * Revision 1.1  2002-10-25 02:55:01  ericn
+ * Revision 1.2  2002-11-11 04:29:00  ericn
+ * -moved headers
+ *
+ * Revision 1.1  2002/10/25 02:55:01  ericn
  * -initial import
  *
  *
@@ -19,7 +22,7 @@
 #include "relativeURL.h"
 #include <stdio.h>
 #include <vector>
-#include "../boundary1/ultoa.h"
+#include "ultoa.h"
 #include <ctype.h>
 
 typedef std::vector<std::string> stringVector_t ;

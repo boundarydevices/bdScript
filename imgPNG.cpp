@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgPNG.cpp,v $
- * Revision 1.1  2002-10-31 02:13:08  ericn
+ * Revision 1.2  2002-11-11 04:29:14  ericn
+ * -moved headers
+ *
+ * Revision 1.1  2002/10/31 02:13:08  ericn
  * -Initial import
  *
  *
@@ -17,7 +20,7 @@
 
 
 #include "imgPNG.h"
-#include <libpng12/png.h>
+#include <png.h>
 #include "fbDev.h"
 #include <string.h>
 

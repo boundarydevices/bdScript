@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.11  2002-11-08 13:58:23  ericn
+ * Revision 1.12  2002-11-11 04:28:55  ericn
+ * -moved headers
+ *
+ * Revision 1.11  2002/11/08 13:58:23  ericn
  * -modified to handle negative screen positions
  *
  * Revision 1.10  2002/11/05 05:41:19  ericn
@@ -48,9 +51,8 @@
 
 
 #include "jsImage.h"
-#include <libpng12/png.h>
 #include "fbDev.h"
-#include "../boundary1/hexDump.h"
+#include "hexDump.h"
 #include "js/jscntxt.h"
 #include "imgGIF.h"
 #include "imgPNG.h"

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlThread.cpp,v $
- * Revision 1.3  2002-11-03 17:55:44  ericn
+ * Revision 1.4  2002-11-11 04:29:06  ericn
+ * -moved headers
+ *
+ * Revision 1.3  2002/11/03 17:55:44  ericn
  * -modified to support synchronous gets and posts
  *
  * Revision 1.2  2002/11/02 04:12:00  ericn
@@ -26,7 +29,7 @@
 #include "js/jsapi.h"
 #include "mtQueue.h"
 #include "codeQueue.h"
-#include "../boundary1/ultoa.h"
+#include "ultoa.h"
 #include "jsGlobals.h"
 
 static mutex_t     syncMutex_ ;
