@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.12  2002-12-26 19:41:14  ericn
+ * Revision 1.13  2003-01-05 01:56:57  ericn
+ * -moved AddRoot calls
+ *
+ * Revision 1.12  2002/12/26 19:41:14  ericn
  * -removed debug statements
  *
  * Revision 1.11  2002/12/26 19:26:59  ericn
@@ -67,7 +70,7 @@ public:
         cx_( cx ),
         scope_( scope ),
         curBox_( 0 ){}
-   virtual ~jsTouchScreenThread_t( void ){}
+   virtual ~jsTouchScreenThread_t( void ){ printf( "closing ts thread\n" ); close(); }
 
    // these are called directly by the touch screen thread
    virtual void onTouch( unsigned        x, 
@@ -167,6 +170,7 @@ static jsTouchScreenThread_t *thread_ = 0 ;
 
 static void doOnMove( void *data )
 {
+   assert( data == (void *)thread_ );
    int const x = thread_->lastX_ ;
    int const y = thread_->lastY_ ;
    
@@ -253,6 +257,7 @@ static void doOnTouch( void *data )
 
 static void doOnRelease( void *data )
 {
+   assert( data == (void *)thread_ );
    if( 0 != thread_->curBox_ )
    {
       thread_->curBox_->onRelease_( *thread_->curBox_, thread_->lastX_, thread_->lastY_ );
@@ -391,13 +396,14 @@ bool initJSTouch( touchScreenThread_t *&thread,
    {
       if( JS_DefineFunctions( cx, glob, touch_functions ) )
       {
+         JS_AddRoot( cx, &onTouchCode_ );
+         JS_AddRoot( cx, &onMoveCode_ );
+         JS_AddRoot( cx, &onReleaseCode_ );
+
          thread_ = new jsTouchScreenThread_t( cx, glob );
          if( thread_->begin() )
          {
             thread = thread_ ;
-            JS_AddRoot( cx, &onTouchCode_ );
-            JS_AddRoot( cx, &onMoveCode_ );
-            JS_AddRoot( cx, &onReleaseCode_ );
 
             return true ;
          }
