@@ -17,6 +17,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/poll.h>
 #include "codeQueue.h"
 #include "jsGlobals.h"
 #include "linux/pxa-gpio.h"
@@ -26,9 +27,9 @@ static int fdRed =0;
 static int fdGreen =0;
 static int fdTurnstile =0;
 static int fdDoorlock =0;
-static jsval sFeedbackHandlerLow = JSVAL_VOID;
-static jsval sFeedbackHandlerHigh = JSVAL_VOID;
-static JSObject *feedbackHandlerScope;
+static jsval sFeedbackHandlerLow[2] = { JSVAL_VOID, JSVAL_VOID };
+static jsval sFeedbackHandlerHigh[2] = { JSVAL_VOID, JSVAL_VOID };
+static JSObject *feedbackHandlerScope = 0 ;
 static pthread_t feedbackThreadHandle = 0 ;
 
 static JSBool jsSetGpio( int &fd, char* device,JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -52,7 +53,6 @@ static JSBool jsSetGpio( int &fd, char* device,JSContext *cx, JSObject *obj, uin
       }
       if ( (fd > 0) && (write( fd, &ledState, 1) >= 0) )
       {
-//         printf( "%s = %i\n", device,state);
          *rval = JSVAL_TRUE;
       }
       else
@@ -84,68 +84,115 @@ static JSBool jsSetTurnstile( JSContext *cx, JSObject *obj, uintN argc, jsval *a
    return jsSetGpio(fdTurnstile,"Turnstile",cx,obj,argc,argv,rval);
 }
 
+static char const * const devNames[2] = {
+   "/dev/Feedback",
+   "/dev/Feedback2"
+};
 
 static void* FeedbackThread( void *arg )
 {
-printf( "FeedbackThread %p (id %x)\n", &arg, pthread_self() );   
-   int fd = open( "/dev/Feedback", O_RDONLY);
-   if (fd<0) fprintf( stderr, "Error %d:%s opening /dev/feedback\n",fd,strerror(errno));
-   else
+   pollfd pfds[2];
+   for( int i = 0 ; i < 2 ; i++ )
    {
-      char ch;
-      int  numRead;
-      while ( (numRead = read( fd, &ch, 1)) >= 0)
+      char const *devName =  devNames[i];
+      pfds[i].events = POLLIN ;
+      pfds[i].fd = open( devName, O_RDONLY);
+      if( pfds[i].fd < 0)
       {
-         if ( numRead > 0)
+         fprintf( stderr, "Error %s opening %s\n",strerror(errno), devName);
+         while( 0 < i-- )
+            close( pfds[i].fd );
+         return 0 ;
+      }
+   }
+   
+   while( 1 )
+   {
+      int pResult = poll( pfds, 2, -1 );
+      if( 0 < pResult )
+      {
+         for( int i = 0 ; i < 2 ; i++ )
          {
-//            printf( "feedback %02x", (unsigned char)ch );
-            if (feedbackHandlerScope != 0)
+            if( POLLIN & pfds[i].revents )
             {
-               if (ch&1)
-	       {
-	          if (sFeedbackHandlerHigh != JSVAL_VOID)
-		    queueSource( feedbackHandlerScope, sFeedbackHandlerHigh, "onFeedbackHigh" );
+               char ch;
+               int numRead ;
+               if( (numRead = read( pfds[i].fd, &ch, 1)) >= 0)
+               {
+                  if ( numRead > 0)
+                  {
+                     if (feedbackHandlerScope != 0)
+                     {
+                        if (ch&1)
+         	        {
+                           if (sFeedbackHandlerHigh[i] != JSVAL_VOID)
+         		      queueSource( feedbackHandlerScope, sFeedbackHandlerHigh[i], "onFeedbackHigh" );
+                        }
+                        else
+                        {
+         	           if (sFeedbackHandlerLow[i] != JSVAL_VOID)
+         		      queueSource( feedbackHandlerScope, sFeedbackHandlerLow[i], "onFeedbackLow" );
+                        }
+                     }
+                  }
+                  else
+                  {
+                     fprintf( stderr, "feedback null read\n" );
+                     break;
+                  }
                }
                else
-	       {
-	          if (sFeedbackHandlerLow != JSVAL_VOID)
-		    queueSource( feedbackHandlerScope, sFeedbackHandlerLow, "onFeedbackLow" );
-               }
+                  break;
             }
-         }
-         else
-         {
-            fprintf( stderr, "feedback null read\n" );
-            break;
-         }
-         
+         } // for each device
       }
-      close(fd);
+      else
+      {
+         fprintf( stderr, "feedback pollerr %m\n" );
+         break;
+      }
    }
+   
+   for( int i = 0 ; i < 2 ; i++ )
+      close( pfds[i].fd );
+   
    return 0 ;
 }
 
-static JSBool jsOnFeedback(jsval* psFeed, JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+static JSBool jsOnFeedback(int which,jsval psFeed[], JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
 
-   if ( ( argc == 1) && JSVAL_IS_STRING( argv[0] ) )
+   if ( ( argc == 2) 
+        && 
+        JSVAL_IS_INT( argv[0] )
+        && 
+        JSVAL_IS_STRING( argv[1] ) )
    {
-      *psFeed = argv[0];
-      *rval = JSVAL_TRUE ;
-      if (feedbackThreadHandle==0)
-         if (pthread_create( &feedbackThreadHandle, 0, FeedbackThread, 0 )!=0)
-            feedbackThreadHandle = 0;
+      int const feedbackId = JSVAL_TO_INT( argv[0] );
+      if( ( 0 <= feedbackId ) && ( 2 > feedbackId ) )
+      {
+         psFeed[feedbackId] = argv[1];
+         *rval = JSVAL_TRUE ;
+         if (feedbackThreadHandle==0)
+            if (pthread_create( &feedbackThreadHandle, 0, FeedbackThread, 0 )!=0)
+               feedbackThreadHandle = 0;
+      }
+      else
+         JS_ReportError( cx, "invalid feedback id, use 0 or 1" );
    }
+   else
+      JS_ReportError( cx, "usage: onFeedback[Low|High]( [0|1], code )" );
+
    return JS_TRUE ;
 }
 static JSBool jsOnFeedbackLow( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   return jsOnFeedback(&sFeedbackHandlerLow,cx,obj,argc,argv,rval );
+   return jsOnFeedback(0,sFeedbackHandlerLow,cx,obj,argc,argv,rval );
 }
 static JSBool jsOnFeedbackHigh( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   return jsOnFeedback(&sFeedbackHandlerHigh,cx,obj,argc,argv,rval );
+   return jsOnFeedback(0,sFeedbackHandlerHigh,cx,obj,argc,argv,rval );
 }
 static JSBool jsGetDebounce( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, int ioctlVal )
 {
@@ -229,8 +276,11 @@ static JSFunctionSpec gpio_functions[] = {
 
 bool initJSGpio( JSContext *cx, JSObject *glob )
 {
-   JS_AddRoot( cx, &sFeedbackHandlerLow);
-   JS_AddRoot( cx, &sFeedbackHandlerHigh);
+   for( int i = 0 ; i < 2 ; i++ )
+   {
+      JS_AddRoot( cx, &sFeedbackHandlerLow[i]);
+      JS_AddRoot( cx, &sFeedbackHandlerHigh[i]);
+   }
    feedbackHandlerScope = glob ;
    return JS_DefineFunctions( cx, glob, gpio_functions);
 }
@@ -249,6 +299,9 @@ void shutdownGpio()
       pthread_join( feedbackThreadHandle, &exitStat );
    }
 
-   JS_RemoveRoot( execContext_, &sFeedbackHandlerLow);
-   JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh);
+   for( int i = 0 ; i < 2 ; i++ )
+   {
+      JS_RemoveRoot( execContext_, &sFeedbackHandlerLow[i]);
+      JS_RemoveRoot( execContext_, &sFeedbackHandlerHigh[i]);
+   }
 }
