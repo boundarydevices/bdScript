@@ -2,10 +2,13 @@
 # Makefile for curlCache library and utility programs
 #
 
-#HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
-HARDWARE_TYPE=-DCONFIG_BD2003
-
 -include config.mk
+
+ifeq (BD2003,$(KERNEL_BOARDTYPE))
+   HARDWARE_TYPE=-DCONFIG_BD2003
+else
+   HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
+endif
 
 MPEG2LIBS = -lmpeg2 -lvo
 
@@ -29,7 +32,6 @@ OBJS = \
        dither.o \
        dumpCPP.o \
        fbDev.o \
-       flashThread.o \
        ftObjs.o \
        gpioPoll.o \
        hexDump.o \
@@ -92,7 +94,7 @@ OBJS = \
        flashVar.o \
        jsFlashVar.o \
 
-ifneq ($(HARDWARE_TYPE),-DCONFIG_PXA_GAME_CONTROLLER)
+ifeq (BD2003,$(KERNEL_BOARDTYPE))
 
 OBJS += \
        audioQueue.o \
@@ -116,6 +118,10 @@ OBJS += \
        zOrder.o \
 
 endif
+
+ifeq (y,$(CONFIG_LIBFLASH))       
+   OBJS += flashThread.o
+endif       
 
 ifndef INSTALL_ROOT
 INSTALL_ROOT=../install/arm-linux
