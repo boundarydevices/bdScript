@@ -1,5 +1,5 @@
 #ifndef __CHILDPROCESS_H__
-#define __CHILDPROCESS_H__ "$Id: childProcess.h,v 1.2 2003-08-24 15:47:43 ericn Exp $"
+#define __CHILDPROCESS_H__ "$Id: childProcess.h,v 1.3 2003-08-24 17:30:48 ericn Exp $"
 
 /*
  * childProcess.h
@@ -22,7 +22,10 @@
  * Change History : 
  *
  * $Log: childProcess.h,v $
- * Revision 1.2  2003-08-24 15:47:43  ericn
+ * Revision 1.3  2003-08-24 17:30:48  ericn
+ * -added virtual destructor
+ *
+ * Revision 1.2  2003/08/24 15:47:43  ericn
  * -exposed child process map
  *
  * Revision 1.1  2002/10/25 02:55:01  ericn
@@ -43,7 +46,7 @@ void stopChildMonitor();  // stop trapping SIGCHLD signal
 struct childProcess_t {
    childProcess_t( void )
       : pid_( -1 ){}
-   ~childProcess_t( void ){}
+   virtual ~childProcess_t( void ){}
 
    bool run( char const *path,
              char       *argv[],
