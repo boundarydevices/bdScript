@@ -3,3 +3,4 @@ build ftRender tsThread madHeaders madTest imgJPEG imgPNG ccDiskCache ccWorker c
 parsedURL recordTest ftDump
 *.lst *.out bc
 ffPlay ffFormat ffFrames testffFormat dlopen
+testquickcam
