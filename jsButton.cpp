@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.20  2003-02-10 01:17:46  ericn
+ * Revision 1.21  2003-08-23 21:36:37  ericn
+ * -added draw, allow function for callbacks
+ *
+ * Revision 1.20  2003/02/10 01:17:46  ericn
  * -modified to allow truncation of text
  *
  * Revision 1.19  2003/02/07 04:41:35  ericn
@@ -206,9 +209,15 @@ static void doit( box_t         &box,
    defHandler( box, x, y );
    
    jsval jsv ;
-   if( JS_GetProperty( button->cx_, button->jsObj_, method, &jsv ) && JSVAL_IS_STRING( jsv ) )
+   if( JS_GetProperty( button->cx_, button->jsObj_, method, &jsv ) )
    {
-      executeCode( button->jsObj_, jsv, method );
+      JSType const type = JS_TypeOfValue( button->cx_, jsv );
+      if( ( JSTYPE_STRING == type )
+          ||
+          ( JSTYPE_FUNCTION == type ) )
+      {
+         executeCode( button->jsObj_, jsv, method );
+      }
    }
 }
 
@@ -448,14 +457,38 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   }
                }
 
-               if( JS_GetProperty( cx, rhObj, "onTouch", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                  JS_DefineProperty( cx, thisObj, "onTouch", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               if( JS_GetProperty( cx, rhObj, "onMove", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                  JS_DefineProperty( cx, thisObj, "onMove", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               if( JS_GetProperty( cx, rhObj, "onMoveOff", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                  JS_DefineProperty( cx, thisObj, "onMoveOff", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               if( JS_GetProperty( cx, rhObj, "onRelease", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                  JS_DefineProperty( cx, thisObj, "onRelease", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+               if( JS_GetProperty( cx, rhObj, "onTouch", &jsv ) )
+               {
+                  JSType type = JS_TypeOfValue( cx, jsv );
+                  if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
+                     JS_DefineProperty( cx, thisObj, "onTouch", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  else if( JSTYPE_VOID != type )
+                     JS_ReportError( cx, "Invalid onTouch handler\n" );
+               }
+               if( JS_GetProperty( cx, rhObj, "onMove", &jsv ) )
+               {
+                  JSType type = JS_TypeOfValue( cx, jsv );
+                  if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
+                     JS_DefineProperty( cx, thisObj, "onMove", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  else if( JSTYPE_VOID != type )
+                     JS_ReportError( cx, "Invalid onMove handler" );
+               }
+               if( JS_GetProperty( cx, rhObj, "onMoveOff", &jsv ) )
+               {
+                  JSType type = JS_TypeOfValue( cx, jsv );
+                  if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
+                     JS_DefineProperty( cx, thisObj, "onMoveOff", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  else if( JSTYPE_VOID != type )
+                     JS_ReportError( cx, "Invalid onMoveOff handler" );
+               }
+               if( JS_GetProperty( cx, rhObj, "onRelease", &jsv ) )
+               {
+                  JSType type = JS_TypeOfValue( cx, jsv );
+                  if( ( JSTYPE_STRING == type ) ||  ( JSTYPE_FUNCTION == type ) )
+                     JS_DefineProperty( cx, thisObj, "onRelease", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  else if( JSTYPE_VOID != type )
+                     JS_ReportError( cx, "Invalid onRelease handler" );
+               }
 
                JS_SetPrivate( cx, thisObj, buttonData );
 
@@ -634,8 +667,27 @@ jsButtonChangeText( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
 
 }
 
+static JSBool
+jsButtonDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   buttonData_t *const button = (buttonData_t *)JS_GetInstancePrivate( cx, obj, &jsButtonClass_, NULL );
+   if( button )
+   {
+      box_t &box = *button->box_ ;
+   
+      if( 0 != button->img_ )
+         display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
+   }
+   else
+      JS_ReportError( cx, "Invalid button data" );
+   
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec buttonMethods_[] = {
-    {"changeText",         jsButtonChangeText,           0 },
+    {"changeText", jsButtonChangeText, 0 },
+    {"draw",       jsButtonDraw, 0 },
     {0}
 };
 
