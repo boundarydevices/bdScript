@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.2  2002-11-29 16:42:55  ericn
+ * Revision 1.3  2002-11-30 05:24:32  ericn
+ * -removed debug stuff
+ *
+ * Revision 1.2  2002/11/29 16:42:55  ericn
  * -changed function typedefs
  *
  * Revision 1.1  2002/11/27 18:35:41  ericn
@@ -228,19 +231,14 @@ void shutdownCurlWorkers(void)
 
    for( int i = 0 ; i < NUM_READERS ; i++ )
    {
-      printf( "waiting for thread %lu\n", readers_[i] );
       void *exitStat ;
       int result ;
       if( 0 == ( result = pthread_join( readers_[i], &exitStat ) ) )
       {
-         printf( "done with thread %lu\n", readers_[i] );
       }
       else
          fprintf( stderr, "Error %d(%m) waiting for curlReader thread\n", result );
    }
-
-   printf( "curl threads stopped\n" );
-
 }
 
 
