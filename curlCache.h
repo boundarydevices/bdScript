@@ -1,5 +1,5 @@
 #ifndef __CURLCACHE_H__
-#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.2 2002-10-06 14:52:02 ericn Exp $"
+#define __CURLCACHE_H__ "$Id: curlCache.h,v 1.3 2002-10-09 01:10:03 ericn Exp $"
 
 /*
  * curlCache.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: curlCache.h,v $
- * Revision 1.2  2002-10-06 14:52:02  ericn
+ * Revision 1.3  2002-10-09 01:10:03  ericn
+ * -added post support
+ *
+ * Revision 1.2  2002/10/06 14:52:02  ericn
  * -made getCachedName() public
  *
  * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
@@ -26,6 +29,7 @@
 #include <stdio.h>
 #include <curl/curl.h>
 #include <string>
+#include <vector>
 
 class curlFile_t {
 public:
@@ -77,14 +81,69 @@ private:
 };
 
 
+
+class curlRequest_t {
+public:
+   curlRequest_t( char const url[] ); // must stay around 'til destructor
+   ~curlRequest_t( void );
+
+   struct fileValue_t {
+      char const   *path_ ;
+      void const   *content_ ;
+      unsigned long length_ ;
+   };
+
+   struct param_t {
+      bool        isFile_ ;
+      char const *name_ ;
+      union {
+         char const *stringValue_ ;
+         fileValue_t fileValue_ ;
+      } value_ ;
+   };
+
+   //
+   // parameters to these routines must stay around until completion
+   // of curlCache_t::get(request) or until destructor of curlRequest_t
+   //
+   void addVariable( char const *name,
+                     char const *value );
+
+   void addFile( char const   *name,
+                 char const   *path,
+                 void const   *content,
+                 unsigned long length );
+
+   bool hasFile( void ) const { return hasFile_ ; }
+
+   char const *getURL( void ) const { return url_ ; }
+
+private:
+   friend class curlCache_t ;
+
+   char const             *url_ ;
+   bool                    hasFile_ ;
+   std::vector<param_t>    parameters_ ;
+};
+
+
+
 class curlCache_t {
 public:
    //
-   // returns open curlFile_t if found in cache or retrieved from server
+   // Use this routine for simple get()'s
+   // 
+   // To build up a request with multiple parameters, use
+   // curlRequest_t
    //
    curlFile_t get( char const url[] );
-
    std::string getCachedName( char const url[] );
+
+   //
+   // use this routine to build up the parts before a post request
+   //
+   curlFile_t post( curlRequest_t const & );
+   std::string getCachedName( curlRequest_t const & );
 
 private:
    curlCache_t( curlCache_t const & ); // no copies
@@ -97,25 +156,42 @@ private:
    void makeSpace( unsigned numFiles, unsigned long bytes );
 
    //
-   // use this function to start a transfer
+   // use this function to start a get transfer
    //
-   bool startTransfer( char const targetURL[],
-                       CURL     *&cHandle,
-                       int       &fd );
+   bool startTransfer( std::string const &cachedName,
+                       char const        *targetURL,
+                       CURL              *&cHandle,
+                       int               &fd );
+
+   //
+   // Use this function to start a post transfer.
+   // If this routine returns true, the caller must clean up the
+   // output variables:
+   //
+   //    close() the fd
+   //    curl_easy_cleanup() the cHandle
+   //    curl_formfree() the postHead
+   //    curl_slist_free_all() the headerlist
+   //
+   bool startPost( std::string const   &cachedName,   // input
+                   curlRequest_t const &req,          // input
+                   CURL               *&cHandle,      // output
+                   int                 &fd,           // output
+                   struct curl_slist  *&headerlist,   // output 
+                   struct HttpPost    *&postHead );   // output
 
    //
    // use this function to complete a transfer after curl_easy_perform()
    //
-   bool store( char const targetURL[],
-               CURL      *curl,   // handle to connection
+   bool store( CURL      *curl,   // handle to connection
                int        fd );
 
    //
    // use this function to discard a transfer
    //
-   void discard( char const targetURL[],
-                 CURL      *curl,
-                 int        fd );
+   void discard( std::string const &cacheName,
+                 CURL              *curl,
+                 int                fd );
 
    char const * const   dirName_ ;
    unsigned long const  maxSize_ ;

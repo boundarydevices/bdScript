@@ -8,8 +8,11 @@
  * Change History : 
  *
  * $Log: curlCache.cpp,v $
- * Revision 1.1  2002-09-28 16:50:46  ericn
- * Initial revision
+ * Revision 1.2  2002-10-09 01:10:07  ericn
+ * -added post support
+ *
+ * Revision 1.1.1.1  2002/09/28 16:50:46  ericn
+ * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2002
@@ -25,6 +28,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "dirByATime.h"
+#include <zlib.h>
 
 bool findEnd( void const   *mem,            // input : mapped file
               unsigned long fileSize,       // input : size of mapped memory
@@ -173,7 +177,7 @@ curlFile_t :: curlFile_t( curlFile_t const &rhs )
          {
             fileSize_ = rhs.fileSize_ ;
             size_     = rhs.size_ ;
-            data_     = mem ;
+            data_     = ((char const *)mem ) + sizeof( curlFile_t::header_t );
             httpCode_ = rhs.httpCode_ ;
             fileTime_ = rhs.fileTime_ ;
             return ;
@@ -200,6 +204,7 @@ curlFile_t :: ~curlFile_t( void )
 curlFile_t curlCache_t :: get( char const url[] )
 {
    std::string const cacheName( getCachedName( url ) );
+
    struct stat st ;
    if( 0 == stat( cacheName.c_str(), &st ) )
    {
@@ -210,19 +215,19 @@ curlFile_t curlCache_t :: get( char const url[] )
 
       CURL *curl ;
       int   fd ;
-      if( startTransfer( url, curl, fd ) )
+      if( startTransfer( cacheName, url, curl, fd ) )
       {
          CURLcode result = curl_easy_perform( curl );
          if( 0 == result )
          {
-            if( store( url, curl, fd ) )
+            if( store( curl, fd ) )
             {
             }
             else
                unlink( cacheName.c_str() );
          }
          else
-            discard( url, curl, fd );
+            discard( cacheName, curl, fd );
       }
 
    } // file not found, retrieve it
@@ -230,6 +235,82 @@ curlFile_t curlCache_t :: get( char const url[] )
    return curlFile_t( cacheName.c_str() );
 }
 
+
+curlFile_t curlCache_t :: post( curlRequest_t const &req )
+{
+   std::string const cacheName( getCachedName( req ) );
+
+   struct stat st ;
+   if( 0 == stat( cacheName.c_str(), &st ) )
+   {
+   } // file in cache... return it
+   else
+   {
+      makeSpace( 1, 1<<20 ); // 1MB
+
+      CURL *curl ;
+      int   fd ;
+      struct curl_slist  *headerlist ;
+      struct HttpPost    *postHead ;
+      
+      if( startPost( cacheName, req, curl, fd, headerlist, postHead ) )
+      {
+         CURLcode result = curl_easy_perform( curl );
+         if( 0 == result )
+         {
+            if( store( curl, fd ) )
+            {
+            }
+            else
+               unlink( cacheName.c_str() );
+         }
+         else
+            discard( cacheName, curl, fd );
+
+         curl_formfree( postHead );
+         curl_slist_free_all( headerlist );
+      }
+
+   } // file not found, retrieve it
+   
+   return curlFile_t( cacheName.c_str() );
+}
+
+curlRequest_t :: curlRequest_t( char const url[] )
+   : url_( url ),
+     hasFile_( false )
+{
+}
+   
+curlRequest_t :: ~curlRequest_t( void )
+{
+}
+
+void curlRequest_t :: addVariable
+   ( char const *name,
+     char const *value )
+{
+   param_t param ;
+   param.name_               = name ;
+   param.isFile_             = false ;
+   param.value_.stringValue_ = value ;
+   parameters_.push_back( param );
+}
+
+void curlRequest_t :: addFile
+   ( char const   *name,
+     char const   *path,
+     void const   *content,
+     unsigned long length )
+{
+   param_t param ;
+   param.name_                      = name ;
+   param.isFile_                    = true ;
+   param.value_.fileValue_.path_    = path ;
+   param.value_.fileValue_.content_ = content ;
+   param.value_.fileValue_.length_  = length ;
+   parameters_.push_back( param );
+}
 
 static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
 {
@@ -281,12 +362,12 @@ void curlCache_t :: makeSpace( unsigned numFiles, unsigned long bytes )
 // use this function to start a transfer
 //
 bool curlCache_t :: startTransfer
-   ( char const targetURL[],
-     CURL     *&cHandle,
-     int       &fd )
+   ( std::string const &cachedName,
+     char const         targetURL[],
+     CURL             *&cHandle,
+     int               &fd )
 {
-   std::string tmpName( getCachedName( targetURL ) );
-   fd = creat( tmpName.c_str(), S_IRWXU | S_IRGRP | S_IROTH );
+   fd = creat( cachedName.c_str(), S_IRWXU | S_IRGRP | S_IROTH );
    if( 0 < fd )
    {
       curlFile_t::header_t header ;
@@ -318,6 +399,8 @@ bool curlCache_t :: startTransfer
                   }
                }
             }
+            curl_easy_cleanup( cHandle );
+            cHandle = 0 ;
          }
       }
       
@@ -328,13 +411,92 @@ bool curlCache_t :: startTransfer
    return false ;
 }
 
+bool curlCache_t :: startPost
+   ( std::string const   &cachedName,
+     curlRequest_t const &req,
+     CURL               *&cHandle,
+     int                 &fd,
+     struct curl_slist  *&headerlist,
+     struct HttpPost    *&postHead )
+{
+   fd = creat( cachedName.c_str(), S_IRWXU | S_IRGRP | S_IROTH );
+   if( 0 < fd )
+   {
+      curlFile_t::header_t header ;
+      memset( &header, 0, sizeof( header ) );
+      if( sizeof( header ) == write( fd, &header, sizeof( header ) ) )
+      {
+         cHandle = curl_easy_init();
+         if( 0 != cHandle )
+         {
+            CURLcode result = curl_easy_setopt( cHandle, CURLOPT_URL, req.getURL() );
+   
+            if( 0 == result )
+            {
+               postHead = NULL;
+               struct HttpPost* last = NULL;
+               for( unsigned i = 0 ; i < req.parameters_.size(); i++ )
+               {
+                  curlRequest_t::param_t const &param = req.parameters_[i];
+
+                  if( !param.isFile_ )
+                     curl_formadd( &postHead, &last, 
+                                   CURLFORM_PTRNAME, param.name_,
+                                   CURLFORM_PTRCONTENTS, param.value_.stringValue_,
+                                   CURLFORM_END );
+                  else
+                     curl_formadd( &postHead, &last,
+                                   CURLFORM_PTRNAME, param.name_,
+                                   CURLFORM_FILE, param.value_.fileValue_.path_,
+                                   CURLFORM_CONTENTTYPE, "application/octet-stream",
+                                   CURLFORM_END );
+               }
+               
+               headerlist = curl_slist_append( NULL, "Expect:" );
+               curl_easy_setopt( cHandle, CURLOPT_HTTPHEADER, headerlist );
+
+               result = curl_easy_setopt( cHandle, CURLOPT_HTTPPOST, postHead );
+               if( 0 == result )
+               {
+                  result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
+                  if( 0 == result )
+                  {
+                     result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, fd );
+                     if( 0 == result )
+                     {
+                        result = curl_easy_setopt( cHandle, CURLOPT_FILETIME, &curlTimeBuffer_ );
+                        if( 0 == result )
+                        {
+                           return true ;
+                        }
+                     }
+                  }
+               }
+
+               curl_formfree( postHead );
+               postHead = 0 ;
+               curl_slist_free_all( headerlist );
+               headerlist = 0 ;
+
+            }
+
+            curl_easy_cleanup( cHandle );
+            cHandle = 0 ;
+         }
+      }
+      
+      close( fd );
+      fd = -1 ;
+   }
+
+   return false ;
+}
 
 //
 // use this function to complete a transfer after curl_easy_perform()
 //
 bool curlCache_t :: store
-   ( char const targetURL[],
-     CURL      *curl,   // handle to connection
+   ( CURL      *curl,   // handle to connection
      int        fd )
 {
    bool worked = false ;
@@ -407,14 +569,13 @@ bool curlCache_t :: store
 // use this function to discard a transfer
 //
 void curlCache_t :: discard
-   ( char const targetURL[],
-     CURL      *curl,
-     int        fd )
+   ( std::string const &cacheName,
+     CURL              *curl,
+     int               fd )
 {
    curl_easy_cleanup( curl );
    close( fd );
-   std::string tmpName( getCachedName( targetURL ) );
-   unlink( tmpName.c_str() );
+   unlink( cacheName.c_str() );
 }
 
 
@@ -442,6 +603,33 @@ std::string curlCache_t :: getCachedName( char const url[] )
    return path ;
 }
 
+std::string curlCache_t :: getCachedName( curlRequest_t const &req )
+{
+   std::string name( getCachedName( req.url_ ) );
+   unsigned long adler = adler32( 0, (Bytef const *)name.c_str(), name.size() );
+   for( unsigned i = 0 ; i < req.parameters_.size(); i++ )
+   {
+      curlRequest_t::param_t const &param = req.parameters_[i];
+      adler = adler32( adler, (Bytef const *)param.name_, strlen( param.name_ ) );
+      if( !param.isFile_ )
+      {
+         adler = adler32( adler, (Bytef const *)param.value_.stringValue_, strlen( param.value_.stringValue_ ) );
+      } // string value
+      else
+      {
+         adler = ~adler ;
+         adler = adler32( adler, (Bytef const *)param.value_.fileValue_.path_, strlen( param.value_.fileValue_.path_ ) );
+         adler = adler32( adler, (Bytef const *)param.value_.fileValue_.content_, param.value_.fileValue_.length_ );
+      } // file
+   }
+   
+   char adlerHex[10];
+   sprintf( adlerHex, "^%08lX", adler );
+   name += adlerHex ;
+   
+   return name ;
+}
+
 static curlCache_t *cache_ = 0 ;
 
 curlCache_t &getCurlCache( void )
@@ -455,7 +643,7 @@ curlCache_t &getCurlCache( void )
 }
 
 #ifdef STANDALONE 
-#include <stdio.h>
+#include "memFile.h"
 
 static void printInfo( curlFile_t const &f )
 {
@@ -465,29 +653,88 @@ static void printInfo( curlFile_t const &f )
    tm const *ftm = localtime( &ft );
    printf( "file time %s", asctime( ftm ) );
    printf( "mime type %s\n", f.getMimeType() );
+   if( 0 != strstr( f.getMimeType(), "text" ) )
+   {
+      printf( "content:<" );
+      fwrite( f.getData(), f.getSize(), 1, stdout );
+      printf( ">\n" );
+   }
 }
+
+static char const usage[] = {
+   "Usage : curlCache url [var value]|[var @file]...\n" 
+};
 
 int main( int argc, char const * const argv[] )
 {
    if( 1 < argc )
    {
+      char const *url = argv[1];
       curlCache_t &cache = getCurlCache();
-      for( int arg = 1 ; arg < argc ; arg++ )
+      if( 2 == argc )
       {
-         curlFile_t f( cache.get( argv[arg] ) );
+         curlFile_t f( cache.get( url ) );
          if( f.isOpen() )
          {
-            printf( "%s found in cache, %lu bytes\n", argv[arg], f.getSize() );
+            printf( "%s found in cache, %lu bytes\n", url, f.getSize() );
             printInfo( f );
             curlFile_t f2( f );
             printInfo( f2 );
          }
          else
-            printf( "%s not found in cache\n", argv[arg] );
+            printf( "%s not found in cache\n", url );
+      }
+      else if( 0 == ( argc & 1 ) )
+      {
+         std::vector<memFile_t> files ;
+         curlRequest_t req( url );
+
+         for( int arg = 2 ; arg < argc ; arg += 2 )
+         {
+            if( '@' != argv[arg+1][0] )
+            {
+               req.addVariable( argv[arg], argv[arg+1] );
+            } // string parameter
+            else
+            {
+               files.push_back( memFile_t( argv[arg+1]+1 ) );
+               memFile_t const &fIn = files.back();
+
+               if( fIn.worked() )
+               {
+                  req.addFile( argv[arg], argv[arg+1]+1, fIn.getData(), fIn.getLength() );
+               }
+               else
+               {
+                  fprintf( stderr, "Error %s opening %s\n", fIn.getError(), argv[arg+1]+1 );
+                  return -3 ;
+               }
+            } // file parameter
+         }
+
+         //
+         // okay, now post or get the file
+         //
+         printf( "cacheName == %s\n", cache.getCachedName( req ).c_str() );
+         curlFile_t f( cache.post( req ) );
+         if( f.isOpen() )
+         {
+            printf( "%s found in cache, %lu bytes\n", url, f.getSize() );
+            printInfo( f );
+            curlFile_t f2( f );
+            printInfo( f2 );
+         }
+         else
+            printf( "%s not found in cache\n", url );
+      }
+      else
+      {
+         fprintf( stderr, usage );
+         fprintf( stderr, "either one or an odd number of parameters\n" );
       }
    }
    else
-      fprintf( stderr, "Usage : curlCache url [url...]\n" );
+      fprintf( stderr, usage );
 
    return 0 ;
 }
