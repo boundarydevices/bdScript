@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.29  2003-01-06 04:30:53  ericn
+ * Revision 1.30  2003-01-20 06:24:12  ericn
+ * -Added module jsUse
+ *
+ * Revision 1.29  2003/01/06 04:30:53  ericn
  * -added exception handling
  *
  * Revision 1.28  2003/01/05 01:51:45  ericn
@@ -136,6 +139,7 @@
 #include "jsEnviron.h"
 #include "jsTCP.h"
 #include "jsTTY.h"
+#include "jsUse.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -266,6 +270,7 @@ int prMain(int argc, char **argv)
                      initJSEnv( cx, glob );
                      initJSTCP( cx, glob );
                      initJSTTY( cx, glob );
+                     initJSUse( cx, glob );
 
                      getCurlCache();
 
@@ -362,7 +367,7 @@ int prMain(int argc, char **argv)
          fprintf( stderr, "Error initializing Javascript runtime\n" );
    }
    else
-      fprintf( stderr, "Usage : testEvents url\n" );
+      fprintf( stderr, "Usage : jsExec url\n" );
  
    return 0;
 
