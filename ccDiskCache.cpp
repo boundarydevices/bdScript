@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.3  2003-07-31 04:30:52  ericn
+ * Revision 1.4  2003-08-01 14:28:05  ericn
+ * -fixed urlLen in initial cache load
+ *
+ * Revision 1.3  2003/07/31 04:30:52  ericn
  * -modified to longword align data (by padding header)
  *
  * Revision 1.2  2002/11/29 16:44:54  ericn
@@ -146,6 +149,8 @@ void ccDiskCache_t :: inUse
       else
       {
          fprintf( stderr, "%s:%s: attempt to re-allocate object %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "header %s, fd %d, data %p\n", header.completed_ ? "completed" : "incomplete",
+                          header.fd_, header.data_ );
          ABORT( 1 );
       }
    }
@@ -260,7 +265,7 @@ bool ccDiskCache_t :: allocateInitial
          //
          cacheEntries_[newHeader->sequence_] = newHeader ;
          entriesByName_[url] = newHeader->sequence_ ;
-
+         
          return true ;
       } // had or made space
       else
@@ -357,7 +362,7 @@ void ccDiskCache_t :: discardTemp( unsigned sequence )
    }
 }
 
-void ccDiskCache_t :: storeData
+bool ccDiskCache_t :: storeData
    ( unsigned    sequence,        // input : returned from allocateInitial
      unsigned    size,            // input : how much data to store. Must be less than allocation
      void const *data,            // input : data to write
@@ -431,6 +436,9 @@ void ccDiskCache_t :: storeData
 
                if( failed )
                   unlink( cachedFileName.c_str() );
+
+               return !failed ;
+
             }
             else
             {
@@ -455,6 +463,7 @@ void ccDiskCache_t :: storeData
       fprintf( stderr, "%s:%s Attempt to store non-existent file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
+   return false ;
 }
 
 bool ccDiskCache_t :: makeSpace( unsigned long spaceNeeded )
@@ -541,7 +550,7 @@ void ccDiskCache_t :: dump( void ) const
    for( list_head *h = mru_.next ; h != &mru_ ; h = h->next )
    {
       header_t const &header = *((header_t const *) h );
-      printf( "%08lx:%d:%10lu:%s\n", header.sequence_, header.completed_, header.fd_, header.name_ );
+      printf( "%08lx:%d:%10ld:%10lu:%s\n", header.sequence_, header.completed_, header.fd_, header.size_, header.name_ );
    }
 }
 
@@ -599,16 +608,16 @@ ccDiskCache_t :: ccDiskCache_t
                   memFile_t fIn( fullName.c_str() );
                   if( fIn.worked() )
                   {
-                     if( 9 < fIn.getLength() )
+                     if( 9 < fIn.getLength() ) // namelen, datalen, one byte of name, one data?
                      {
                         unsigned long urlLen ;
                         memcpy( &urlLen, fIn.getData(), sizeof( urlLen ) );
-                        unsigned const pad = ( 4 - ( fIn.getLength() & 3 ) ) & 3 ;
+                        unsigned const pad = ( 4 - ( urlLen & 3 ) ) & 3 ;
 
                         if( urlLen <= fIn.getLength() - sizeof( urlLen ) - sizeof( unsigned long ) - 1 - pad ) // min 1 byte of data, 4 bytes of length
                         {
                            char const *url = (char const *)fIn.getData() + sizeof( urlLen );
-                           if( '\0' == url[urlLen] )
+                           if( '\0' == url[urlLen-1] ) // urlLen includes NULL terminator
                            {
                               unsigned long dataSize ;
                               memcpy( &dataSize, url + urlLen + pad, sizeof( dataSize ) );
@@ -648,7 +657,7 @@ ccDiskCache_t :: ccDiskCache_t
                                  }
                               } // file has reasonable sizes
                               else
-                                 fprintf( stderr, "%s:invalid name or data size:%lu/%lu/%lu\n", fullName.c_str(), urlLen, dataSize, fIn.getLength() );
+                                 fprintf( stderr, "%s:%s: invalid name or data size:%lu/%lu/%lu\n", fullName.c_str(), url, urlLen, dataSize, fIn.getLength() );
                            }
                            else
                               fprintf( stderr, "Invalid terminator in url:%s\n", fullName.c_str() );
