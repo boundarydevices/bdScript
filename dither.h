@@ -1,5 +1,5 @@
 #ifndef __DITHER_H__
-#define __DITHER_H__ "$Id: dither.h,v 1.2 2004-07-04 21:33:54 ericn Exp $"
+#define __DITHER_H__ "$Id: dither.h,v 1.3 2005-01-01 16:11:59 ericn Exp $"
 
 /*
  * dither.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: dither.h,v $
- * Revision 1.2  2004-07-04 21:33:54  ericn
+ * Revision 1.3  2005-01-01 16:11:59  ericn
+ * -prevent dither copies
+ *
+ * Revision 1.2  2004/07/04 21:33:54  ericn
  * -added getBits() method
  *
  * Revision 1.1  2004/03/17 04:56:19  ericn
@@ -46,6 +49,7 @@ public:
    unsigned char const *getBits(void) const { return bits_ ; }
 
 private:
+   dither_t( dither_t const & ); // no copies
    unsigned char const * const bits_ ;
    unsigned const              width_ ;
    unsigned const              height_ ;
