@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: tcpPollServer.cpp,v $
- * Revision 1.1  2004-03-17 04:56:19  ericn
+ * Revision 1.2  2004-12-18 18:31:17  ericn
+ * -misc additions
+ *
+ * Revision 1.1  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  *
@@ -27,6 +30,40 @@
 #include <sys/poll.h>
 #include <unistd.h>
 #include <stdio.h>
+#include "pollHandler.h"
+
+class sockHandler_t : public pollHandler_t {
+public:
+   sockHandler_t( int fd, pollHandlerSet_t &set )
+      : pollHandler_t( fd, set )
+      , fd_( fd )
+      , set_( set ){}
+   virtual ~sockHandler_t( void ){}
+
+   virtual void onDataAvail( void );     // POLLIN
+   virtual void onWriteSpace( void );    // POLLOUT
+   virtual void onError( void );         // POLLERR
+   virtual void onHUP( void );           // POLLHUP
+protected:
+   int               fd_ ;
+   pollHandlerSet_t &set_ ;
+};
+
+void sockHandler_t :: onDataAvail( void )     // POLLIN
+{
+}
+
+void sockHandler_t :: onWriteSpace( void )    // POLLOUT
+{
+}
+
+void sockHandler_t :: onError( void )         // POLLERR
+{
+}
+
+void sockHandler_t :: onHUP( void )           // POLLHUP
+{
+}
 
 int main( int argc, char const * const argv[] )
 {
@@ -97,11 +134,30 @@ int main( int argc, char const * const argv[] )
                   if( fds[1].revents )
                   {
                      printf( "client sock 0x%02x\n", fds[1].revents );
-                     fds[1].events &= ~fds[1].revents ;
+                     if( fds[1].revents & POLLIN )
+                     {
+                        char inBuf[2048];
+                        int numRead ;
+                        while( 0 < ( numRead = read( fds[1].fd, inBuf, sizeof( inBuf ) ) ) )
+                        {
+                           printf( "rx %d\n", numRead );
+                           write( 1, inBuf, numRead );
+                        }
+                     }
+
+                     if( fds[1].revents & ( POLLERR | POLLHUP ) )
+                     {
+                        printf( "client close/HUP\n" );
+                        close( fds[1].fd );
+                        fds[1].fd = -1 ;
+                        fds[1].events = 0 ;
+                     }
+                     else
+                        fds[1].events &= (~fds[1].revents | POLLIN );
                   }
                }
                else if( 0 == numReady )
-                  fprintf( stderr, "idle\n" );
+                  ;
                else
                {
                   perror( "poll" );
