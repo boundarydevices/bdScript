@@ -1,5 +1,5 @@
 #ifndef __MADHEADERS_H__
-#define __MADHEADERS_H__ "$Id: madHeaders.h,v 1.1 2002-11-05 05:42:15 ericn Exp $"
+#define __MADHEADERS_H__ "$Id: madHeaders.h,v 1.2 2002-11-05 15:14:01 ericn Exp $"
 
 /*
  * madHeaders.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: madHeaders.h,v $
- * Revision 1.1  2002-11-05 05:42:15  ericn
+ * Revision 1.2  2002-11-05 15:14:01  ericn
+ * -changed name of method
+ *
+ * Revision 1.1  2002/11/05 05:42:15  ericn
  * -Initial import
  *
  *
@@ -36,7 +39,7 @@ public:
    mp3FrameSet_t const &frames( void ) const { return frames_ ; }
 
    unsigned long lengthSeconds( void ) const { return numSeconds_ ; }
-   unsigned long playbackFrequency( void ) const { return playbackRate_ ; }
+   unsigned long playbackRate( void ) const { return playbackRate_ ; }
    unsigned long numChannels( void ) const { return numChannels_ ; }
 
    bool          worked_ ;

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.1  2002-11-05 05:42:20  ericn
+ * Revision 1.2  2002-11-05 15:14:04  ericn
+ * -changed name of method
+ *
+ * Revision 1.1  2002/11/05 05:42:20  ericn
  * -Initial import
  *
  *
@@ -149,7 +152,7 @@ int main( int argc, char const * const argv[] )
             printf( "parsed MP3 headers\n" );
             printf( "%lu frames\n", headers.frames().size() );
             printf( "%lu seconds\n", headers.lengthSeconds() );
-            printf( "frequency %lu\n", headers.playbackFrequency() );
+            printf( "playback rate %lu\n", headers.playbackRate() );
             printf( "%lu channels\n", headers.numChannels() );
          }
          else
