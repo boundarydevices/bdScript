@@ -82,6 +82,11 @@ ftRender: ftRender.o $(LIB)
 	arm-linux-nm ftRender >ftRender.map
 	$(STRIP) ftRender
 
+recordTest: recordTest.o $(LIB)
+	$(CC) -D_REENTRANT=1 -o recordTest recordTest.o $(LIBS) -lCurlCache -lstdc++ -ljs -lnspr4 -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
+	arm-linux-nm recordTest >recordTest.map
+	$(STRIP) recordTest
+
 tsThreadMain.o: tsThread.h tsThread.cpp Makefile
 	$(CC) -D_REENTRANT=1 -c $(IFLAGS) -o tsThreadMain.o -O2 -D__MODULETEST__ $(IFLAGS) tsThread.cpp
 
