@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.1  2003-11-30 16:45:53  ericn
+ * Revision 1.2  2003-12-01 04:54:58  ericn
+ * -adde progress bar
+ *
+ * Revision 1.1  2003/11/30 16:45:53  ericn
  * -kernel and JFFS2 upgrade support
  *
  *
@@ -31,6 +34,8 @@
 #include <linux/mtd/mtd.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
+#include "fbDev.h"
+#include "meter.h"
 
 static unsigned const maxKernelSize = ( 1<<20 );
 static char const kernelDev[] = {
@@ -125,56 +130,189 @@ printf( "0x%x bytes of kernel partition\n"
    return JS_TRUE ;
 }
 
+//
+// both kernel.upgrade() and fileSys.upgrade() accept
+// four optional parameters which control the output of 
+// a horizontal progress bar.
+//
+
+static bool programParams( uintN        argc, 
+                           jsval const  argv[],
+                           char const *&programData,
+                           unsigned    &programLength,
+                           unsigned    &startX,
+                           unsigned    &endX,
+                           unsigned    &topY,
+                           unsigned    &height )
+{
+   startX = endX = topY = height = 0 ;
+   
+   if( ( 1 <= argc ) && JSVAL_IS_STRING( argv[0] ) )
+   {
+      JSString *sKernel = JSVAL_TO_STRING( argv[0] );
+      programData   = JS_GetStringBytes( sKernel );
+      programLength = JS_GetStringLength( sKernel );
+
+      if( ( 5 == argc )
+          &&
+          JSVAL_IS_INT( argv[1] )
+          &&
+          JSVAL_IS_INT( argv[2] )
+          &&
+          JSVAL_IS_INT( argv[3] )
+          &&
+          JSVAL_IS_INT( argv[4] ) )
+      {
+         startX = JSVAL_TO_INT( argv[1] );
+         endX   = JSVAL_TO_INT( argv[2] );
+         topY   = JSVAL_TO_INT( argv[3] );
+         height = JSVAL_TO_INT( argv[4] );
+         fbDevice_t &fb = getFB();
+
+         if( ( endX > startX )
+             &&
+             ( endX < fb.getWidth() )
+             &&
+             ( 0 < height )
+             &&
+             ( startX + height < fb.getHeight() ) )
+         {
+         } // parameters are valid
+         else
+         {
+            startX = endX = topY = height = 0 ;
+         }
+      } // have progress bar parameters
+      else
+      {
+      } // no optional parameters
+
+      return true ;
+   }
+   
+   return false ;
+}
+
+
+static bool doProgram( JSContext  *cx, 
+                       int         devFd,
+                       void const *data,
+                       unsigned    dataLength,
+                       unsigned    xLeft, 
+                       unsigned    xRight,
+                       unsigned    yTop, 
+                       unsigned    height )
+{
+   mtd_info_t meminfo;
+   if( 0 == ioctl( devFd, MEMGETINFO, &meminfo ) )
+   {   
+      erase_info_t erase;
+      erase.start = 0 ;
+      erase.length = meminfo.erasesize;
+
+      fbDevice_t &fb = getFB();
+
+      unsigned const yBottom = yTop + height - 1 ;
+      meter_t meter( 0, meminfo.size,
+                     xLeft, xRight==xLeft ? xLeft+1 : xRight );
+
+      unsigned char red   = 0xFF ;
+      unsigned char green = 0xFF ;
+      unsigned char blue  = 0xFF ;
+
+      if( 0 < height )
+         fb.rect( xLeft, yTop, xRight, yBottom, red, green, blue );
+
+      red = green = blue = 0x40 ;
+
+      unsigned const numToErase = meminfo.size / meminfo.erasesize ;
+      unsigned count = 0 ;
+      unsigned bytePos = 0 ;
+      unsigned xNext = xLeft ;
+      for( ; count < numToErase ; count++ ) 
+      {
+         if( 0 == ioctl( devFd, MEMERASE, &erase ) )
+         {
+            bytePos += meminfo.erasesize ;
+            unsigned newLeft = meter.project( bytePos );
+            if( 0 < height )
+               fb.rect( xNext, yTop, newLeft, yBottom, red, green, blue );
+            xNext = newLeft ;
+            printf( "." ); fflush( stdout );
+         }
+         else
+         {      
+            printf( "\r\nMTD Erase failure");
+            break;
+         }
+         erase.start += meminfo.erasesize;
+      }
+
+      // fill if necessary
+      if( ( xNext < xRight ) && ( count == numToErase ) && ( 0 < height ) )
+         fb.rect( xNext, yTop, xRight, yBottom, red, green, blue );
+
+      unsigned char const *nextIn = (unsigned char const *)data ;
+
+      meter_t meter2( 0, dataLength,
+                      xLeft, xRight==xLeft ? xLeft+1 : xRight );
+      bytePos = 0 ;
+      xNext   = xLeft ;
+      red = blue = 0 ;
+      green   = 0x80 ;
+      while( 0 < dataLength )
+      {
+         unsigned numToWrite = dataLength > meminfo.erasesize ? meminfo.erasesize : dataLength ;
+         unsigned numWritten = write( devFd, nextIn, numToWrite );
+         if( numWritten == numToWrite )
+         {
+            nextIn     += numWritten ;
+            dataLength -= numWritten ;
+            bytePos    += numWritten ;
+            unsigned newLeft = meter2.project( bytePos );
+            if( 0 < height )
+               fb.rect( xNext, yTop, newLeft, yBottom, red, green, blue );
+            xNext = newLeft ;
+         }
+         else
+         {
+            JS_ReportError( cx, "Error writing flash block\n" );
+            break;
+         }
+      }
+      
+      if( ( xNext < xRight ) && ( 0 == dataLength ) && ( 0 < height ) )
+         fb.rect( xNext, yTop, xRight, yBottom, red, green, blue );
+
+      return ( 0 == dataLength );
+
+   }
+   else
+      JS_ReportError( cx, "%s reading partition info", strerror( errno ) );
+
+   return false ;
+
+}
+
 static JSBool
 jsKernelUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
    
-   if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
+   unsigned    xLeft, xRight ;
+   unsigned    yTop, height ;
+   char const *kernelData ;
+   unsigned    kernelLength ;
+   if( programParams( argc, argv, kernelData, kernelLength, xLeft, xRight, yTop, height ) )
    {
-      JSString *sKernel = JSVAL_TO_STRING( argv[0] );
-      char const *kernelData = JS_GetStringBytes( sKernel );
-      unsigned const kernelLength = JS_GetStringLength( sKernel );
       if( ( (1<<16) < kernelLength ) && ( '\xEA' == kernelData[3] ) )
       {
          printf( "program %u bytes of kernel here\n", kernelLength );
          int const devFd = open( kernelDev, O_RDWR );
          if( 0 <= devFd )
          {
-            mtd_info_t meminfo;
-            if( 0 == ioctl( devFd, MEMGETINFO, &meminfo ) )
-            {   
-               erase_info_t erase;
-               erase.start = 0 ;
-               erase.length = meminfo.erasesize;
-               
-               unsigned const numToErase = meminfo.size / meminfo.erasesize ;
-               unsigned count = 0 ;
-               for( ; count < numToErase ; count++ ) 
-               {
-                  if( 0 == ioctl( devFd, MEMERASE, &erase ) )
-                  {
-                     printf( "." ); fflush( stdout );
-                  }
-                  else
-                  {      
-                     printf( "\r\nMTD Erase failure");
-                     break;
-                  }
-                  erase.start += meminfo.erasesize;
-               }
-
-               unsigned numWritten = write( devFd, kernelData, kernelLength );
-               if( ( numWritten == kernelLength ) && ( numToErase == count ) )
-               {
-                  printf( "%u bytes programmed successfully\n", kernelLength );
-                  *rval = JSVAL_TRUE ;
-               }
-               else
-                  JS_ReportError( cx, "erased %u of %u pages, wrote %u out of %u bytes\n", count, numToErase, numWritten, kernelLength );
-            }
-            else
-               JS_ReportError( cx, "%s reading partition info", strerror( errno ) );
+            if( doProgram( cx, devFd, kernelData, kernelLength, xLeft, xRight, yTop, height ) )
+               *rval = JSVAL_TRUE ;
             
             close( devFd );
          }
@@ -185,7 +323,7 @@ jsKernelUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
          JS_ReportError( cx, "Doesn't look like a kernel image\n" );
    }
    else
-      JS_ReportError( cx, "Usage: kernel.upgrade( 'kernelData' (string) )" );
+      JS_ReportError( cx, "Usage: kernel.upgrade( 'kernelData' [, xLeft, xRight, yTop, height ] )" );
 
    return JS_TRUE ;
 }
@@ -229,11 +367,13 @@ static JSBool
 jsFileSysUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
-   if( ( 1 == argc ) && JSVAL_IS_STRING( argv[0] ) )
+   
+   unsigned    xLeft, xRight ;
+   unsigned    yTop, height ;
+   char const *fileSysData ;
+   unsigned    fileSysLength ;
+   if( programParams( argc, argv, fileSysData, fileSysLength, xLeft, xRight, yTop, height ) )
    {
-      JSString *sFileSys = JSVAL_TO_STRING( argv[0] );
-      char const *fileSysData = JS_GetStringBytes( sFileSys );
-      unsigned const fileSysLength = JS_GetStringLength( sFileSys );
       if( (1<<20) < fileSysLength )
       {
          printf( "program %u bytes of fileSys here\n", fileSysLength );
@@ -243,40 +383,8 @@ jsFileSysUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
             int const devFd = open( fileSysDev, O_RDWR );
             if( 0 <= devFd )
             {
-               mtd_info_t meminfo;
-               if( 0 == ioctl( devFd, MEMGETINFO, &meminfo ) )
-               {   
-                  erase_info_t erase;
-                  erase.start = 0 ;
-                  erase.length = meminfo.erasesize;
-                  
-                  unsigned const numToErase = meminfo.size / meminfo.erasesize ;
-                  unsigned count = 0 ;
-                  for( ; count < numToErase ; count++ ) 
-                  {
-                     if( 0 == ioctl( devFd, MEMERASE, &erase ) )
-                     {
-                        printf( "." ); fflush( stdout );
-                     }
-                     else
-                     {      
-                        printf( "\r\nMTD Erase failure");
-                        break;
-                     }
-                     erase.start += meminfo.erasesize;
-                  }
-   
-                  unsigned numWritten = write( devFd, fileSysData, fileSysLength );
-                  if( ( numWritten == fileSysLength ) && ( numToErase == count ) )
-                  {
-                     printf( "%u bytes programmed successfully\n", fileSysLength );
-                     *rval = JSVAL_TRUE ;
-                  }
-                  else
-                     JS_ReportError( cx, "erased %u of %u pages, wrote %u out of %u bytes\n", count, numToErase, numWritten, fileSysLength );
-               }
-               else
-                  JS_ReportError( cx, "%s reading partition info", strerror( errno ) );
+               if( doProgram( cx, devFd, fileSysData, fileSysLength, xLeft, xRight, yTop, height ) )
+                  *rval = JSVAL_TRUE ;
                
                close( devFd );
             }
@@ -290,7 +398,7 @@ jsFileSysUpgrade( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
          JS_ReportError( cx, "Doesn't look like a fileSys image\n" );
    }
    else
-      JS_ReportError( cx, "Usage: fileSys.upgrade( 'fileSysData' (string) )" );
+      JS_ReportError( cx, "Usage: fileSys.upgrade( 'fileSysData' [, xLeft, xRight, yTop, height ]" );
 
    return JS_TRUE ;
 }
