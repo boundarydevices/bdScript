@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.3 2002-11-02 18:39:16 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.4 2002-11-22 15:08:41 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.3  2002-11-02 18:39:16  ericn
+ * Revision 1.4  2002-11-22 15:08:41  ericn
+ * -added method render()
+ *
+ * Revision 1.3  2002/11/02 18:39:16  ericn
  * -added getRed(), getGreen(), getBlue() methods to descramble pins
  *
  * Revision 1.2  2002/10/31 02:06:23  ericn
@@ -49,6 +52,10 @@ public:
    static unsigned char getRed( unsigned short screenRGB );
    static unsigned char getGreen( unsigned short screenRGB );
    static unsigned char getBlue( unsigned short screenRGB );
+
+   void render( unsigned short x, unsigned short y,
+                unsigned short w, unsigned short h, // width and height of image
+                unsigned short const *pixels );
 
 private:
    fbDevice_t( char const *name );

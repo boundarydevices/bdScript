@@ -7,7 +7,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.8  2002-11-22 10:58:55  tkisky
+ * Revision 1.9  2002-11-22 15:13:18  ericn
+ * -added method render()
+ *
+ * Revision 1.8  2002/11/22 10:58:55  tkisky
  * -Don't mess up display settings
  *
  * Revision 1.7  2002/11/21 23:03:00  tkisky
@@ -290,6 +293,40 @@ fbDevice_t :: fbDevice_t( char const *name )
       mem_ = new unsigned short[ width_ * height_ ];
    }
 }
+
+void fbDevice_t :: render
+   ( unsigned short xPos, 
+     unsigned short yPos,
+     unsigned short w, 
+     unsigned short h, // width and height of image
+     unsigned short const *pixels )
+{
+   if( ( 0 < w ) && ( 0 < h ) && ( xPos < getWidth() ) && ( yPos < getHeight() ) )
+   {
+      int const left = xPos ;
+
+      for( unsigned y = 0 ; y < h ; y++, yPos++ )
+      {
+         if( yPos < getHeight() )
+         {
+            unsigned short *pix = getRow( yPos ) + left ;
+            xPos = left ;
+            for( unsigned x = 0 ; x < w ; x++, xPos++ )
+            {
+               if( xPos < getWidth() )
+               {
+                  *pix++ = pixels[y*w+x];
+               }
+               else
+                  break; // only going further off the screen
+            }
+         }
+         else
+            break; // only going further off the screen
+      }
+   }
+}
+
 
 fbDevice_t :: ~fbDevice_t( void )
 {
