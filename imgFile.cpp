@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgFile.cpp,v $
- * Revision 1.1  2003-10-18 19:16:16  ericn
+ * Revision 1.2  2003-10-19 17:02:36  ericn
+ * -added GIF support
+ *
+ * Revision 1.1  2003/10/18 19:16:16  ericn
  * -Initial import
  *
  *
@@ -24,7 +27,7 @@
 
 #define __USEJPEG__ 1
 // #define __USEPNG__ 1
-// #define __USEGIF__ 1
+#define __USEGIF__ 1
 
 bool imageFromFile( char const *fileName,
                     image_t    &image )
