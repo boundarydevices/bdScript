@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.8  2002-12-01 02:42:44  ericn
+ * Revision 1.9  2002-12-07 21:01:37  ericn
+ * -added support for text buttons
+ *
+ * Revision 1.8  2002/12/01 02:42:44  ericn
  * -modified to root handlers on way through queue
  *
  * Revision 1.7  2002/11/30 18:52:57  ericn
@@ -47,11 +50,13 @@
 #include "codeQueue.h"
 #include "jsImage.h"
 #include "audioQueue.h"
+#include "ftObjs.h"
 
 typedef struct buttonData_t {
    box_t          *box_ ;
    JSObject       *jsObj_ ;
    JSContext      *cx_ ;
+   // these fields are used for image buttons
    unsigned short *img_ ;
    unsigned char  *imgAlpha_ ;
    unsigned short  imgWidth_ ;
@@ -64,6 +69,18 @@ typedef struct buttonData_t {
    unsigned char  *touchImgAlpha_ ;
    unsigned short  touchImgWidth_ ;
    unsigned short  touchImgHeight_ ;
+
+   // these fields are used for text buttons
+   char const     *msgString_ ;
+   unsigned long   bgColor_ ;
+   unsigned long   textColor_ ;
+   unsigned short  buttonWidth_ ;
+   unsigned short  buttonHeight_ ;
+   unsigned short  pointSize_ ;
+   unsigned char   borderWidth_ ;
+   void const     *fontData_ ;
+   unsigned long   fontSize_ ;
+
    unsigned char  *touchSoundData_ ;
    unsigned long   touchSoundLength_ ;
    unsigned char  *releaseSoundData_ ;
@@ -84,6 +101,8 @@ void jsButtonFinalize(JSContext *cx, JSObject *obj)
          destroyBox( button->box_ );
          button->box_ = 0 ;
       }
+      if( button->msgString_ )
+         delete [] (char *)button->msgString_ ;
       delete button ;
    } // have button data
    else
@@ -107,6 +126,8 @@ enum jsImage_tinyId {
    BUTTON_TOUCHCODE,
    BUTTON_MOVECODE,
    BUTTON_RELEASECODE,
+   BUTTON_FONT,
+   BUTTON_TEXT
 };
 
 
@@ -131,6 +152,8 @@ static JSPropertySpec buttonProperties_[] = {
   {"onTouch",           BUTTON_TOUCHCODE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onMove",            BUTTON_MOVECODE,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"onRelease",         BUTTON_RELEASECODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"font",              BUTTON_FONT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"text",              BUTTON_TEXT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -170,6 +193,102 @@ static void display( unsigned short  xLeft,
    }
 }
 
+static void drawButton( buttonData_t const &button, bool pressed )
+{
+   unsigned char const bgColors[3] = { 
+      button.bgColor_ >> 16,
+      button.bgColor_ >> 8,
+      button.bgColor_
+   };
+
+   unsigned char const border = button.borderWidth_ ;
+
+   unsigned char darkIncr[3] = {
+      bgColors[0]/border,
+      bgColors[1]/border,
+      bgColors[2]/border
+   };
+
+   unsigned char liteDecr[3] = {
+      (256-bgColors[0])/border,
+      (256-bgColors[1])/border,
+      (256-bgColors[2])/border
+   };
+   
+   unsigned char lite[3] = {
+      0xFF, 0xFF, 0xFF
+   };
+   unsigned char dark[3] = {
+      0, 0, 0
+   };
+
+   fbDevice_t &fb = getFB();
+
+   unsigned short b[4] = { button.box_->xLeft_, button.box_->yTop_, button.box_->xRight_, button.box_->yBottom_ };
+
+   unsigned char const *const topLeft     = pressed ? dark : lite ;
+   unsigned char const *const bottomRight = pressed ? lite : dark ;
+
+   //
+   // draw something that looks like a button
+   //
+   for( unsigned char i = 0 ; i < border ; i++ )
+   {
+      fb.line( b[0], b[1], b[2], b[1], 1, topLeft[0],topLeft[1],topLeft[2] );
+      fb.line( b[0], b[1], b[0], b[3], 1, topLeft[0],topLeft[1],topLeft[2] );
+      fb.line( b[0], b[3], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
+      fb.line( b[2], b[1], b[2], b[3], 1, bottomRight[0],bottomRight[1],bottomRight[2] );
+
+      b[0]++ ; b[1]++ ; b[2]-- ; b[3]-- ;
+
+      for( unsigned j = 0 ; j < 3 ; j++ )
+      {
+         lite[j] -= liteDecr[j];
+         dark[j] += darkIncr[j];
+      } // change shades
+   } // draw bounding box
+
+   fb.rect( b[0], b[1], b[2], b[3], bgColors[0], bgColors[1], bgColors[2] );
+
+   if( pressed )
+   {
+      b[0] += border ;
+      b[2] += border ;
+   }
+
+   freeTypeLibrary_t library ;
+   freeTypeFont_t    font( library, button.fontData_, button.fontSize_ );
+   if( font.worked() )
+   {
+      freeTypeString_t ftString( font, button.pointSize_, button.msgString_, strlen( button.msgString_ ) );
+
+      unsigned const boxWidth  = b[2]-b[0];
+      if( boxWidth > ftString.getWidth() )
+      {
+         unsigned const diff = boxWidth-ftString.getWidth();
+         unsigned const leftMarg = diff/2 ;
+         b[0] += leftMarg ;
+         b[2] -= diff-leftMarg ;
+      } // center horizontally
+
+      unsigned const boxHeight = b[3]-b[1];
+      if( boxHeight > ftString.getHeight() )
+      {
+         unsigned const diff = boxHeight-ftString.getHeight();
+         unsigned const topMarg = diff/2 ;
+         b[1] += topMarg ;
+         b[3] -= ( diff-topMarg );
+      } // center vertically
+
+      fb.antialias( ftString.getRow(0),
+                    ftString.getWidth(),
+                    ftString.getHeight(),
+                    b[0], b[1], b[2], b[3],
+                    (unsigned char)( button.textColor_ >> 16 ),
+                    (unsigned char)( button.textColor_ >> 8 ),
+                    (unsigned char)( button.textColor_ ) );
+   }
+}
 
 static void buttonTouch( box_t         &box, 
                          unsigned short x, 
@@ -179,7 +298,10 @@ static void buttonTouch( box_t         &box,
    assert( 0 != button );
    assert( button->box_ == &box );
 
-   display( box.xLeft_, box.yTop_, button->touchImg_, button->touchImgAlpha_, button->touchImgWidth_, button->touchImgHeight_ );
+   if( 0 != button->img_ )
+      display( box.xLeft_, box.yTop_, button->touchImg_, button->touchImgAlpha_, button->touchImgWidth_, button->touchImgHeight_ );
+   else if( 0 != button->fontData_ )
+      drawButton( *button, true );
 
    if( ( 0 != button->touchSoundData_ ) && ( 0 != button->touchSoundLength_ ) )
    {
@@ -199,7 +321,12 @@ static void buttonMove( box_t         &box,
    buttonData_t *const button = (buttonData_t *)box.objectData_ ;
    assert( 0 != button );
    assert( button->box_ == &box );
-   display( box.xLeft_, box.yTop_, button->moveImg_, button->moveImgAlpha_, button->moveImgWidth_, button->moveImgHeight_ );
+
+   if( 0 != button->img_ )
+      display( box.xLeft_, box.yTop_, button->moveImg_, button->moveImgAlpha_, button->moveImgWidth_, button->moveImgHeight_ );
+   else if( 0 != button->fontData_ )
+      drawButton( *button, false );
+   
    doit( box, x, y, defaultTouchMove, "onMove" );
 }
 
@@ -211,7 +338,10 @@ static void buttonRelease( box_t         &box,
    assert( 0 != button );
    assert( button->box_ == &box );
    
-   display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
+   if( 0 != button->img_ )
+      display( box.xLeft_, box.yTop_, button->img_, button->imgAlpha_, button->imgWidth_, button->imgHeight_ );
+   else if( 0 != button->fontData_ )
+      drawButton( *button, false );
    
    if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
    {
@@ -251,8 +381,6 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
             jsval     vY ;
             jsval     vW ;
             jsval     vH ;
-            jsval     vImage ;
-            JSObject *oImage ;
 
             if( JS_GetProperty( cx, rhObj, "x", &vX ) && JSVAL_IS_INT( vX )
                 &&
@@ -260,27 +388,14 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                 &&
                 JS_GetProperty( cx, rhObj, "width", &vW ) && JSVAL_IS_INT( vW )
                 &&
-                JS_GetProperty( cx, rhObj, "height", &vH ) && JSVAL_IS_INT( vH )
-                &&
-                JS_GetProperty( cx, rhObj, "img", &vImage ) && JSVAL_IS_OBJECT( vImage ) 
-                &&
-                ( 0 != ( oImage = JSVAL_TO_OBJECT( vImage ) ) ) )
+                JS_GetProperty( cx, rhObj, "height", &vH ) && JSVAL_IS_INT( vH ) )
             {
                JS_DefineProperty( cx, thisObj, "x", vX, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "y", vY, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "width", vW, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                JS_DefineProperty( cx, thisObj, "height", vH, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-               JS_DefineProperty( cx, thisObj, "image", vImage, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-
-               jsval drawParams[2] = {
-                  vX, vY
-               };
-
-               jsval drawResult ;
-               jsImageDraw( cx, oImage, 2, drawParams, &drawResult );
 
                buttonData_t *const buttonData = new buttonData_t ;
-               printf( "new buttonData %p\n", buttonData );
                memset( buttonData, 0, sizeof( *buttonData ) );
                
                fbDevice_t &fb = getFB();
@@ -311,45 +426,8 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                box->onTouchMove_ = buttonMove ;
                box->onRelease_   = buttonRelease ;
 
-               JS_SetPrivate( cx, thisObj, buttonData );
-
                jsval     jsv ;
                JSObject *jsO ;
-               int       iVal ;
-               if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
-               {
-                  buttonData->imgWidth_ = JSVAL_TO_INT( jsv );
-                  if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
-                  {
-                     buttonData->imgHeight_ = JSVAL_TO_INT( jsv );
-                     if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                     {
-                        buttonData->img_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
-                        if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                           buttonData->imgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
-                     }
-                  }
-               }
-               
-               if( JS_GetProperty( cx, rhObj, "touchImg", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( oImage = JSVAL_TO_OBJECT( jsv ) ) ) )
-               {
-                  JS_DefineProperty( cx, thisObj, "touchImage", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
-                  if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
-                  {
-                     buttonData->touchImgWidth_ = JSVAL_TO_INT( jsv );
-                     if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
-                     {
-                        buttonData->touchImgHeight_ = JSVAL_TO_INT( jsv );
-                        if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                        {
-                           buttonData->touchImg_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
-                           if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
-                              buttonData->touchImgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
-                        }
-                     }
-                  }
-               }
-               
                if( JS_GetProperty( cx, rhObj, "touchSound", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( jsO = JSVAL_TO_OBJECT( jsv ) ) ) )
                {
                   JS_DefineProperty( cx, thisObj, "touchSound", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
@@ -377,6 +455,132 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   JS_DefineProperty( cx, thisObj, "onMove", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
                if( JS_GetProperty( cx, rhObj, "onRelease", &jsv ) && JSVAL_IS_STRING( jsv ) )
                   JS_DefineProperty( cx, thisObj, "onRelease", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+               JS_SetPrivate( cx, thisObj, buttonData );
+
+               jsval     vImage ;
+               JSObject *oImage ;
+               if( JS_GetProperty( cx, rhObj, "img", &vImage ) && JSVAL_IS_OBJECT( vImage ) 
+                   &&
+                   ( 0 != ( oImage = JSVAL_TO_OBJECT( vImage ) ) ) )
+               {
+                  JS_DefineProperty( cx, thisObj, "image", vImage, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+   
+                  jsval drawParams[2] = {
+                     vX, vY
+                  };
+   
+                  jsval drawResult ;
+                  jsImageDraw( cx, oImage, 2, drawParams, &drawResult );
+
+                  int       iVal ;
+                  if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
+                  {
+                     buttonData->imgWidth_ = JSVAL_TO_INT( jsv );
+                     if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->imgHeight_ = JSVAL_TO_INT( jsv );
+                        if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                        {
+                           buttonData->img_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                           if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                              buttonData->imgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                        }
+                     }
+                  }
+                  
+                  if( JS_GetProperty( cx, rhObj, "touchImg", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( oImage = JSVAL_TO_OBJECT( jsv ) ) ) )
+                  {
+                     JS_DefineProperty( cx, thisObj, "touchImage", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                     if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->touchImgWidth_ = JSVAL_TO_INT( jsv );
+                        if( JS_GetProperty( cx, oImage, "height", &jsv ) && JSVAL_IS_INT( jsv ) )
+                        {
+                           buttonData->touchImgHeight_ = JSVAL_TO_INT( jsv );
+                           if( JS_GetProperty( cx, oImage, "pixBuf", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                           {
+                              buttonData->touchImg_ = (unsigned short *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                              if( JS_GetProperty( cx, oImage, "alpha", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                                 buttonData->touchImgAlpha_ = (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(jsv) );
+                           }
+                        }
+                     }
+                  }
+               } // get image button fields
+               else if( JS_GetProperty( cx, rhObj, "font", &jsv ) 
+                        && 
+                        JSVAL_IS_OBJECT( jsv ) )
+               {
+                  JS_DefineProperty( cx, thisObj, "font", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                  JSObject *const fontObj = JSVAL_TO_OBJECT( jsv );
+                  if( JS_GetProperty( cx, fontObj, "data", &jsv ) 
+                      &&
+                      JSVAL_IS_STRING( jsv ) )
+                  {
+                     JSString *const sFont = JSVAL_TO_STRING( jsv );
+                     buttonData->fontData_ = JS_GetStringBytes( sFont );
+                     buttonData->fontSize_ = JS_GetStringLength( sFont );
+   
+                     buttonData->bgColor_      = 0x808080 ;
+                     buttonData->textColor_    = 0 ;
+                     buttonData->buttonWidth_  = w ;
+                     buttonData->buttonHeight_ = h ;
+                     buttonData->pointSize_    = 10 ;
+                     buttonData->borderWidth_  = 2 ;
+   
+                     if( JS_GetProperty( cx, rhObj, "text", &jsv ) )
+                     {
+                        JSString * const msg = JSVAL_TO_STRING( jsv );
+                        unsigned const len = JS_GetStringLength( msg );
+                        char *newMsg = new char[ len + 1 ];
+                        memcpy( newMsg, JS_GetStringBytes( msg ), len );
+                        newMsg[len] = '\0' ;
+                        buttonData->msgString_ = newMsg ;
+                        JS_DefineProperty( cx, thisObj, "text", jsv, 0, 0,  JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+                     } // have button text
+                     else
+                     {
+                        JS_ReportError( cx, "missing button text" );
+                        buttonData->msgString_ = "missing" ;
+                     }
+                     
+                     if( JS_GetProperty( cx, rhObj, "pointSize", &jsv ) 
+                         &&
+                         JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->pointSize_ = JSVAL_TO_INT( jsv );
+                     }
+                     
+                     if( JS_GetProperty( cx, rhObj, "bgColor_", &jsv ) 
+                         &&
+                         JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->bgColor_ = JSVAL_TO_INT( jsv );
+                     }
+   
+                     if( JS_GetProperty( cx, rhObj, "textColor_", &jsv ) 
+                         &&
+                         JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->textColor_ = JSVAL_TO_INT( jsv );
+                     }
+   
+                     if( JS_GetProperty( cx, rhObj, "borderWidth", &jsv ) 
+                         &&
+                         JSVAL_IS_INT( jsv ) )
+                     {
+                        buttonData->borderWidth_ = JSVAL_TO_INT( jsv );
+                     }
+                     
+                     drawButton( *buttonData, false );
+                  
+                  }
+                  else
+                     JS_ReportError( cx, "missing font data" );
+               } // get font fields
+               else
+                  JS_ReportError( cx, "Must have either img or font" );
                
                getZMap().addBox( *box );
             }

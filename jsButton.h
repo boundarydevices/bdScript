@@ -1,5 +1,5 @@
 #ifndef __JSBUTTON_H__
-#define __JSBUTTON_H__ "$Id: jsButton.h,v 1.1 2002-11-21 14:09:52 ericn Exp $"
+#define __JSBUTTON_H__ "$Id: jsButton.h,v 1.2 2002-12-07 21:01:40 ericn Exp $"
 
 /*
  * jsButton.h
@@ -25,7 +25,7 @@
  *    onRelease    - code to execute on button release 
  *
  * button( { x:int, y:int,
- *           img:image
+ *           img:image              // rhs is a fully loaded image object
  *           [, width:int]
  *           [, height:int]
  *           [, touchImg:image]
@@ -40,10 +40,37 @@
  *
  *    isPressed()    - returns true if button is pressed
  *
+ * Or, for those times when you just can't spend the time
+ * making images, there's a text-mode version which is faster
+ * to create:
+ *
+ * textButton( { x:int, y:int,
+ *               bgColor:0xRRGGBB,
+ *               text:"buttonText",
+ *               width:int,
+ *               height:int,
+ *               font:font,                        // fully loaded font object
+ *               pointSize:int
+ *               [, textColor:0xRRGGBB]            // defaults to black (0x000000)
+ *               [, borderWidth:int(#pixels)]      // defaults to 2
+ *               [, touchSound:mp3File]
+ *               [, releaseSound:mp3File]
+ *               [, onTouch:"code"]
+ *               [, onMove:"code"]
+ *               [, onRelease:"code"]
+ *             } );
+ *
+ * This version of button replaces the img and touchImg methods 
+ * with a background color, text and text. It also makes size a 
+ * required field, and adds optional fields textColor and borderWidth.
+ *
  * Change History : 
  *
  * $Log: jsButton.h,v $
- * Revision 1.1  2002-11-21 14:09:52  ericn
+ * Revision 1.2  2002-12-07 21:01:40  ericn
+ * -added support for text buttons
+ *
+ * Revision 1.1  2002/11/21 14:09:52  ericn
  * -Initial import
  *
  *
