@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.9  2002-11-17 00:51:34  ericn
+ * Revision 1.10  2002-11-17 03:17:11  ericn
+ * -added garbage collection, got rid of timeout
+ *
+ * Revision 1.9  2002/11/17 00:51:34  ericn
  * -Added Javascript barcode support
  *
  * Revision 1.8  2002/11/14 13:13:17  ericn
@@ -277,8 +280,7 @@ int main(int argc, char **argv)
                                     }
                                     else
                                     {
-                                       printf( "script complete due to timeout\n" );
-                                       break;
+                                       JS_GC( cx );
                                     }
                                  }
                               }
