@@ -7,7 +7,6 @@
 #include <linux/mtd/mtd.h>
 #include <syscall.h>
 #include <signal.h>
-#include <hexDump.h>
 
 #define __NR_myIoctl  __NR_ioctl
 #define __NR_myOpen   __NR_open
