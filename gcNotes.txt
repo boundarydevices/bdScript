@@ -1,0 +1,72 @@
+Mechanisms for storing and queueing code:
+   1. Javascript thread saves source code reference in global,
+      external thread queues the code back to Javascript
+      thread.
+
+      onTouch(), timer(), oneShot(), 
+
+   2. Javascript thread pulls code from an object, saves the object
+      ptr and code reference in a message and queues the message
+      to another thread.
+
+      When an interesting event occurs, the secondary thread queues
+      the execution of code back to the Javascript thread.
+
+   3. Same as 2.), but Javascript thread intercepts the queueing of 
+      code and doesn't wait for primary code pulling loop.
+
+      (Kinda like modal message pump in Windoze)
+
+Problems:
+   When object references are 'out there' on message queues or in
+   secondary threads, they need to be 'rooted', and currently they
+   aren't.
+
+Opportunities:
+   
+   1. When handed off to a secondary thread, we're always executing in
+      the primary Javascript thread, so we should probably root things
+      at hand-off time. (I don't think we really have a choice)
+
+   2. In order to root these, we can use:
+      
+      JS_AddRoot
+      JS_AddNamedRoot   (do we always have a convenient name?)
+
+      The difficulty I can see with these are that JS_AddRoot requires
+      a fixed location in RAM, which is difficult to provide for things
+      working their way through queues, and JSAddNamedRoot requires
+      a name (duh!).
+
+      Maybe we can accomplish address stability by placing the GC-Thing
+      refs in dynamically allocated memory and simply pass ptrs through
+      the message queues.
+      
+      A quick look at JS_AddRoot indicates that it performs a hash on
+      the ptr handed to JS_AddRoot (ptr-to-ptr-to-GC-Thing), so it should
+      be really efficient to add and remove roots on the fly.
+
+      This seems like a good way to go.
+
+Work to be done:
+   Queues in use:
+      audioQueue  - structure in queue has a direct ptr to a JSObject.
+                    
+                    --- This will have to change to have stable address
+                    for JSObject
+
+      ccWorker    - structure in queue has an opaque ptr to app data, which
+                    in turn points to the ccActiveURL item_t, which in
+                    turn points to structure with jsCurl request, which
+                    has JSObjects lhObj_ and rhObj_, and a JSContext cx_.
+                    
+                    --- This can work, although we should get rid of the
+                    rhObj_ and need to JS_AddRoot the lhObj_.
+                    
+      codeQueue   - scriptAndScope_t is passed through queue, and has
+                    members JSObject *scope_ and jsval script_.
+                    
+                    --- This will have to change to have stable address
+                    for JSObject as well as rooting.
+
+   That's not so bad.
