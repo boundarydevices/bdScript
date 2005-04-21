@@ -9,8 +9,17 @@ typedef int BOOL;
 typedef unsigned long DWORD;
 typedef unsigned short WORD;
 typedef unsigned long ULONG;
-//typedef unsigned __int64 ULONGLONG;
+
+#ifdef _MSC_VER
+#define MICROSOFT_EMBEDDED
+#endif
+
+#ifdef MICROSOFT_EMBEDDED
+typedef unsigned __int64 ULONGLONG;
+#else
 typedef unsigned long long ULONGLONG;
+#endif
+
 typedef long LONG;
 #define __stdcall
 

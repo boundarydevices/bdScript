@@ -13,10 +13,11 @@ void __fastcall ZeroMem(int count,void* dest);
 
 SJpeg::SJpeg()
 {
+	int i;
 	m_IData = NULL;
 	basePtr=NULL;
-	for (int i=0;i<=15;i++) {dqt_tables[i]=NULL;}
-	for (int i=0;i<=7;i++) {dht_tables[i]=NULL;}
+	for (i=0;i<=15;i++) {dqt_tables[i]=NULL;}
+	for (i=0;i<=7;i++) {dht_tables[i]=NULL;}
 	mcuRow=NULL;
 	mcuRowCnt=0;
 }
@@ -267,7 +268,10 @@ void SJpeg::GetMCURow(StartOfScan* sos)
 	}//while (MCUsLeftInRow--)
 }
 
+#ifdef MICROSOFT_EMBEDDED
+extern "C" int __umull18(unsigned valueA,unsigned valueB);
 
+#else
 #define __umull18(a,b) \
 ({  register int __rTempLo,__rTempHi;	register int __val=a;	\
   __asm__ ("%@ Inlined smull				\n\
@@ -278,6 +282,7 @@ void SJpeg::GetMCURow(StartOfScan* sos)
              "=&r" (__rTempLo), "=&r" (__rTempHi)	\
            : "r" (b), "0" (__val) );			\
 	     __val;})
+#endif
 
 #define fracBits 16
 
