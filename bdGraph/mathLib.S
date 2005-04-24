@@ -58,3 +58,10 @@ uShiftRight:
 	orr		r0,r0,r3,LSL r1
 	mov		pc,lr
 	
+//int __umull18(unsigned valueA,unsigned valueB);
+__umull18:
+	umull	r3,r2,r1,r0
+	mov		r0,r2,LSL # (32-18)
+	add		r0,r0,r3,LSR # (18)
+	mov		pc,lr
+	
