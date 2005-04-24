@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.35  2004-10-30 19:37:33  ericn
+ * Revision 1.36  2005-04-24 18:51:14  ericn
+ * -add SETPLANE call for sm501yuv
+ *
+ * Revision 1.35  2004/10/30 19:37:33  ericn
  * -Neon yuv support
  *
  * Revision 1.34  2004/03/17 04:56:19  ericn
@@ -141,6 +144,7 @@
 #include <pthread.h>
 #include "fbDev.h"
 #include "debugPrint.h"
+#include "linux/sm501yuv.h"
 
 static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
@@ -381,10 +385,21 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
 printf( "input row stride: %u\n", rowStride );
 printf( "frame size: %u x %u\n", frames.maxWidth_, frames.maxHeight_ );
 printf( "queue size: %u x %u, %u, %u\n", 
-        frames.queue_->width_, 
-        frames.queue_->height_,
-        frames.queue_->rowStride_,
-        frames.queue_->entrySize_ );
+      frames.queue_->width_, 
+      frames.queue_->height_,
+      frames.queue_->rowStride_,
+      frames.queue_->entrySize_ );
+      
+      struct sm501yuvPlane_t pi ;
+      pi.xLeft_     = params.x_ ;
+      pi.yTop_      = params.y_ ;
+      pi.inWidth_   = frames.queue_->width_ ;
+      pi.inHeight_  = frames.queue_->height_ ;
+      pi.outWidth_  = params.width_ ;
+      pi.outHeight_ = params.height_ ;
+      
+      int const ior = ioctl( fdYUV, SM501YUV_SETPLANE, &pi );
+      printf( "setplane: %d\n", ior );
 
       unsigned const bytesPerFrame = rowStride*height ;
 printf( "%u bytes/frame\n", bytesPerFrame );
