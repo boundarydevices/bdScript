@@ -6,7 +6,7 @@ all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmSt
 
 -include config.mk
 
-KERNEL_BOARDTYPE ?= "BD2003"
+KERNEL_BOARDTYPE ?= "NEON"
 ifeq ("BD2003",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_BD2003
 else
