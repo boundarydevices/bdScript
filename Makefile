@@ -188,6 +188,7 @@ endif
 #
 config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
+	echo "#define NEON 1" >> $@
 
 %.o : %.cpp config.h
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
