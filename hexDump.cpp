@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: hexDump.cpp,v $
- * Revision 1.3  2004-07-04 21:31:47  ericn
+ * Revision 1.4  2005-05-25 16:25:04  ericn
+ * -added address spec
+ *
+ * Revision 1.3  2004/07/04 21:31:47  ericn
  * -added dumpHex method
  *
  * Revision 1.2  2004/03/17 04:56:19  ericn
@@ -61,7 +64,7 @@ bool hexDumper_t :: nextLine( void )
 {
    if( 0 < bytesLeft_ )
    {
-      char *next = longOut( lineBuf_, (unsigned long)data_ );
+      char *next = longOut( lineBuf_, (unsigned long)addr_ );
       *next++ = ' ' ;
       *next++ = ' ' ;
       *next++ = ' ' ;
@@ -108,6 +111,7 @@ bool hexDumper_t :: nextLine( void )
       *next = 0 ;
 
       data_       = bytes ;
+      addr_      += lineBytes ;
       bytesLeft_ -= lineBytes ;
       return true ;
    }
