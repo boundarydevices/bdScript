@@ -23,3 +23,4 @@ config.h
 mpegDecode testYUV *.prestrip
 mpegDecodeMain
 udpEcho udpSendTo httpPoll dnsPoll pwd rollingMedian
+adler32 mpegFile mpegPlay readBlocks
