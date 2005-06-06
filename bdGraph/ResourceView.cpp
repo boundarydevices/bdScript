@@ -1,6 +1,7 @@
 #include "ICommon.h"
 #include "Scale.h"
 #include "Scale16.h"
+#include "Scale18.h"
 #include "ResourceView.h"
 //#include <unistd.h>
 //#include <stdio.h>
@@ -121,6 +122,27 @@ void ResourceView::RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,
 				0,0,0,0))
 		{
 			Scale16::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
+//	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
+//  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
+			delete[] pDib;
+		}
+	}
+}
+void ResourceView::RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length)
+{
+    CResourceObj data;
+    data.Init(resource,length);
+    Scale* pScaleObj = Scale::GetScalableImage(&data,flags);
+
+//  pScaleObj->m_flags = flags;
+    if (pScaleObj)
+    {
+		BYTE *pDib = NULL;
+		if (pDib= pScaleObj->GetDibBits(fbWidth,fbHeight,
+				0,0,fbWidth,fbHeight,
+				0,0,0,0))
+		{
+			Scale18::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 			delete[] pDib;
