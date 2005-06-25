@@ -436,6 +436,10 @@ rollingMedian: rollingMedian.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -D__STANDALONE__ -Xlinker -Map -Xlinker rollingMedian.map rollingMedian.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
+pixmanTest: pixmanTest.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -D__STANDALONE__ -Xlinker -Map -Xlinker pixmanTest.map pixmanTest.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpixman -lpthread -lstdc++ -lm
+	$(STRIP) $@
+
 start.o: start.c
 	$(CC) $(HARDWARE_TYPE) -fno-rtti -c -nodefaultlibs -o $@ $<
 
@@ -475,5 +479,5 @@ clean:
 	rm -f *.o *.a *.map *.lst *.sym bc curlGet dirTest urlTest \
          jsExec testJS ftRender madHeaders backtrace \
          cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
-         mpeg2mp3 \
+         mpeg2mp3 pixmanTest \
          $(LIB)
