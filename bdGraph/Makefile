@@ -6,9 +6,21 @@ OBJS = Scale.o Scale18.o Scale16.o SImageData16.o ScaleUpObj.o ScaleYCbCrf1.o Sc
        ScaleRGB.o ScaleYCbCr.o ScaleY.o SImageDataJpeg.o SImagePosition.o invDCT_JQ.o fft.o fftClean.o \
        ResourceView.o mathLib.o
 
+CROSS_COMPILE1 ?= arm-linux-
+ARM_GCC         ?= $(CROSS_COMPILE1)gcc
+ARM_AR          ?= $(CROSS_COMPILE1)ar
+ARM_GCC         ?= $(CROSS_COMPILE1)gcc
+ARM_LD          ?= $(CROSS_COMPILE1)ld
+ARM_STRIP       ?= $(CROSS_COMPILE1)strip
+ARM_CCAS        ?= $(CROSS_COMPILE1)gcc
+
+cc-option = $(shell if $(ARM_GCC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi ;)
+
+MALIGN := $(call cc-option,-malignment-traps,-mshort-load-bytes)
+FLOAT_TYPE=-msoft-float
 
 
-CC=arm-linux-gcc
+CC=$(ARM_GCC)
 LIB = libbdGraph.a
 
 ifndef INSTALL_ROOT
@@ -22,12 +34,6 @@ endif
 CC_BFLAGS=-c $(IFLAGS) -O2
 CCC_FLAGS1=$(CC_BFLAGS) -DX386
 
-ARM_ROOT		?= arm-linux
-ARM_AR          ?= $(ARM_ROOT)-ar
-ARM_GCC         ?= $(ARM_ROOT)-gcc
-ARM_LD          ?= $(ARM_ROOT)-ld
-ARM_STRIP       ?= $(ARM_ROOT)-strip
-ARM_CCAS        ?= $(ARM_GCC)
 
 ifneq (,$(findstring arm, $(CC)))
    CC=$(ARM_GCC)
@@ -37,13 +43,13 @@ ifneq (,$(findstring arm, $(CC)))
    LIBS=-L./ -L$(INSTALL_ROOT)lib
    IFLAGS= -I$(KERNEL_DIR)/include
    CCAS=$(ARM_CCAS)
-#SOFT_FLOAT=-msoft-float
-   CCC_FLAGS =  $(CC_BFLAGS) $(SOFT_FLOAT) -Os -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
+   _CFLAGS =  $(CC_BFLAGS) $(FLOAT_TYPE) -Os -Wno-trigraphs -fno-strict-aliasing \
    			-fno-common -Uarm  -pipe -mno-apcs-frame \
-            -mno-sched-prolog -mapcs-32 -D__LINUX_ARM_ARCH__=5 -march=armv4 -mshort-load-bytes \
+            -mno-sched-prolog -mapcs-32 -D__LINUX_ARM_ARCH__=5 -march=armv4 $(MALIGN) \
             -fno-exceptions -fomit-frame-pointer -DARM -D__ARM_ARCH_4__
 
-   CCC_CPPFLAGS		= $(CCC_FLAGS) -fno-rtti
+   CCC_FLAGS = -Wstrict-prototypes $(_CFLAGS) 
+   CCC_CPPFLAGS	      =  -fno-rtti $(_CFLAGS) 
 
 else
    CCAS = gcc
