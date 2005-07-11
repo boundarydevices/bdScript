@@ -614,7 +614,7 @@ int SRle::readByte()
 			}
 		}
 	}
-	return -1;
+	return 0;
 }
 
 int SRle::readWord()
