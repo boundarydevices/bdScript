@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: dither.cpp,v $
- * Revision 1.3  2005-01-01 18:28:04  ericn
+ * Revision 1.4  2005-07-28 19:16:33  tkisky
+ * -try fixing border on image
+ *
+ * Revision 1.3  2005/01/01 18:28:04  ericn
  * -fixed luminance
  *
  * Revision 1.2  2004/05/08 19:21:02  ericn
@@ -124,17 +127,14 @@ dither_t :: dither_t
 //      memset( buildDown, 0, downErrorMax * sizeof( downErrors[1][0] ) );
 
       int errPos ;
+      const unsigned short * pCur = &rgb16[y*width];
       for( int x = 0, errPos = 0 ; x < width ; x++, bitOffset++, errPos += 3 )
       {
-         unsigned short inPix = rgb16[y*width+x];
-
-         int const blue = ( (inPix & 0x1f) << 3 );
-         inPix >>= 5 ;
-         int const green = ( (inPix & (0x3f<<5)) >> (5-2) );
-         inPix >>= 6 ;
-         int const red = ( inPix << 3 );
-
-         int colors[3] = { red, green, blue };
+         unsigned short inPix = *pCur++;
+	 int colors[3];
+	 colors[0] = (inPix>>(5+6-3)) & 0xf8;   //red
+	 colors[1] = (inPix>>(5-2)) & 0xfc;     //green
+	 colors[2] = (inPix<<3) & 0xf8;         //blue
 /* 200 ms in this line */
 //         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
 
@@ -146,7 +146,6 @@ dither_t :: dither_t
          int const l = luminance( colors[0], colors[1], colors[2] );
 //         int const l = colors[1];
          int actual[3];
-         int actualRed, actualGreen, actualBlue ;
          unsigned char const mask = ( 1 << (bitOffset&7) );
          unsigned const outByte = bitOffset / 8 ;
 
@@ -193,7 +192,6 @@ if( ( 2 >= y ) && ( 5 > x ) )
 {
    printf( "---------> x %d, y %d\n", x, y );
    printf( "desired %d/%d/%d\n", red, green, blue );
-   printf( "actual  %d/%d/%d\n", actualRed, actualGreen, actualBlue );
    printf( "errors  %d/%d/%d\n", rightErrors[0], rightErrors[1], rightErrors[2] );
 }
 */
