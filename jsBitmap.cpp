@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.6  2004-11-16 07:34:59  tkisky
+ * Revision 1.7  2005-07-28 21:42:19  tkisky
+ * -fix border around dithered image
+ *
+ * Revision 1.6  2004/11/16 07:34:59  tkisky
  * -add return val setting to jsBitmapLine, make rect color same as line color
  *
  * Revision 1.5  2004/09/25 21:50:07  ericn
@@ -786,12 +789,12 @@ void imageToBitmap( JSContext *cx,
                                            + (xStart/8);
             unsigned char *const bitEnd = bitData + JS_GetStringLength(sBitmapBits);
             unsigned char const  startOutMask = (0x80 >> (xStart & 7));
-            unsigned char const *nextIn = dither.getBits();
-            unsigned char        inByte = *nextIn++ ;
+            const unsigned int *nextIn = (const unsigned int *)dither.getBits();
+            unsigned int inMask = 0;
+            unsigned int inVal;
    
             unsigned maxWidth = bitmapWidth - xStart ;
-
-            unsigned char inMask = 1 ;
+            if (maxWidth > imageWidth) maxWidth = imageWidth;
 
             for( unsigned y = 0 ; y < imageHeight ; y++ )
             {
@@ -800,33 +803,33 @@ void imageToBitmap( JSContext *cx,
 // we'll need to set nextIn, inByte, and mask here
 //
                unsigned char *nextOut = bitData + (y*bytesPerRow) ;
-               unsigned outMask = startOutMask ;
-               unsigned char out = *nextOut ; // get leading bits
-
-               for( unsigned x = 0 ; x < imageWidth ; x++ )
+               unsigned char outMask = startOutMask ;
+               unsigned char outSet = 0;
+               unsigned char outClear = 0;
+               unsigned x;
+               for( x = 0 ; x < maxWidth ; x++ )
                {
-                  if( inByte & inMask )
-                     out &= ~outMask ;
-                  else
-                     out |= outMask ;
-                  
+                  if (inMask == 0) { inMask = 1; inVal = *nextIn++; }
+                  if (inVal & inMask) outClear |= outMask ;
+                  else outSet |= outMask ;
                   inMask <<= 1 ;
-                  if( 0 == inMask )
-                  {
-                     inMask = 1 ;
-                     inByte = *nextIn++ ;
-                  }
-   
                   outMask >>= 1 ;
-                  if( 0 == outMask )
-                  {
-                     outMask = 0x80 ;
-                     if( x < maxWidth )
-                        *nextOut++ = out ;
-                     out = *nextOut ; // trailing bits
+
+                  if (outMask == 0) {
+                  	*nextOut = (*nextOut | outSet) & ~outClear;
+                  	nextOut++;
+                  	outMask = 0x80;
+                  	outSet = outClear = 0;
                   }
                }
-
+               if (outSet | outClear) {
+                  *nextOut = (*nextOut | outSet) & ~outClear;
+               }
+	           while (x < imageWidth) {
+                  if (inMask == 0) { inMask = 1; inVal = *nextIn++; }
+                  inMask <<= 1 ;
+                  x++;
+	           }
                assert( nextOut <= bitEnd );
             }
          } // clip to max y

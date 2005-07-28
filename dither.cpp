@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: dither.cpp,v $
- * Revision 1.4  2005-07-28 19:16:33  tkisky
+ * Revision 1.5  2005-07-28 21:42:19  tkisky
+ * -fix border around dithered image
+ *
+ * Revision 1.4  2005/07/28 19:16:33  tkisky
  * -try fixing border on image
  *
  * Revision 1.3  2005/01/01 18:28:04  ericn
@@ -64,18 +67,9 @@ static int luminance( int red, int green, int blue )
    //    green = 9/16= 0.5625    == 1/2 + 1/16
    //    blue  = 1/8 = 0.125
    //
-   if( 0 < red )
-      red = red>>2 + red>>4 ;
-   else
-      red = 0 ;
-   if( 0 < green )
-      green = green>>1 + green>>4 ;
-   else
-      green = 0 ;
-   if( 0 < blue )
-      blue = blue >> 3 ;
-   else
-      blue = 0 ;
+   red = (red>0) ? ((red + (red<<2))>>4) : 0;
+   green = (green>0) ? ((green + (green<<3))>>4) : 0;
+   blue = (blue>0) ? (blue>>3) : 0;
    return red+green+blue ;
 }
 
@@ -84,13 +78,11 @@ static int luminance( int red, int green, int blue )
 #define GREENERROR(x)  (((x)*3)+1)
 #define BLUEERROR(x)   (((x)*3)+2)
 
+const int maxVals[] = {0xf8,0xfc,0xf8};
+const int minVals[] = {0,0,0};
 
-dither_t :: dither_t
-   ( unsigned short const rgb16[],
-     unsigned width, unsigned height )
-   : bits_( new unsigned char [ ((width*height)+7)/8 ] )
-   , width_( width )
-   , height_( height )
+dither_t :: dither_t ( unsigned short const rgb16[], unsigned width, unsigned height )
+   :  bits_(new unsigned char [ ((width*height)+31)/8 ]), width_( width ), height_( height )
 {
    // 
    // need 1 forward error value and three downward errors for 
@@ -114,77 +106,64 @@ dither_t :: dither_t
    
    fbDevice_t &fb = getFB();
 
-   unsigned bitOffset = 0 ;
-   unsigned char *const outBits = (unsigned char *)bits_ ;
+   unsigned int mask = 1;
+   unsigned int outVal=0;
+   unsigned int *outBits = (unsigned int *)bits_ ;
 
    for( int y = 0 ; y < height ; y++ )
    {
       // not carrying errors from right-edge to left
       memset( rightErrors, 0, sizeof( rightErrors ) );
 
-      int * const useDown   = downErrors[ y & 1];
-      int * const buildDown = downErrors[ (~y) & 1 ];
+      int * useDown   = downErrors[ y & 1];
+      int * buildDown = downErrors[ (~y) & 1 ];
 //      memset( buildDown, 0, downErrorMax * sizeof( downErrors[1][0] ) );
 
-      int errPos ;
       const unsigned short * pCur = &rgb16[y*width];
-      for( int x = 0, errPos = 0 ; x < width ; x++, bitOffset++, errPos += 3 )
+      for( int x = 0; x < width ; x++ )
       {
          unsigned short inPix = *pCur++;
-	 int colors[3];
-	 colors[0] = (inPix>>(5+6-3)) & 0xf8;   //red
-	 colors[1] = (inPix>>(5-2)) & 0xfc;     //green
-	 colors[2] = (inPix<<3) & 0xf8;         //blue
+         int colors[3];
+         colors[0] = (inPix>>(5+6-3)) & 0xf8;   //red
+         colors[1] = (inPix>>(5-2)) & 0xfc;     //green
+         colors[2] = (inPix<<3) & 0xf8;         //blue
 /* 200 ms in this line */
 //         int colors[3] = { fb.getRed( inPix ), fb.getGreen( inPix ), fb.getBlue( inPix ) };
 
 /* 300 ms in this loop */
          for( unsigned c = 0 ; c < 3 ; c++ )
-            colors[c] += useDown[errPos+c] + rightErrors[c];
+            colors[c] += *useDown++ + rightErrors[c];
 
 /* 100 ms in luminance */
          int const l = luminance( colors[0], colors[1], colors[2] );
 //         int const l = colors[1];
-         int actual[3];
-         unsigned char const mask = ( 1 << (bitOffset&7) );
-         unsigned const outByte = bitOffset / 8 ;
 
-         if( l > 0x80 )
-         {
-            outBits[outByte] |= mask ;
-            actual[0] = 0xF8 ;
-            actual[1] = 0xFC ;
-            actual[2] = 0xF8 ;
-         } // output white
-         else
-         {
-            outBits[outByte] &= ~mask ;
-            actual[0] = actual[1] = actual[2] = 0 ;
-         } // output black
+         const int *actual;
+         if (l > 0x80) {
+            outVal |= mask ;  // output white
+            actual = maxVals;
+         } else {
+            actual = minVals;	// output black
+         } 
+         mask <<= 1;
+         if (mask==0) {mask=1; *outBits++ = outVal; outVal=0;}
 
 /* 300 ms below */
-
          //
          // now calculate and store errors
          //
-         int buildStart = errPos ;
          for( unsigned c = 0 ; c < 3 ; c++ )
          {
             int const diff = colors[c] - actual[c];
-            int const sixteenths = diff/16 ;
-            
-            rightErrors[c] = 7*sixteenths ;
-
-            if( 0 < x )
-            {
-               buildDown[buildStart-3+c] += 3*sixteenths ;
-               buildDown[buildStart+c] += 5*sixteenths ;
+            rightErrors[c] = (7*diff)>>4 ;
+            if (x > 0) {
+               buildDown[-3] += (3*diff)>>4 ;
+               *buildDown++ += (5*diff)>>4 ;
+            } else {
+               *buildDown++ = (5*diff)>>4 ;
             }
-            else
-               buildDown[buildStart+c] = 5*sixteenths ;
 
-            if( x < width - 1 )
-               buildDown[buildStart+3+c] = sixteenths ;
+            if (x < (width-1)) buildDown[3-1] = diff>>4 ;
          }
 
 /*
@@ -197,6 +176,7 @@ if( ( 2 >= y ) && ( 5 > x ) )
 */
       }
    }
+   if (mask!=1) *outBits = outVal;
 
    delete [] downErrors[0];
    delete [] downErrors[1];
