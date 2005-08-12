@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.5  2003-08-04 03:13:56  ericn
+ * Revision 1.6  2005-08-12 04:19:15  ericn
+ * -include <string.h>
+ *
+ * Revision 1.5  2003/08/04 03:13:56  ericn
  * -added standalone test
  *
  * Revision 1.4  2003/08/02 19:28:57  ericn
@@ -32,6 +35,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "id3tag.h"
+#include <string.h>
 
 inline unsigned short scale( mad_fixed_t sample )
 {
