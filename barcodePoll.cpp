@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: barcodePoll.cpp,v $
- * Revision 1.4  2004-01-01 20:11:42  ericn
+ * Revision 1.5  2005-08-12 03:31:54  ericn
+ * -include <string.h>
+ *
+ * Revision 1.4  2004/01/01 20:11:42  ericn
  * -added isOpen() routine, and switched pollHandlers to use close()
  *
  * Revision 1.3  2003/12/27 22:58:51  ericn
@@ -29,6 +32,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <string.h>
 
 class bcPollTimer_t : public pollTimer_t {
 public:

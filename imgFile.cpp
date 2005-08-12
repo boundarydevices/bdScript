@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgFile.cpp,v $
- * Revision 1.3  2004-05-02 14:05:08  ericn
+ * Revision 1.4  2005-08-12 03:31:42  ericn
+ * -include <string.h>
+ *
+ * Revision 1.3  2004/05/02 14:05:08  ericn
  * -use PNG by default
  *
  * Revision 1.2  2003/10/19 17:02:36  ericn
@@ -27,6 +30,7 @@
 #include "imgJPEG.h"
 #include "imgPNG.h"
 #include "imgGIF.h"
+#include <string.h>
 
 #define __USEJPEG__ 1
 #define __USEPNG__ 1

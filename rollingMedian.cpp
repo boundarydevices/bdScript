@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: rollingMedian.cpp,v $
- * Revision 1.2  2004-12-03 04:43:16  ericn
+ * Revision 1.3  2005-08-12 03:31:46  ericn
+ * -include <string.h>
+ *
+ * Revision 1.2  2004/12/03 04:43:16  ericn
  * -added dump method,standalone program, then fixed
  *
  * Revision 1.1  2004/11/26 15:30:04  ericn
@@ -24,6 +27,7 @@
 #include <stdio.h>
 // #define DEBUGPRINT
 #include "debugPrint.h"
+#include <string.h>
 
 rollingMedian_t :: rollingMedian_t( unsigned N )
    : N_( N )

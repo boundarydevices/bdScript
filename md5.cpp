@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: md5.cpp,v $
- * Revision 1.3  2004-09-27 04:35:33  ericn
+ * Revision 1.4  2005-08-12 03:31:38  ericn
+ * -include <string.h>
+ *
+ * Revision 1.3  2004/09/27 04:35:33  ericn
  * -allow md5 of file and cramfs
  *
  * Revision 1.2  2003/09/06 19:50:28  ericn
@@ -25,6 +28,7 @@
 #include "md5.h"
 #include "openssl/md5.h"
 #include <stdio.h>
+#include <string.h>
 
 void getMD5( void const   *data,
              unsigned long bytes,
