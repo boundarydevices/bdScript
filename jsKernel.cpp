@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.4  2004-09-28 04:02:59  ericn
+ * Revision 1.5  2005-08-12 04:19:36  ericn
+ * -allow compile against 2.6
+ *
+ * Revision 1.4  2004/09/28 04:02:59  ericn
  * -don't draw to screen for BD2004, reboot when done programming
  *
  * Revision 1.3  2003/12/04 02:23:45  ericn
@@ -37,7 +40,11 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#ifndef KERNEL_2_6
 #include <linux/mtd/mtd.h>
+#else
+#include <mtd/mtd-user.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>

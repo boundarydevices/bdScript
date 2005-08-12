@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.3  2004-02-07 12:14:34  ericn
+ * Revision 1.4  2005-08-12 04:18:43  ericn
+ * -allow compile against 2.6
+ *
+ * Revision 1.3  2004/02/07 12:14:34  ericn
  * -allow zero-length values
  *
  * Revision 1.2  2004/02/03 06:11:12  ericn
@@ -26,7 +29,11 @@
 #include <fcntl.h>
 #include <time.h>
 #include <sys/mount.h>
+#ifndef KERNEL_2_6
 #include <linux/mtd/mtd.h>
+#else
+#include <mtd/mtd-user.h>
+#endif
 #include <syscall.h>
 #include <signal.h>
 #include <stdio.h>
