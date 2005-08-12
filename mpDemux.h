@@ -1,5 +1,5 @@
 #ifndef __MPDEMUX_H__
-#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.5 2003-07-27 15:13:40 ericn Exp $"
+#define __MPDEMUX_H__ "$Id: mpDemux.h,v 1.6 2005-08-12 04:19:00 ericn Exp $"
 
 /*
  * mpDemux.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: mpDemux.h,v $
- * Revision 1.5  2003-07-27 15:13:40  ericn
+ * Revision 1.6  2005-08-12 04:19:00  ericn
+ * -make streamSet_t public
+ *
+ * Revision 1.5  2003/07/27 15:13:40  ericn
  * -added time summary to bulk info
  *
  * Revision 1.4  2003/07/24 13:44:09  ericn
@@ -91,7 +94,6 @@ public:
    // reset to allow reading again
    inline void reset( void ){ nextIn_ = startData_ ; bytesLeft_ = fileSize_ ; streams_.numStreams_ = 0 ; }
 
-private:
    struct streamSet_t {
       enum { maxStreams_ = 8 };
    
@@ -101,6 +103,7 @@ private:
       streamSet_t( void ){ memset( this, 0, sizeof( *this ) ); }
    };
 
+private:
    typedef enum state_e {
       end_e,
       processing_e
