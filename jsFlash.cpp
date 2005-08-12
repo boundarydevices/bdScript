@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.6  2003-11-28 14:57:41  ericn
+ * Revision 1.7  2005-08-12 04:20:18  ericn
+ * -removed unused include
+ *
+ * Revision 1.6  2003/11/28 14:57:41  ericn
  * -fixed shutdown dependencies by controlling parsedFlash_t lifetime, use prototype for construction
  *
  * Revision 1.5  2003/11/24 19:42:05  ericn
@@ -41,7 +44,6 @@
 #include "ccActiveURL.h"
 #include "fbDev.h"
 #include <pthread.h>
-#include <linux/timer.h>
 #include "semClasses.h"
 #include "codeQueue.h"
 #include "flashThread.h"
