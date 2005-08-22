@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: serialPoll.cpp,v $
- * Revision 1.2  2004-09-09 21:04:50  tkisky
+ * Revision 1.3  2005-08-22 13:12:36  ericn
+ * -make file name an argument to test prog
+ *
+ * Revision 1.2  2004/09/09 21:04:50  tkisky
  * -explicit default of 8 bit, no parity
  *
  * Revision 1.1  2004/03/27 20:24:22  ericn
@@ -159,6 +162,7 @@ bool serialPoll_t :: read( std::string &s )
 // general pollHandler input routine
 void serialPoll_t :: onDataAvail( void )
 {
+   fprintf( stderr, "data avail\n" );
    unsigned const spaceAvail = sizeof( inData_ )-inLength_-1 ;
    int numRead = ::read( fd_, inData_+inLength_, spaceAvail );
    if( 0 <= numRead )
@@ -257,11 +261,12 @@ void serialPoll_t :: addLine( char const *data, unsigned len )
 
 #ifdef STANDALONE
 
-int main( void )
+int main( int argc, char const * const argv[] )
 {
    pollHandlerSet_t handlers ;
    getTimerPoll( handlers );
-   serialPoll_t  bcPoll( handlers, "/dev/ttyS1", 115200, 8, 'N', 0, '\xE7', 0 );
+   char const *devName = ( 2 <= argc ) ? argv[1] : "/dev/ttyS1" ;
+   serialPoll_t  bcPoll( handlers, devName, 115200, 8, 'N', 0, '\xE7', 0 );
    
    if( bcPoll.isOpen() )
    {
@@ -275,7 +280,7 @@ int main( void )
       }
    }
    else
-      perror( "/dev/ttyS2" );
+      perror( devName );
 
    return 0 ;
 }
