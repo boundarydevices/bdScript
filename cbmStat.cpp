@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: cbmStat.cpp,v $
- * Revision 1.2  2003-05-10 03:18:27  ericn
+ * Revision 1.3  2005-08-22 13:11:41  ericn
+ * -string.h
+ *
+ * Revision 1.2  2003/05/10 03:18:27  ericn
  * -modified to USB status constants (not Posix)
  *
  * Revision 1.1  2003/05/09 04:28:12  ericn
@@ -26,6 +29,7 @@
 #include <linux/lp.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <string.h>
 
 /* ioctls: */
 #define LPGETSTATUS		0x060b		/* same as in drivers/char/lp.c */
