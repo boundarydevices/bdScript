@@ -20,6 +20,12 @@ endif
 endif
 endif
 
+ifneq (,$(findstring 2.4, $(CONFIG_KERNELPATH)))
+   KERNEL_VER=-DKERNEL_2_4
+else
+   KERNEL_VER=-DKERNEL_2_6
+endif
+
 MPEG2LIBS = -lmpeg2 -lvo
 
 #
@@ -158,7 +164,8 @@ ifneq (,$(findstring arm, $(CC)))
    STRIP=arm-linux-strip
    OBJCOPY=arm-linux-objcopy
    LIBS=-L./ -L$(INSTALL_ROOT)/lib
-   IFLAGS= \
+   IFLAGS= -I$(CONFIG_KERNELPATH)/include \
+          -I../linux-wlan-ng-0.1.16-pre8/src/include/ \
           -I$(INSTALL_ROOT)/include \
           -I$(INSTALL_ROOT)/include/mad \
           -I$(INSTALL_ROOT)/include/nspr \
@@ -190,13 +197,13 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -fno-rtti $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
 
 $(LIBBDGRAPH):
-	make -C bdGraph all
+	INSTALL_ROOT=$(INSTALL_ROOT) KERNEL_DIR=$(CONFIG_KERNELPATH) make -C bdGraph all
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
@@ -243,7 +250,7 @@ madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	arm-linux-nm madDecode >madDecode.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph -lstdc++
 
 madTest: madTest.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
@@ -337,7 +344,7 @@ mpeg2mp3: mpeg2mp3.cpp $(LIB)
 	$(STRIP) $@
 
 cbmGraph: cbmGraph.cpp
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmGraph -Xlinker -Map -Xlinker cbmGraph.map cbmGraph.cpp $(LIBS)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmGraph -Xlinker -Map -Xlinker cbmGraph.map cbmGraph.cpp $(LIBS) -lstdc++
 	$(STRIP) $@
 
 starGraph: starGraph.cpp
@@ -349,7 +356,7 @@ starImage: starImage.cpp $(LIB) $(LIBBDGRAPH)
 	$(STRIP) $@
 
 cbmStat: cbmStat.cpp
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o cbmStat -Xlinker -Map -Xlinker cbmStat.map cbmStat.cpp $(LIBS) -lstdc++
 	$(STRIP) $@
 
 cbmImage: cbmImage.cpp
@@ -413,7 +420,7 @@ dnsPoll: dnsPoll.cpp Makefile $(LIB)
 	$(STRIP) $@
 
 flashVar: flashVar.cpp Makefile $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) $(KERNEL_VER) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
 	$(STRIP) $@
 
 tsTest: tsTest.cpp Makefile $(LIB)
