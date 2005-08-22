@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.7  2005-01-09 04:53:08  ericn
+ * Revision 1.8  2005-08-22 13:12:56  ericn
+ * -remove redundant default param
+ *
+ * Revision 1.7  2005/01/09 04:53:08  ericn
  * -added piece-wise processing test via mpegStream.cpp
  *
  * Revision 1.6  2004/10/30 18:55:34  ericn
@@ -357,7 +360,7 @@ void interleaveYUV( int                  width,
 bool mpegDecoder_t :: getPicture
    ( void const *&picture,
      picType_e   &type,
-     unsigned     ptMask = ptAll_e )
+     unsigned     ptMask )
 {
    type = ptUnknown_e ;
    do {
