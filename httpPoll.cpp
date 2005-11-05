@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: httpPoll.cpp,v $
- * Revision 1.2  2004-12-18 18:30:28  ericn
+ * Revision 1.3  2005-11-05 23:23:26  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.2  2004/12/18 18:30:28  ericn
  * -require tcpHandler, not more generic pollHandler
  *
  * Revision 1.1  2004/03/17 04:56:19  ericn
@@ -105,10 +108,12 @@ static bool onError( tcpHandler_t &handler, int event, void *opaque )
    return ((httpPoll_t *)opaque )->onError( handler );
 }
 
+/*
 static bool onHUP( tcpHandler_t &handler, int event, void *opaque )
 {
    return ((httpPoll_t *)opaque )->onHUP( handler );
 }
+*/
 
 static bool onDisconnect( tcpHandler_t &handler, int event, void *opaque )
 {
@@ -174,7 +179,7 @@ bool httpPoll_t :: onConnect( tcpHandler_t &h )
       if( 4 == numWritten )
       {
          numWritten = write( h.getFd(), file_.c_str(), file_.size() );
-         if( file_.size() == numWritten )
+         if( file_.size() == (unsigned)numWritten )
          {                              //  12345678901
             numWritten = write( h.getFd(), " HTTP/1.1\r\n", 11 );
             if( 11 == numWritten )
@@ -184,12 +189,12 @@ bool httpPoll_t :: onConnect( tcpHandler_t &h )
                {
                   header_t const &header = (*it);
                   numWritten = write( h.getFd(), header.fieldName_.c_str(), header.fieldName_.size() );
-                  if( numWritten == header.fieldName_.size() )
+                  if( (unsigned)numWritten == header.fieldName_.size() )
                   {
                      if( 2 == write( h.getFd(), ": ", 2 ) )
                      {
                         numWritten = write( h.getFd(), header.value_.c_str(), header.value_.size() );
-                        if( numWritten == header.value_.size() )
+                        if( (unsigned)numWritten == header.value_.size() )
                         {
                            if( 2 == write( h.getFd(), "\r\n", 2 ) )
                            {
@@ -266,7 +271,7 @@ bool httpPoll_t :: onDataAvail( pollHandler_t &h )
 printf( "%u bytes\n", numAvail );
 
       char inData[2048];
-      if( sizeof( inData ) < numAvail )
+      if( sizeof( inData ) < (unsigned)numAvail )
          numAvail = sizeof( inData );
       int const numRead = read( h.getFd(), inData, numAvail );
       if( 0 < numRead )
@@ -295,12 +300,14 @@ bool httpPoll_t :: onError( pollHandler_t &h )
 {
    printf( "Error\n" );
    onDisconnect( *(tcpHandler_t *)&h );
+   return false ;
 }
 
 bool httpPoll_t :: onHUP( pollHandler_t &h )
 {
    printf( "HUP\n" );
    onDisconnect( *(tcpHandler_t *)&h );
+   return false ;
 }
 
 

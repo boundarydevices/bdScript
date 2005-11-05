@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.8  2004-06-27 14:50:31  ericn
+ * Revision 1.9  2005-11-05 23:23:34  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.8  2004/06/27 14:50:31  ericn
  * -stub for game/suite controller
  *
  * Revision 1.7  2004/05/08 15:03:42  ericn
@@ -45,7 +48,7 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 {
    *rval = JSVAL_FALSE ;
 
-   JSObject *imageObj ;
+   JSObject *imageObj = 0 ;
    if( ( 3 <= argc )
        &&
        ( 4 >= argc )
@@ -64,9 +67,9 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
        )
    {
       fbDevice_t &fb = getFB();
-      unsigned short *imageMem ;
-      unsigned short  imageWidth ;
-      unsigned short  imageHeight ;
+      unsigned short *imageMem = 0 ;
+      unsigned short  imageWidth = 0 ;
+      unsigned short  imageHeight = 0 ;
 
       if( 3 == argc )
       {
@@ -268,9 +271,9 @@ jsAlphaMapRotate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
                {
                   case rotate90_e :
                      {
-                        for( unsigned y = 0 ; y < height ; y++ )
+                        for( unsigned y = 0 ; y < (unsigned)height ; y++ )
                         {
-                           for( unsigned x = 0 ; x < width ; x++ )
+                           for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                            {
                               output[y+x*height] = pixMap[x+(height-y-1)*width];
                            }
@@ -280,9 +283,9 @@ jsAlphaMapRotate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
                      }
                   case rotate180_e :
                      {
-                        for( unsigned y = 0 ; y < height ; y++ )
+                        for( unsigned y = 0 ; y < (unsigned)height ; y++ )
                         {
-                           for( unsigned x = 0 ; x < width ; x++ )
+                           for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                            {
                               output[y*width+x] = pixMap[((height-y-1)*width)+width-x-1];
                            }
@@ -291,9 +294,9 @@ jsAlphaMapRotate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
                      }
                   case rotate270_e :
                      {
-                        for( unsigned y = 0 ; y < height ; y++ )
+                        for( unsigned y = 0 ; y < (unsigned)height ; y++ )
                         {
-                           for( unsigned x = 0 ; x < width ; x++ )
+                           for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                            {
                               output[y+x*height] = pixMap[width-x-1+y*width];
                            }

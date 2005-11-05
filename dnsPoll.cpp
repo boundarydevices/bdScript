@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: dnsPoll.cpp,v $
- * Revision 1.2  2004-12-18 18:28:45  ericn
+ * Revision 1.3  2005-11-05 23:22:15  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.2  2004/12/18 18:28:45  ericn
  * -include opaque ptr in callbacks
  *
  * Revision 1.1  2004/12/13 05:14:12  ericn
@@ -116,6 +119,8 @@ dnsPoll_t &dnsPoll_t::get( pollHandlerSet_t &set )
 {
    if( 0 == dns_ )
       dns_ = new dnsPoll_t( set );
+      
+   return *dns_ ;
 }
 
 
@@ -464,7 +469,8 @@ dnsPoll_t::request_t :: ~request_t( void )
 void dnsInit( pollHandlerSet_t &set )
 {
    getTimerPoll( set );
-   dnsPoll_t &dns = dnsPoll_t::get( set );
+   // dnsPoll_t &dns = 
+   dnsPoll_t::get( set );
 }
 
 

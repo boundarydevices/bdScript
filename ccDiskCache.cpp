@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.6  2004-09-03 15:08:43  ericn
+ * Revision 1.7  2005-11-05 23:22:05  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.6  2004/09/03 15:08:43  ericn
  * -support useCache for http gets
  *
  * Revision 1.5  2003/12/06 22:06:41  ericn
@@ -124,7 +127,7 @@ void ccDiskCache_t :: inUse
             unsigned const dataOffs = urlLen + pad + sizeof( urlLen ) + sizeof( header.size_ );
             
             off_t const fileSize = lseek( header.fd_, 0, SEEK_END );
-            if( fileSize == dataOffs + header.size_ )
+            if( (unsigned)fileSize == dataOffs + header.size_ )
             {
                lseek( header.fd_, dataOffs, SEEK_SET );
                void *mem = mmap( 0, fileSize, PROT_READ, MAP_PRIVATE, header.fd_, 0 );
@@ -411,7 +414,7 @@ bool ccDiskCache_t :: storeData
                if( sizeof( nameLen ) == numWritten )
                {
                   numWritten = write( fd, header.name_, nameLen );
-                  if( nameLen == numWritten )
+                  if( nameLen == (unsigned)numWritten )
                   {
                      unsigned pad = ( 4 - ( nameLen & 3 ) ) & 3 ;
                      if( pad )
@@ -560,21 +563,21 @@ void ccDiskCache_t :: dump( void ) const
    printf( "----> entries by name\n" );
    for( byName_t :: const_iterator nameIt = entriesByName_.begin(); nameIt != entriesByName_.end(); nameIt++ )
    {
-      printf( "%08lx:%s\n", (*nameIt).second, (*nameIt).first.c_str() );
+      printf( "%08x:%s\n", (*nameIt).second, (*nameIt).first.c_str() );
    }
    
    printf( "----> entries by sequence\n" );
    for( bySequence_t :: const_iterator seqIt = cacheEntries_.begin(); seqIt != cacheEntries_.end(); seqIt++ )
    {
       header_t const &header = *((*seqIt).second);
-      printf( "%08lx:%d:%10lu:%s\n", (*seqIt).first, header.completed_, header.fd_, header.name_ );
+      printf( "%08x:%d:%10u:%s\n", (*seqIt).first, header.completed_, header.fd_, header.name_ );
    }
 
    printf( "----> entries by access time\n" );
    for( list_head *h = mru_.next ; h != &mru_ ; h = h->next )
    {
       header_t const &header = *((header_t const *) h );
-      printf( "%08lx:%d:%10ld:%10lu:%s\n", header.sequence_, header.completed_, header.fd_, header.size_, header.name_ );
+      printf( "%08x:%d:%10d:%10lu:%s\n", header.sequence_, header.completed_, header.fd_, header.size_, header.name_ );
    }
 }
 

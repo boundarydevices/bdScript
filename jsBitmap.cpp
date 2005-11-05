@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.7  2005-07-28 21:42:19  tkisky
+ * Revision 1.8  2005-11-05 23:22:48  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.7  2005/07/28 21:42:19  tkisky
  * -fix border around dithered image
  *
  * Revision 1.6  2004/11/16 07:34:59  tkisky
@@ -512,7 +515,6 @@ static JSBool bitmapFromImage(JSContext *cx, JSObject *lhObj, JSObject *rhObj)
       if( !JS_DefineProperty( cx, lhObj, "height",   vHeight, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
          JS_ReportError( cx, "setting height\n" );
       unsigned const bitsPerRow  = ((rhWidth+31)/32) * 32 ;
-      unsigned const bytesPerRow = bitsPerRow / 8 ;
       unsigned const numBits     = bitsPerRow * rhHeight ;
       unsigned const bitBytes    = numBits / 8 ;
 
@@ -571,7 +573,7 @@ static JSBool bitmapFromBitmap(JSContext *cx, JSObject *lhObj, JSObject *rhObj)
       if( !JS_DefineProperty( cx, lhObj, "height",   vHeight, 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE ) )
          JS_ReportError( cx, "setting height\n" );
       unsigned const bitsPerRow  = ((rhWidth+31)/32) * 32 ;
-      unsigned const bytesPerRow = bitsPerRow / 8 ;
+//      unsigned const bytesPerRow = bitsPerRow / 8 ;
       unsigned const numBits     = bitsPerRow * rhHeight ;
       unsigned const bitBytes    = numBits / 8 ;
 
@@ -791,7 +793,7 @@ void imageToBitmap( JSContext *cx,
             unsigned char const  startOutMask = (0x80 >> (xStart & 7));
             const unsigned int *nextIn = (const unsigned int *)dither.getBits();
             unsigned int inMask = 0;
-            unsigned int inVal;
+            unsigned int inVal = 0 ;
    
             unsigned maxWidth = bitmapWidth - xStart ;
             if (maxWidth > imageWidth) maxWidth = imageWidth;

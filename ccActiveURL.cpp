@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.9  2004-09-03 15:08:43  ericn
+ * Revision 1.10  2005-11-05 23:21:55  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.9  2004/09/03 15:08:43  ericn
  * -support useCache for http gets
  *
  * Revision 1.8  2003/12/06 22:06:24  ericn
@@ -85,7 +88,8 @@ void curlCache_t :: get
                if( !diskCache.deleteFromCache( url.c_str() ) )
                   printf( "Error deleting %s from cache\n", url.c_str() );
             }
-            request_t *const req = newRequest( *item, opaque, request_t::get_, callbacks );
+            // request_t *const req = 
+            newRequest( *item, opaque, request_t::get_, callbacks );
 
             curlTransferRequest_t workReq ;
             workReq.opaque_   = item ;
@@ -173,7 +177,8 @@ void curlCache_t :: post
    if( 0 == item )
    {
       item = newItem( hash, request_t::post_, url, false );
-      request_t *const req = newRequest( *item, opaque, request_t::post_, callbacks );
+      // request_t *const req = 
+      newRequest( *item, opaque, request_t::post_, callbacks );
 
       curlTransferRequest_t workReq ;
       workReq.opaque_   = item ;

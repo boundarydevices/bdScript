@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.14  2004-10-28 21:31:22  tkisky
+ * Revision 1.15  2005-11-05 23:23:18  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.14  2004/10/28 21:31:22  tkisky
  * -ClearBox function called
  *
  * Revision 1.13  2004/08/01 18:01:22  ericn
@@ -123,7 +126,7 @@ void freeTypeFont_t :: dump() const
    debugPrint( "face_flags  %ld:\n", face_->face_flags );
    for( int mask = 1, idx = 0 ; mask <= FT_FACE_FLAG_GLYPH_NAMES ; mask <<= 1, idx++ )
    {
-      if( idx < numFaceFlags_ )
+      if( (unsigned)idx < numFaceFlags_ )
       {
          if( 0 != ( face_->face_flags & mask ) )
             debugPrint( "   " );
@@ -347,7 +350,7 @@ freeTypeString_t :: freeTypeString_t
          // chars like "T" have negative value for bitmap_left... aargh!
          if( 0 > font.face_->glyph->bitmap_left ) 
          {
-             if( (0 - font.face_->glyph->bitmap_left ) > width_ )
+             if( (unsigned)(0 - font.face_->glyph->bitmap_left ) > width_ )
              {
                leftMargin = (0 - font.face_->glyph->bitmap_left);
                width_ += leftMargin ;
@@ -410,7 +413,7 @@ freeTypeString_t :: freeTypeString_t
                      unsigned short nextX ;
                      if( ( 0 <= glyph->glyphBitmap_left ) 
                          ||
-                         ( penX > ( 0 - glyph->glyphBitmap_left ) ) )
+                         ( penX > (unsigned)( 0 - glyph->glyphBitmap_left ) ) )
                         nextX = penX + glyph->glyphBitmap_left ;
                      else
                         nextX = 0 ;
@@ -550,7 +553,7 @@ bool freeTypeToBitmapBox( freeTypeFont_t &font,
    long const pixelSize = ((long)pointSize * XRES+71) / 72 ; // should separate X/Y resolution
 
    signed long emHeight = font.face_->bbox.yMax-font.face_->bbox.yMin ;
-   signed long emWidth  = font.face_->bbox.xMax-font.face_->bbox.xMin ;
+//   signed long emWidth  = font.face_->bbox.xMax-font.face_->bbox.xMin ;
 
    signed long bboxHeight = ( emHeight * pixelSize + font.face_->units_per_EM - 1 ) / font.face_->units_per_EM ;
    signed long ascendPixels = ( font.face_->ascender * pixelSize
@@ -803,7 +806,7 @@ debugPrint( "char %c, x:%ld, y:%ld, top %ld, left %ld\n", c, penX, nextY, slot->
             unsigned char const *nextIn = slot->bitmap.buffer ;
             long inPix = slot->bitmap.width ;
             unsigned inOffs = 0 ;
-            if( penX < x )
+            if( (unsigned)penX < x )
             {
 debugPrint( "lclip: %u x %u, %u\n", penX, inPix, right );
                long diff = (long)x - penX ;
@@ -813,14 +816,14 @@ debugPrint( "lclip: %u x %u, %u\n", penX, inPix, right );
                inPix  -= diff ;
 clipped = true ;
             }
-            if( penX + inPix > right )
+            if( (unsigned)(penX + inPix) > right )
             {
 debugPrint( "rclip: x:%u, w:%u, r:%u, left:%ld\n", penX, inPix, right, slot->bitmap_left );
                inPix =  right - penX + 1;
 clipped = true ;
             }
             unsigned char *nextOut = bmp + ( nextY * bmpStride );
-            for( unsigned row = 0 ; ( row < slot->bitmap.rows ) ; row++, nextY++ )
+            for( unsigned row = 0 ; ( row < (unsigned)slot->bitmap.rows ) ; row++, nextY++ )
             {
                if( ( nextY >= y ) && ( nextY < bottomY )
                    &&

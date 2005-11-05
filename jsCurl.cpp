@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.23  2004-09-03 15:08:43  ericn
+ * Revision 1.24  2005-11-05 23:23:03  ericn
+ * -fixed compiler warnings
+ *
+ * Revision 1.23  2004/09/03 15:08:43  ericn
  * -support useCache for http gets
  *
  * Revision 1.22  2003/12/06 22:07:12  ericn
@@ -535,7 +538,7 @@ printf( "useCache: %s\n", useCache ? "true" : "false" );
             {
                struct HttpPost* paramTail = NULL;
                
-               for( unsigned i = 0 ; i < ida->length ; i++ )
+               for( int i = 0 ; i < ida->length ; i++ )
                {
                   jsval     idVal ;
                   JSString *sParamName ;
