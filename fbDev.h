@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.17 2004-11-16 07:31:11 tkisky Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.18 2005-11-05 20:23:16 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.17  2004-11-16 07:31:11  tkisky
+ * Revision 1.18  2005-11-05 20:23:16  ericn
+ * -change default fbdev name
+ *
+ * Revision 1.17  2004/11/16 07:31:11  tkisky
  * -add ConvertRgb24LineTo16
  *
  * Revision 1.16  2004/09/25 21:48:44  ericn
@@ -222,7 +225,7 @@ private:
    friend class flashThread_t ;
 };
 
-fbDevice_t &getFB( char const *devName = "/dev/fb0" );
+fbDevice_t &getFB( char const *devName = "/dev/fb/0" );
 
 
 unsigned short fbDevice_t :: get16( unsigned long rgb )
