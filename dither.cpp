@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: dither.cpp,v $
- * Revision 1.5  2005-07-28 21:42:19  tkisky
+ * Revision 1.6  2005-11-05 20:22:42  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.5  2005/07/28 21:42:19  tkisky
  * -fix border around dithered image
  *
  * Revision 1.4  2005/07/28 19:16:33  tkisky
@@ -104,13 +107,13 @@ dither_t :: dither_t ( unsigned short const rgb16[], unsigned width, unsigned he
 
    int rightErrors[3];
    
-   fbDevice_t &fb = getFB();
+//   fbDevice_t &fb = getFB();
 
    unsigned int mask = 1;
    unsigned int outVal=0;
    unsigned int *outBits = (unsigned int *)bits_ ;
 
-   for( int y = 0 ; y < height ; y++ )
+   for( unsigned y = 0 ; y < height ; y++ )
    {
       // not carrying errors from right-edge to left
       memset( rightErrors, 0, sizeof( rightErrors ) );
@@ -120,7 +123,7 @@ dither_t :: dither_t ( unsigned short const rgb16[], unsigned width, unsigned he
 //      memset( buildDown, 0, downErrorMax * sizeof( downErrors[1][0] ) );
 
       const unsigned short * pCur = &rgb16[y*width];
-      for( int x = 0; x < width ; x++ )
+      for( unsigned x = 0; x < width ; x++ )
       {
          unsigned short inPix = *pCur++;
          int colors[3];

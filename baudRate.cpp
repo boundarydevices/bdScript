@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: baudRate.cpp,v $
- * Revision 1.1  2004-03-27 20:24:22  ericn
+ * Revision 1.2  2005-11-05 20:24:22  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.1  2004/03/27 20:24:22  ericn
  * -Initial import
  *
  *
@@ -63,7 +66,7 @@ static unsigned const numHighSpeedBauds = sizeof( _highSpeedBauds )/sizeof( _hig
 
 bool baudRateToConst( unsigned bps, unsigned &constant )
 {
-   unsigned baudIdx ;
+   unsigned baudIdx = 0 ;
    bool haveBaud = false ;
    
    unsigned i ;

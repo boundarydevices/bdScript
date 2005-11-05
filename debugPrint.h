@@ -1,5 +1,5 @@
 #ifndef __DEBUGPRINT_H__
-#define __DEBUGPRINT_H__ "$Id: debugPrint.h,v 1.3 2004-07-28 14:27:27 ericn Exp $"
+#define __DEBUGPRINT_H__ "$Id: debugPrint.h,v 1.4 2005-11-05 20:22:32 ericn Exp $"
 
 /*
  * debugPrint.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: debugPrint.h,v $
- * Revision 1.3  2004-07-28 14:27:27  ericn
+ * Revision 1.4  2005-11-05 20:22:32  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.3  2004/07/28 14:27:27  ericn
  * -prevent linking of empty debugPrint
  *
  * Revision 1.2  2004/07/04 21:33:16  ericn
@@ -48,6 +51,7 @@ inline void debugHex( char const *label, void const *data, unsigned size )
 #define debugPrint noDebugPrint
 inline int noDebugPrint( char const *, ... )
 {
+   return 0 ;
 }
 
 #define debugHex noDebugHex

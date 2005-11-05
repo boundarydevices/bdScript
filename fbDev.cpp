@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.27  2004-11-16 07:31:01  tkisky
+ * Revision 1.28  2005-11-05 20:22:58  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.27  2004/11/16 07:31:01  tkisky
  * -add ConvertRgb24LineTo16
  *
  * Revision 1.26  2004/11/08 06:56:44  tkisky
@@ -901,7 +904,6 @@ void fbDevice_t :: line
          imageWidth = getWidth();
       if( 0 == imageHeight )
          imageHeight = getHeight();
-      unsigned short const rgb = get16( red, green, blue );
       if( y1 == y2 )
       {
          if( y1 < imageHeight  )
@@ -927,8 +929,6 @@ void fbDevice_t :: box
      unsigned short  imageWidth,
      unsigned short  imageHeight )
 {
-   unsigned short const rgb = get16( red, green, blue );
-
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )

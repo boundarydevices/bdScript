@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlGet.cpp,v $
- * Revision 1.3  2002-11-30 00:32:42  ericn
+ * Revision 1.4  2005-11-05 20:22:23  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.3  2002/11/30 00:32:42  ericn
  * -removed curlCache and curlThread modules
  *
  * Revision 1.2  2002/11/27 18:31:11  ericn
@@ -35,7 +38,7 @@ static unsigned long totalBytes = 0 ;
 static size_t writeData( void *buffer, size_t size, size_t nmemb, void *userp )
 {
    unsigned const total = size*nmemb;
-   printf( "%p:%lu bytes\n", buffer, total );
+   printf( "%p:%u bytes\n", buffer, total );
    totalBytes += total ;
    std::string *pS = (std::string *)userp ;
    pS->append( (char *)buffer, total );

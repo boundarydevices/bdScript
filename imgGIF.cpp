@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgGIF.cpp,v $
- * Revision 1.2  2002-11-23 16:05:01  ericn
+ * Revision 1.3  2005-11-05 20:24:44  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.2  2002/11/23 16:05:01  ericn
  * -added placeholder for alpha channel
  *
  * Revision 1.1  2002/10/31 02:13:08  ericn
@@ -38,7 +41,7 @@ static int gifRead( GifFileType *fIn, GifByteType *data, int count )
 {
    gifSrc_t &src = *( gifSrc_t * )fIn->UserData ;
    unsigned const left = src.length_ - src.numRead_ ;
-   if( count > left )
+   if( (unsigned)count > left )
       count = left ;
 
    memcpy( data, src.data_+src.numRead_, count );
@@ -55,7 +58,7 @@ static void fixupColorMap( fbDevice_t     &fb,
 {
    GifColorType   *rgb = map.Colors ;
    unsigned short *rgb16 = (unsigned short *)map.Colors ;
-   for( unsigned i = 0 ; i < map.ColorCount ; i++, rgb++, rgb16++ )
+   for( unsigned i = 0 ; i < (unsigned)map.ColorCount ; i++, rgb++, rgb16++ )
    {
       unsigned short color = fb.get16( rgb->Red, rgb->Green, rgb->Blue );
       *rgb16 = color ;

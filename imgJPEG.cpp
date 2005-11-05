@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.5  2004-11-16 07:32:43  tkisky
+ * Revision 1.6  2005-11-05 20:23:43  ericn
+ * -fix compiler warnings
+ *
+ * Revision 1.5  2004/11/16 07:32:43  tkisky
  * -add choice to use my JPEG library, not active because dither looks weird with it
  *
  * Revision 1.4  2003/03/23 22:53:12  ericn
@@ -76,7 +79,7 @@ static void jpg_skip_input_data( j_decompress_ptr cinfo, long num_bytes )
 {
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    unsigned left = pSrc->length_ - pSrc->numRead_ ;
-   if( left > num_bytes )
+   if( left > (unsigned)num_bytes )
       num_bytes = left ;
    pSrc->numRead_ += num_bytes ;
 //printf( "skip input : %u/%ld\n", pSrc->numRead_, num_bytes );
@@ -92,7 +95,6 @@ static boolean jpg_resync_to_restart( j_decompress_ptr cinfo, int desired )
 
 static void jpg_term_source( j_decompress_ptr cinfo )
 {
-   jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    // nothing to do
 }
 
@@ -155,7 +157,7 @@ bool imageJPEG( void const    *inData,     // input
    // read the scanlines
    for( unsigned row = 0 ; row < cinfo.output_height ; row++ )
    {
-      unsigned numRead = jpeg_read_scanlines( &cinfo, buffer, 1);
+      jpeg_read_scanlines( &cinfo, buffer, 1);
       unsigned char const *nextOut = buffer[0];
 
       for( unsigned column = 0; column < cinfo.output_width; ++column )
