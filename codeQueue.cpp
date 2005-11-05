@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.21  2004-12-28 03:32:57  ericn
+ * Revision 1.22  2005-11-05 20:22:04  ericn
+ * -fix signed/unsigned test
+ *
+ * Revision 1.21  2004/12/28 03:32:57  ericn
  * -localize filter vars
  *
  * Revision 1.20  2004/01/01 20:11:12  ericn
@@ -173,7 +176,7 @@ void executeCode( JSObject   *scope,
          {
             JS_ReportError( context_, "Don't know how to execute type %d/%s\n", 
                             jst, 
-                            (jst<(sizeof(jsTypeNames_)/sizeof(jsTypeNames_[0]))) 
+                            (jst< (int)((sizeof(jsTypeNames_)/sizeof(jsTypeNames_[0]))))
                             ? jsTypeNames_[jst] : "undefined" );
          }
    }
