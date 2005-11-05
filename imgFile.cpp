@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgFile.cpp,v $
- * Revision 1.4  2005-08-12 03:31:42  ericn
+ * Revision 1.5  2005-11-05 20:23:31  ericn
+ * -add standalone utility
+ *
+ * Revision 1.4  2005/08/12 03:31:42  ericn
  * -include <string.h>
  *
  * Revision 1.3  2004/05/02 14:05:08  ericn
@@ -90,3 +93,35 @@ bool imageFromFile( char const *fileName,
 
 }
 
+
+#ifdef STANDALONE
+#include <stdio.h>
+#include "fbDev.h"
+#include <stdlib.h>
+
+int main( int argc, char const * const argv[] )
+{
+   if( 2 <= argc )
+   {
+      image_t image ;
+      if( imageFromFile( argv[1], image ) )
+      {
+         unsigned x = 0 ;
+         if( 3 <= argc )
+            x = strtoul( argv[2], 0, 0 );
+
+         unsigned y = 0 ;
+         if( 4 <= argc )
+            y = strtoul( argv[3], 0, 0 );
+         getFB().render( x, y, 
+                         image.width_, image.height_, 
+                         (unsigned short *)image.pixData_ );
+      }
+      else
+         perror( argv[1] );
+   }
+   else
+      fprintf( stderr, "Usage: imgFile fileName [x [y]]\n" );
+   return 0 ;
+}   
+#endif
