@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.18 2005-11-05 20:23:16 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.19 2005-11-06 16:01:58 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.18  2005-11-05 20:23:16  ericn
+ * Revision 1.19  2005-11-06 16:01:58  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.18  2005/11/05 20:23:16  ericn
  * -change default fbdev name
  *
  * Revision 1.17  2004/11/16 07:31:11  tkisky
@@ -192,7 +195,7 @@ public:
 
    // draw a box with specified background color and button highlighting.
    // pressed will highlight bottom-right and shade upper left
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
    void buttonize( bool                 pressed,
                    unsigned char        borderWidth,
                    unsigned short       xLeft,

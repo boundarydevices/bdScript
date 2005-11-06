@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.6  2005-11-06 00:49:33  ericn
+ * Revision 1.7  2005-11-06 16:03:25  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.6  2005/11/06 00:49:33  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.5  2005/08/12 04:19:36  ericn
@@ -68,7 +71,7 @@ static char const fileSysDev[] = {
 #endif
 };
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
 #define FBRECT( xl, yt, xr, yb, r, g, b ) fb.rect( xl, yt, xr, yb, r, g, b )
 #else
 #define FBRECT( xl, yt, xr, yb, r, g, b ) /**/

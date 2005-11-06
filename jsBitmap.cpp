@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.8  2005-11-05 23:22:48  ericn
+ * Revision 1.9  2005-11-06 16:02:16  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.8  2005/11/05 23:22:48  ericn
  * -fixed compiler warnings
  *
  * Revision 1.7  2005/07/28 21:42:19  tkisky
@@ -59,7 +62,7 @@ jsBitmapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 {
    *rval = JSVAL_FALSE ;
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
    if( ( 3 == argc )
        &&
        JSVAL_IS_INT( argv[0] )

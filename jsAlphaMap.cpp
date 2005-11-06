@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsAlphaMap.cpp,v $
- * Revision 1.9  2005-11-05 23:23:34  ericn
+ * Revision 1.10  2005-11-06 16:02:10  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.9  2005/11/05 23:23:34  ericn
  * -fixed compiler warnings
  *
  * Revision 1.8  2004/06/27 14:50:31  ericn
@@ -73,7 +76,7 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 
       if( 3 == argc )
       {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
          imageMem = fb.getRow(0);
          imageWidth = fb.getWidth();
          imageHeight = fb.getHeight();

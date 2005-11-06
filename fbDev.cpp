@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.28  2005-11-05 20:22:58  ericn
+ * Revision 1.29  2005-11-06 16:02:02  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.28  2005/11/05 20:22:58  ericn
  * -fix compiler warnings
  *
  * Revision 1.27  2004/11/16 07:31:01  tkisky
@@ -234,7 +237,7 @@ unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
 
 void fbDevice_t :: clear( void )
 {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
    memset( getMem(), 0, getMemSize() );
 #else
    memset( getMem(), 0xFF, getMemSize() );
@@ -245,7 +248,7 @@ void fbDevice_t :: clear( void )
 void fbDevice_t :: clear( unsigned char red, unsigned char green, unsigned char blue )
 {
    unsigned short color16 = get16( red, green, blue );
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
    unsigned short *start = (unsigned short *)getMem();
    unsigned short *end   = start + getHeight() * getWidth();
    while( start < end )
@@ -259,7 +262,7 @@ void fbDevice_t :: clear( unsigned char red, unsigned char green, unsigned char 
 
 void fbDevice_t :: refresh( void )
 {
-#ifndef CONFIG_BD2003
+#ifndef KERNEL_FB
 
    unsigned char const *const src = (unsigned char const *)getMem();
    unsigned char *const dest = lcdRAM_ ;
@@ -330,7 +333,7 @@ unsigned short fbDevice_t :: getPixel( unsigned x, unsigned y )
 { 
    if( ( y < height_ ) && ( x < width_ ) )
    {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       return getRow( y )[ x ]; 
 #else
       unsigned const offs = y * width_ + x ;
@@ -350,7 +353,7 @@ void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
 { 
    if( ( y < height_ ) && ( x < width_ ) )
    {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       getRow( y )[ x ] = rgb ;
 #else
       unsigned const offs = y * width_ + x ;
@@ -559,7 +562,7 @@ void fbDevice_t :: render
    int minHeight= min(getHeight()-yPos,imageDisplayHeight);
    if ((minWidth > 0) && (minHeight > 0))
    {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       // 16-bit color
       minWidth *= sizeof( unsigned short ); //2 bytes/pixel
       do
@@ -638,7 +641,7 @@ void fbDevice_t :: render
    int minHeight= min(destH-yPos,imageDisplayHeight);
    if ((minWidth > 0) && (minHeight > 0))
    {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       // 16-bit color
       minWidth *= sizeof( unsigned short ); //2 bytes/pixel
       do
@@ -690,7 +693,7 @@ void fbDevice_t :: render
    {
       if( ( 0 < w ) && ( 0 < h ) && ( xPos < getWidth() ) && ( yPos < getHeight() ) )
       {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
          int const left = xPos ;
          for( unsigned y = 0 ; y < h ; y++, yPos++, alpha += w )
          {
@@ -847,7 +850,7 @@ void fbDevice_t :: rect
          y2 = imageHeight - 1 ;
 
       unsigned short const rgb = get16( red, green, blue );
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
       unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
       while( row <= endRow )
@@ -982,7 +985,7 @@ void fbDevice_t :: antialias
       {
          unsigned char const *alphaCol = bmp + (row*bmpWidth);
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
          unsigned short      *screenPix = getRow( yTop++ ) + xLeft ;
 
          unsigned short screenCol = xLeft ;
@@ -1039,7 +1042,7 @@ void fbDevice_t :: antialias
       else
          break;
    }
-#ifndef CONFIG_BD2003
+#ifndef KERNEL_FB
 refresh();
 #endif 
 }
@@ -1074,7 +1077,7 @@ void fbDevice_t :: antialias
       {
          unsigned char const *alphaCol = bmp + (row*bmpWidth);
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
          unsigned short      *screenPix = imageMem+ (imageWidth*yTop++) + xLeft ;
 
          unsigned short screenCol = xLeft ;
@@ -1131,12 +1134,12 @@ void fbDevice_t :: antialias
       else
          break;
    }
-#ifndef CONFIG_BD2003
+#ifndef KERNEL_FB
 refresh();
 #endif 
 }
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
 void fbDevice_t :: buttonize
    ( bool                 pressed,
      unsigned char        borderWidth,
@@ -1198,7 +1201,7 @@ void fbDevice_t :: buttonize
 }
 #endif
 
-#ifndef CONFIG_BD2003
+#ifndef KERNEL_FB
 void fbDevice_t :: render
    ( bitmap_t const &bmp,
      unsigned        xStart,
@@ -1265,7 +1268,7 @@ fbDevice_t :: ~fbDevice_t( void )
 {
    if( 0 <= fd_ )
    {
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       munmap( mem_, memSize_ );
 #else 
       delete [] (unsigned char *)mem_ ;

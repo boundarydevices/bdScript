@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.16  2005-11-06 00:49:37  ericn
+ * Revision 1.17  2005-11-06 16:01:50  ericn
+ * -KERNEL_FB, not CONFIG_BD2003
+ *
+ * Revision 1.16  2005/11/06 00:49:37  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.15  2004/12/05 00:55:26  tkisky
@@ -393,7 +396,7 @@ jsBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
 static JSBool
 jsButtonize( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -494,7 +497,7 @@ static JSFunctionSpec screen_methods[] = {
    { "rect",         jsRect,             0,0,0 },
    { "line",         jsLine,             0,0,0 },
    { "box",          jsBox,              0,0,0 },
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
    { "buttonize",    jsButtonize,        0,0,0 },
 #endif 
    { 0 }
