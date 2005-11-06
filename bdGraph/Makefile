@@ -77,10 +77,6 @@ $(LIB): Makefile $(OBJS)
 buildSinTable: buildSinTable.cpp fft.h
 	gcc -DX86 buildSinTable.cpp -o $@ -fno-exceptions -lm
 
-
-mathLib.S :
-	ln -s ../../boundaryLib/mathLib.S
-
 sinTable8.c : buildSinTable
 	./buildSinTable
 
