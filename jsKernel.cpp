@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsKernel.cpp,v $
- * Revision 1.5  2005-08-12 04:19:36  ericn
+ * Revision 1.6  2005-11-06 00:49:33  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.5  2005/08/12 04:19:36  ericn
  * -allow compile against 2.6
  *
  * Revision 1.4  2004/09/28 04:02:59  ericn
@@ -83,7 +86,6 @@ jsKernelMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       unsigned numRead = read( fdKernel, kernelData, maxKernelSize );
       if( 0 <= numRead )
       {
-         unsigned const totalSize = numRead ;
          //
          // kernel partition consists of 
          //    boot loader + kernel
@@ -104,7 +106,6 @@ jsKernelMD5( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
             }
          }
 
-         unsigned const paramStart = numRead ;
          while( 0 < numRead )
          {
             --numRead ;

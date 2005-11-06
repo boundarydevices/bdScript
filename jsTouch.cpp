@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.23  2004-12-28 03:35:12  ericn
+ * Revision 1.24  2005-11-06 00:49:43  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.23  2004/12/28 03:35:12  ericn
  * -added shutdown routine
  *
  * Revision 1.22  2004/11/27 18:00:34  ericn
@@ -171,7 +174,6 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
 void jsTouchPoll_t :: setCooked( char const *data )
 {
    double a[6];
-   unsigned swap ;
    if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf", a, a+1, a+2, a+3, a+4, a+5 ) )
    {
       raw_ = false ;

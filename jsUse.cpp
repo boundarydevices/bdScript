@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUse.cpp,v $
- * Revision 1.2  2004-01-02 23:36:16  ericn
+ * Revision 1.3  2005-11-06 00:49:45  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.2  2004/01/02 23:36:16  ericn
  * -remove debug stmt
  *
  * Revision 1.1  2003/01/20 06:24:01  ericn
@@ -82,7 +85,6 @@ static void libraryOnComplete( jsCurlRequest_t &req, void const *data, unsigned 
 static JSBool
 use(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval* rval)
 {
-   JSString *sLib ;
    if( ( 1 == argc )
        && 
        JSVAL_IS_OBJECT( argv[0] ) )

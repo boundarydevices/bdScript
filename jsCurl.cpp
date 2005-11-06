@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.24  2005-11-05 23:23:03  ericn
+ * Revision 1.25  2005-11-06 00:49:29  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.24  2005/11/05 23:23:03  ericn
  * -fixed compiler warnings
  *
  * Revision 1.23  2004/09/03 15:08:43  ericn
@@ -279,32 +282,6 @@ static void cbOnFailure( void *cbParam )
    delete &req ;
 }
 
-static void cbOnCancel( void *cbParam )
-{
-   jsCurlRequest_t &req = *(jsCurlRequest_t *)cbParam ;
-   req.status_     = req.cancelled_ ;
-   req.isComplete_ = true ;
-
-   jsval rhval ;
-   if( JS_GetProperty( req.cx_, 
-                       req.lhObj_, 
-                       "initializer",
-                       &rhval ) 
-       &&
-       JSVAL_IS_OBJECT( rhval ) )
-   {
-      JSObject *rhObj = JSVAL_TO_OBJECT( rhval );
-      jsval handlerVal ;
-      if( JS_GetProperty( req.cx_, rhObj, "onCancel", &handlerVal ) 
-          && 
-          JSVAL_IS_STRING( handlerVal ) )
-      {
-         executeCode( req.lhObj_, handlerVal, "curlRequest::onCancel" );
-      }
-   }
-
-   delete &req ;
-}
 
 static void cbOnSize( void *cbParam )
 {
@@ -381,8 +358,7 @@ static void jsCurlOnComplete( jsCurlRequest_t &req, void const *data, unsigned l
 
 static void jsCurlOnFailure( jsCurlRequest_t &req, std::string const &errorMsg )
 {
-   req.errorMsg_ = errorMsg ;
-   char volatile c = req.errorMsg_[0]; // forcibly detach from errorMsg
+   req.errorMsg_.assign( errorMsg.c_str() ); // forcibly detach from errorMsg
    queueCallback( cbOnFailure, &req );
 }
 

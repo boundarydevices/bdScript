@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sniffWLAN.cpp,v $
- * Revision 1.3  2003-09-07 22:51:17  ericn
+ * Revision 1.4  2005-11-06 00:49:52  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.3  2003/09/07 22:51:17  ericn
  * -modified to allow empty SSID
  *
  * Revision 1.2  2003/08/13 00:49:04  ericn
@@ -195,9 +198,9 @@ typedef struct p80211msgd
 
 
 sniffWLAN_t :: sniffWLAN_t( void )
-   : cancel_( false ),
-     fd_( socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL)) ),
-     firstAP_( 0 )
+   : cancel_( false )
+   , firstAP_( 0 )
+   , fd_( socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL)) )
 {
    if( 0 <= fd_ )
    {

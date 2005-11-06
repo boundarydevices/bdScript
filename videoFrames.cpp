@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: videoFrames.cpp,v $
- * Revision 1.2  2004-10-30 18:48:52  ericn
+ * Revision 1.3  2005-11-06 00:49:55  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.2  2004/10/30 18:48:52  ericn
  * -use decoder's stride() method
  *
  * Revision 1.1  2003/07/27 15:19:12  ericn
@@ -199,6 +202,9 @@ bool videoFrames_t :: pull( videoQueue_t :: entry_t *&entry )
          }
       } while( 1 );
    } // or why bother ?
+   
+   
+   return true ;
 }
 
 

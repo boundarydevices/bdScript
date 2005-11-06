@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.6  2003-07-27 15:13:43  ericn
+ * Revision 1.7  2005-11-06 00:49:47  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.6  2003/07/27 15:13:43  ericn
  * -added time summary to bulk info
  *
  * Revision 1.5  2003/07/24 13:44:11  ericn
@@ -152,6 +155,7 @@ static bool find_start_code
    return worked ;
 }
 
+#if 0
 static bool looksLikeMPEG( unsigned char const *inData, unsigned long inSize )
 {
    unsigned long state = 0xFF ;
@@ -169,7 +173,7 @@ static bool looksLikeMPEG( unsigned char const *inData, unsigned long inSize )
    else
       return false ;
 }
-
+#endif
 
 inline unsigned short be16( unsigned char const *&inData,
                             unsigned long        &sizeInOut )
@@ -449,7 +453,7 @@ void mpegDemux_t :: bulkInfo_t :: clear( mpegDemux_t :: bulkInfo_t const *bi )
    for( unsigned sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
    {
       streamAndFrames_t * const sAndF = bi->streams_[sIdx];
-      free( (void *)bi->streams_[sIdx] );
+      free( (void *)sAndF );
    }
    free( (void *)bi );
 }

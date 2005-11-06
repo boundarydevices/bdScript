@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.3  2003-01-31 13:26:44  ericn
+ * Revision 1.4  2005-11-06 00:49:49  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.3  2003/01/31 13:26:44  ericn
  * -added startsAtRoot flag and test program
  *
  * Revision 1.2  2002/11/30 18:00:30  ericn
@@ -164,6 +167,9 @@ parsedURL_t :: parsedURL_t( std::string const &url )
 
             break;
          }
+         case stateError_:
+            i = url.size();
+            break;
       }
    }
 

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.23  2003-09-22 02:01:17  ericn
+ * Revision 1.24  2005-11-06 00:49:34  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.23  2003/09/22 02:01:17  ericn
  * -separated boost and changed record level params
  *
  * Revision 1.22  2003/09/15 02:22:25  ericn
@@ -122,7 +125,6 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
           ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
       {
          jsval     val ;
-         JSString *sHandler ;
          
          if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
              &&
@@ -295,8 +297,6 @@ jsWavePlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
        &&
        ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
    {
-      unsigned const length = JS_GetStringLength( dataStr );
-
       jsval onComplete = JSVAL_VOID ;
       jsval onCancel   = JSVAL_VOID ;
       
@@ -308,7 +308,6 @@ jsWavePlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
           ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
       {
          jsval     val ;
-         JSString *sHandler ;
          
          if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
              &&
@@ -551,8 +550,6 @@ jsRecordPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
        &&
        ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
    {
-      unsigned const length = JS_GetStringLength( dataStr );
-
       jsval onComplete = JSVAL_VOID ;
       jsval onCancel   = JSVAL_VOID ;
       
@@ -563,8 +560,7 @@ jsRecordPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
           &&
           ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
       {
-         jsval     val ;
-         JSString *sHandler ;
+         jsval val ;
          
          if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
              &&
@@ -813,9 +809,8 @@ static JSBool recordBuffer( JSContext *cx, JSObject *obj, uintN argc, jsval *arg
          JSObject *rhObj ;
          if( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) )
          {
-            jsval     val ;
-            JSString *sHandler ;
-            double    maxSeconds ;
+            jsval  val ;
+            double maxSeconds ;
             
             if( JS_GetProperty( cx, rhObj, "maxSeconds", &val ) 
                 &&

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.15  2004-12-05 00:55:26  tkisky
+ * Revision 1.16  2005-11-06 00:49:37  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.15  2004/12/05 00:55:26  tkisky
  * -more info in error message
  *
  * Revision 1.14  2004/03/17 04:56:19  ericn
@@ -202,14 +205,14 @@ jsGetRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 
                fbDevice_t &fb = getFB();
 
-               for( unsigned y = 0 ; y < height ; y++ )
+               for( unsigned y = 0 ; y < (unsigned)height ; y++ )
                {
                   int const screenY = startY + y ;
                   if( ( 0 <= screenY ) 
                       &&
                       ( screenY < fb.getHeight() ) )
                   {
-                     for( unsigned x = 0 ; x < width ; x++ )
+                     for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                      {
                         int const screenX = x + startX ;
                         if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
@@ -278,14 +281,14 @@ jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
          fbDevice_t &fb = getFB();
 
-         for( unsigned y = 0 ; y < height ; y++ )
+         for( unsigned y = 0 ; y < (unsigned)height ; y++ )
          {
             int const screenY = startY + y ;
             if( ( 0 <= screenY ) 
                 &&
                 ( screenY < fb.getHeight() ) )
             {
-               for( unsigned x = 0 ; x < width ; x++ )
+               for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                {
                   int const screenX = x + startX ;
                   if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )

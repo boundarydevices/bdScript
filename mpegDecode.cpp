@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.8  2005-08-22 13:12:56  ericn
+ * Revision 1.9  2005-11-06 00:49:48  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.8  2005/08/22 13:12:56  ericn
  * -remove redundant default param
  *
  * Revision 1.7  2005/01/09 04:53:08  ericn
@@ -214,7 +217,7 @@ void yuv_null_copy( void * _id, uint8_t * const * src, unsigned int v_offset)
    int loop = 8 ;
    do {
       // for each block of 2 lines, 2 pixels of width
-      for( int i = 0 ; i < id->width ; i += 4 )
+      for( unsigned i = 0 ; i < id->width ; i += 4 )
       {
          unsigned char u ;
          unsigned char v ;
@@ -333,20 +336,17 @@ void interleaveYUV( int                  width,
                     unsigned char const *u, 
                     unsigned char const *v )
 {
-   unsigned char const * const startU = u ;
-   for( unsigned row = 0 ; row < height ; row++ )
+   for( int row = 0 ; row < height ; row++ )
    {
       unsigned char const *uRow = u ;
       unsigned char const *vRow = v ;
-      for( unsigned col = 0 ; col < width ; col++ )
+      for( int col = 0 ; col < width ; col++ )
       {
          *yuv++ = *y++ ;
          if( 0 == ( col & 1 ) )
             *yuv++ = *uRow++ ;
          else
             *yuv++ = *vRow++ ;
-
-//         yuv += 2 ;
       }
       
       if( 1 == ( row & 1 ) )

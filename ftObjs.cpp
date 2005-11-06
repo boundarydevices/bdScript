@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: ftObjs.cpp,v $
- * Revision 1.15  2005-11-05 23:23:18  ericn
+ * Revision 1.16  2005-11-06 00:49:25  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.15  2005/11/05 23:23:18  ericn
  * -fixed compiler warnings
  *
  * Revision 1.14  2004/10/28 21:31:22  tkisky
@@ -825,7 +828,7 @@ clipped = true ;
             unsigned char *nextOut = bmp + ( nextY * bmpStride );
             for( unsigned row = 0 ; ( row < (unsigned)slot->bitmap.rows ) ; row++, nextY++ )
             {
-               if( ( nextY >= y ) && ( nextY < bottomY )
+               if( ( nextY >= (long)y ) && ( nextY < (long)bottomY )
                    &&
                    ( 0 < inPix ) )
                {

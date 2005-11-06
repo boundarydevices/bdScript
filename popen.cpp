@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: popen.cpp,v $
- * Revision 1.2  2002-12-10 04:10:02  ericn
+ * Revision 1.3  2005-11-06 00:49:50  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.2  2002/12/10 04:10:02  ericn
  * -fixed problems with timeout
  *
  * Revision 1.1  2002/12/09 15:21:11  ericn
@@ -65,7 +68,7 @@ bool popen_t :: getLine
       int const fd = fileno( fIn_ );
 
       // set non-blocking mode
-      int fcRes = fcntl( fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+      fcntl( fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
 
       while( 1 )
       {

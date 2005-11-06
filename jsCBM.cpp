@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCBM.cpp,v $
- * Revision 1.16  2004-05-05 03:18:34  ericn
+ * Revision 1.17  2005-11-06 00:49:27  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.16  2004/05/05 03:18:34  ericn
  * -updated to work with jsPrinter base class
  *
  * Revision 1.15  2004/03/27 20:23:10  ericn
@@ -199,7 +202,8 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 #if 1
 			int const fd = open( "/tmp/testNew.prt", O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR );
 			if (fd>=0) {
-				int const numWritten = write( fd, data, l );
+//				int const numWritten = 
+            write( fd, data, l );
 				close(fd);
 			}
 			else printf("error opening /tmp/testNew.prt\n");
@@ -236,7 +240,7 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 		}
 #endif
                int const numWritten = write( *pfd, p, len );
-               if( numWritten == image.getLength() )
+               if( (unsigned)numWritten == image.getLength() )
                {
                   *rval = JSVAL_TRUE ;
                }
@@ -257,7 +261,7 @@ jsCBMPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       {
          unsigned const outLen = JS_GetStringLength( sArg );
          int const numWritten = write( *pfd, JS_GetStringBytes( sArg ), outLen );
-         if( numWritten != outLen )
+         if( (unsigned)numWritten != outLen )
             printf( "wrote %d of %u string bytes\n", numWritten, outLen );
    
          *rval = JSVAL_TRUE ;

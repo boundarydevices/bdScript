@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.8  2004-10-30 19:37:14  ericn
+ * Revision 1.9  2005-11-06 00:49:35  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.8  2004/10/30 19:37:14  ericn
  * -accept all picture types
  *
  * Revision 1.7  2003/08/03 14:41:49  ericn
@@ -83,7 +86,6 @@ jsMPEGPlay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
              ( 0 != ( rhObj = JSVAL_TO_OBJECT( argv[0] ) ) ) )
          {
             jsval     val ;
-            JSString *sHandler ;
             
             if( JS_GetProperty( cx, rhObj, "onComplete", &val ) 
                 &&

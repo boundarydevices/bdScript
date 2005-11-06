@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsUDP.cpp,v $
- * Revision 1.4  2005-01-01 17:51:05  ericn
+ * Revision 1.5  2005-11-06 00:49:44  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2005/01/01 17:51:05  ericn
  * -allow broadcasts
  *
  * Revision 1.3  2003/12/28 20:55:49  ericn
@@ -151,7 +154,7 @@ static JSBool jsUDPSendTo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
          char const     *data = JS_GetStringBytes( sData );
          unsigned const  dataLen = JS_GetStringLength( sData );
          int const numSent = sendto( udpSocket->getFd(), data, dataLen, 0, (struct sockaddr *)&remote, sizeof( remote ) );
-         *rval = (numSent == dataLen )
+         *rval = ((unsigned)numSent == dataLen )
                  ? JSVAL_TRUE 
                  : JSVAL_FALSE ;
       }

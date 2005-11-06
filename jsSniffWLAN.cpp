@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsSniffWLAN.cpp,v $
- * Revision 1.2  2003-08-13 00:49:04  ericn
+ * Revision 1.3  2005-11-06 00:49:39  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.2  2003/08/13 00:49:04  ericn
  * -fixed cancellation process
  *
  * Revision 1.1  2003/08/12 01:20:38  ericn
@@ -286,6 +289,7 @@ bool initSniffWLAN( JSContext *cx, JSObject *glob )
       JS_AddRoot( cx, &snifferOnAP_ );
       JS_AddRoot( cx, &snifferOnComplete_ );
       JS_AddRoot( cx, &snifferAPObject_ );
+      return true ;
    }
    else
       return false ;

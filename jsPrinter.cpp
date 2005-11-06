@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsPrinter.cpp,v $
- * Revision 1.4  2004-05-12 03:46:17  ericn
+ * Revision 1.5  2005-11-06 00:49:36  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2004/05/12 03:46:17  ericn
  * -added read() method
  *
  * Revision 1.3  2004/05/12 03:42:26  ericn
@@ -148,7 +151,7 @@ jsPrinterPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
       {
          unsigned const outLen = JS_GetStringLength( sArg );
          int const numWritten = write( *pfd, JS_GetStringBytes( sArg ), outLen );
-         if( numWritten != outLen )
+         if( (unsigned)numWritten != outLen )
             printf( "wrote %d of %u string bytes\n", numWritten, outLen );
       }
    }

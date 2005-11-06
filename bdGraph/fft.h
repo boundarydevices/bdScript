@@ -725,6 +725,8 @@ static void inline IncNpd(npd* dest)
 	}
 #endif
 }
+
+#if 0
 static void AddNpd(npd* dest, const npd* src)
 {
 #ifdef ARM_1
@@ -750,6 +752,7 @@ static void AddNpd(npd* dest, const npd* src)
 	}
 #endif
 }
+#endif
 
 static void inline SubNpd(npd* dest,const npd* src)
 {
@@ -821,16 +824,16 @@ static void inline DivNpd_p1(npd* dest,const npd_p1* src,const int divisor)
 	unsigned int a= *s; s--;
 #if 0
 	printf("{");
-	for (i=0; i<NPD_P1_CNT-1; i++) printf("0x%08x,",src->n[i]);
+	for (i=0; (unsigned)i < NPD_P1_CNT-1; i++) printf("0x%08x,",src->n[i]);
 	printf("0x%08x}/ %i = ",src->n[i],divisor);
 #endif
-	if (a<divisor) {
-		for (j=0; j<NPD_CNT; j++) {
+	if ((int)a<divisor) {
+		for (j=0; (unsigned)j < NPD_CNT; j++) {
 			unsigned int temp = *s; s--;
 			for (i=0; i<32; i++) {
 				c = a>>31;
 				a = (a<<1) + (temp>>31); temp<<=1;
-				if (c==0) if (a >= divisor) c=1;
+				if (c==0) if ((int)a >= divisor) c=1;
 				if (c==1) a -= divisor;
 				ShiftLeft(dest,c);
 			}

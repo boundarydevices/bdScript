@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsFlashVar.cpp,v $
- * Revision 1.2  2004-02-07 13:40:53  ericn
+ * Revision 1.3  2005-11-06 00:49:30  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.2  2004/02/07 13:40:53  ericn
  * -removed debug prints
  *
  * Revision 1.1  2004/02/07 12:14:51  ericn
@@ -74,8 +77,7 @@ jsSetFlashVar( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
       {
          char const *varName = JS_GetStringBytes( sVarName );
          char const *value = JS_GetStringBytes( sValue );
-         writeFlashVar( JS_GetStringBytes( sVarName ),
-                        JS_GetStringBytes( sValue ) );
+         writeFlashVar( varName, value );
          *rval = JSVAL_TRUE ;
       }
       else

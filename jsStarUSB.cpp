@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.6  2005-03-06 07:37:49  tkisky
+ * Revision 1.7  2005-11-06 00:49:41  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.6  2005/03/06 07:37:49  tkisky
  * -work around for older star printer software
  *
  * Revision 1.5  2004/12/05 00:56:11  tkisky
@@ -81,8 +84,8 @@ extern int usb_debug ;
 
 starPoll_t :: starPoll_t( void )
    : pollTimer_t()
-   , udev_( 0 )
    , prevLen_( 0 )
+   , udev_( 0 )
    , statusHandler_( JSVAL_VOID )
    , statusObj_( 0 ), asb_valid(0), lastENQ(0), lastEOT(0), asbInitialized(0), statusWaitTicks(2), eotNext(0)
 {
@@ -97,7 +100,7 @@ starPoll_t :: starPoll_t( void )
 
    unsigned char found = 0;
    struct usb_bus *bus;
-   struct usb_device *dev;
+   struct usb_device *dev = 0 ;
 
    for (bus = usb_busses; bus; bus = bus->next)
    {
@@ -147,7 +150,7 @@ void starPoll_t :: print( JSContext *cx, void const *data, unsigned len )
                                              (char *)nextOut, toWrite, 1000 );
       statusWaitTicks = 2;
       lastENQ &= ~0x20;		//clear idle bit
-      if( toWrite == numWritten )
+      if( toWrite == (unsigned)numWritten )
       {
          outBytes -= numWritten ;
          nextOut  += numWritten ;
@@ -210,7 +213,7 @@ void starPoll_t :: fire( void )
             char change=0;
             statusWaitTicks = 0;
             if (asb_valid || ((numRead >= 9) && ((inBuf[0] & 0x13) && ((inBuf[0] & 0x91)!=10))) ) {
-               if ( ( numRead != prevLen_ ) || ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) ) {
+               if ( ( (unsigned)numRead != prevLen_ ) || ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) ) {
                   for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
                   printf( "\n" );
                   if (numRead >= 9) {
@@ -251,7 +254,6 @@ void starPoll_t :: fire( void )
             }
             if (change) if( JSVAL_VOID != statusHandler_ )
             {
-               JSObject *scope = statusObj_ ;
                executeCode( statusObj_, statusHandler_, "starUSB:onStatusChange", 0, 0 );
             }
          } else printf( "read error %d\n", numRead );
@@ -520,7 +522,6 @@ jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
          {
             unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
-            char cHeightSpec[12];
 
             unsigned const rowBytes = (bmWidth+7)/8 ;
             unsigned const imageBytes = bmHeight*(rowBytes+3);    // 'b'+n+m+pixels
@@ -784,7 +785,7 @@ static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 
 		assert( nextOut <= outBuf+sizeof(outBuf) );
 
-		printf( "%lu total bytes sent to printer\n", totalOut );
+//		printf( "%lu total bytes sent to printer\n", totalOut );
 //		printf( "done sending to printer\n" );
 	} else JS_ReportError( cx, "Invalid bitmap\n" );
 }

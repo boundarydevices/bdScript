@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.4  2003-11-28 14:53:40  ericn
+ * Revision 1.5  2005-11-06 00:49:23  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2003/11/28 14:53:40  ericn
  * -misc fixes, remove some debug code
  *
  * Revision 1.3  2003/11/24 19:42:05  ericn
@@ -151,15 +154,14 @@ flashThread_t :: flashThread_t
 // uncomment these to blt directly to the fb 
 //unsigned short * const pixels = fb.getRow( 0 );
 //display_.bpl = 2*fb.getWidth();
-         unsigned const videoBytes = display_.width*display_.height*sizeof(pixels[0]);
          unsigned short const bg = fb.get16( ( bgColor_ >> 16 ),
                                              ( bgColor_ >> 8 ) & 0xFF,
                                              ( bgColor_ & 0xFF ) );
          // set top row
-         for( unsigned i = 0 ; i < display_.width ; i++ )
+         for( int i = 0 ; i < display_.width ; i++ )
             pixels[i] = bg ;
          // set remaining rows 
-         for( unsigned i = 1 ; i < display_.height ; i++ )
+         for( int i = 1 ; i < display_.height ; i++ )
             memcpy( pixels+(i*display_.width), pixels, display_.bpl );
          fbMem_ = (unsigned short *)fb.getMem() + x_ + ( y_ * fb.getWidth() );
          fbStride_ = fb.getWidth()*sizeof(pixels[0]);
@@ -360,7 +362,7 @@ void *flashThread( void *param )
           {
              char *pixMem = (char *)tObj.fbMem_ ;
              char *flashMem = (char *)tObj.display_.pixels ;
-             for( unsigned i = 0 ; i < tObj.display_.height ; i++, pixMem += tObj.fbStride_, flashMem += tObj.display_.bpl )
+             for( int i = 0 ; i < tObj.display_.height ; i++, pixMem += tObj.fbStride_, flashMem += tObj.display_.bpl )
                 memcpy( pixMem, flashMem, tObj.display_.bpl );
           }
 
@@ -392,6 +394,8 @@ void *flashThread( void *param )
    } while( 1 );
    
    debugPrint( "flashThread shutdown\n" );
+   
+   return 0 ;
 }
 
 

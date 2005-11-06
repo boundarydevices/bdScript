@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: urlFile.cpp,v $
- * Revision 1.7  2004-09-03 15:08:43  ericn
+ * Revision 1.8  2005-11-06 00:49:54  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.7  2004/09/03 15:08:43  ericn
  * -support useCache for http gets
  *
  * Revision 1.6  2004/06/19 18:15:16  ericn
@@ -110,8 +113,8 @@ static curlCallbacks_t const callbacks_ = {
 
 urlFile_t :: urlFile_t( char const url[] )
    : url_( url ),
-     size_( 0 ),
      data_( 0 ),
+     size_( 0 ),
      handle_( 0xdeadbeef ),
      callingThread_( pthread_self() ),
      failed_( false )

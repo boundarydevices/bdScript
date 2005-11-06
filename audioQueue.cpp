@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.36  2005-04-24 18:51:14  ericn
+ * Revision 1.37  2005-11-06 00:49:22  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.36  2005/04/24 18:51:14  ericn
  * -add SETPLANE call for sm501yuv
  *
  * Revision 1.35  2004/10/30 19:37:33  ericn
@@ -253,7 +256,7 @@ void setVolume( unsigned char volParam )
 static void normalize( short int *samples,
                        unsigned   numSamples )
 {
-	unsigned long const maxNormalizeRatio = 0x800000 ;//* 128 max
+	long const maxNormalizeRatio = 0x800000 ;//* 128 max
 	signed short *next = samples ;
 	signed short min = *next;
 	signed short max = *next++;
@@ -418,6 +421,8 @@ printf( "%u bytes/frame\n", bytesPerFrame );
       perror( "/dev/yuv" );
 #endif 
    printf( "%u pictures\n", picCount );
+   
+   return 0 ;
 }
 
 void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
@@ -445,7 +450,7 @@ void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 	const int logN=cnw->logN;	//1024 points
 	const int n=(1<<logN);
 	const int n_d2=(1<<(logN-1));
-	const int n_d4=(1<<(logN-2));
+//	const int n_d4=(1<<(logN-2));
 	const int n3_d4=(3<<(logN-2));
 	int i;
 
@@ -474,7 +479,6 @@ void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 //		printf("readPos:%i outSampleCnt:%i, max:%i\r\n",readPos,outSampleCnt,outSampleCntMax);
 		while ((((writePos-readPos)& (blkSize-1))+numRead)<n) {
 			int max;
-			short* pSamples;
 
 			writePos=(writePos+numRead)& (blkSize-1);
 			numRead=0;
@@ -594,7 +598,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                if( headers.worked() )
                {
 
-                  printf( "playback %lu bytes (%lu seconds) from %p here\n", 
+                  printf( "playback %u bytes (%lu seconds) from %p here\n", 
                           item->length_, 
                           headers.lengthSeconds(),
                           item->data_ );
@@ -814,7 +818,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      {
                         unsigned const bytesToWrite = numFilled*sizeof(samples[0]);
                         int numWritten = write( writeFd, samples, bytesToWrite );
-                        if( numWritten != bytesToWrite )
+                        if( (unsigned)numWritten != bytesToWrite )
                         {
                            fprintf( stderr, "!!! short write %u/%u\n", numWritten, bytesToWrite );
                            return 0 ;
@@ -1061,9 +1065,12 @@ printf( "have %u streams\n", bi->count_ ); fflush( stdout );
                         streams.audioFrames_ = bi->streams_[sIdx];
                         break;
                      }
+                     case mpegDemux_t::endOfFile_e :
+                        sIdx = bi->count_ ;
+                        break ;
                   }
                } // for each stream in the file
-      
+
                if( ( 0 != streams.audioFrames_ )
                    &&
                    ( 0 != streams.videoFrames_ ) )
@@ -1188,7 +1195,7 @@ printf( "allocate frames: %u x %u\n", width, height );
                            {
                               unsigned const bytesToWrite = numFilled*sizeof(samples[0]);
                               int numWritten = write( writeFd, samples, bytesToWrite );
-                              if( numWritten != bytesToWrite )
+                              if( (unsigned)numWritten != bytesToWrite )
                               {
                                  fprintf( stderr, "!!! short write %u/%u\n", numWritten, bytesToWrite );
                                  return 0 ;
@@ -1564,6 +1571,8 @@ printf( "set input gain to %d\n", newLevel );
 
       closeReadFd();
    }
+   
+   return true ;
 }
 
 void audioQueue_t :: shutdown( void )

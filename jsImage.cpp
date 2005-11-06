@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.30  2004-07-04 21:32:25  ericn
+ * Revision 1.31  2005-11-06 00:49:31  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.30  2004/07/04 21:32:25  ericn
  * -added bitmap->bitmap construction
  *
  * Revision 1.29  2004/05/08 16:33:50  ericn
@@ -264,9 +267,9 @@ jsImageDither( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
                JS_DefineProperty( cx, returnObj, "pixBuf", STRING_TO_JSVAL( sAlphaMap ), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                dither_t dither( pixMap, width, height );
                unsigned char *const alphaOut = (unsigned char *)pixMem ;
-               for( unsigned y = 0 ; y < height ; y++ )
+               for( unsigned y = 0 ; y < (unsigned)height ; y++ )
                {
-                  for( unsigned x = 0 ; x < width ; x++ )
+                  for( unsigned x = 0 ; x < (unsigned)width ; x++ )
                   {
                      alphaOut[y*width+x] = dither.isBlack( x, y ) ? 0 : 0xFF ;
                   }
@@ -472,7 +475,7 @@ jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          unsigned const pixBytes = width * height * sizeof( pixMap[0] );
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
-            if( ( x < width ) && ( y < height ) )
+            if( ( x < (unsigned)width ) && ( y < (unsigned)height ) )
             {
                pixMap[(y*width)+x] = rgb16 ;
             }
@@ -787,8 +790,6 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
             unsigned short *pixMap = (unsigned short *)JS_malloc( cx, pixBytes );
             if( pixMap )
             {
-               fbDevice_t &fb = getFB();
-               unsigned short const rgb16 = fb.get16( rgb32 );
                unsigned short *nextOut = pixMap ;
                for( unsigned r = 0 ; r < h ; r++ )
                   for( unsigned c = 0 ; c < w ; c++ )

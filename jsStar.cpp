@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStar.cpp,v $
- * Revision 1.4  2004-05-10 15:41:47  ericn
+ * Revision 1.5  2005-11-06 00:49:40  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2004/05/10 15:41:47  ericn
  * -split parts of initRaster to allow choice in user-space
  *
  * Revision 1.3  2004/05/08 23:55:05  ericn
@@ -127,7 +130,6 @@ jsStarImageToString( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
          if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
          {
             unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
-            char cHeightSpec[12];
 
             unsigned const rowBytes = (bmWidth+7)/8 ;
             unsigned const imageBytes = bmHeight*(rowBytes+3);    // 'b'+n+m+pixels

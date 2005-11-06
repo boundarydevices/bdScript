@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: serialPoll.cpp,v $
- * Revision 1.3  2005-08-22 13:12:36  ericn
+ * Revision 1.4  2005-11-06 00:49:51  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.3  2005/08/22 13:12:36  ericn
  * -make file name an argument to test prog
  *
  * Revision 1.2  2004/09/09 21:04:50  tkisky
@@ -172,7 +175,7 @@ void serialPoll_t :: onDataAvail( void )
       {
          char const *start = inData_ ;
          
-         for( unsigned next = 0 ; next < numRead ; next++ )
+         for( unsigned next = 0 ; (int)next < numRead ; next++ )
          {
             if( terminator_ == start[inLength_] )
             {

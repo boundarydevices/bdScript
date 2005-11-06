@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.23  2003-11-25 00:13:17  ericn
+ * Revision 1.24  2005-11-06 00:49:26  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.23  2003/11/25 00:13:17  ericn
  * -no need to lock from button handlers
  *
  * Revision 1.22  2003/08/26 00:33:13  ericn
@@ -511,7 +514,6 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                   jsval drawResult ;
                   jsImageDraw( cx, oImage, 2, drawParams, &drawResult );
 
-                  int       iVal ;
                   if( JS_GetProperty( cx, oImage, "width", &jsv ) && JSVAL_IS_INT( jsv ) )
                   {
                      buttonData->imgWidth_ = JSVAL_TO_INT( jsv );

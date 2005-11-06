@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.4  2005-08-12 04:18:43  ericn
+ * Revision 1.5  2005-11-06 00:49:24  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2005/08/12 04:18:43  ericn
  * -allow compile against 2.6
  *
  * Revision 1.3  2004/02/07 12:14:34  ericn
@@ -95,7 +98,7 @@ readVars_t :: readVars_t( void )
          unsigned offset = meminfo.size-meminfo.erasesize ;
          image_ = (char *)malloc( meminfo.erasesize );
 //         printf( "malloc result %p\n", image_ );
-         if( offset == lseek( fd, offset, SEEK_SET ) )
+         if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
          {
             // nearest size in pages (probably always equal)
             maxSize_ = ( meminfo.erasesize / pageSize ) * pageSize ;
@@ -104,7 +107,7 @@ readVars_t :: readVars_t( void )
             while( bytesUsed_ < maxSize_ )
             {
                int numRead = read( fd, nextIn, pageSize );
-               if( pageSize == numRead )
+               if( pageSize == (unsigned)numRead )
                {
                   bytesUsed_ += pageSize ;
                   nextIn    += pageSize ;
@@ -327,7 +330,7 @@ void writeFlashVar( char const *name,
                if( meminfo.erasesize == rv.maxSize() )
                {
                   unsigned offset = meminfo.size-meminfo.erasesize+ rv.bytesUsed();
-                  if( offset == lseek( fd, offset, SEEK_SET ) )
+                  if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
                   {
                      //
                      // build memory image of new entry
@@ -341,7 +344,7 @@ void writeFlashVar( char const *name,
                      *upd++ = '\n' ;
                      unsigned const entryLen = upd-entryStart ;
                      int const numWrote = write( fd, entryStart, entryLen );
-                     if( numWrote == entryLen )
+                     if( (unsigned)numWrote == entryLen )
                      {
 //                        printf( "wrote %u bytes of new entry\n", numWrote );
                      }
@@ -486,7 +489,7 @@ printf( "saving %u bytes\n", uniqueSize );
                         erase.length = meminfo.erasesize;
                         if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
                         {
-                           if( offset == lseek( fd, offset, SEEK_SET ) )
+                           if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
                            {
                               int numWritten = 0 ;
                               for( i = 0 ; i < numUnique ; i++ )
@@ -498,7 +501,7 @@ printf( "saving %u bytes\n", uniqueSize );
                                  numWritten += write( fd, "\n", 1 );
                               }
 
-                              if( numWritten == uniqueSize )
+                              if( (unsigned)numWritten == uniqueSize )
                               {
                                  printf( "wrote %u bytes of unique data\n", uniqueSize );
                               }

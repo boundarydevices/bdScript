@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.9  2004-12-18 18:29:43  ericn
+ * Revision 1.10  2005-11-06 00:49:42  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.9  2004/12/18 18:29:43  ericn
  * -rename tcp handler
  *
  * Revision 1.8  2004/02/07 18:42:50  ericn
@@ -142,7 +145,7 @@ void jsTcpHandler_t::onDataAvail( void )      // POLLIN
 
       while( ( 0 < numAvail )
              &&
-             ( 0 < ( readSize = ( ( numAvail > sizeof( inData ) ) 
+             ( 0 < ( readSize = ( ( (unsigned)numAvail > sizeof( inData ) ) 
                                   ? sizeof( inData )
                                   : numAvail ) ) )
              &&
@@ -164,7 +167,7 @@ void jsTcpHandler_t::onDataAvail( void )      // POLLIN
          } // 
 
          readSize = numAvail ;
-         if( readSize > sizeof( inData ) )
+         if( (unsigned)readSize > sizeof( inData ) )
             readSize = sizeof( inData );
       }
 

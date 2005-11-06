@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCamera.cpp,v $
- * Revision 1.4  2004-03-17 04:56:19  ericn
+ * Revision 1.5  2005-11-06 00:49:28  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.4  2004/03/17 04:56:19  ericn
  * -updates for mini-board (no sound, video, touch screen)
  *
  * Revision 1.3  2003/06/04 02:56:32  ericn
@@ -109,9 +112,9 @@ struct cameraThreadParams_t {
         y_( y ),
         w_( w ),
         h_( h ),
-        mutex_( pthreadMutexDefault ),
         imgBuf_( 0 ),
-        wantImage_( false )
+        wantImage_( false ),
+        mutex_( pthreadMutexDefault )
    {
       pthread_cond_init( &condition_, 0 );
    }
@@ -245,7 +248,7 @@ static void *displayThread( void *arg )
    ioctl( params->fd_, VIDIOCGWIN, &vidwin);
    
    // clamp width to camera x-resolution
-   if( params->w_ < vidcap.maxwidth )
+   if( (int)params->w_ < vidcap.maxwidth )
    {
       vidwin.x   = ( vidcap.maxwidth - params->w_ ) / 2 ;
    } // center horizontally
@@ -256,7 +259,7 @@ static void *displayThread( void *arg )
    }
 
    // clamp height to camera y-resolution
-   if( params->h_ < vidcap.maxheight )
+   if( (int)params->h_ < vidcap.maxheight )
    {
       vidwin.y   = ( vidcap.maxheight - params->h_ ) / 2 ;
    } // center vertically
@@ -333,6 +336,8 @@ static void *displayThread( void *arg )
    }
    else
       perror( "VIDIOCGMBUF" );
+      
+   return 0 ;
 }
 
 static JSBool
@@ -407,7 +412,7 @@ static void *captureThread( void *arg )
    ioctl( params->fd_, VIDIOCGWIN, &vidwin);
    
    // clamp width to camera x-resolution
-   if( params->w_ < vidcap.maxwidth )
+   if( (int)params->w_ < vidcap.maxwidth )
    {
       vidwin.x   = ( vidcap.maxwidth - params->w_ ) / 2 ;
    } // center horizontally
@@ -418,7 +423,7 @@ static void *captureThread( void *arg )
    }
 
    // clamp height to camera y-resolution
-   if( params->h_ < vidcap.maxheight )
+   if( (int)params->h_ < vidcap.maxheight )
    {
       vidwin.y   = ( vidcap.maxheight - params->h_ ) / 2 ;
    } // center vertically
@@ -470,6 +475,8 @@ static void *captureThread( void *arg )
    }
    else
       perror( "VIDIOCGMBUF" );
+      
+   return 0 ;
 }
 
 static JSBool
@@ -558,8 +565,6 @@ static JSBool jsCamera( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
    
       if( camera )
       {
-         fbDevice_t &fb = getFB();
-         
          JS_DefineProperty( cx, camera, "device",
                             STRING_TO_JSVAL( sDevice ),
                             0, 0, 

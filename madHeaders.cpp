@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madHeaders.cpp,v $
- * Revision 1.6  2002-12-15 00:13:02  ericn
+ * Revision 1.7  2005-11-06 00:49:46  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.6  2002/12/15 00:13:02  ericn
  * -removed debug msgs
  *
  * Revision 1.5  2002/11/24 19:06:58  ericn
@@ -86,7 +89,7 @@ madHeaders_t :: madHeaders_t
                printf ("warning: number of channels varies within file %u/%u\n", stats.channels, MAD_NCHANNELS( &header ));
                break;
             }
-            if( stats.freq != header.samplerate )
+            if( (unsigned)stats.freq != header.samplerate )
             {
                printf( "error: frequency change during decode %u:%u\n", stats.freq, header.samplerate );
                break;

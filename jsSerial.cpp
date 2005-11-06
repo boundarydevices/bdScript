@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsSerial.cpp,v $
- * Revision 1.1  2004-03-27 20:24:35  ericn
+ * Revision 1.2  2005-11-06 00:49:38  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.1  2004/03/27 20:24:35  ericn
  * -Initial import
  *
  *
@@ -180,11 +183,11 @@ static JSBool jsSerialPort( JSContext *cx, JSObject *obj, uintN argc, jsval *arg
          JS_ReportError( cx, "allocating serialPort\n" );
          *rval = JSVAL_FALSE ;
       }
-      
-      return JS_TRUE;
    }
    else
       JS_ReportError( cx, "Usage : myVar = new serialPort( '/dev/ttyS2', '\r' );" );
+   
+   return JS_TRUE;
 }
 
 static JSBool

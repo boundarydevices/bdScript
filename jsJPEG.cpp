@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsJPEG.cpp,v $
- * Revision 1.1  2003-03-22 03:50:10  ericn
+ * Revision 1.2  2005-11-06 00:49:32  ericn
+ * -more compiler warning cleanup
+ *
+ * Revision 1.1  2003/03/22 03:50:10  ericn
  * -Initial import
  *
  *
@@ -45,6 +48,7 @@ struct memDest_t {
 
 typedef memDest_t  *memDestPtr_t ;
 
+#if 0
 static void dumpcinfo( jpeg_compress_struct const &cinfo )
 {
    hexDumper_t dump( &cinfo, sizeof( cinfo ) );
@@ -60,6 +64,7 @@ static void dumpMemDest( memDest_t const &md )
       printf( "%s\n", dump.getLine() );
    fflush( stdout );
 }
+#endif
 
 /*
  * Initialize destination --- called by jpeg_start_compress
