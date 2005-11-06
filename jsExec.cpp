@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.81  2004-12-28 03:46:43  ericn
+ * Revision 1.82  2005-11-06 17:32:24  ericn
+ * -added modularity based on kernel config params
+ *
+ * Revision 1.81  2004/12/28 03:46:43  ericn
  * -additional cleanup
  *
  * Revision 1.80  2004/09/27 04:51:05  ericn
@@ -280,9 +283,15 @@
 #include "jsText.h"
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
+#ifdef CONFIG_JSBARCODE
 #include "jsBarcode.h"
 #include "jsBCWidths.h"
+#endif
+
+#ifdef CONFIG_JSGPIO
 #include "jsGpio.h"
+#endif
+
 // #include "jsShell.h"
 #include "jsButton.h"
 #include "ccActiveURL.h"
@@ -312,17 +321,43 @@
 #include "jsFlashVar.h"
 #include "jsMD5.h"
 
-#ifdef CONFIG_BD2003
+#include "touchPoll.h"
+
+#ifdef KERNEL_SOUND
+   #define CONFIG_JSMP3
+   #define CONFIG_JSFLASH
+   #ifdef KERNEL_FB_SM501YUV
+      #define CONFIG_JSMPEG
+   #endif
+#endif
+
+#ifdef CONFIG_JSMP3
 #include "audioQueue.h"
 #include "jsVolume.h"
-#include "jsCamera.h"
-#include "jsCBM.h"
-#include "jsPrinter.h"
 #include "jsMP3.h"
+#ifdef CONFIG_JSMPEG
 #include "jsMPEG.h"
+#endif
+#ifdef CONFIG_JSFLASH
 #include "jsFlash.h"
-#include "jsStarUSB.h"
+#endif
+#endif
+
+#ifdef CONFIG_JSCAMERA
+#include "jsCamera.h"
 #endif 
+
+#ifdef CONFIG_JSCBM
+#include "jsCBM.h"
+#endif
+
+#ifdef CONFIG_JSPRINTER
+#include "jsPrinter.h"
+#endif
+
+#ifdef CONFIG_JSSTARUSB
+#include "jsStarUSB.h"
+#endif
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -355,7 +390,7 @@ static JSBool
 jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
    *rval = JSVAL_TRUE ;
-   for( int arg = 0 ; arg < argc ; arg++ )
+   for( uintN arg = 0 ; arg < argc ; arg++ )
    {
       if( !queueUnrootedSource( obj, argv[arg], "queueCode" ) )
       {
@@ -557,11 +592,8 @@ int prMain(int argc, char **argv)
                   initJSBitmap( cx, glob );
                   initJSHyperlink( cx, glob );
                   initJSExit( cx, glob );
-                  initJSBarcode( cx, glob );
-                  initJSBCWidths( cx, glob );
 //                  initJSShell( cx, glob );
                   initJSPopen( cx, glob );
-                  initJSGpio( cx, glob );
                   initJSMD5( cx, glob );
                   initJSEnv( cx, glob );
                   initJSTCP( cx, glob );
@@ -578,25 +610,51 @@ int prMain(int argc, char **argv)
                   initJSKernel( cx, glob );
                   initJSSerial( cx, glob );
                   initJSFlashVar( cx, glob );
-#ifdef CONFIG_BD2003
+                  initJSButton( cx, glob );
+                  initJSTouch( cx, glob );
+
+#ifdef CONFIG_JSBARCODE                  
+                  initJSBarcode( cx, glob );
+                  initJSBCWidths( cx, glob );
+#endif
+
+#ifdef CONFIG_JSGPIO
+                  initJSGpio( cx, glob );
+#endif                  
+
+#ifdef CONFIG_JSMP3                  
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
-                  initJSButton( cx, glob );
-                  initJSCamera( cx, glob );
-                  initPrinter( cx, glob );
-                  initJSCBM( cx, glob );
+   #ifdef CONFIG_JSMPEG
                   initJSMPEG( cx, glob );
+   #endif
+   
+   #ifdef CONFIG_JSFLASH
                   initJSFlash( cx, glob );
-                  initJSTouch( cx, glob );
-                  initJSStarUSB( cx, glob );
-
+   #endif
                   //
                   // start up audio output 
                   //
-                  audioQueue_t &audioOut = getAudioQueue(); 
-#else
-printf( "BD2004 board type\n" );
+//                  audioQueue_t &audioOut = 
+                  (void)getAudioQueue(); 
 #endif
+
+#ifdef CONFIG_JSCAMERA
+                  initJSCamera( cx, glob );
+#endif 
+                  
+#ifdef CONFIG_JSPRINTER
+                  initPrinter( cx, glob );
+#endif
+
+#ifdef CONFIG_JSCBM
+                  initJSCBM( cx, glob );
+#endif
+                  
+#ifdef CONFIG_JSSTARUSB
+                  initJSStarUSB( cx, glob );
+#endif
+
                   getCurlCache();
 
                   JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
@@ -604,7 +662,8 @@ printf( "BD2004 board type\n" );
                   {                     
                      if( JS_DefineProperty( cx, glob, "argv", OBJECT_TO_JSVAL( sArgv ), 0, 0, JSPROP_ENUMERATE ) ) // root
                      {
-                        JSErrorReporter oldReporter = JS_SetErrorReporter( cx, myError );
+                        // JSErrorReporter oldReporter = 
+                        JS_SetErrorReporter( cx, myError );
 
                         JSScript *script = 0 ;
 
@@ -664,11 +723,8 @@ printf( "BD2004 board type\n" );
       
                            if( exec )
                            {
-                              unsigned numEvents = 0 ;
-      
                               while( mainLoop( pollHandlers_, cx ) )
                                  ;
-      //                                 printf( "in main loop\n" );
                            }
                            else
                               fprintf( stderr, "exec error %s\n", argv[1] );
@@ -681,14 +737,18 @@ printf( "BD2004 board type\n" );
                   }
 
                   shutdownTTY();
+
+#ifdef CONFIG_JSGPIO
                   shutdownGpio();
+#endif
 
                   shutdownJSProcesses();
                   shutdownCurlWorkers();
                   shutdownCCDiskCache();
                   shutdownTouch();
                   abortCodeQueue();
-#ifdef CONFIG_BD2003
+
+#ifdef CONFIG_JSMP3
                   audioQueue_t::shutdown();
 #endif 
                }
@@ -778,7 +838,7 @@ int main( int argc, char *argv[] )
       sa.sa_handler = handler;
       sigemptyset(&sa.sa_mask);
       sa.sa_flags = 0;
-#ifdef CONFIG_BD2003
+#ifdef KERNEL_FB
       getFB( "/dev/fb0" );
 #else
       getFB( "/dev/lcd" );
@@ -820,7 +880,8 @@ int main( int argc, char *argv[] )
    
       do
       {
-         int result = prMain( argc, argv );
+         // int result = 
+         prMain( argc, argv );
          if( gotoCalled_ )
          {
             argv[1] = (char *)gotoURL_.c_str();
