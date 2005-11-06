@@ -127,9 +127,6 @@ OBJS += \
        jsFlash.o \
        jsMP3.o \
        jsMPEG.o \
-       jsPrinter.o \
-       jsStar.o \
-       jsStarUSB.o \
        jsVolume.o \
        madDecode.o \
        madHeaders.o \
@@ -142,6 +139,13 @@ OBJS += \
 
 HARDWARE_TYPE += -DKERNEL_FB=1
 else
+endif
+
+ifeq (y, $(CONFIG_JSSTARUSB))
+   OBJS += jsPrinter.o \
+       jsStar.o \
+       jsStarUSB.o \
+
 endif
 
 ifeq (y,$(CONFIG_JSBARCODE))       
