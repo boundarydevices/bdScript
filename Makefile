@@ -89,7 +89,6 @@ OBJS = \
        jsUse.o \
        md5.o \
        memFile.o \
-       monitorWLAN.o \
        openFds.o \
        palette.o \
        parsedFlash.o \
@@ -115,6 +114,12 @@ OBJS = \
 
 ifneq ("", $(CONFIG_JSGPIO))
 OBJS += jsGpio.o
+endif
+
+ifeq (y,$(KERNEL_PCCARD))
+ifneq ("", $(CONFIG_JSMONITORWLAN))
+OBJS += monitorWLAN.o
+endif
 endif
 
 ifeq (y,$(KERNEL_FB))

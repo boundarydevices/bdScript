@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.82  2005-11-06 17:32:24  ericn
+ * Revision 1.83  2005-11-06 20:26:43  ericn
+ * -conditional Monitor WLAN
+ *
+ * Revision 1.82  2005/11/06 17:32:24  ericn
  * -added modularity based on kernel config params
  *
  * Revision 1.81  2004/12/28 03:46:43  ericn
@@ -305,8 +308,12 @@
 #include "jsUse.h"
 #include "jsURL.h"
 #include "jsFileIO.h"
+
+#ifdef CONFIG_JSMONITORWLAN
 #include "jsSniffWLAN.h"
 #include "jsMonWLAN.h"
+#endif
+
 #include "jsPing.h"
 #include "jsProcess.h"
 #include "jsDir.h"
@@ -601,8 +608,12 @@ int prMain(int argc, char **argv)
                   initJSUse( cx, glob );
                   initJSURL( cx, glob );
                   initJSFileIO( cx, glob );
+
+#ifdef CONFIG_JSMONITORWLAN
                   initSniffWLAN( cx, glob );
                   initMonitorWLAN( cx, glob );
+#endif
+
                   initPing( cx, glob );
                   initJSProcess( cx, glob );
                   initJSDir( cx, glob );
