@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.37  2005-11-06 00:49:22  ericn
+ * Revision 1.38  2005-11-06 20:26:25  ericn
+ * -conditional FFT
+ *
+ * Revision 1.37  2005/11/06 00:49:22  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.36  2005/04/24 18:51:14  ericn
@@ -445,6 +448,7 @@ void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
 	header->numSamples_ = ( maxSamples*sizeof(header->samples_[0]) - bytesLeft ) / sizeof( header->samples_[0] );
 }
 
+#ifdef FILTERAUDIO
 void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 {
 	const int logN=cnw->logN;	//1024 points
@@ -518,6 +522,8 @@ void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 
 	header->numSamples_ = outSampleCnt;
 }
+
+#endif
 
 //
 // Because I'm lazy and can't figure out the
@@ -1012,8 +1018,12 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                }
 
                header->numChannels_ = 1 ;
-               if (0) queue->GetAudioSamples(readFd,header);
-               else queue->GetAudioSamples2(readFd,header);
+               
+#ifdef FILTERAUDIO
+               queue->GetAudioSamples2(readFd,header);
+#else
+               queue->GetAudioSamples(readFd,header);
+#endif
 
                 normalize( (short *)header->samples_, header->numSamples_ );
                _recording = false ;
@@ -1312,8 +1322,10 @@ audioQueue_t :: audioQueue_t( void )
    readFragSize_ = 8192 ;
    maxReadBytes_ = numReadFrags_ * readFragSize_ ;
 
+#ifdef FILTERAUDIO
    cnw = new CleanNoiseWork;
    Init_cnw(cnw,10);
+#endif
 
    int readFd = openReadFd();
    if( 0 <= readFd )
@@ -1383,8 +1395,10 @@ audioQueue_t :: audioQueue_t( void )
 
 audioQueue_t :: ~audioQueue_t( void )
 {
+#ifdef FILTERAUDIO
   Finish_cnw(cnw);
   delete cnw;
+#endif  
 }
 
 bool audioQueue_t :: queuePlayback

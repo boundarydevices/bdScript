@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.14 2003-09-26 00:43:50 tkisky Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.15 2005-11-06 20:26:23 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.14  2003-09-26 00:43:50  tkisky
+ * Revision 1.15  2005-11-06 20:26:23  ericn
+ * -conditional FFT
+ *
+ * Revision 1.14  2003/09/26 00:43:50  tkisky
  * -fft stuff
  *
  * Revision 1.13  2003/09/22 02:02:01  ericn
@@ -70,8 +73,12 @@
 #endif
 
 #include <string>
+
+#ifdef FILTERAUDIO
 #include "bdGraph/fft.h"
 #include "bdGraph/fftClean.h"
+#endif
+
 extern unsigned char getVolume( void );
 extern void setVolume( unsigned char volume ); // range is 0-100
 
@@ -199,7 +206,10 @@ private:
    // returns false if thread should shutdown
    bool pull( item_t *& );
    void GetAudioSamples(const int readFd,waveHeader_t* header);
+
+#ifdef FILTERAUDIO   
    void GetAudioSamples2(const int readFd,waveHeader_t* header);
+#endif
 
    friend void *audioThread( void *arg );
 
@@ -210,7 +220,9 @@ private:
    unsigned      numReadFrags_ ;
    unsigned      readFragSize_ ;
    unsigned      maxReadBytes_ ;
+#ifdef FILTERAUDIO   
    CleanNoiseWork* cnw;
+#endif
 };
 
 #endif
