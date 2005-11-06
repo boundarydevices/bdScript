@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.83  2005-11-06 20:26:43  ericn
+ * Revision 1.84  2005-11-06 20:42:11  ericn
+ * -CONFIG_XYZ == 1
+ *
+ * Revision 1.83  2005/11/06 20:26:43  ericn
  * -conditional Monitor WLAN
  *
  * Revision 1.82  2005/11/06 17:32:24  ericn
@@ -270,6 +273,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
+#include "config.h"
 /* include the JS engine API header */
 #include "js/jsstddef.h"
 #include "js/jsapi.h"
@@ -286,12 +290,14 @@
 #include "jsText.h"
 #include "jsAlphaMap.h"
 #include "jsTouch.h"
-#ifdef CONFIG_JSBARCODE
+
+#if CONFIG_JSBARCODE == 1
 #include "jsBarcode.h"
 #include "jsBCWidths.h"
 #endif
 
-#ifdef CONFIG_JSGPIO
+#if CONFIG_JSGPIO == 1
+#error gpio support include
 #include "jsGpio.h"
 #endif
 
@@ -309,7 +315,7 @@
 #include "jsURL.h"
 #include "jsFileIO.h"
 
-#ifdef CONFIG_JSMONITORWLAN
+#if CONFIG_JSMONITORWLAN == 1
 #include "jsSniffWLAN.h"
 #include "jsMonWLAN.h"
 #endif
@@ -331,38 +337,44 @@
 #include "touchPoll.h"
 
 #ifdef KERNEL_SOUND
-   #define CONFIG_JSMP3
-   #define CONFIG_JSFLASH
-   #ifdef KERNEL_FB_SM501YUV
-      #define CONFIG_JSMPEG
+   #define CONFIG_JSMP3 1
+   #define CONFIG_JSFLASH 1
+   #ifdef KERNEL_FB_SM501YUV 
+      #define CONFIG_JSMPEG 1
    #endif
+#else
+   #undef CONFIG_JSMP3
+   #undef CONFIG_JSFLASH
+   #undef CONFIG_JSMPEG
 #endif
 
 #ifdef CONFIG_JSMP3
-#include "audioQueue.h"
-#include "jsVolume.h"
-#include "jsMP3.h"
-#ifdef CONFIG_JSMPEG
-#include "jsMPEG.h"
-#endif
-#ifdef CONFIG_JSFLASH
-#include "jsFlash.h"
-#endif
+   #include "audioQueue.h"
+   #include "jsVolume.h"
+   #include "jsMP3.h"
+   
+   #ifdef CONFIG_JSMPEG
+      #include "jsMPEG.h"
+   #endif
+   
+   #ifdef CONFIG_JSFLASH
+      #include "jsFlash.h"
+   #endif
 #endif
 
-#ifdef CONFIG_JSCAMERA
+#if CONFIG_JSCAMERA == 1
 #include "jsCamera.h"
 #endif 
 
-#ifdef CONFIG_JSCBM
+#if CONFIG_JSCBM == 1
 #include "jsCBM.h"
 #endif
 
-#ifdef CONFIG_JSPRINTER
+#if CONFIG_JSPRINTER == 1
 #include "jsPrinter.h"
 #endif
 
-#ifdef CONFIG_JSSTARUSB
+#if CONFIG_JSSTARUSB == 1
 #include "jsStarUSB.h"
 #endif
 
@@ -624,16 +636,16 @@ int prMain(int argc, char **argv)
                   initJSButton( cx, glob );
                   initJSTouch( cx, glob );
 
-#ifdef CONFIG_JSBARCODE                  
+#if CONFIG_JSBARCODE == 1 
                   initJSBarcode( cx, glob );
                   initJSBCWidths( cx, glob );
 #endif
 
-#ifdef CONFIG_JSGPIO
+#if CONFIG_JSGPIO == 1
                   initJSGpio( cx, glob );
 #endif                  
 
-#ifdef CONFIG_JSMP3                  
+#ifdef CONFIG_JSMP3
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
    #ifdef CONFIG_JSMPEG
@@ -648,21 +660,22 @@ int prMain(int argc, char **argv)
                   //
 //                  audioQueue_t &audioOut = 
                   (void)getAudioQueue(); 
+#else
 #endif
 
-#ifdef CONFIG_JSCAMERA
+#if CONFIG_JSCAMERA == 1
                   initJSCamera( cx, glob );
 #endif 
                   
-#ifdef CONFIG_JSPRINTER
+#if CONFIG_JSPRINTER == 1
                   initPrinter( cx, glob );
 #endif
 
-#ifdef CONFIG_JSCBM
+#if CONFIG_JSCBM == 1
                   initJSCBM( cx, glob );
 #endif
                   
-#ifdef CONFIG_JSSTARUSB
+#if CONFIG_JSSTARUSB == 1
                   initJSStarUSB( cx, glob );
 #endif
 
@@ -749,7 +762,7 @@ int prMain(int argc, char **argv)
 
                   shutdownTTY();
 
-#ifdef CONFIG_JSGPIO
+#if CONFIG_JSGPIO == 1
                   shutdownGpio();
 #endif
 
@@ -759,7 +772,7 @@ int prMain(int argc, char **argv)
                   shutdownTouch();
                   abortCodeQueue();
 
-#ifdef CONFIG_JSMP3
+#if CONFIG_JSMP3 == 1
                   audioQueue_t::shutdown();
 #endif 
                }
