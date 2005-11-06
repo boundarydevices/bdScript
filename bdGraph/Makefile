@@ -126,7 +126,7 @@ fftTest: fftTest.o fft.o
 fftFloat: fftFloat.c
 	gcc $@.c -fno-exceptions -O2 -lm -o $@
 
-all: $(LIB) buildSinTable mic mic-x86 fftTest fftTest-x86
+all: $(LIB) buildSinTable fftTest fftTest-x86
 
 .PHONY: install install-lib
 
