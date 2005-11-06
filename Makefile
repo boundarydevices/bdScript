@@ -14,7 +14,7 @@ ifeq ("BD2004",$(KERNEL_BOARDTYPE))
    HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
 else
 ifeq ("NEON",$(KERNEL_BOARDTYPE))
-   HARDWARE_TYPE=-DCONFIG_BD2003 -DNEON
+   HARDWARE_TYPE= -DNEON
 else
 endif
 endif
@@ -34,7 +34,6 @@ MPEG2LIBS = -lmpeg2 -lvo
 #MPEG2LIBS = -lmpeg2 -lmpeg2convert
 
 OBJS = \
-       barcodePoll.o \
        baudRate.o \
        bitmap.o \
        box.o \
@@ -60,7 +59,6 @@ OBJS = \
        imgJPEG.o \
        imgPNG.o \
        jsAlphaMap.o \
-       jsBarcode.o \
        jsBCWidths.o \
        jsBitmap.o \
        jsCurl.o \
@@ -69,7 +67,6 @@ OBJS = \
        jsExit.o \
        jsFileIO.o \
        jsGlobals.o \
-       jsGpio.o \
        jsHyperlink.o \
        jsImage.o \
        jsJPEG.o \
@@ -116,8 +113,11 @@ OBJS = \
        flashVar.o \
        jsFlashVar.o \
 
-ifneq ("BD2004",$(KERNEL_BOARDTYPE))
+ifneq ("", $(CONFIG_JSGPIO))
+OBJS += jsGpio.o
+endif
 
+ifeq (y,$(KERNEL_FB))
 OBJS += \
        audioQueue.o \
        cbmImage.o \
@@ -140,7 +140,14 @@ OBJS += \
        videoQueue.o \
        zOrder.o \
 
+HARDWARE_TYPE += -DKERNEL_FB=1
+else
 endif
+
+ifeq (y,$(CONFIG_JSBARCODE))       
+   OBJS += barcodePoll.o \
+           jsBarcode.o
+endif       
 
 ifeq (y,$(CONFIG_LIBFLASH))       
    OBJS += flashThread.o
@@ -197,7 +204,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -fno-rtti $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -fno-rtti -Wall -Wno-invalid-offsetof $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
@@ -206,6 +213,8 @@ $(LIBBDGRAPH):
 	INSTALL_ROOT=$(INSTALL_ROOT) KERNEL_DIR=$(CONFIG_KERNELPATH) make -C bdGraph all
 
 $(LIB): Makefile $(OBJS)
+	echo "OBJS == $(OBJS)"
+	echo "KERNEL_FB == '$(KERNEL_FB)'"
 	$(AR) r $(LIB) $(OBJS)
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
@@ -400,7 +409,7 @@ serialPoll: serialPoll.cpp $(LIB)
 	$(STRIP) $@
 
 touchPoll: touchPoll.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 urlPoll: urlPoll.cpp Makefile $(LIB)
@@ -453,6 +462,18 @@ start.o: start.c
 progFlash.o: progFlash.cpp
 	$(CC) $(HARDWARE_TYPE) -fno-rtti -c -nodefaultlibs -o $@ $<
 
+imgFileMain.o: imgFile.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o
+imgFile: $(IMGFILEOBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker imgFile.map \
+      $(IMGFILEOBJS) \
+      $(LIBS) -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+   
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
 #
