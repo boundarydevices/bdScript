@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.84  2005-11-06 20:42:11  ericn
+ * Revision 1.85  2005-11-07 15:36:12  ericn
+ * -fix conditional wlan
+ *
+ * Revision 1.84  2005/11/06 20:42:11  ericn
  * -CONFIG_XYZ == 1
  *
  * Revision 1.83  2005/11/06 20:26:43  ericn
@@ -621,7 +624,7 @@ int prMain(int argc, char **argv)
                   initJSURL( cx, glob );
                   initJSFileIO( cx, glob );
 
-#ifdef CONFIG_JSMONITORWLAN
+#if CONFIG_JSMONITORWLAN == 1
                   initSniffWLAN( cx, glob );
                   initMonitorWLAN( cx, glob );
 #endif
