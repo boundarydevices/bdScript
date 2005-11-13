@@ -105,7 +105,6 @@ void CDataObj::Advance()
 
 int main(int argc, char *argv[])
 {
-	int fd;
 	unsigned short *fbMem = NULL;
 	int fbWidth,fbHeight,memSize;
 	int picWidth,picHeight;
@@ -121,7 +120,7 @@ int main(int argc, char *argv[])
 			filename = argv[2];
 			opts = argv[1];
 		}
-		if (*opts = '-') {
+		if (*opts == '-') {
 			opts++;
 			if ((*opts == 'r') || (*opts == 'R')) flags = 1;
 			if ((*opts == 'b') || (*opts == 'B')) flags = 2;
