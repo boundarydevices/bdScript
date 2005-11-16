@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.5  2005-11-06 00:49:24  ericn
+ * Revision 1.6  2005-11-16 14:49:44  ericn
+ * -use debugPrint, not printf and comments
+ *
+ * Revision 1.5  2005/11/06 00:49:24  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.4  2005/08/12 04:18:43  ericn
@@ -43,6 +46,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 static char const deviceName_[] = {
    "/dev/mtd2"
@@ -79,29 +85,33 @@ readVars_t :: readVars_t( void )
    image_ = 0 ;
    bytesUsed_ = 0 ;
    maxSize_ = 0 ;
+
+   debugPrint( "opening flash device %s\n", deviceName_ );
+   
    int fd = open( deviceName_, O_RDONLY );
    if( 0 <= fd )
    {
       mtd_info_t meminfo;
       if( ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) == 0)
       {
-/*
-         printf( "flags       0x%lx\n", meminfo.flags ); 
-         printf( "size        0x%lx\n", meminfo.size ); 
-         printf( "erasesize   0x%lx\n", meminfo.erasesize ); 
-         printf( "oobblock    0x%lx\n", meminfo.oobblock ); 
-         printf( "oobsize     0x%lx\n", meminfo.oobsize ); 
-         printf( "ecctype     0x%lx\n", meminfo.ecctype ); 
-         printf( "eccsize     0x%lx\n", meminfo.eccsize ); 
-         printf( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
-*/
+         debugPrint( "flags       0x%lx\n", meminfo.flags ); 
+         debugPrint( "size        0x%lx\n", meminfo.size ); 
+         debugPrint( "erasesize   0x%lx\n", meminfo.erasesize ); 
+         debugPrint( "oobblock    0x%lx\n", meminfo.oobblock ); 
+         debugPrint( "oobsize     0x%lx\n", meminfo.oobsize ); 
+         debugPrint( "ecctype     0x%lx\n", meminfo.ecctype ); 
+         debugPrint( "eccsize     0x%lx\n", meminfo.eccsize ); 
+         debugPrint( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
+
          unsigned offset = meminfo.size-meminfo.erasesize ;
          image_ = (char *)malloc( meminfo.erasesize );
-//         printf( "malloc result %p\n", image_ );
+
          if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
          {
             // nearest size in pages (probably always equal)
             maxSize_ = ( meminfo.erasesize / pageSize ) * pageSize ;
+
+            debugPrint( "maxSize 0x%x\n", maxSize_ );
 
             char *nextIn = (char *)image_ ;
             while( bytesUsed_ < maxSize_ )
@@ -228,6 +238,7 @@ bool varIter_t::next
    {
       char const c = *next_++ ;
 
+debugPrint( "state %d, char %c <%02x>\n", state, c, c );
       if( nameChar == state )
       {
          if( '=' == c )
