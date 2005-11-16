@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.6  2005-11-16 14:49:44  ericn
+ * Revision 1.7  2005-11-16 14:57:42  ericn
+ * -use FLASHVARDEV environment variable if present
+ *
+ * Revision 1.6  2005/11/16 14:49:44  ericn
  * -use debugPrint, not printf and comments
  *
  * Revision 1.5  2005/11/06 00:49:24  ericn
@@ -86,9 +89,13 @@ readVars_t :: readVars_t( void )
    bytesUsed_ = 0 ;
    maxSize_ = 0 ;
 
-   debugPrint( "opening flash device %s\n", deviceName_ );
+   char const *devName = getenv( "FLASHVARDEV" );
+   if( 0 == devName )
+      devName = deviceName_ ;
+      
+   debugPrint( "opening flash device %s\n", devName );
    
-   int fd = open( deviceName_, O_RDONLY );
+   int fd = open( devName, O_RDONLY );
    if( 0 <= fd )
    {
       mtd_info_t meminfo;
