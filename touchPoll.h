@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.4 2004-11-26 15:28:52 ericn Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.5 2005-11-17 03:47:53 ericn Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.4  2004-11-26 15:28:52  ericn
+ * Revision 1.5  2005-11-17 03:47:53  ericn
+ * -change default device name param to something recognizable internally
+ *
+ * Revision 1.4  2004/11/26 15:28:52  ericn
  * -use median/mean instead of range filter
  *
  * Revision 1.3  2004/01/01 20:11:42  ericn
@@ -35,7 +38,7 @@
 class touchPoll_t : public pollHandler_t {
 public:
    touchPoll_t( pollHandlerSet_t &set,
-                char const       *devName = "/dev/touchscreen/ucb1x00" );
+                char const       *devName = 0 );
    ~touchPoll_t( void );
 
    // override this to perform processing of a touch
