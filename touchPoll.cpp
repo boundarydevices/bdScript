@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.8  2004-12-28 03:48:01  ericn
+ * Revision 1.9  2005-11-17 03:48:26  ericn
+ * -allow environment override of device, change default to /dev/misc/x
+ *
+ * Revision 1.8  2004/12/28 03:48:01  ericn
  * -clean queue on exit
  *
  * Revision 1.7  2004/12/03 04:43:50  ericn
@@ -65,12 +68,22 @@ struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
 	struct timeval stamp;
 };
 
+static char const *getTouchDev( char const *devName )
+{
+   char const *envDev = getenv( "TSDEV" );
+   if( 0 != envDev )
+      devName = envDev ;
+   if( 0 == devName )
+      devName = "/dev/misc/touchscreen/ucb1x00" ;
+   return devName ;
+}
+
 touchPoll_t :: touchPoll_t
    ( pollHandlerSet_t &set,
      char const       *devName )
-   : pollHandler_t( open( devName, O_RDONLY ), set )
+   : pollHandler_t( open( getTouchDev(devName), O_RDONLY ), set )
 {
-debugPrint( "touchPoll constructed, fd == %d\n", getFd() );   
+debugPrint( "touchPoll constructed, dev = %s, fd == %d\n", devName, getFd() );   
    if( isOpen() )
    {
       fcntl( fd_, F_SETFD, FD_CLOEXEC );
@@ -174,6 +187,8 @@ debugPrint( "missed touch\n" );
 
 #ifdef STANDALONE
 
+#include <unistd.h>
+
 int main( void )
 {
    pollHandlerSet_t handlers ;
@@ -190,7 +205,7 @@ int main( void )
       }
    }
    else
-      perror( "/dev/touchscreen/ucb1x00" );
+      perror( "error opening touch device" );
 
    return 0 ;
 }
