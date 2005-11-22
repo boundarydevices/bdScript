@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.7  2005-11-16 14:57:42  ericn
+ * Revision 1.8  2005-11-22 17:41:58  tkisky
+ * -fix write FLASHVARDEV use
+ *
+ * Revision 1.7  2005/11/16 14:57:42  ericn
  * -use FLASHVARDEV environment variable if present
  *
  * Revision 1.6  2005/11/16 14:49:44  ericn
@@ -56,6 +59,12 @@
 static char const deviceName_[] = {
    "/dev/mtd2"
 };
+char const * GetFlashDev()
+{
+   char const *devName = getenv( "FLASHVARDEV" );
+   if( 0 == devName ) devName = deviceName_;
+   return devName;
+}
 
 static unsigned const pageSize = 4096 ;
 // #define TESTREST 1
@@ -89,10 +98,7 @@ readVars_t :: readVars_t( void )
    bytesUsed_ = 0 ;
    maxSize_ = 0 ;
 
-   char const *devName = getenv( "FLASHVARDEV" );
-   if( 0 == devName )
-      devName = deviceName_ ;
-      
+   char const *devName = GetFlashDev();
    debugPrint( "opening flash device %s\n", devName );
    
    int fd = open( devName, O_RDONLY );
@@ -197,7 +203,7 @@ readVars_t :: readVars_t( void )
       close( fd );
    }
    else
-      perror( deviceName_ );
+      perror(devName);
 }
 
 readVars_t :: ~readVars_t( void )
@@ -332,6 +338,7 @@ void writeFlashVar( char const *name,
                     char const *value )
 {
    readVars_t rv ;
+   char const *devName = GetFlashDev();
    if( rv.worked() )
    {
       unsigned const nameLen = strlen( name );
@@ -339,7 +346,7 @@ void writeFlashVar( char const *name,
       unsigned const avail = rv.maxSize() - rv.bytesUsed();
       if( avail > nameLen + dataLen + 2 )
       {
-         int fd = open( deviceName_, O_WRONLY );
+         int fd = open( devName, O_WRONLY );
          if( 0 <= fd )
          {
             mtd_info_t meminfo;
@@ -381,7 +388,7 @@ void writeFlashVar( char const *name,
             close( fd );
          }
          else
-            perror( deviceName_ );
+            perror(devName);
       }
       else
       {
@@ -493,7 +500,7 @@ void writeFlashVar( char const *name,
             {
 printf( "saving %u bytes\n", uniqueSize );
 
-               int fd = open( deviceName_, O_WRONLY );
+               int fd = open( devName, O_WRONLY );
                if( 0 <= fd )
                {
                   mtd_info_t meminfo;
@@ -541,7 +548,7 @@ printf( "saving %u bytes\n", uniqueSize );
                   close( fd );
                }
                else
-                  perror( deviceName_ );
+                  perror(devName);
             }
             else
                fprintf( stderr, "Flash parameter area is full!\n" );
