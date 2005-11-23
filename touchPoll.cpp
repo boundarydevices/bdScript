@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.9  2005-11-17 03:48:26  ericn
+ * Revision 1.10  2005-11-23 13:08:20  ericn
+ * -printf, not debugPrint in base class onTouch/onRelease
+ *
+ * Revision 1.9  2005/11/17 03:48:26  ericn
  * -allow environment override of device, change default to /dev/misc/x
  *
  * Revision 1.8  2004/12/28 03:48:01  ericn
@@ -108,12 +111,12 @@ touchPoll_t :: ~touchPoll_t( void )
 
 void touchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
-   debugPrint( "touch screen touch : %u/%u, pressure %u\n", x, y, pressure );
+   printf( "touch screen touch : %u/%u, pressure %u\n", x, y, pressure );
 }
 
 void touchPoll_t :: onRelease( timeval const &tv )
 {
-   debugPrint( "touch screen release\n" );
+   printf( "touch screen release\n" );
 }
 
 static bool wasDown = false ;
