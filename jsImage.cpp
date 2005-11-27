@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.31  2005-11-06 00:49:31  ericn
+ * Revision 1.32  2005-11-27 16:18:09  ericn
+ * -added image.getPixel()
+ *
+ * Revision 1.31  2005/11/06 00:49:31  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.30  2004/07/04 21:32:25  ericn
@@ -443,6 +446,60 @@ jsImageRotate90( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 }
 
 static JSBool
+jsGetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      unsigned x = JSVAL_TO_INT( argv[0] );
+      unsigned y = JSVAL_TO_INT( argv[1] );
+      
+      jsval widthVal, heightVal, dataVal ;
+      if( JS_GetProperty( cx, obj, "width", &widthVal )
+          &&
+          JS_GetProperty( cx, obj, "height", &heightVal )
+          &&
+          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal ) )
+      {
+         int const width  = JSVAL_TO_INT( widthVal );
+         int const height = JSVAL_TO_INT( heightVal );
+         JSString *pixStr = JSVAL_TO_STRING( dataVal );
+         unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+         if( JS_GetStringLength( pixStr ) == pixBytes )
+         {
+            if( ( x < (unsigned)width ) && ( y < (unsigned)height ) )
+            {
+               unsigned short rgb16 = pixMap[(y*width)+x];
+               unsigned red   = fbDevice_t::getRed( rgb16 );
+               unsigned green = fbDevice_t::getGreen( rgb16 );
+               unsigned blue  = fbDevice_t::getBlue( rgb16 );
+               unsigned long rgb = (red<<16) | (green<<8) | blue ;
+               *rval = INT_TO_JSVAL( rgb );
+            }
+            else
+               JS_ReportError( cx, "Invalid position: %u x %u, image dim %u x %u\n", x, y, width, height );
+         }
+         else
+            JS_ReportError( cx, "Invalid width or height" );
+      }
+      else
+         JS_ReportError( cx, "Invalid image" );
+   }
+   else
+      JS_ReportError( cx, "Usage: image.getPixel( x, y );" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
 jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
@@ -489,7 +546,7 @@ jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          JS_ReportError( cx, "Invalid image" );
    }
    else
-      JS_ReportError( cx, "Usage: screen.getPixel( x, y );" );
+      JS_ReportError( cx, "Usage: image.setPixel( x, y, rgb );" );
 
    return JS_TRUE ;
 }
@@ -615,6 +672,7 @@ static JSFunctionSpec imageMethods_[] = {
     {"dither",       jsImageDither,         3 },
     {"scale",        jsImageScale,          6,0,0 },
     {"rotate90",     jsImageRotate90,       0,0,0 },
+    {"getPixel",     jsGetPixel,            2,0,0 },
     {"setPixel",     jsSetPixel,            3,0,0 },
     {"rect",         jsImageRect,           6,0,0 },
     {"line",         jsImageLine,           6,0,0 },
