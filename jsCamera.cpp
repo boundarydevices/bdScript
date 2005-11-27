@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsCamera.cpp,v $
- * Revision 1.5  2005-11-06 00:49:28  ericn
+ * Revision 1.6  2005-11-27 15:35:21  ericn
+ * -remove debug msg
+ *
+ * Revision 1.5  2005/11/06 00:49:28  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.4  2004/03/17 04:56:19  ericn
@@ -143,8 +146,6 @@ jsGrab( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       {
          pthread_cond_wait( &params->condition_, &params->mutex_ );
       }
-
-      printf( "have image at 0x%p\n", params->imgBuf_ );
 
       unsigned char const * const rgb = params->imgBuf_ ;
       params->imgBuf_ = 0 ;
