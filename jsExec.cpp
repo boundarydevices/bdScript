@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.85  2005-11-07 15:36:12  ericn
+ * Revision 1.86  2005-12-11 16:02:30  ericn
+ * -
+ *
+ * Revision 1.85  2005/11/07 15:36:12  ericn
  * -fix conditional wlan
  *
  * Revision 1.84  2005/11/06 20:42:11  ericn
@@ -302,6 +305,10 @@
 #if CONFIG_JSGPIO == 1
 #error gpio support include
 #include "jsGpio.h"
+#endif
+
+#if CONFIG_JSCAIRO == 1
+#include "jsCairo.h"
 #endif
 
 // #include "jsShell.h"
@@ -648,6 +655,10 @@ int prMain(int argc, char **argv)
                   initJSGpio( cx, glob );
 #endif                  
 
+#if CONFIG_JSCAIRO == 1
+                  initJSCairo( cx, glob );
+#endif                  
+
 #ifdef CONFIG_JSMP3
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
@@ -764,6 +775,10 @@ int prMain(int argc, char **argv)
                   }
 
                   shutdownTTY();
+
+#if CONFIG_JSCAIRO == 1
+                  shutdownJSCairo();
+#endif
 
 #if CONFIG_JSGPIO == 1
                   shutdownGpio();

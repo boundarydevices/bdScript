@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.32  2005-11-27 16:18:09  ericn
+ * Revision 1.33  2005-12-11 16:02:30  ericn
+ * -
+ *
+ * Revision 1.32  2005/11/27 16:18:09  ericn
  * -added image.getPixel()
  *
  * Revision 1.31  2005/11/06 00:49:31  ericn
@@ -110,6 +113,7 @@
  */
 
 
+#include "config.h"
 #include "jsImage.h"
 #include "fbDev.h"
 #include "hexDump.h"
@@ -123,6 +127,11 @@
 #include "bdGraph/Scale16.h"
 #include "dither.h"
 #include "jsBitmap.h"
+
+#if CONFIG_JSCAIRO == 1
+#include "jsCairo.h"
+#include <cairo.h>
+#endif
 
 JSBool
 jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -783,7 +792,8 @@ static void imageOnComplete( jsCurlRequest_t &req, void const *data, unsigned lo
 static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    static char const usage[] = {
-      "Usage : new image( { url:\"something\" | width:int, height:int [,bgColor:0xRRGGBB] } );"
+      "Usage : new image( { url:\"something\" | width:int, height:int [,bgColor:0xRRGGBB] }"
+                          "| cairo_surface );" 
    };
 
    *rval = JSVAL_FALSE ;
@@ -799,83 +809,105 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
-         jsval urlv ;
-         jsval widthv ;
-         jsval heightv ;
-         if( JS_GetProperty( cx, rhObj, "url", &urlv ) 
-             &&
-             JSVAL_IS_STRING( urlv ) )
+         if( JS_InstanceOf( cx, rhObj, &jsCairoSurfaceClass_, NULL ) )
          {
-            if( queueCurlRequest( thisObj, argv[0], cx, imageOnComplete ) )
+            cairo_surface_t *surf = surfObject( cx, rhObj );
+            if( surf )
             {
+               printf( "create image here\n" );
+               cairo_surface_flush(surf);
+               unsigned char const *const pixels = (unsigned char *)
+                                                   cairo_surface_get_user_data( surf, &cairoPixelKey_ );
+               if( pixels )
+               {
+                  // TBD: How to get format
+               }
+               else
+                  JS_ReportError(cx, "invalid pixel data\n" );               
             }
             else
-            {
-               JS_ReportError( cx, "Error queueing curlRequest" );
-            }
-         }
-         else if( JS_GetProperty( cx, rhObj, "width", &widthv ) 
-                  &&
-                  JSVAL_IS_INT( widthv )
-                  &&
-                  JS_GetProperty( cx, rhObj, "height", &heightv )
-                  &&
-                  JSVAL_IS_INT( heightv ) )
-         {
-            unsigned short const w = JSVAL_TO_INT( widthv );
-            unsigned short const h = JSVAL_TO_INT( heightv );
-            unsigned long rgb32 = 0xFFFFFF ; // default white
-            jsval colorv ;
-            if( JS_GetProperty( cx, rhObj, "bgColor", &colorv ) 
-                &&
-                JSVAL_IS_INT( colorv ) )
-            {
-               rgb32 = JSVAL_TO_INT( colorv );
-            }
-            JS_DefineProperty( cx, thisObj, "width",
-                               INT_TO_JSVAL( w ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            JS_DefineProperty( cx, thisObj, "height",
-                               INT_TO_JSVAL( h ),
-                               0, 0, 
-                               JSPROP_ENUMERATE
-                               |JSPROP_PERMANENT
-                               |JSPROP_READONLY );
-            unsigned const pixBytes = w*h*sizeof(unsigned short);
-            unsigned short *pixMap = (unsigned short *)JS_malloc( cx, pixBytes );
-            if( pixMap )
-            {
-               unsigned short *nextOut = pixMap ;
-               for( unsigned r = 0 ; r < h ; r++ )
-                  for( unsigned c = 0 ; c < w ; c++ )
-                     *nextOut++ = rgb32 ;
-               JSString *sPix = JS_NewString( cx, (char *)pixMap, pixBytes );
-               JS_DefineProperty( cx, thisObj, "pixBuf",
-                                  STRING_TO_JSVAL( sPix ),
-                                  0, 0, 
-                                  JSPROP_ENUMERATE
-                                  |JSPROP_PERMANENT
-                                  |JSPROP_READONLY );
-               JS_DefineProperty( cx, thisObj, "isLoaded",
-                                  JSVAL_TRUE,
-                                  0, 0, 
-                                  JSPROP_ENUMERATE
-                                  |JSPROP_PERMANENT
-                                  |JSPROP_READONLY );
-
-            }
-            else
-               JS_ReportError( cx, "Out of memory allocating image" );
+               JS_ReportError( cx, usage );
          }
          else
-            JS_ReportError( cx, usage );
+         {
+            jsval urlv ;
+            jsval widthv ;
+            jsval heightv ;
+            if( JS_GetProperty( cx, rhObj, "url", &urlv ) 
+                &&
+                JSVAL_IS_STRING( urlv ) )
+            {
+               if( queueCurlRequest( thisObj, argv[0], cx, imageOnComplete ) )
+               {
+               }
+               else
+               {
+                  JS_ReportError( cx, "Error queueing curlRequest" );
+               }
+            }
+            else if( JS_GetProperty( cx, rhObj, "width", &widthv ) 
+                     &&
+                     JSVAL_IS_INT( widthv )
+                     &&
+                     JS_GetProperty( cx, rhObj, "height", &heightv )
+                     &&
+                     JSVAL_IS_INT( heightv ) )
+            {
+               unsigned short const w = JSVAL_TO_INT( widthv );
+               unsigned short const h = JSVAL_TO_INT( heightv );
+               unsigned long rgb32 = 0xFFFFFF ; // default white
+               jsval colorv ;
+               if( JS_GetProperty( cx, rhObj, "bgColor", &colorv ) 
+                   &&
+                   JSVAL_IS_INT( colorv ) )
+               {
+                  rgb32 = JSVAL_TO_INT( colorv );
+               }
+               JS_DefineProperty( cx, thisObj, "width",
+                                  INT_TO_JSVAL( w ),
+                                  0, 0, 
+                                  JSPROP_ENUMERATE
+                                  |JSPROP_PERMANENT
+                                  |JSPROP_READONLY );
+               JS_DefineProperty( cx, thisObj, "height",
+                                  INT_TO_JSVAL( h ),
+                                  0, 0, 
+                                  JSPROP_ENUMERATE
+                                  |JSPROP_PERMANENT
+                                  |JSPROP_READONLY );
+               unsigned const pixBytes = w*h*sizeof(unsigned short);
+               unsigned short *pixMap = (unsigned short *)JS_malloc( cx, pixBytes );
+               if( pixMap )
+               {
+                  unsigned short *nextOut = pixMap ;
+                  for( unsigned r = 0 ; r < h ; r++ )
+                     for( unsigned c = 0 ; c < w ; c++ )
+                        *nextOut++ = rgb32 ;
+                  JSString *sPix = JS_NewString( cx, (char *)pixMap, pixBytes );
+                  JS_DefineProperty( cx, thisObj, "pixBuf",
+                                     STRING_TO_JSVAL( sPix ),
+                                     0, 0, 
+                                     JSPROP_ENUMERATE
+                                     |JSPROP_PERMANENT
+                                     |JSPROP_READONLY );
+                  JS_DefineProperty( cx, thisObj, "isLoaded",
+                                     JSVAL_TRUE,
+                                     0, 0, 
+                                     JSPROP_ENUMERATE
+                                     |JSPROP_PERMANENT
+                                     |JSPROP_READONLY );
+   
+               }
+               else
+                  JS_ReportError( cx, "Out of memory allocating image" );
+            }
+            else
+               JS_ReportError( cx, usage );
+         } // not cairo
       }
       else
          JS_ReportError( cx, "Error allocating image" );
-   }
+   } // one parameter: object
    else
       JS_ReportError( cx, usage );
       

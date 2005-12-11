@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.15  2004-05-23 21:25:59  ericn
+ * Revision 1.16  2005-12-11 16:02:30  ericn
+ * -
+ *
+ * Revision 1.15  2004/05/23 21:25:59  ericn
  * -make symbol names work off of barcodeReader class
  *
  * Revision 1.14  2004/05/07 13:32:34  ericn
@@ -197,11 +200,11 @@ static JSBool jsBarcodeReader( JSContext *cx, JSObject *obj, uintN argc, jsval *
          JS_ReportError( cx, "allocating barcodeReader\n" );
          *rval = JSVAL_FALSE ;
       }
-      
-      return JS_TRUE;
    }
    else
       JS_ReportError( cx, "Usage : myVar = new barcodeReader( '/dev/ttyS2', '\r' );" );
+   
+   return JS_TRUE;
 }
 
 static unsigned const _standardBauds[] = {
@@ -382,7 +385,7 @@ jsSetBaud( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          unsigned baudIdx ;
          bool haveBaud = false ;
          
-         int const baud = JSVAL_TO_INT( argv[0] );
+         unsigned const baud = JSVAL_TO_INT( argv[0] );
          unsigned i ;
          for( i = 0 ; i < numStandardBauds ; i++ )
          {
@@ -633,8 +636,6 @@ static JSFunctionSpec barcodeReader_methods[] = {
    { "setDelay",        jsSetDelay,  0,0,0 },
    { 0 }
 };
-
-static pthread_t threadHandle_ = 0 ;
 
 char const *const bcrSymNames_[BCR_NUMSYMBOLOGIES] = {
    "unknownSym",
