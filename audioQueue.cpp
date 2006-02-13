@@ -8,7 +8,37 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.38  2005-11-06 20:26:25  ericn
+ * Revision 1.48  2006-02-13 21:50:57  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.47  2006/12/01 18:29:07  tkisky
+ * -debug rate prints
+ *
+ * Revision 1.46  2006/09/25 16:11:27  ericn
+ * -get rid of compiler warnings
+ *
+ * Revision 1.45  2006/09/23 22:17:16  ericn
+ * -add interject() method
+ *
+ * Revision 1.44  2006/08/31 15:51:13  ericn
+ * -remove unused code
+ *
+ * Revision 1.43  2006/08/16 21:10:52  ericn
+ * -include config.h
+ *
+ * Revision 1.42  2006/08/16 02:36:46  ericn
+ * -use linux/sm501-int.h for ioctl consts
+ *
+ * Revision 1.41  2006/08/07 18:34:03  tkisky
+ * -change CONFIG_MPEG to CONFIG_JSMPEG
+ *
+ * Revision 1.40  2006/08/07 18:20:29  tkisky
+ * -separate mpeg stuff
+ *
+ * Revision 1.39  2006/05/14 14:43:17  ericn
+ * -expose fd routines, timestamp variables
+ *
+ * Revision 1.38  2005/11/06 20:26:25  ericn
  * -conditional FFT
  *
  * Revision 1.37  2005/11/06 00:49:22  ericn
@@ -130,6 +160,7 @@
 #include "audioQueue.h"
 #include "semClasses.h"
 #include <unistd.h>
+#include <assert.h>
 #include "codeQueue.h"
 #include "mad.h"
 #include <fcntl.h>
@@ -144,12 +175,19 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <poll.h>
-#include "videoQueue.h"
 #include "tickMs.h"
+#include "config.h"
+
+#ifdef CONFIG_JSMPEG
+#include "videoQueue.h"
 #include "videoFrames.h"
+#include "mpDemux.h"
+#endif
 #include <pthread.h>
 #include "fbDev.h"
 #include "debugPrint.h"
+typedef int irqreturn_t ;
+#include "linux/sm501-int.h"
 #include "linux/sm501yuv.h"
 
 static bool volatile _cancel = false ;
@@ -157,7 +195,9 @@ static bool volatile _playing = false ;
 static bool volatile _recording = false ;
 static audioQueue_t *audioQueue_ = 0 ; 
 static mutex_t       openMutex_ ;
-
+timeval lastPlayStart_ = { 0 };
+timeval lastPlayEnd_ = { 0 };
+                  
 #define OUTBUFSIZE 8192
 
 static int readFd_ = -1 ;
@@ -165,7 +205,7 @@ static int readFdRefs_ = 0 ;
 static int writeFd_ = -1 ;
 static int writeFdRefs_ = 0 ;
 
-static int openReadFd( void )
+int openReadFd( void )
 {
    mutexLock_t lock( openMutex_ );
 
@@ -178,7 +218,7 @@ static int openReadFd( void )
    return readFd_ ;
 }
 
-static void closeReadFd( void )
+void closeReadFd( void )
 {
    mutexLock_t lock( openMutex_ );
    assert( 0 < readFdRefs_ );
@@ -191,21 +231,22 @@ static void closeReadFd( void )
    } // last close
 }
 
-static int openWriteFd( void )
+int openWriteFd( void )
 {
    mutexLock_t lock( openMutex_ );
 
    if( 0 > writeFd_ )
       writeFd_ = open( "/dev/dsp", O_WRONLY );
    
-   if( 0 <= writeFd_ )
+   if( 0 <= writeFd_ ){
       ++writeFdRefs_ ;
-//   fprintf( stderr, "Audio opened for write %d\n", writeFdRefs_ );
+debugPrint( "Audio opened fd %d for write %d\n", writeFd_, writeFdRefs_ );
+   }
 
    return writeFd_ ;
 }
 
-static void closeWriteFd( void )
+void closeWriteFd( void )
 {
    mutexLock_t lock( openMutex_ );
    assert( 0 < writeFdRefs_ );
@@ -249,6 +290,8 @@ void setVolume( unsigned char volParam )
       perror( "audioWriteFd" );
 }
 
+
+#ifdef NORMALIZE_AUDIO
 //
 // This number is magic and was determined by the scientific process
 // of trying to record something soft.
@@ -290,6 +333,8 @@ static void normalize( short int *samples,
 		}
 	}
 }
+
+#endif
 
 static void audioCallback( void *cbParam )
 {
@@ -340,6 +385,7 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
+#ifdef CONFIG_JSMPEG
 struct playbackStreams_t {
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
@@ -403,9 +449,9 @@ printf( "queue size: %u x %u, %u, %u\n",
       pi.inHeight_  = frames.queue_->height_ ;
       pi.outWidth_  = params.width_ ;
       pi.outHeight_ = params.height_ ;
-      
+
       int const ior = ioctl( fdYUV, SM501YUV_SETPLANE, &pi );
-      printf( "setplane: %d\n", ior );
+      printf( "setplane: %d/0x%08x\n", ior, SM501YUV_SETPLANE );
 
       unsigned const bytesPerFrame = rowStride*height ;
 printf( "%u bytes/frame\n", bytesPerFrame );
@@ -427,6 +473,7 @@ printf( "%u bytes/frame\n", bytesPerFrame );
    
    return 0 ;
 }
+#endif
 
 void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
 {
@@ -594,20 +641,23 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
       {
          if( audioQueue_t :: mp3Play_ == item->type_ )
          {
+            gettimeofday( &lastPlayStart_, 0 );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
                unsigned long numWritten = 0 ;
                _playing = true ;
-   
+
                madHeaders_t headers( item->data_, item->length_ );
                if( headers.worked() )
                {
+
 
                   printf( "playback %u bytes (%lu seconds) from %p here\n", 
                           item->length_, 
                           headers.lengthSeconds(),
                           item->data_ );
+
 
                   struct mad_stream stream;
                   struct mad_frame	frame;
@@ -622,7 +672,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
    
                   spaceLeft = OUTBUFSIZE ;
                   nextOut = outBuffer ;
-   
+
+unsigned wrote = 0 ;   
                   unsigned frameId = 0 ;
                   do {
                      if( -1 != mad_frame_decode(&frame, &stream ) )
@@ -637,16 +688,18 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                               {
                                  fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
                                  break;
-                              }
+                              } else {
+                                 fprintf( stderr, "Setting rate1 to %d:%m\n", sampleRate );
+			      }
                            }
-   
+
                            nChannels = MAD_NCHANNELS(&frame.header) ;
-   
+
                         } // first frame... check sample rate
                         else
                         {
                         } // not first frame
-            
+
                         mad_synth_frame( &synth, &frame );
                         if( 1 == nChannels )
                         {
@@ -663,6 +716,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                                  numWritten += OUTBUFSIZE ;
                                  nextOut = outBuffer ;
                                  spaceLeft = OUTBUFSIZE ;
+wrote += numWritten ;                                 
                               }
                            }
                         } // mono
@@ -704,15 +758,19 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      {
                         write( writeFd, outBuffer, (OUTBUFSIZE-spaceLeft)*sizeof(outBuffer[0]) );
                         numWritten += OUTBUFSIZE-spaceLeft ;
+                        wrote += (OUTBUFSIZE-spaceLeft);
                      } // flush tail end of output
-   //                  memset( outBuffer, 0, OUTBUFSIZE );
-   //                  write( writeFd, outBuffer, OUTBUFSIZE );
                   }
+//printf( "wrote %u samples, cancel %d, eof %d, shutdown %d\n", wrote, _cancel, eof, queue->shutdown_ );
+
                   /* close input file */
                   
                   mad_synth_finish( &synth );
                   mad_frame_finish( &frame );
                   mad_stream_finish(&stream);
+
+                  gettimeofday( &lastPlayEnd_, 0 );
+
                }
                else
                {
@@ -724,8 +782,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   if( _cancel )
                   {
                      _cancel = false ;
-                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
-                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
+//                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
+//                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
                   }
                   else
                   {
@@ -749,6 +807,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
          }
          else if( audioQueue_t :: mp3Raw_ == item->type_ )
          {
+            gettimeofday( &lastPlayStart_, 0 );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
@@ -799,7 +858,10 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                                     if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
                                        fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
                                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
-                                       fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                       fprintf( stderr, "Error setting sampling rate to %d:%m\n",sampleRate);
+				    else {
+                                       fprintf( stderr, "Setting rate2 to %d:%m\n", sampleRate );
+				    } 
                                  }
                               }
                            }
@@ -882,6 +944,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                      } // no more data, wait for empty
                   } // while !done
 
+                  gettimeofday( &lastPlayEnd_, 0 );
+
                   if( samples )
                      delete [] samples ;
 
@@ -919,11 +983,14 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                spaceLeft = OUTBUFSIZE ;
                nextOut = outBuffer ;
 
-               if( header.sampleRate_ != lastSampleRate )
+               if( header.sampleRate_ != (unsigned)lastSampleRate )
                {
                   lastSampleRate = header.sampleRate_ ;
                   if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastSampleRate );
+		  else {
+                     fprintf( stderr, "Setting rate3 to %d:%m\n", lastSampleRate );
+		  }
                }
 
                if( 1 == header.numChannels_ )
@@ -976,6 +1043,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                         ( !queue->shutdown_ );
                } // stereo, we can write directly
 
+               gettimeofday( &lastPlayEnd_, 0 );
+
                _playing = false ;
 
                if( !queue->shutdown_ )
@@ -1010,11 +1079,14 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
             {
                audioQueue_t :: waveHeader_t *header = ( audioQueue_t :: waveHeader_t * )item->data_ ;
                _recording = true ;
-               if( header->sampleRate_ != lastRecordRate )
+               if( header->sampleRate_ != (unsigned)lastRecordRate )
                {
                   lastRecordRate = header->sampleRate_ ;
                   if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
+		  else {
+                     fprintf( stderr, "Setting rate4 to %d:%m\n", lastRecordRate );
+		  }
                }
 
                header->numChannels_ = 1 ;
@@ -1025,7 +1097,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                queue->GetAudioSamples(readFd,header);
 #endif
 
-                normalize( (short *)header->samples_, header->numSamples_ );
+//                normalize( (short *)header->samples_, header->numSamples_ );
                _recording = false ;
 
                if( !queue->shutdown_ )
@@ -1042,6 +1114,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
             else
                perror( "audioReadFd" );
          }
+#ifdef CONFIG_JSMPEG
          else if( audioQueue_t :: mpegPlay_ == item->type_ )
          {
             writeFd = openWriteFd();
@@ -1153,7 +1226,10 @@ printf( "allocate frames: %u x %u\n", width, height );
                                           if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
                                              fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
                                           if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
-                                             fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                             fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
+					  else {
+                                             fprintf( stderr, "Setting rate5 to %d:%m\n", sampleRate );
+					  }
                                        }
                                     }
                                  }
@@ -1299,6 +1375,7 @@ printf( "allocate frames: %u x %u\n", width, height );
             else
                perror( "audioWriteFd" );
          }
+#endif
          else
             fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
       }
@@ -1340,9 +1417,12 @@ audioQueue_t :: audioQueue_t( void )
       if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
 
-      int speed = 44100 ;
+      int speed = DEFAULT_PLAYBACK_SPEED;
       if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+      else {
+         fprintf( stderr, "Setting rate6 to %u\n", speed );
+      }
 
       int recordLevel = 0 ;
       if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
@@ -1539,8 +1619,8 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       }
    } // limit scope of lock
       
-   ioctl( readFd_, SNDCTL_DSP_SYNC, 0 );
-   ioctl( writeFd_, SNDCTL_DSP_SYNC, 0 );
+//   ioctl( readFd_, SNDCTL_DSP_SYNC, 0 );
+//   ioctl( writeFd_, SNDCTL_DSP_SYNC, 0 );
 
    return true ;
 }

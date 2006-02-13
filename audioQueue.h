@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.15 2005-11-06 20:26:23 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.19 2006-02-13 21:52:28 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,19 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.15  2005-11-06 20:26:23  ericn
+ * Revision 1.19  2006-02-13 21:52:28  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.18  2006/12/01 18:29:54  tkisky
+ * -added DEFAULT_PLAYBACK_SPEED
+ *
+ * Revision 1.17  2006/09/23 22:16:55  ericn
+ * -match effect_t in include/linux/soundcard.h for raw data
+ *
+ * Revision 1.16  2006/05/14 14:42:48  ericn
+ * -expose fd routines, timestamp variables
+ *
+ * Revision 1.15  2005/11/06 20:26:23  ericn
  * -conditional FFT
  *
  * Revision 1.14  2003/09/26 00:43:50  tkisky
@@ -82,6 +94,7 @@
 extern unsigned char getVolume( void );
 extern void setVolume( unsigned char volume ); // range is 0-100
 
+#define DEFAULT_PLAYBACK_SPEED 44100 //48000	//44100 for pxa
 
 class audioQueue_t {
 public:
@@ -112,10 +125,12 @@ public:
    //
    // wave file data is prepended with this
    //
+   // --- structure must match effect_t in pxa-audio.c
+   //
    struct waveHeader_t {
-      unsigned char  numChannels_ ;
-      unsigned short sampleRate_ ;
-      unsigned long  numSamples_ ;
+      unsigned       numChannels_ ;
+      unsigned       numSamples_ ;
+      unsigned       sampleRate_ ;
       unsigned short samples_[1];
    };
 
@@ -224,6 +239,15 @@ private:
    CleanNoiseWork* cnw;
 #endif
 };
+audioQueue_t &getAudioQueue( void );
+
+int openReadFd( void );
+void closeReadFd( void );
+int openWriteFd( void );
+void closeWriteFd( void );
+
+extern timeval lastPlayStart_ ;
+extern timeval lastPlayEnd_ ;
 
 #endif
 

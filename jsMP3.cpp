@@ -9,7 +9,16 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.24  2005-11-06 00:49:34  ericn
+ * Revision 1.27  2006-02-13 21:50:57  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.26  2006/09/23 22:17:16  ericn
+ * -add interject() method
+ *
+ * Revision 1.25  2006/05/14 14:45:13  ericn
+ * -allow predecoded MP3, add timing routines
+ *
+ * Revision 1.24  2005/11/06 00:49:34  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.23  2003/09/22 02:01:17  ericn
@@ -97,6 +106,10 @@
 #include "audioQueue.h"
 #include "macros.h"
 #include "hexDump.h"
+#include "madDecode.h"
+
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 static JSBool
 jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -199,58 +212,136 @@ static JSPropertySpec mp3FileProperties_[] = {
 
 static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long size )
 {
-   //
-   // MP3 data is loaded in data[], validate and parse headers
-   //
-   madHeaders_t headers( data, size );
-   if( headers.worked() )
+   jsval     val ;
+   JSObject *initObj ;
+   
+   if( JS_GetProperty( req.cx_, req.lhObj_, initializerProp_, &val ) 
+       &&
+       JSVAL_IS_OBJECT( val ) 
+       &&
+       ( 0 != ( initObj = JSVAL_TO_OBJECT(val) ) ) )
    {
-      JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)data, size );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "data",
-                         STRING_TO_JSVAL( sData ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "duration",
-                         INT_TO_JSVAL( headers.lengthSeconds() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "frameCount",
-                         INT_TO_JSVAL( headers.frames().size() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "sampleRate",
-                         INT_TO_JSVAL( headers.playbackRate() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( req.cx_, 
-                         req.lhObj_, 
-                         "numChannels",
-                         INT_TO_JSVAL( headers.numChannels() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
+      if( JS_GetProperty( req.cx_, initObj, "predecode", &val ) 
+          &&
+          JSVAL_IS_INT( val ) 
+          &&
+          ( 0 != JSVAL_TO_INT(val) ) )
+      {
+         unsigned short *decoded ;
+         unsigned        decodedBytes ;
+         unsigned        sampleRate ;
+         unsigned        numChannels ;
+         if( madDecodeAll( data, size,
+                           decoded, decodedBytes,
+                           sampleRate, numChannels ) )
+         {
+            audioQueue_t::waveHeader_t *waveHdr ;
+
+            unsigned waveSize = decodedBytes+sizeof(audioQueue_t::waveHeader_t)-sizeof(waveHdr->samples_);
+
+            void *waveData = JS_malloc( req.cx_, waveSize );
+            waveHdr = (audioQueue_t::waveHeader_t *)waveData ;
+            waveHdr->numChannels_ = numChannels ;
+            waveHdr->sampleRate_  = sampleRate ;
+            waveHdr->numSamples_  = decodedBytes/sizeof(waveHdr->samples_[0]);
+
+            memcpy( waveHdr->samples_, decoded, decodedBytes );
+
+            JSString *sData = JS_NewString( req.cx_, (char *)waveData, waveSize );
+            delete [] decoded ;
+
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "decoded",
+                               STRING_TO_JSVAL( sData ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "duration",
+                               INT_TO_JSVAL( ( (decodedBytes*sizeof(unsigned short))+sampleRate-1)/sampleRate ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "sampleRate",
+                               INT_TO_JSVAL( sampleRate ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "numChannels",
+                               INT_TO_JSVAL( numChannels ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+         }
+         else
+            JS_ReportError( req.cx_, "decoding MP3 data\n" );
+      }
+      else
+      {
+         //
+         // MP3 data is loaded in data[], validate and parse headers
+         //
+         madHeaders_t headers( data, size );
+         if( headers.worked() )
+         {
+            JSString *sData = JS_NewStringCopyN( req.cx_, (char const *)data, size );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "data",
+                               STRING_TO_JSVAL( sData ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "duration",
+                               INT_TO_JSVAL( headers.lengthSeconds() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "frameCount",
+                               INT_TO_JSVAL( headers.frames().size() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "sampleRate",
+                               INT_TO_JSVAL( headers.playbackRate() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+            JS_DefineProperty( req.cx_, 
+                               req.lhObj_, 
+                               "numChannels",
+                               INT_TO_JSVAL( headers.numChannels() ),
+                               0, 0, 
+                               JSPROP_ENUMERATE
+                               |JSPROP_PERMANENT
+                               |JSPROP_READONLY );
+         }
+         else
+            JS_ReportError( req.cx_, "parsing MP3 headers\n" );
+      }
    }
    else
-   {
-      JS_ReportError( req.cx_, "parsing MP3 headers\n" );
-   }
+      JS_ReportError( req.cx_, "Missing %s", initializerProp_ );
 }
 
 static JSBool mp3File( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -496,11 +587,11 @@ static void waveFileOnComplete( jsCurlRequest_t &req, void const *data, unsigned
                  waveLong, longs[2], 
                  fmtLong, longs[3], 
                  dataLong, longs[9] );
-      }
 
-      hexDumper_t dump( longs, sizeof( longs ) );
-      while( dump.nextLine() )
-         printf( "%s\n", dump.getLine() );
+         hexDumper_t dump( longs, sizeof( longs ) );
+         while( dump.nextLine() )
+            printf( "%s\n", dump.getLine() );
+      }
    }
    else
       JS_ReportError( req.cx_, "WAVE too short" );
@@ -894,8 +985,26 @@ jsMP3Cancel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+static JSBool
+jsLastPlayStart( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = INT_TO_JSVAL( (lastPlayStart_.tv_sec*1000)+(lastPlayStart_.tv_usec / 1000) );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsLastPlayEnd( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = INT_TO_JSVAL( (lastPlayEnd_.tv_sec*1000)+(lastPlayEnd_.tv_usec / 1000) );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec _functions[] = {
-    {"mp3Cancel",           jsMP3Cancel,          0 },
+    {"mp3Cancel",           jsMP3Cancel,     0 },
+    {"lastPlayStart",       jsLastPlayStart, 0 },
+    {"lastPlayEnd",         jsLastPlayEnd,   0 },
     {0}
 };
 
