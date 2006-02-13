@@ -1,5 +1,5 @@
 #ifndef __PARSEDURL_H__
-#define __PARSEDURL_H__ "$Id: parsedURL.h,v 1.2 2003-01-31 13:26:28 ericn Exp $"
+#define __PARSEDURL_H__ "$Id: parsedURL.h,v 1.3 2006-02-13 21:07:49 ericn Exp $"
 
 /*
  * parsedURL.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: parsedURL.h,v $
- * Revision 1.2  2003-01-31 13:26:28  ericn
+ * Revision 1.3  2006-02-13 21:07:49  ericn
+ * -add constants for http and https
+ *
+ * Revision 1.2  2003/01/31 13:26:28  ericn
  * -added startsAtRoot flag
  *
  * Revision 1.1  2002/11/29 18:38:05  ericn
@@ -23,6 +26,9 @@
  */
 
 #include "stringVector.h"
+
+extern std::string const protocolHTTP_ ;
+extern std::string const protocolHTTPS_ ;
 
 class parsedURL_t {
 public:

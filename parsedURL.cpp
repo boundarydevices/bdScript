@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.4  2005-11-06 00:49:49  ericn
+ * Revision 1.5  2006-02-13 21:07:52  ericn
+ * -add constants for http and https
+ *
+ * Revision 1.4  2005/11/06 00:49:49  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.3  2003/01/31 13:26:44  ericn
@@ -28,6 +31,9 @@
 #include "parsedURL.h"
 #include "ultoa.h"
 #include <stdio.h>
+
+std::string const protocolHTTP_( "http" );
+std::string const protocolHTTPS_( "https" );
 
 void printURL( parsedURL_t const &url )
 {
