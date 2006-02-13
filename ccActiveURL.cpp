@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.cpp,v $
- * Revision 1.10  2005-11-05 23:21:55  ericn
+ * Revision 1.11  2006-02-13 21:11:48  ericn
+ * -preliminary https support
+ *
+ * Revision 1.10  2005/11/05 23:21:55  ericn
  * -fixed compiler warnings
  *
  * Revision 1.9  2004/09/03 15:08:43  ericn
@@ -96,6 +99,7 @@ void curlCache_t :: get
             strcpy( workReq.url_, url.c_str() );
             workReq.postHead_ = 0 ;
             workReq.cancel_   = &item->cancel_ ;
+            workReq.https_    = ( 0 == memcmp( workReq.url_, protocolHTTPS_.c_str(), protocolHTTPS_.size() ) );
    
             getCurlRequestQueue().push( workReq );
          } // not found in cache... get it
@@ -184,6 +188,7 @@ void curlCache_t :: post
       workReq.opaque_   = item ;
       strcpy( workReq.url_, url.c_str() );
       workReq.postHead_ = postHead ;
+      workReq.https_    = ( 0 == memcmp( workReq.url_, protocolHTTPS_.c_str(), protocolHTTPS_.size() ) );
       workReq.cancel_   = &item->cancel_ ;
 
       getCurlRequestQueue().push( workReq );

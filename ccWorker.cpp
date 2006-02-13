@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: ccWorker.cpp,v $
- * Revision 1.10  2004-01-02 23:37:06  ericn
+ * Revision 1.11  2006-02-13 21:11:21  ericn
+ * -preliminary https support
+ *
+ * Revision 1.10  2004/01/02 23:37:06  ericn
  * -debugPrint()
  *
  * Revision 1.9  2003/11/22 13:26:36  ericn
@@ -140,41 +143,49 @@ debugPrint( "curlReader %p (id %x)\n", &arg, pthread_self() );
             errorBuf[0] = '\0' ;
 
             CURLcode result = curl_easy_setopt( cHandle, CURLOPT_ERRORBUFFER, errorBuf );
-
             if( 0 == result )
             {
                result = curl_easy_setopt( cHandle, CURLOPT_URL, request.url_ );
    
                if( 0 == result )
                {
-                  if( request.postHead_ )
-                     result = curl_easy_setopt( cHandle, CURLOPT_HTTPPOST, request.postHead_ );
-                  if( 0 == result )
-                  {
-                     result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
+                  if( request.https_ ){
+                     result = curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, FALSE);
+                     if( 0 == result ){
+                        result = curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYHOST, 0);
+                     }
+                  } // set up for https
+                  
+                  if( 0 == result ){
+                     if( request.postHead_ )
+                        result = curl_easy_setopt( cHandle, CURLOPT_HTTPPOST, request.postHead_ );
                      if( 0 == result )
                      {
-                        progressData_t pd ;
-                        pd.request_       = &request ;
-                        pd.data_          = &data ;
-                        pd.expectedBytes_ = 0 ;
-   
-                        result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &pd );
+                        result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
                         if( 0 == result )
                         {
-                           result = curl_easy_setopt( cHandle, CURLOPT_FAILONERROR, (void *)1 );
+                           progressData_t pd ;
+                           pd.request_       = &request ;
+                           pd.data_          = &data ;
+                           pd.expectedBytes_ = 0 ;
+      
+                           result = curl_easy_setopt( cHandle, CURLOPT_WRITEDATA, &pd );
                            if( 0 == result )
                            {
-                              result = curl_easy_setopt( cHandle, CURLOPT_NOPROGRESS, 0 );
+                              result = curl_easy_setopt( cHandle, CURLOPT_FAILONERROR, (void *)1 );
                               if( 0 == result )
                               {
-                                 result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSFUNCTION, progress_callback );
+                                 result = curl_easy_setopt( cHandle, CURLOPT_NOPROGRESS, 0 );
                                  if( 0 == result )
                                  {
-                                    result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSDATA, &pd );
+                                    result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSFUNCTION, progress_callback );
                                     if( 0 == result )
                                     {
-                                       result = curl_easy_perform( cHandle );
+                                       result = curl_easy_setopt( cHandle, CURLOPT_PROGRESSDATA, &pd );
+                                       if( 0 == result )
+                                       {
+                                          result = curl_easy_perform( cHandle );
+                                       }
                                     }
                                  }
                               }
@@ -182,8 +193,11 @@ debugPrint( "curlReader %p (id %x)\n", &arg, pthread_self() );
                         }
                      }
                   }
+                  else {
+                     errorMsg = "https setup error" ;
+                  }
                }
-   
+
                curl_easy_cleanup( cHandle );
                
                if( CURLE_OK != result )

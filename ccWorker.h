@@ -1,5 +1,5 @@
 #ifndef __CCWORKER_H__
-#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.4 2003-08-01 14:29:31 ericn Exp $"
+#define __CCWORKER_H__ "$Id: ccWorker.h,v 1.5 2006-02-13 21:11:21 ericn Exp $"
 
 /*
  * ccWorker.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: ccWorker.h,v $
- * Revision 1.4  2003-08-01 14:29:31  ericn
+ * Revision 1.5  2006-02-13 21:11:21  ericn
+ * -preliminary https support
+ *
+ * Revision 1.4  2003/08/01 14:29:31  ericn
  * -change onComplete interface
  *
  * Revision 1.3  2002/11/30 16:22:41  ericn
@@ -39,6 +42,7 @@
 
 struct curlTransferRequest_t {
    void              *opaque_ ;     // app-specific data
+   bool               https_ ;      // flag for HTTPS setup
    char              url_[256];     // url to request, should be absolute
    struct HttpPost   *postHead_ ;   // post with parameters or NULL. Deallocated by curl thread.
    bool volatile     *cancel_ ;     // used to tell curl thread to abort

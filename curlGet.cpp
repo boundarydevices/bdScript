@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: curlGet.cpp,v $
- * Revision 1.4  2005-11-05 20:22:23  ericn
+ * Revision 1.5  2006-02-13 21:12:05  ericn
+ * -preliminary https support
+ *
+ * Revision 1.4  2005/11/05 20:22:23  ericn
  * -fix compiler warnings
  *
  * Revision 1.3  2002/11/30 00:32:42  ericn
@@ -77,6 +80,8 @@ bool curlGet( char const *url,
 
       if( 0 == result )
       {
+         curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, FALSE);
+         curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYHOST, 0);
          result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
          if( 0 == result )
          {
