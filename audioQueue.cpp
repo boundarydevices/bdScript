@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.48  2006-02-13 21:50:57  ericn
+ * Revision 1.49  2006-02-14 01:21:47  ericn
+ * -Alsa driver needs format and channels after open
+ *
+ * Revision 1.48  2006/02/13 21:50:57  ericn
  * -remove audio interject support
  *
  * Revision 1.47  2006/12/01 18:29:07  tkisky
@@ -613,7 +616,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
    {
       if( 0 != ioctl(writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
-            
+
+#ifndef KERNEL_SND // ALSA needs format later
       int const format = AFMT_S16_LE ;
       if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
@@ -621,7 +625,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
       int const channels = 2 ;
       if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-      
+#endif
       closeWriteFd();
    }
    else
@@ -645,6 +649,14 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
+#ifdef KERNEL_SND // ALSA needs format again
+               int const format = AFMT_S16_LE ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+               int const channels = 2 ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+#endif
                unsigned long numWritten = 0 ;
                _playing = true ;
 
