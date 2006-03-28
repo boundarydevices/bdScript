@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.19  2003-11-24 22:49:43  ericn
+ * Revision 1.20  2006-03-28 04:10:33  ericn
+ * -bring up to date (qualify global routines)
+ *
+ * Revision 1.19  2003/11/24 22:49:43  ericn
  * -max volume
  *
  * Revision 1.18  2003/11/04 13:09:32  ericn
@@ -693,7 +696,7 @@ udpBarcode_t :: udpBarcode_t
             lseek( fdBeep, waveDataStart, SEEK_SET );
             read( fdBeep, beepData_, beepBytes_ );
          }
-         close( fdBeep );
+         ::close( fdBeep );
       }
       else
          perror( "beep" );
@@ -736,7 +739,7 @@ void udpBarcode_t :: onBarcode( void )
          
          if( ( 0 != beepData_ ) && ( 0 != beepBytes_ ) )
          {
-            write( audioFd_, beepData_, beepBytes_ );
+            ::write( audioFd_, beepData_, beepBytes_ );
          } // play beep sound
       }
       else
@@ -744,7 +747,7 @@ void udpBarcode_t :: onBarcode( void )
    }
 
    if( keyence_e == scannerType_ )
-      write( fd_, "LON\r", 4 );
+      ::write( fd_, "LON\r", 4 );
 
 }
 
@@ -801,7 +804,7 @@ udpTouch_t :: udpTouch_t
          lseek( fdDing, waveDataStart, SEEK_SET );
          read( fdDing, dingData_, dingBytes_ );
       }
-      close( fdDing );
+      ::close( fdDing );
    }
    else
       perror( "ding" );
@@ -817,7 +820,7 @@ udpTouch_t :: udpTouch_t
          lseek( fdDong, waveDataStart, SEEK_SET );
          read( fdDong, dongData_, dongBytes_ );
       }
-      close( fdDong );
+      ::close( fdDong );
    }
    else
       perror( "dong" );
@@ -1225,8 +1228,8 @@ int main( int argc, char const * const argv[] )
                      speed /= 2 ;
                   }
                
-                  int not = 0 ;
-                  if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &not ) )
+                  int dont = 0 ;
+                  if( 0 != ioctl( fdAudio, SNDCTL_DSP_STEREO, &dont ) )
                      perror( "STEREO" );
 
                   int const vol = 0x6464 ;
@@ -1253,7 +1256,7 @@ int main( int argc, char const * const argv[] )
                      if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_SPEED, &speed ) )
                         fprintf( stderr, "set speed %m\n" );
                   
-                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_STEREO, &not ) )
+                     if( 0 != ioctl( fdAudioWrite, SNDCTL_DSP_STEREO, &dont ) )
                         perror( "STEREO" );
 
                      int fdCamera = open( "/dev/video0", O_RDONLY );
