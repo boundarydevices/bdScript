@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.19 2005-11-06 16:01:58 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.20 2006-03-28 04:24:46 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.19  2005-11-06 16:01:58  ericn
+ * Revision 1.20  2006-03-28 04:24:46  ericn
+ * -make getMem() public (I know, I know)
+ *
+ * Revision 1.19  2005/11/06 16:01:58  ericn
  * -KERNEL_FB, not CONFIG_BD2003
  *
  * Revision 1.18  2005/11/05 20:23:16  ericn
@@ -213,8 +216,9 @@ public:
                 unsigned        x,
                 unsigned        y );      // implicit 1 = black
 #endif 
-private:
    void           *getMem( void ) const { return mem_ ; }
+
+private:
    fbDevice_t( fbDevice_t const &rhs ); // no copies
    fbDevice_t( char const *name );
    ~fbDevice_t( void );
