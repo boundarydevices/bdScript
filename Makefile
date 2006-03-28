@@ -122,7 +122,7 @@ OBJS += monitorWLAN.o
 endif
 endif
 
-ifneq ("", $(CONFIG_JSCAIRO))
+ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
 endif
 
@@ -210,7 +210,8 @@ else
    TSINPUTFLAG=1
 endif
 
-ifneq ("", $(CONFIG_JSCAIRO))
+ifeq (y,$(CONFIG_JSCAIRO))
+echo "CAIRO == $(CONFIG_JSCAIRO)"
 IFLAGS += -I$(INSTALL_ROOT)/include/cairo
 LIBS   +=-lCurlCache -lcairo -lpixman -lfontconfig -lexpat
 endif
