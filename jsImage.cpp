@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.33  2005-12-11 16:02:30  ericn
+ * Revision 1.34  2006-03-28 04:16:50  ericn
+ * -conditional compile on Cairo
+ *
+ * Revision 1.33  2005/12/11 16:02:30  ericn
  * -
  *
  * Revision 1.32  2005/11/27 16:18:09  ericn
@@ -793,7 +796,9 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 {
    static char const usage[] = {
       "Usage : new image( { url:\"something\" | width:int, height:int [,bgColor:0xRRGGBB] }"
+#if CONFIG_JSCAIRO == 1
                           "| cairo_surface );" 
+#endif			  
    };
 
    *rval = JSVAL_FALSE ;
@@ -809,6 +814,7 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
       if( thisObj )
       {
          *rval = OBJECT_TO_JSVAL( thisObj ); // root
+#if CONFIG_JSCAIRO == 1
          if( JS_InstanceOf( cx, rhObj, &jsCairoSurfaceClass_, NULL ) )
          {
             cairo_surface_t *surf = surfObject( cx, rhObj );
@@ -829,6 +835,7 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                JS_ReportError( cx, usage );
          }
          else
+#endif	 
          {
             jsval urlv ;
             jsval widthv ;
