@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBarcode.cpp,v $
- * Revision 1.16  2005-12-11 16:02:30  ericn
+ * Revision 1.17  2006-03-28 04:09:32  ericn
+ * -cleanup
+ *
+ * Revision 1.16  2005/12/11 16:02:30  ericn
  * -
  *
  * Revision 1.15  2004/05/23 21:25:59  ericn
@@ -94,7 +97,6 @@ public:
    
    jsval     object_ ;
    JSObject *scope_ ;
-   pthread_t threadHandle_ ;
 };
 
 
