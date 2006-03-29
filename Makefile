@@ -20,10 +20,10 @@ endif
 endif
 endif
 
-ifneq (,$(findstring 2.4, $(CONFIG_KERNELPATH)))
-   KERNEL_VER=-DKERNEL_2_4
-else
+ifneq (,$(findstring 2.6, $(CONFIG_KERNELPATH)))
    KERNEL_VER=-DKERNEL_2_6
+else
+   KERNEL_VER=-DKERNEL_2_4
 endif
 
 MPEG2LIBS = -lmpeg2 -lvo
@@ -122,6 +122,8 @@ OBJS += monitorWLAN.o
 endif
 endif
 
+KERNEL_FB ?= y
+CONFIG_JSCAIRO ?= y
 ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
 endif
@@ -162,6 +164,7 @@ ifeq (y,$(CONFIG_JSBARCODE))
            jsBarcode.o
 endif       
 
+CONFIG_LIBFLASH?=y
 ifeq (y,$(CONFIG_LIBFLASH))       
    OBJS += flashThread.o
 endif       
@@ -170,19 +173,19 @@ ifndef INSTALL_ROOT
 INSTALL_ROOT=../install/arm-linux
 endif
 
-CC=arm-linux-gcc
+CROSS_COMPILE = arm-linux-
+CC= $(CROSS_COMPILE)gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
 LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
             $(INSTALL_ROOT)/lib/libmpeg2.a \
             $(INSTALL_ROOT)/lib/libmad.a
 
 ifneq (,$(findstring arm, $(CC)))
-   CC=arm-linux-gcc
-   AR=arm-linux-ar
-   NM=arm-linux-nm
-	LD=arm-linux-ld
-   STRIP=arm-linux-strip
-   OBJCOPY=arm-linux-objcopy
+   AR=$(CROSS_COMPILE)ar
+   NM=$(CROSS_COMPILE)nm
+   LD=$(CROSS_COMPILE)ld
+   STRIP=$(CROSS_COMPILE)strip
+   OBJCOPY=$(CROSS_COMPILE)objcopy
    LIBS=-L./ -L$(INSTALL_ROOT)/lib
    IFLAGS= -I$(CONFIG_KERNELPATH)/include \
           -I../linux-wlan-ng-0.1.16-pre8/src/include/ \
@@ -223,7 +226,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -fno-rtti -Wall -Wno-invalid-offsetof $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
