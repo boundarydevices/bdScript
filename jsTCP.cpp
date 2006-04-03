@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTCP.cpp,v $
- * Revision 1.10  2005-11-06 00:49:42  ericn
+ * Revision 1.11  2006-04-03 13:34:13  ericn
+ * -removed debug messages
+ *
+ * Revision 1.10  2005/11/06 00:49:42  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.9  2004/12/18 18:29:43  ericn
@@ -191,7 +194,6 @@ void jsTcpHandler_t::onDataAvail( void )      // POLLIN
    }
    else if( 0 == ioctlResult )
    {
-      printf( "?? closed ??\n" );
       onHUP();
    }
    else
@@ -298,7 +300,6 @@ jsTCPClientReadln( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
          std::string s ;
          if( socketData->readln( s ) )
          {
-fprintf( stderr, "---> host data %s\n", s.c_str() );
             *rval = STRING_TO_JSVAL( JS_NewStringCopyN( cx, s.c_str(), s.size() ) );
          }
       }
@@ -350,13 +351,7 @@ void jsTCPClientFinalize(JSContext *cx, JSObject *obj)
             socketData->close();       // no completion handler
          delete socketData ;
       } // have socket data
-//      else
-//         printf( "no socket data\n" );
-// this seems to be normal, and unrelated to finalization of a TCP client object
-//
    }
-   else
-      printf( "TCP finalize NULL object\n" );
 }
 
 static JSFunctionSpec tcpClientMethods_[] = {
