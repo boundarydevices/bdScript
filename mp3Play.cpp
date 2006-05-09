@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.4  2002-11-30 00:30:55  ericn
+ * Revision 1.5  2006-05-09 03:36:41  ericn
+ * -remove curlCache_t reference
+ *
+ * Revision 1.4  2002/11/30 00:30:55  ericn
  * -removed curlCache and curlThread modules
  *
  * Revision 1.3  2002/10/26 14:13:36  ericn
@@ -29,6 +32,7 @@
 #include <unistd.h>
 #include <sys/soundcard.h>
 #include <sys/ioctl.h>
+#include "memFile.h"
 
 static int dspFd_ = -1 ;
 static int sampleRate_ = 0 ;
@@ -276,10 +280,9 @@ int main( int argc, char *argv[] )
    
                if( 0 != speed )
                {
-                  curlCache_t &cache = getCurlCache();
                   char *cURL = argv[1];
-                  curlFile_t f( cache.get( cURL, true ) );
-                  if( f.isOpen() )
+		  memFile_t f( cURL );
+                  if( f.worked() )
                   {
                      audio_buf_info info ;
                      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &info ) )
@@ -295,7 +298,7 @@ int main( int argc, char *argv[] )
                      outBuffer = new unsigned short [ fragSize ];
                      spaceLeft = fragSize ;
                      nice( -10 );
-                     decode( (unsigned char *)f.getData(), f.getSize() );
+                     decode( (unsigned char *)f.getData(), f.getLength() );
                      
                      if( fragSize != spaceLeft )
                      {
@@ -305,7 +308,7 @@ int main( int argc, char *argv[] )
                      return 0 ;
                   }
                   else
-                     fprintf( stderr, "Error retrieving %s\n", cURL );
+                     perror( cURL );
                }
                else
                {
