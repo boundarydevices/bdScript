@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.25  2005-11-06 00:49:29  ericn
+ * Revision 1.26  2006-05-13 22:59:47  ericn
+ * -remove debug msg
+ *
+ * Revision 1.25  2005/11/06 00:49:29  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.24  2005/11/05 23:23:03  ericn
@@ -496,7 +499,6 @@ bool queueCurlRequest
              JS_ValueToBoolean( request.cx_, useCacheVal, &jsUseCache ) )
          {
             useCache = jsUseCache ;
-printf( "useCache: %s\n", useCache ? "true" : "false" );
          } // have optional useCache
 
          struct HttpPost *postHead = 0 ;
