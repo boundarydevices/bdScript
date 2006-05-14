@@ -58,6 +58,7 @@ OBJS = \
        imgGIF.o \
        imgJPEG.o \
        imgPNG.o \
+       imgToPNG.o \
        jsAlphaMap.o \
        jsBCWidths.o \
        jsBitmap.o \
@@ -70,6 +71,7 @@ OBJS = \
        jsHyperlink.o \
        jsImage.o \
        jsJPEG.o \
+       jsPNG.o \
        jsKernel.o \
        jsMD5.o \
        jsMonWLAN.o \
@@ -130,6 +132,7 @@ endif
 
 ifeq (y,$(KERNEL_FB))
 OBJS += \
+       audioOutPoll.o \
        audioQueue.o \
        cbmImage.o \
        jsButton.o \
@@ -152,7 +155,7 @@ HARDWARE_TYPE += -DKERNEL_FB=1
 else
 endif
 
-ifeq (y, $(CONFIG_JSSTARUSB))
+ifeq (y,$(CONFIG_JSSTARUSB))
    OBJS += jsPrinter.o \
        jsStar.o \
        jsStarUSB.o \
@@ -235,8 +238,6 @@ $(LIBBDGRAPH):
 	INSTALL_ROOT=$(INSTALL_ROOT) KERNEL_DIR=$(CONFIG_KERNELPATH) make -C bdGraph all
 
 $(LIB): Makefile $(OBJS)
-	echo "OBJS == $(OBJS)"
-	echo "KERNEL_FB == '$(KERNEL_FB)'"
 	$(AR) r $(LIB) $(OBJS)
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
@@ -268,6 +269,42 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
+odometer: odometer.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odometer odometer.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle odometer | sort >odometer.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+digitStrip: digitStrip.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o digitStrip digitStrip.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle digitStrip | sort >digitStrip.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+shadeGrad: shadeGrad.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o shadeGrad shadeGrad.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle shadeGrad | sort >shadeGrad.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+sm501reg: sm501reg.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501reg sm501reg.cpp -lstdc++ 
+	arm-linux-nm sm501reg >sm501reg.map
+	$(STRIP) sm501reg
+
+sm501flip: sm501flip.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501flip sm501flip.cpp -lstdc++ 
+	arm-linux-nm sm501flip >sm501flip.map
+	$(STRIP) sm501flip
+
+markSpace: markSpace.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o markSpace markSpace.cpp -lstdc++ 
+	arm-linux-nm markSpace >markSpace.map
+	$(STRIP) markSpace
+
 flashThreadMain.o : flashThread.cpp
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -DSTANDALONE=1 -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o flashThreadMain.o
 
@@ -277,8 +314,12 @@ flashThread: flashThreadMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	arm-linux-strip flashThread
 
 madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 $(IFLAGS) -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
 	arm-linux-nm madDecode >madDecode.map
+
+madDecode2: madDecode.cpp $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE2=1 $(IFLAGS) -o madDecode2 madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
+	arm-linux-nm madDecode2 >madDecode2.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph -lstdc++
@@ -330,6 +371,13 @@ imgPNGMain.o : imgPNG.cpp Makefile
 imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
 	$(STRIP) imgPNG
+
+imgToPNGMain.o : imgToPNG.cpp Makefile
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o imgToPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgToPNG.cpp
+
+imgToPNG : imgToPNGMain.o $(LIB) 
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgToPNG imgToPNGMain.o $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lstdc++ -lpng -lz
+	$(STRIP) imgToPNG
 
 bc : dummyBC.cpp
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o bc dummyBC.cpp -lstdc++
@@ -468,6 +516,10 @@ mpegDecode: mpegDecodeMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 
 hexDump: hexDump.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o hexDump -D__STANDALONE__ -Xlinker -Map -Xlinker hexDump.map hexDump.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+vsync: vsync.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -D__STANDALONE__ -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 rollingMedian: rollingMedian.cpp Makefile $(LIB)
