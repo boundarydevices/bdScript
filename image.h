@@ -1,5 +1,5 @@
 #ifndef __IMAGE_H__
-#define __IMAGE_H__ "$Id: image.h,v 1.2 2005-01-01 16:11:49 ericn Exp $"
+#define __IMAGE_H__ "$Id: image.h,v 1.3 2006-05-14 14:43:44 ericn Exp $"
 
 /*
  * image.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: image.h,v $
- * Revision 1.2  2005-01-01 16:11:49  ericn
+ * Revision 1.3  2006-05-14 14:43:44  ericn
+ * -allow image_t construction
+ *
+ * Revision 1.2  2005/01/01 16:11:49  ericn
  * -add image types
  *
  * Revision 1.1  2003/10/18 19:16:16  ericn
@@ -42,10 +45,22 @@ public:
       , height_( 0 )
       , alpha_( 0 ){}
 
+   image_t( void const *pixData,		// should be new []'d, image will take ownership
+	    unsigned width,
+	    unsigned height,
+	    void const *alpha = 0 )		// 			"
+      : pixData_( pixData )
+      , width_( width )
+      , height_( height )
+      , alpha_( alpha ){}
+
    ~image_t( void );
                
    // use this before re-use
    void unload( void );
+   
+   // or this if you have control
+   inline void disown( void ){ pixData_ = 0 ; }
 
    void const    *pixData_ ;
    unsigned short width_ ;
