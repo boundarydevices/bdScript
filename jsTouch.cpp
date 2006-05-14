@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.24  2005-11-06 00:49:43  ericn
+ * Revision 1.25  2006-05-14 14:35:38  ericn
+ * -add touchTime(), releaseTime() methods to measure latency
+ *
+ * Revision 1.24  2005/11/06 00:49:43  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.23  2004/12/28 03:35:12  ericn
@@ -200,6 +203,9 @@ jsTouchPoll_t :: ~jsTouchPoll_t( void )
 {
 }
 
+static timeval touchTime_ = { 0 };
+static timeval releaseTime_ = { 0 };
+
 void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
 {
    debugPrint( "raw: %d/%d\n", x, y );
@@ -215,6 +221,7 @@ void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &t
    } // already touching, move or release
    else
    {
+      touchTime_ = tv ;
       std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
       if( 0 < boxes.size() )
       {
@@ -282,6 +289,7 @@ void jsTouchPoll_t :: onRelease( timeval const &tv )
 {
    if( 0 != curBox_ )
    {
+      releaseTime_ = tv ;
       curBox_->onRelease_( *curBox_, prevX_, prevY_ );
       curBox_ = 0 ;
    } // touching, move or release box
@@ -393,12 +401,30 @@ jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+static JSBool
+jsTouchTime( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = INT_TO_JSVAL( (touchTime_.tv_sec*1000)+(touchTime_.tv_usec / 1000) );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsReleaseTime( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = INT_TO_JSVAL( (releaseTime_.tv_sec*1000)+(releaseTime_.tv_usec / 1000) );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec touchMethods_[] = {
     {"getX",         jsGetTouchX,           0 },
     {"getY",         jsGetTouchY,           0 },
     {"isRaw",        jsIsRaw,               0 },
     {"setRaw",       jsSetRaw,              0 },
     {"setCooked",    jsSetCooked,           0 },
+    {"touchTime",    jsTouchTime,           0 },
+    {"releaseTime",  jsReleaseTime,         0 },
     {0}
 };
 
