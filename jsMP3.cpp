@@ -9,13 +9,7 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.27  2006-02-13 21:50:57  ericn
- * -remove audio interject support
- *
- * Revision 1.26  2006/09/23 22:17:16  ericn
- * -add interject() method
- *
- * Revision 1.25  2006/05/14 14:45:13  ericn
+ * Revision 1.25  2006-05-14 14:45:13  ericn
  * -allow predecoded MP3, add timing routines
  *
  * Revision 1.24  2005/11/06 00:49:34  ericn
@@ -236,9 +230,9 @@ static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long
                            sampleRate, numChannels ) )
          {
             audioQueue_t::waveHeader_t *waveHdr ;
-
+            
             unsigned waveSize = decodedBytes+sizeof(audioQueue_t::waveHeader_t)-sizeof(waveHdr->samples_);
-
+            
             void *waveData = JS_malloc( req.cx_, waveSize );
             waveHdr = (audioQueue_t::waveHeader_t *)waveData ;
             waveHdr->numChannels_ = numChannels ;
