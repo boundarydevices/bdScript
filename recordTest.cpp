@@ -24,21 +24,27 @@ static void normalize( short int *samples,
    }
    min = 0-min ;
    max = max > min ? max : min ;
-   
-   printf( "max sample %d\n", max );
-   
-   //
-   // fixed point 16:16
-   //
-   unsigned long const ratio = ( 0x70000000UL / max );
-   printf( "ratio %lx\n", ratio );
 
-   next = samples ;
-   for( unsigned i = 0 ; i < numSamples ; i++ )
+   printf( "max sample %d\n", max );
+
+   if( 0 )
    {
-      signed long x16 = ratio * *next ;
-      signed short s = (signed short)( x16 >> 16 );
-      *next++ = s ;
+      //
+      // fixed point 16:16
+      //
+      unsigned long ratio = ( 0x70000000UL / max );
+   
+      if( ratio > (8 << 16) )
+         ratio = 8 << 16 ;
+   
+      printf( "ratio %lx\n", ratio );
+      next = samples ;
+      for( unsigned i = 0 ; i < numSamples ; i++ )
+      {
+         signed long x16 = ratio * *next ;
+         signed short s = (signed short)( x16 >> 16 );
+         *next++ = s ;
+      }
    }
 }
 
@@ -120,7 +126,24 @@ int main( int argc, char const *const argv[] )
             if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
                fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
 
-            int speed = 11025 ;
+            int fragSize = 0 ;
+            if( 0 != ioctl( readFd, SNDCTL_DSP_GETBLKSIZE, &fragSize ) )
+               fprintf( stderr, ":ioctl(SNDCTL_DSP_GETBLKSIZE)\n" );
+            else
+               printf( "fragSize: %d\n", fragSize );
+
+            if( 4 <= argc )
+            {
+               fragSize = strtoul( argv[3], 0, 0 );
+               if( 0 != ioctl( readFd, SNDCTL_DSP_SETFRAGMENT, &fragSize ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFRAGMENT)\n" );
+               else
+                  printf( "fragSize is now %d bytes (%s)\n", fragSize, argv[3] );
+            }
+
+            int speed = ( 3 < argc )
+                      ? atoi( argv[2] )
+                      : 44100 ;
             while( 0 < speed )
             {
                if( 0 == ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
@@ -169,7 +192,7 @@ int main( int argc, char const *const argv[] )
             while( dumpData.nextLine() )
                printf( "%s\n", dumpData.getLine() );
 
-//            normalize( (short *)samples, numSamples );
+            normalize( (short *)samples, numSamples );
 
             int const writeFd = open( "/dev/dsp", O_WRONLY );
             if( 0 <= writeFd )
@@ -184,7 +207,7 @@ int main( int argc, char const *const argv[] )
                }
                else
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
-               
+
                int vol = 0x4646 ;
                if( 2 <= argc )
                {
