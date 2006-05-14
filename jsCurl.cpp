@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.26  2006-05-13 22:59:47  ericn
+ * Revision 1.27  2006-05-14 14:33:16  ericn
+ * -use constant for initializer
+ *
+ * Revision 1.26  2006/05/13 22:59:47  ericn
  * -remove debug msg
  *
  * Revision 1.25  2005/11/06 00:49:29  ericn
@@ -104,6 +107,10 @@
 #include "codeQueue.h"
 #include "ccActiveURL.h"
 #include <unistd.h>
+
+char const * const initializerProp_ = {
+   "initializer"
+};
 
 enum jsCurl_tinyid {
    CURLFILE_ISLOADED, 
@@ -228,7 +235,7 @@ static void cbOnComplete( void *cbParam )
    jsval rhval ;
    if( JS_GetProperty( req.cx_, 
                        req.lhObj_, 
-                       "initializer",
+                       initializerProp_,
                        &rhval ) 
        &&
        JSVAL_IS_OBJECT( rhval ) )
@@ -267,7 +274,7 @@ static void cbOnFailure( void *cbParam )
    jsval rhval ;
    if( JS_GetProperty( req.cx_, 
                        req.lhObj_, 
-                       "initializer",
+                       initializerProp_,
                        &rhval ) 
        &&
        JSVAL_IS_OBJECT( rhval ) )
@@ -301,7 +308,7 @@ static void cbOnSize( void *cbParam )
    jsval rhval ;
    if( JS_GetProperty( req.cx_, 
                        req.lhObj_, 
-                       "initializer",
+                       initializerProp_,
                        &rhval ) 
        &&
        JSVAL_IS_OBJECT( rhval ) )
@@ -333,7 +340,7 @@ static void cbOnProgress( void *cbParam )
    jsval rhval ;
    if( JS_GetProperty( req.cx_, 
                        req.lhObj_, 
-                       "initializer",
+                       initializerProp_,
                        &rhval ) 
        &&
        JSVAL_IS_OBJECT( rhval ) )
@@ -464,7 +471,7 @@ bool queueCurlRequest
                       |JSPROP_PERMANENT
                       |JSPROP_READONLY );
 
-   JS_DefineProperty( cx, lhObj, "initializer",
+   JS_DefineProperty( cx, lhObj, initializerProp_,
                       initializer,
                       0, 0, 
                       JSPROP_ENUMERATE

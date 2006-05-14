@@ -1,5 +1,5 @@
 #ifndef __JSCURL_H__
-#define __JSCURL_H__ "$Id: jsCurl.h,v 1.10 2003-11-28 14:09:54 ericn Exp $"
+#define __JSCURL_H__ "$Id: jsCurl.h,v 1.11 2006-05-14 14:33:08 ericn Exp $"
 
 /*
  * jsCurl.h
@@ -115,7 +115,10 @@
  * Change History : 
  *
  * $Log: jsCurl.h,v $
- * Revision 1.10  2003-11-28 14:09:54  ericn
+ * Revision 1.11  2006-05-14 14:33:08  ericn
+ * -use constant for initializer
+ *
+ * Revision 1.10  2003/11/28 14:09:54  ericn
  * -lock lhObj_ via jsval
  *
  * Revision 1.9  2002/12/03 13:36:13  ericn
@@ -218,6 +221,8 @@ private:
 };
 
 bool initJSCurl( JSContext *cx, JSObject *glob );
+
+extern char const * const initializerProp_ ;
 
 #endif
 
