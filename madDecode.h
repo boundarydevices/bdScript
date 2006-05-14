@@ -1,5 +1,5 @@
 #ifndef __MADDECODE_H__
-#define __MADDECODE_H__ "$Id: madDecode.h,v 1.4 2003-08-04 03:13:40 ericn Exp $"
+#define __MADDECODE_H__ "$Id: madDecode.h,v 1.5 2006-05-14 14:34:36 ericn Exp $"
 
 /*
  * madDecode.h
@@ -23,7 +23,10 @@
  * Change History : 
  *
  * $Log: madDecode.h,v $
- * Revision 1.4  2003-08-04 03:13:40  ericn
+ * Revision 1.5  2006-05-14 14:34:36  ericn
+ * -add madDecodeAll() routine
+ *
+ * Revision 1.4  2003/08/04 03:13:40  ericn
  * -fixed comment
  *
  * Revision 1.3  2003/07/27 15:14:24  ericn
@@ -67,10 +70,10 @@ public:
                      unsigned       maxSamples,       // max #samples
                      unsigned      &numRead );        // number actually read
 
-   inline unsigned numSamples( void ) const { return haveHeader_ ? numSamples_ : 0 ; }
    inline bool haveHeader( void ) const { return haveHeader_ ; }
-   inline unsigned sampleRate( void ) const { return sampleRate_ ; }
-   inline unsigned numChannels( void ) const { return numChannels_ ; }
+   inline unsigned numSamples( void ) const { return haveHeader_ ? numSamples_ : 0 ; }
+   inline unsigned sampleRate( void ) const { return haveHeader_ ? sampleRate_ : 0 ; }
+   inline unsigned numChannels( void ) const { return haveHeader_ ? numChannels_ : 0 ; }
 
 private:
    struct mad_stream mp3Stream_ ;
@@ -84,6 +87,16 @@ private:
    unsigned          numSamples_ ; // number of samples available
    unsigned          sampleStart_ ; // read up to this sample -1 
 };
+
+
+bool madDecodeAll( void const      *mp3Data,             // input
+                   unsigned         mp3Length,           // input
+                   unsigned short *&decodedData,         // output: delete[] when done
+                   unsigned        &numBytes,            // output
+                   unsigned        &sampleRate,          // output
+                   unsigned        &numChannels,         // output
+                   unsigned         padToPage = 8192,    // input
+                   unsigned         maxBytes = 1<<20 );  // input
 
 #endif
 
