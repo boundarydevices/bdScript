@@ -9,25 +9,7 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.93  2006-02-13 21:17:38  ericn
- * -remove jsKernel reference
- *
- * Revision 1.92  2007/01/12 00:02:51  ericn
- * -show library addresses in stack dump
- *
- * Revision 1.91  2006/12/01 18:39:37  tkisky
- * -better stack dump on error
- *
- * Revision 1.90  2006/10/29 21:57:12  ericn
- * -add jsUsblp initialization
- *
- * Revision 1.89  2006/10/05 14:40:51  ericn
- * -add detach flag to cmd line
- *
- * Revision 1.88  2006/08/16 21:11:10  ericn
- * -allow GPIO support
- *
- * Revision 1.87  2006/05/14 14:42:19  ericn
+ * Revision 1.87  2006-05-14 14:42:19  ericn
  * -add jsPNG, audioOutPoll
  *
  * Revision 1.86  2005/12/11 16:02:30  ericn
@@ -325,6 +307,7 @@
 #endif
 
 #if CONFIG_JSGPIO == 1
+#error gpio support include
 #include "jsGpio.h"
 #endif
 
@@ -355,6 +338,7 @@
 #include "jsProcess.h"
 #include "jsDir.h"
 #include "jsUDP.h"
+#include "jsKernel.h"
 #include "pollTimer.h"
 #include "memFile.h"
 #include "debugPrint.h"
@@ -363,8 +347,6 @@
 #include "jsSerial.h"
 #include "jsFlashVar.h"
 #include "jsMD5.h"
-#include <fcntl.h>
-#include "jsUsblp.h"
 
 #include "touchPoll.h"
 
@@ -602,7 +584,7 @@ static namedConstant_t constants_[] = {
  * a context, and a global object, then initializes the JS run time,
  * and creates a context. */
 
-int prMain(int argc, char **argv, bool )
+int prMain(int argc, char **argv)
 {
    // initialize the JS run time, and return result in rt
    JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
@@ -665,6 +647,7 @@ int prMain(int argc, char **argv, bool )
                   initJSProcess( cx, glob );
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );
+                  initJSKernel( cx, glob );
                   initJSSerial( cx, glob );
                   initJSFlashVar( cx, glob );
                   initJSButton( cx, glob );
@@ -717,8 +700,6 @@ int prMain(int argc, char **argv, bool )
 #if CONFIG_JSSTARUSB == 1
                   initJSStarUSB( cx, glob );
 #endif
-
-                  initJSUsbLp( cx, glob );
 
                   getCurlCache();
 
@@ -853,78 +834,11 @@ int prMain(int argc, char **argv, bool )
 static struct sigaction sa;
 static struct sigaction oldint;
 
-void dumparea(unsigned int* p, int size)
-{
-	fprintf( stderr, "%p ",p);
-	while (size > 0) {
-		fprintf(stderr, "%08x ",*p);
-		p++;
-		size -= 4;
-		if ( (((int)p)&0xf)==0) fprintf(stderr,"\n%p ",p);
-	}
-	fprintf( stderr, "\n");
-}
-struct sigcontext1 {
-	unsigned long trap_no;
-	unsigned long error_code;
-	unsigned long oldmask;
-	unsigned long arm_r0;
-	unsigned long arm_r1;
-	unsigned long arm_r2;
-	unsigned long arm_r3;
-	unsigned long arm_r4;
-	unsigned long arm_r5;
-	unsigned long arm_r6;
-	unsigned long arm_r7;
-	unsigned long arm_r8;
-	unsigned long arm_r9;
-	unsigned long arm_r10;
-	unsigned long arm_fp;
-	unsigned long arm_ip;
-	unsigned long arm_sp;
-	unsigned long arm_lr;
-	unsigned long arm_pc;
-	unsigned long arm_cpsr;
-	unsigned long fault_address;
-};
-
-struct ucontext1 {
-        unsigned long     uc_flags;
-        struct ucontext  *uc_link;
-        stack_t           uc_stack;
-        struct sigcontext1 uc_mcontext;
-};
-
-void handler(int sig,siginfo_t* si,void* p) 
+void handler(int sig) 
 {
    pthread_t me = pthread_self();
-   fprintf( stderr, "got signal %i, si=%p p=%p, stack == %p\n", sig, si,p,&me );
-//   fprintf( stderr, "pid=%x, uid=%x\n",si->si_pid,si->si_uid); //pid not part of segv union
+   fprintf( stderr, "got signal, stack == %p (id %x)\n", &sig, me );
    fprintf( stderr, "sighandler at %p\n", handler );
-   fprintf( stderr, "Failed access %p\n", (si->si_addr));
-   struct ucontext1* pu = (struct ucontext1*)p;
-   struct sigcontext1* uc = &pu->uc_mcontext;
-   fprintf( stderr,"uc_mcontext:\n");
-   fprintf( stderr,"r0:%08lx r1:%08lx r2:%08lx r3:%08lx\n",uc->arm_r0,uc->arm_r1,uc->arm_r2,uc->arm_r3);
-   fprintf( stderr,"r4:%08lx r5:%08lx r6:%08lx r7:%08lx\n",uc->arm_r4,uc->arm_r5,uc->arm_r6,uc->arm_r7);
-   fprintf( stderr,"r8:%08lx r9:%08lx sl:%08lx fp:%08lx\n",uc->arm_r8,uc->arm_r9,uc->arm_r10,uc->arm_fp);
-   fprintf( stderr,"ip:%08lx sp:%08lx lr:%08lx pc:%08lx\n",uc->arm_ip,uc->arm_sp,uc->arm_lr,uc->arm_pc);
-   fprintf( stderr,"cpsr:%08lx fault:%08lx\n",uc->arm_cpsr,uc->fault_address);
-
-   FILE *fMaps = fopen( "/proc/self/maps", "rt" );
-   if( fMaps ){
-      char temp[132];
-      while( 0 != fgets( temp,sizeof(temp)-1,fMaps ) )
-         printf( "%s\n", temp );
-      fclose( fMaps );
-   }
-
-   fprintf( stderr,"siginfo:\n");
-   dumparea((unsigned int *)si,sizeof(siginfo_t));
-   fprintf( stderr,"ucontext:\n");
-   dumparea((unsigned int *)p,sizeof(struct ucontext));
-   fprintf( stderr,"stack:\n");
-   dumparea((unsigned int *)(uc->arm_sp), ((uc->arm_sp|0xfff)+1) - uc->arm_sp);
 
    unsigned long addr = (unsigned long)&sig ;
    unsigned long page = addr & ~0xFFF ; // 4K
@@ -944,11 +858,8 @@ void handler(int sig,siginfo_t* si,void* p)
 
    fprintf( stderr, "Handler done.\n" );
    fflush( stderr );
-   if (oldint.sa_flags & SA_SIGINFO) {
-	if (oldint.sa_sigaction) oldint.sa_sigaction(sig,si,p);
-   } else {
-        if( oldint.sa_handler ) oldint.sa_handler( sig );
-   }
+   if( oldint.sa_handler )
+      oldint.sa_handler( sig );
 
    exit( 1 );
 }
@@ -974,9 +885,9 @@ int main( int argc, char *argv[] )
    if( 2 <= argc )
    {
       // Initialize the sa structure
-      sa.sa_sigaction = handler;
+      sa.sa_handler = handler;
       sigemptyset(&sa.sa_mask);
-      sa.sa_flags = SA_SIGINFO;
+      sa.sa_flags = 0;
 #ifdef KERNEL_FB
       getFB( "/dev/fb0" );
 #else
@@ -1016,39 +927,11 @@ int main( int argc, char *argv[] )
             fprintf( stderr, "Error resolving exe:%m\n" );
          }
       } // limit scope of temporaries
-
-      char **nativeArgs = new char *[argc+1];
-      memset( nativeArgs, 0, (argc+1)*sizeof(nativeArgs[0]) );
-      bool detach = false ;
-      int numArgs = 0 ;
-
-      { // limit scope
-         for( int arg = 0 ; arg < argc ; arg++ ){
-            if( 0 == strcasecmp( "-d", argv[arg] ) ){
-               detach = true ;
-            }
-            else
-               nativeArgs[numArgs++] = argv[arg];
-         }
-      }
-
-      if( detach ){
-         printf( "detach from console\n" );
-         for( int i = 0 ; i < 3 ; i++ )
-            close( i );
-         int fdNull = open( "/dev/null", O_RDWR );
-         if( 0 <= fdNull ){
-            for( int i = 0 ; i < 3 ; i++ )
-               dup(fdNull);
-         }
-         else
-            perror( "/dev/null" );
-      }
-
+   
       do
       {
          // int result = 
-         prMain( numArgs, nativeArgs, detach );
+         prMain( argc, argv );
          if( gotoCalled_ )
          {
             argv[1] = (char *)gotoURL_.c_str();
@@ -1066,9 +949,7 @@ int main( int argc, char *argv[] )
       } while( 1 );
    }
    else
-      fprintf( stderr, 
-               "Usage : jsExec [-d] url\n" 
-               "-d      detach from stdin/stdout/stderr\n" );
+      fprintf( stderr, "Usage : jsExec url\n" );
    
    return 0 ;
 }
