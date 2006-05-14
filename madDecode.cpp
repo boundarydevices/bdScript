@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.6  2005-08-12 04:19:15  ericn
+ * Revision 1.7  2006-05-14 14:34:55  ericn
+ * -add madDecodeAll() routine, madDecode2 test program
+ *
+ * Revision 1.6  2005/08/12 04:19:15  ericn
  * -include <string.h>
  *
  * Revision 1.5  2003/08/04 03:13:56  ericn
@@ -237,6 +240,72 @@ bool madDecoder_t :: readSamples( unsigned short samples[],
    return 0 != numRead ;
 }
 
+
+
+bool madDecodeAll( void const      *mp3Data,             // input
+                   unsigned         mp3Length,           // input
+                   unsigned short *&decodedData,         // output
+                   unsigned        &numBytes,            // output
+                   unsigned        &sampleRate,          // output
+                   unsigned        &numChannels,         // output
+                   unsigned         padToPage,           // input
+                   unsigned         maxBytes )           // input
+{
+   decodedData = 0 ;
+   
+   unsigned long totalRead = 0 ;
+   bool hadHeader = false ;
+
+   { // limit decoder scope
+      madDecoder_t decoder ;
+      decoder.feed( mp3Data, mp3Length );
+   
+      do {
+         if( !hadHeader && decoder.haveHeader() ){
+            numChannels = decoder.numChannels();
+            sampleRate  = decoder.sampleRate();
+            hadHeader = true ;
+         }
+   
+         enum { maxSamples = 2048 };
+         unsigned short samples[maxSamples];
+         unsigned numRead ;
+         while( decoder.readSamples( samples, maxSamples, numRead ) ){
+            totalRead += numRead ;
+         }
+         if( !decoder.getData() )
+            break;
+      } while( 1 );
+   }
+   
+   numBytes = totalRead * sizeof(unsigned short);   
+   if( hadHeader && ( numBytes > 0 ) && ( numBytes < maxBytes ) )
+   {
+      // round up to page size
+      numBytes = ((numBytes+padToPage-1)/padToPage)*padToPage ;
+      totalRead = numBytes/sizeof(unsigned short);
+
+      decodedData = new unsigned short [totalRead];
+
+      madDecoder_t decoder ;
+      decoder.feed( mp3Data, mp3Length );
+
+      unsigned numFilled = 0 ;
+      do {
+         unsigned numRead ;
+         while( decoder.readSamples( decodedData+numFilled, totalRead-numFilled, numRead ) ){
+            numFilled += numRead ;
+         }
+         if( !decoder.getData() )
+            break;
+      } while( numFilled < totalRead );
+
+      return true ;
+   }
+   
+   return false ;
+}
+
 #ifdef STANDALONE
 #include "memFile.h"
 
@@ -266,6 +335,309 @@ int main( int argc, char const * const argv[] )
    }
    else
       fprintf( stderr, "Usage : madDecode fileName\n" );
+
+   return 0 ;
+}
+
+#elif defined( STANDALONE2 )
+
+//
+// touch effect latency test (gather touch-to-play time with and without decode)
+// 
+#include "memFile.h"
+#include "tickMs.h"
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/soundcard.h>
+#include <sys/ioctl.h>
+#include "pollHandler.h"
+#include "touchPoll.h"
+#include "ttyPoll.h"
+#include <signal.h>
+
+struct mp3Data_t {
+   char const     *fileName_ ;
+   unsigned        numBytes_ ;
+   unsigned        channels_ ;
+   unsigned        sampleRate_ ;
+   long long       endOfDecode_ ;
+   unsigned short *data_ ;
+};
+
+class touchPlay_t : public touchPoll_t {
+public:
+   touchPlay_t( pollHandlerSet_t &set,
+                int               dspFd,
+                mp3Data_t        &sound )
+      : touchPoll_t( set )
+      , dspFd_( dspFd )
+      , sound_( sound )
+      , wasDown_( false ){}
+   ~touchPlay_t( void ){}
+
+   virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
+   virtual void onRelease( timeval const &tv );
+
+   timeval const &when( void ) const { return touchTime_ ; }
+
+protected:
+private:
+   touchPlay_t(touchPlay_t const &); // no copies
+   
+   int const  dspFd_ ;
+   mp3Data_t &sound_ ;
+   timeval    touchTime_ ;
+   timeval    endPlay_ ;
+   bool       wasDown_ ;
+};
+
+
+void touchPlay_t :: onTouch
+   ( int x, int y, unsigned pressure, timeval const &tv )
+{
+   if( !wasDown_ )
+   {
+      wasDown_ = 1 ;
+      touchTime_ = tv ;
+      write( dspFd_, sound_.data_, sound_.numBytes_ );
+      if( 0 != ioctl( dspFd_, SNDCTL_DSP_POST, 0 ) ) 
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
+      gettimeofday( &endPlay_, 0 );
+   }
+}
+
+void touchPlay_t :: onRelease( timeval const &tv )
+{
+   wasDown_ = 0 ;
+   unsigned long start = (touchTime_.tv_sec*1000)+(touchTime_.tv_usec / 1000);
+   unsigned long end = (endPlay_.tv_sec*1000)+(endPlay_.tv_usec / 1000);
+   unsigned long elapsed = end-start ;
+   printf( "elapsed: %lu\n", elapsed );
+}
+
+
+#include "hexDump.h"
+#include <execinfo.h>
+#include <stdlib.h>
+
+static struct sigaction sa;
+static struct sigaction oldint;
+
+void handler(int sig) 
+{
+   fprintf( stderr, "got signal, id %x\n", sig );
+   fprintf( stderr, "sighandler at %p\n", handler );
+
+   unsigned long addr = (unsigned long)&sig ;
+   unsigned long page = addr & ~0xFFF ; // 4K
+   unsigned long size = page+0x1000-addr ;
+   hexDumper_t dumpStack( &sig, size ); // just dump this page
+   while( dumpStack.nextLine() )
+      fprintf( stderr, "%s\n", dumpStack.getLine() );
+
+   void *btArray[128];
+   int const btSize = backtrace(btArray, sizeof(btArray) / sizeof(void *) );
+
+   fprintf( stderr, "########## Backtrace ##########\n"
+                    "Number of elements in backtrace: %u\n", btSize );
+
+   if (btSize > 0)
+      backtrace_symbols_fd( btArray, btSize, fileno(stdout) );
+
+   fprintf( stderr, "Handler done.\n" );
+   fflush( stderr );
+   if( oldint.sa_handler )
+      oldint.sa_handler( sig );
+
+   exit( 1 );
+}
+
+
+
+int main( int argc, char const * const argv[] )
+{
+   long long const start = tickMs();
+
+   if( 2 <= argc )
+   {
+      unsigned const numFiles = argc-1;
+      mp3Data_t *const data = new mp3Data_t[numFiles];
+      memset( data, 0, numFiles*sizeof(data[0]));
+
+      long long beforeFiles = tickMs();
+
+      for( unsigned i = 0 ; i < numFiles ; i++ )
+      {
+         data[i].fileName_ = argv[i+1];
+         memFile_t fIn( data[i].fileName_ );
+         if( fIn.worked() )
+         {
+            unsigned long totalRead = 0 ;
+            bool hadHeader = false ;
+            madDecoder_t decoder ;
+            decoder.feed( fIn.getData(), fIn.getLength() );
+            do {
+               if( !hadHeader && decoder.haveHeader() ){
+                  data[i].channels_ = decoder.numChannels();
+                  data[i].sampleRate_ = decoder.sampleRate();
+                  hadHeader = true ;
+               }
+               enum { maxSamples = 2048 };
+               unsigned short samples[maxSamples];
+               unsigned numRead ;
+               while( decoder.readSamples( samples, maxSamples, numRead ) ){
+                  totalRead += numRead ;
+               }
+               if( !decoder.getData() )
+                  break;
+            } while( 1 );
+            
+            data[i].endOfDecode_ = tickMs();
+            data[i].numBytes_ = totalRead*sizeof(*data[i].data_);
+         }
+         else
+            perror( data[i].fileName_ );
+      }
+
+      long long endOfFiles = tickMs();
+
+      audio_buf_info info ;
+      memset( &info, 0, sizeof(info) );
+      unsigned lastSpeed = 0 ;
+
+      int dspFd = open( "/dev/dsp", O_WRONLY );
+      if( 0 <= dspFd )
+      {
+         if( 0 == ioctl(dspFd, SNDCTL_DSP_SYNC, 0 ) ) 
+         {
+            int const format = AFMT_S16_LE ;
+            if( 0 == ioctl( dspFd, SNDCTL_DSP_SETFMT, &format) ) 
+            {
+               int const channels = 1 ;
+               if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
+   
+               int speed = 44100 ;
+               while( 0 < speed )
+               {
+                  if( 0 == ioctl( dspFd, SNDCTL_DSP_SPEED, &speed ) )
+                  {
+                     lastSpeed = speed ;
+                     break;
+                  }
+                  else
+                     fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+                  speed /= 2 ;
+               }
+   
+               if( 0 != speed )
+               {
+                  if( 0 != ioctl( dspFd, SNDCTL_DSP_GETOSPACE, &info ) )
+                     fprintf( stderr, "Error %m getting outBuffer stats\n" );
+                     
+                  long long readyToWrite = tickMs();
+                  
+                  printf( "%lu ms in open, fragsize == %lu\n", 
+                           (unsigned long)(readyToWrite-endOfFiles),
+                           info.fragsize );
+               }
+               else
+                  fprintf( stderr, "No known speed supported\n" );
+            }
+            else
+               fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+         }
+         else
+            fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC)\n" );
+      }
+      else
+         perror( "/dev/dsp" );
+
+      printf( "%lu ms in decode\n", (unsigned long)(endOfFiles-beforeFiles) );
+
+      for( unsigned i = 0 ; i < numFiles ; i++ )
+      {
+         printf( "%s: %lu bytes, %u channels, %u Hz, %lu ms\n", 
+                 data[i].fileName_, 
+                 data[i].numBytes_,
+                 data[i].channels_, 
+                 data[i].sampleRate_,
+                 ( 0 == i ) 
+                 ? (unsigned long)(data[i].endOfDecode_-beforeFiles)
+                 : (unsigned long)(data[i].endOfDecode_-data[i-1].endOfDecode_) );
+         if( 0 != info.fragsize ){
+            data[i].numBytes_ = ((data[i].numBytes_ + info.fragsize - 1)/info.fragsize)*info.fragsize ;
+            unsigned const numSamples = data[i].numBytes_/sizeof(data[i].data_[0]);
+            data[i].data_ = new unsigned short [numSamples];
+            
+            long long startDecode2 = tickMs();
+            memFile_t fIn( data[i].fileName_ );
+            if( fIn.worked() )
+            {
+               unsigned long totalRead = 0 ;
+               bool hadHeader = false ;
+               madDecoder_t decoder ;
+               decoder.feed( fIn.getData(), fIn.getLength() );
+
+               do {
+                  unsigned numRead ;
+                  while( decoder.readSamples( data[i].data_+totalRead, numSamples-totalRead, numRead ) ){
+                     totalRead += numRead ;
+                  }
+                  if( !decoder.getData() )
+                     break;
+               } while( 1 );
+
+               printf( "   %lu ms decode2\n", tickMs()-startDecode2 );
+
+            }
+            else
+               perror( data[i].fileName_ );
+         }
+      }
+
+      if( 0 <= dspFd ){
+         for( unsigned i = 0 ; i < numFiles ; i++ ){
+            if( lastSpeed != data[i].sampleRate_ ){
+                  if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &data[i].sampleRate_ ) )
+                  {
+                     perror( "SPEED" );
+                     break;
+                  }
+                  lastSpeed = data[i].sampleRate_ ;
+            }
+            write( dspFd, data[i].data_, data[i].numBytes_ );
+         }
+      
+         if( 0 < numFiles )
+         {
+            signal(SIGTERM,SIG_IGN);
+            sa.sa_handler = handler;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            // Set up the signal handler
+            sigaction(SIGSEGV, &sa, NULL);
+            
+            pollHandlerSet_t poll ;
+   
+            ttyPollHandler_t *tty = new ttyPollHandler_t( poll );
+            touchPlay_t *player = new touchPlay_t( poll, dspFd, data[0] );
+
+            while( !tty->ctrlcHit() ){
+               poll.poll(-1);
+            }
+            
+            sleep(4);
+            printf( "exiting...\n" );
+         }
+      
+         close( dspFd );
+      }      
+
+      delete [] data ;
+   }
+   else
+      fprintf( stderr, "Usage : madDecode2 fileName [fileName...]\n" );
 
    return 0 ;
 }
