@@ -125,7 +125,6 @@ endif
 endif
 
 KERNEL_FB ?= y
-CONFIG_JSCAIRO ?= y
 ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
 endif
