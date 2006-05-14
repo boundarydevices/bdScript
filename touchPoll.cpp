@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.10  2005-11-23 13:08:20  ericn
+ * Revision 1.11  2006-05-14 14:32:42  ericn
+ * -use first timestamp, not last
+ *
+ * Revision 1.10  2005/11/23 13:08:20  ericn
  * -printf, not debugPrint in base class onTouch/onRelease
  *
  * Revision 1.9  2005/11/17 03:48:26  ericn
@@ -128,8 +131,13 @@ void touchPoll_t :: onDataAvail( void )
    unsigned count = 0 ;
    int numRead ;
 
+   timeval firstTime ;
+   
    while( sizeof( nextEvent ) == ( numRead = read( fd_, &nextEvent, sizeof( nextEvent ) ) ) )
    {
+      if( 0 == count )
+         firstTime = nextEvent.stamp ;
+
       medianX_.feed( nextEvent.x );
       medianY_.feed( nextEvent.y );
 
@@ -159,7 +167,7 @@ debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
          if( meanX_.read( x ) && meanY_.read( y ) )
          {
 debugPrint( "out: %u/%u\n", x, y );
-            onTouch( x, y, event.pressure, event.stamp );
+            onTouch( x, y, event.pressure, firstTime );
             if( !wasDown )
             {
 debugPrint( "first touch at %u:%u\n", x, y );
@@ -175,7 +183,7 @@ debugPrint( "not enough values\n" );
       {
          if( wasDown )
          {
-            onRelease( event.stamp );
+            onRelease( firstTime );
             wasDown = false ;
          }
          else
