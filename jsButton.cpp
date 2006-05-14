@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.24  2005-11-06 00:49:26  ericn
+ * Revision 1.25  2006-05-14 14:44:30  ericn
+ * -allow predecoded audio through audioOutPoll
+ *
+ * Revision 1.24  2005/11/06 00:49:26  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.23  2003/11/25 00:13:17  ericn
@@ -95,6 +98,7 @@
 #include "codeQueue.h"
 #include "jsImage.h"
 #include "audioQueue.h"
+#include "audioOutPoll.h"
 #include "ftObjs.h"
 
 typedef struct buttonData_t {
@@ -126,8 +130,10 @@ typedef struct buttonData_t {
    void const     *fontData_ ;
    unsigned long   fontSize_ ;
 
+   bool            touchSoundDecoded_ ;
    unsigned char  *touchSoundData_ ;
    unsigned long   touchSoundLength_ ;
+   bool            releaseSoundDecoded_ ;
    unsigned char  *releaseSoundData_ ;
    unsigned long   releaseSoundLength_ ;
 };
@@ -306,10 +312,21 @@ static void buttonTouch( box_t         &box,
 
    if( ( 0 != button->touchSoundData_ ) && ( 0 != button->touchSoundLength_ ) )
    {
-      audioQueue_t &q = getAudioQueue();
-//      unsigned numCancelled ;
-//      q.clear( numCancelled );
-      q.queuePlayback( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
+      audioOutPoll_t *ao ;
+      if( button->touchSoundDecoded_ 
+          && 
+          ( 0 != ( ao = audioOutPoll_t::get() ) ) )
+      {
+         ao->queuePlayback( *(audioQueue_t::waveHeader_t *)button->touchSoundData_ );
+      }
+      else
+      {
+         audioQueue_t &q = getAudioQueue();
+         if( !button->touchSoundDecoded_ )
+            q.queuePlayback( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
+         else
+            q.queuePlayback( button->jsObj_, *(audioQueue_t::waveHeader_t *)button->touchSoundData_ );
+      }
    }
 
    doit( box, x, y, defaultTouch, "onTouch" );
@@ -363,7 +380,11 @@ static void buttonRelease( box_t         &box,
       audioQueue_t &q = getAudioQueue();
 //      unsigned numCancelled ;
 //      q.clear( numCancelled );
-      q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
+      if( !button->releaseSoundDecoded_ )
+         q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
+      else
+         q.queuePlayback( button->jsObj_, *(audioQueue_t::waveHeader_t *)button->releaseSoundData_ );
+
    }
 
    doit( box, x, y, defaultRelease, "onRelease" );
@@ -451,6 +472,14 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                      JSString *sVal = JSVAL_TO_STRING(jsv);
                      buttonData->touchSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
                      buttonData->touchSoundLength_ = JS_GetStringLength( sVal );
+                     buttonData->touchSoundDecoded_ = 0 ;
+                  }
+                  else if( JS_GetProperty( cx, jsO, "decoded", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                  {
+                     JSString *sVal = JSVAL_TO_STRING(jsv);
+                     buttonData->touchSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
+                     buttonData->touchSoundLength_ = JS_GetStringLength( sVal );
+                     buttonData->touchSoundDecoded_ = 1 ;
                   }
                }
                if( JS_GetProperty( cx, rhObj, "releaseSound", &jsv ) && JSVAL_IS_OBJECT( jsv ) && ( 0 != ( jsO = JSVAL_TO_OBJECT( jsv ) ) ) )
@@ -461,6 +490,14 @@ static JSBool button( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsv
                      JSString *sVal = JSVAL_TO_STRING(jsv);
                      buttonData->releaseSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
                      buttonData->releaseSoundLength_ = JS_GetStringLength( sVal );
+                     buttonData->releaseSoundDecoded_ = 0 ;
+                  }
+                  else if( JS_GetProperty( cx, jsO, "decoded", &jsv ) && JSVAL_IS_STRING( jsv ) )
+                  {
+                     JSString *sVal = JSVAL_TO_STRING(jsv);
+                     buttonData->releaseSoundData_ = (unsigned char *)JS_GetStringBytes( sVal );
+                     buttonData->releaseSoundLength_ = JS_GetStringLength( sVal );
+                     buttonData->releaseSoundDecoded_ = 1 ;
                   }
                }
 
