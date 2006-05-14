@@ -4,7 +4,7 @@
  * (c) Copyright 2002 by M&N Logistik-Lösungen Online GmbH
  * set under the GPLv2
  *
- * $Id: pxaregs.c,v 1.3 2006-02-13 21:09:49 ericn Exp $
+ * $Id: pxaregs.c,v 1.1 2006-05-14 14:51:23 ericn Exp $
  *
  * Please send patches to h.schurig, working at mn-logistik.de
  * - added fix from Bernhard Nemec
@@ -272,7 +272,6 @@ static struct reg_info regs[] = {
 { "CCCR_L",    0x41300000,  0, 0x0000001f, 'x', "CM crystal freq to memory freq multiplier" }, 
 { "CCCR_M",    0x41300000,  5, 0x00000003, 'x', "CM memory freq to run mode freq multiplier" },
 { "CCCR_N",    0x41300000,  7, 0x00000007, 'x', "CM run mode freq to turbo freq multiplier" },
-{ "CCCR_A",    0x41300000, 25, 0x02000000, 'x', "Alternate setting for memory clock" }, 
 
 { "CKEN",      0x41300004,  0, 0xffffffff, 'x', "Clock Enable Register (3-36)" },
 { "CKEN_0",    0x41300004,  0, 0x00000001, 'd', "CM PWM0 clock enabled" },
@@ -292,8 +291,6 @@ static struct reg_info regs[] = {
 { "OSCC",      0x41300008,  0, 0xffffffff, 'x', "Oscillator Configuration Register (3-38)" },
 { "OSCC_OOK",  0x41300008,  0, 0x00000001, 'd', "CM 32.768 kHz oscillator enabled and stabilized" },
 { "OSCC_OON",  0x41300008,  1, 0x00000001, 'd', "CM 32.768 kHz oscillator enabled" },
-
-{ "CCSR",      0x4130000C,  0, 0xffffffff, 'x', "Core Clock Status Register" },
 
 // TODO: CP14-Registers (3-37)
 
@@ -480,19 +477,7 @@ static struct reg_info regs[] = {
 { "GPLR2_82", 0x40E00008, 18, 0x00000001, 'd', "GPIO 82 level" },
 { "GPLR2_83", 0x40E00008, 19, 0x00000001, 'd', "GPIO 83 level" },
 { "GPLR2_84", 0x40E00008, 20, 0x00000001, 'd', "GPIO 84 level" },
-{ "GPLR2_85", 0x40E00008, 21, 0x00000001, 'd', "GPIO 85 level" },
-{ "GPLR2_86", 0x40E00008, 22, 0x00000001, 'd', "GPIO 86 level" },
-{ "GPLR2_87", 0x40E00008, 23, 0x00000001, 'd', "GPIO 87 level" },
-{ "GPLR2_88", 0x40E00008, 24, 0x00000001, 'd', "GPIO 88 level" },
-{ "GPLR2_89", 0x40E00008, 25, 0x00000001, 'd', "GPIO 89 level" },
-{ "GPLR2_90", 0x40E00008, 26, 0x00000001, 'd', "GPIO 90 level" },
-{ "GPLR2_91", 0x40E00008, 27, 0x00000001, 'd', "GPIO 91 level" },
-{ "GPLR2_92", 0x40E00008, 28, 0x00000001, 'd', "GPIO 92 level" },
-{ "GPLR2_93", 0x40E00008, 29, 0x00000001, 'd', "GPIO 93 level" },
-{ "GPLR2_94", 0x40E00008, 30, 0x00000001, 'd', "GPIO 94 level" },
-{ "GPLR2_95", 0x40E00008, 31, 0x00000001, 'd', "GPIO 95 level" },
 #endif
-
 
 { "GPDR0",    0x40E0000C,  0, 0xffffffff, 'x', "GPIO Direction Register 0 (4-9)" },
 { "GPDR0_0",  0x40E0000C,  0, 0x00000001, 'd', "GPIO 0 i/o direction (1=output)" },
@@ -584,24 +569,6 @@ static struct reg_info regs[] = {
 { "GPDR2_82", 0x40E00014, 18, 0x00000001, 'd', "GPIO 82 i/o direction (1=output)" },
 { "GPDR2_83", 0x40E00014, 19, 0x00000001, 'd', "GPIO 83 i/o direction (1=output)" },
 { "GPDR2_84", 0x40E00014, 20, 0x00000001, 'd', "GPIO 84 i/o direction (1=output)" },
-{ "GPDR2_85", 0x40E00014, 21, 0x00000001, 'd', "GPIO 85 i/o direction (1=output)" },
-{ "GPDR2_86", 0x40E00014, 22, 0x00000001, 'd', "GPIO 86 i/o direction (1=output)" },
-{ "GPDR2_87", 0x40E00014, 23, 0x00000001, 'd', "GPIO 87 i/o direction (1=output)" },
-{ "GPDR2_88", 0x40E00014, 24, 0x00000001, 'd', "GPIO 88 i/o direction (1=output)" },
-{ "GPDR2_89", 0x40E00014, 25, 0x00000001, 'd', "GPIO 89 i/o direction (1=output)" },
-{ "GPDR2_90", 0x40E00014, 26, 0x00000001, 'd', "GPIO 90 i/o direction (1=output)" },
-{ "GPDR2_91", 0x40E00014, 27, 0x00000001, 'd', "GPIO 91 i/o direction (1=output)" },
-{ "GPDR2_92", 0x40E00014, 28, 0x00000001, 'd', "GPIO 92 i/o direction (1=output)" },
-{ "GPDR2_93", 0x40E00014, 29, 0x00000001, 'd', "GPIO 93 i/o direction (1=output)" },
-{ "GPDR2_94", 0x40E00014, 30, 0x00000001, 'd', "GPIO 94 i/o direction (1=output)" },
-{ "GPDR2_95", 0x40E00014, 31, 0x00000001, 'd', "GPIO 95 i/o direction (1=output)" },
-
-{ "GPDR3",    0x40E0010C,  0, 0xffffffff, 'x', "GPIO Direction Register 3" },
-{ "GPLR3",    0x40E00100,  0, 0xffffffff, 'x', "GPIO Level Register 3" },
-{ "GPSR3",    0x40E00118,  0, 0xffffffff, 'x', "GPIO Set Register 3" },
-{ "GPCR3",    0x40E00124,  0, 0xffffffff, 'x', "GPIO Clear Register 3" },
-{ "GAFR3L",   0x40E0006C,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 3 Lower (96-111)" },
-{ "GAFR3U",   0x40E00070,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 3 Upper (112-120)" },
 
 { "GPSR0",    0x40E00018,  0, 0xffffffff, 'x', "GPIO Set Register 0 (4-10)" },
 { "GPSR0_0",  0x40E00018,  0, 0x00000001, 'd', "GPIO 0 set" },
@@ -1130,7 +1097,7 @@ static struct reg_info regs[] = {
 { "GAFR1U_62", 0x40E00060, 28, 0x00000003, 'x', "GPIO 62 alternate function select" },
 { "GAFR1U_63", 0x40E00060, 30, 0x00000003, 'x', "GPIO 63 alternate function select" },
 
-{ "GAFR2L",    0x40E00064,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 2 Lower (64-79)" },
+{ "GAFR2L",    0x40E00064,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 2 Lower (4-19)" },
 { "GAFR2L_64", 0x40E00064,  0, 0x00000003, 'x', "GPIO 64 alternate function select" },
 { "GAFR2L_65", 0x40E00064,  2, 0x00000003, 'x', "GPIO 65 alternate function select" },
 { "GAFR2L_66", 0x40E00064,  4, 0x00000003, 'x', "GPIO 66 alternate function select" },
@@ -1148,23 +1115,12 @@ static struct reg_info regs[] = {
 { "GAFR2L_78", 0x40E00064, 28, 0x00000003, 'x', "GPIO 78 alternate function select" },
 { "GAFR2L_79", 0x40E00064, 30, 0x00000003, 'x', "GPIO 79 alternate function select" },
 
-{ "GAFR2U",    0x40E00068,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 2 Upper (80-95)" },
+{ "GAFR2U",    0x40E00068,  0, 0xffffffff, 'x', "GPIO Alternate Function Register 2 Upper (4-19)" },
 { "GAFR2U_80", 0x40E00068,  0, 0x00000003, 'x', "GPIO 80 alternate function select" },
 { "GAFR2U_81", 0x40E00068,  2, 0x00000003, 'x', "GPIO 81 alternate function select" },
 { "GAFR2U_82", 0x40E00068,  4, 0x00000003, 'x', "GPIO 82 alternate function select" },
 { "GAFR2U_83", 0x40E00068,  6, 0x00000003, 'x', "GPIO 83 alternate function select" },
 { "GAFR2U_84", 0x40E00068,  8, 0x00000003, 'x', "GPIO 84 alternate function select" },
-{ "GAFR2U_85", 0x40E00068, 10, 0x00000003, 'x', "GPIO 85 alternate function select" },
-{ "GAFR2U_86", 0x40E00068, 12, 0x00000003, 'x', "GPIO 86 alternate function select" },
-{ "GAFR2U_87", 0x40E00068, 14, 0x00000003, 'x', "GPIO 87 alternate function select" },
-{ "GAFR2U_88", 0x40E00068, 16, 0x00000003, 'x', "GPIO 88 alternate function select" },
-{ "GAFR2U_89", 0x40E00068, 18, 0x00000003, 'x', "GPIO 89 alternate function select" },
-{ "GAFR2U_90", 0x40E00068, 20, 0x00000003, 'x', "GPIO 90 alternate function select" },
-{ "GAFR2U_91", 0x40E00068, 22, 0x00000003, 'x', "GPIO 91 alternate function select" },
-{ "GAFR2U_92", 0x40E00068, 24, 0x00000003, 'x', "GPIO 92 alternate function select" },
-{ "GAFR2U_93", 0x40E00068, 26, 0x00000003, 'x', "GPIO 93 alternate function select" },
-{ "GAFR2U_94", 0x40E00068, 28, 0x00000003, 'x', "GPIO 94 alternate function select" },
-{ "GAFR2U_95", 0x40E00068, 30, 0x00000003, 'x', "GPIO 95 alternate function select" },
 
 { "ICMR",      0x40D00004,  0, 0xffffffff, 'x', "Interrupt Controller Mask Register (4-22)" },
 { "ICMR_IM7",  0x40D00004,  7, 0x00000001, 'x', "Pending IRQ 7 (HWUART) unmasked?" },
@@ -1347,8 +1303,7 @@ static struct reg_info regs[] = {
 { "LCCR3_HSP", 0x4400000C, 21, 0x00000001, 'd', "LCD L_LCLK horizontal sync polarity active low" },
 { "LCCR3_PCP", 0x4400000C, 22, 0x00000001, 'd', "LCD data sampled on falling edge of L_PCLK" },
 { "LCCR3_OEP", 0x4400000C, 23, 0x00000001, 'd', "LCD L_BIAS output enable active low" },
-{ "LCCR3_BPP", 0x4400000C, 24, 0x00000007, 'x', "LCD bits per pixel" },
-{ "LCCR3_BPP3", 0x4400000C, 29, 0x00000001, 'x', "LCD bits per pixel" },
+{ "LCCR3_BPP", 0x4400000C, 24, 0x00000007, '<', "LCD bits per pixel" },
 { "LCCR3_DPC", 0x4400000C, 27, 0x00000007, 'd', "LCD double pixel clock rate at L_PCLK" },
 
 
@@ -1383,8 +1338,6 @@ static struct reg_info regs[] = {
 // TODO
 
 
-{ "LCDBSCNTR", 0x48000054,  0, 0xffffffff, 'x', "LCD Controller Buffer Strength" },
-{ "LCDBS",     0x48000054,  0, 0x0000000F, 'd', "LCD Buffer Strength (0-0xff)" },
 
 
 { "MDCNFG",         0x48000000, 0, 0xffffffff, 'x', "SDRAM Configuration Register (6-9)" },
@@ -1616,34 +1569,6 @@ static struct reg_info regs[] = {
 { "MMC_ARGL",			0x41100038, 0, 0xffffffff, 'x', "MMC Lower Argument Register (15-36)" },
 { "MMC_ARGL_ARG",		0x41100038, 0, 0x0000ffff, 'x', "upper 16 bits of command argument" },
 
-{ "UHCREV",       0x4C000000, 0, 0xFFFFFFFF, 'x', "UHC HCI Spec Revision register 20-10" },
-{ "UHCHCON",         0x4C000004, 0, 0xFFFFFFFF, 'x', "UHC Host Control register 20-10" },
-{ "UHCCOMS",         0x4C000008, 0, 0xFFFFFFFF, 'x', "UHC Command Status register 20-14" },
-{ "UHCINTS",         0x4C00000C, 0, 0xFFFFFFFF, 'x', "UHC Interrupt Status register 20-16" },
-{ "UHCINTE",         0x4C000010, 0, 0xFFFFFFFF, 'x', "UHC Interrupt Enable register 20-18" },
-{ "UHCINTD",         0x4C000014, 0, 0xFFFFFFFF, 'x', "UHC Interrupt Disable register 20-20" },
-{ "UHCHCCA",         0x4C000018, 0, 0xFFFFFFFF, 'x', "UHC Host Controller Communication Area register 20-21" },
-{ "UHCPCED",         0x4C00001C, 0, 0xFFFFFFFF, 'x', "UHC Period Current Endpoint Descriptor register 20-21" },
-{ "UHCCHED",         0x4C000020, 0, 0xFFFFFFFF, 'x', "UHC Control Head Endpoint Descriptor register 20-22" },
-{ "UHCCCED",         0x4C000024, 0, 0xFFFFFFFF, 'x', "UHC Control Current Endpoint Descriptor register 20-22" },
-{ "UHCBHED",         0x4C000028, 0, 0xFFFFFFFF, 'x', "UHC Bulk Head Endpoint Descriptor register 20-23" },
-{ "UHCBCED",         0x4C00002C, 0, 0xFFFFFFFF, 'x', "UHC Bulk Current Endpoint Descriptor register 20-24" },
-{ "UHCDHEAD",        0x4C000030, 0, 0xFFFFFFFF, 'x', "UHC Done Head register 20-25" },
-{ "UHCFMI",       0x4C000034, 0, 0xFFFFFFFF, 'x', "UHC Frame Interval register 20-26" },
-{ "UHCFMR",       0x4C000038, 0, 0xFFFFFFFF, 'x', "UHC Frame Remaining register 20-27" },
-{ "UHCFMN",       0x4C00003C, 0, 0xFFFFFFFF, 'x', "UHC Frame Number register 20-28" },
-{ "UHCPERS",         0x4C000040, 0, 0xFFFFFFFF, 'x', "UHC Periodic Start register 20-29" },
-{ "UHCLST",       0x4C000044, 0, 0xFFFFFFFF, 'x', "UHC Low-Speed Threshold register 20-30" },
-{ "UHCRHDA",         0x4C000048, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Descriptor A register 20-31" },
-{ "UHCRHDB",         0x4C00004C, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Descriptor B register 20-33" },
-{ "UHCRHS",       0x4C000050, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Status register 20-34" },
-{ "UHCRHPS1",        0x4C000054, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Port 1 Status register 20-35" },
-{ "UHCRHPS2",        0x4C000058, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Port 2 Status register 20-35" },
-{ "UHCRHPS3",        0x4C00005C, 0, 0xFFFFFFFF, 'x', "UHC Root Hub Port 3 Status register 20-35" },
-{ "UHCSTAT",         0x4C000060, 0, 0xFFFFFFFF, 'x', "UHC Status register 20-39" },
-{ "UHCHR",        0x4C000064, 0, 0xFFFFFFFF, 'x', "UHC Reset register 20-41" },
-{ "UHCHIE",       0x4C000068, 0, 0xFFFFFFFF, 'x', "UHC Interrupt Enable register 20-44" },
-{ "UHCHIT",       0x4C00006C, 0, 0xFFFFFFFF, 'x', "UHC Interrupt Test register 20-450" },
 
 #if defined(CONFIG_ARCH_PXA_IDP) || defined(CONFIG_ARCH_RAMSES)
 // CS5+0x03C00000  CPLD		0x14000000
