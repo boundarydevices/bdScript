@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.7  2005-11-06 00:49:41  ericn
+ * Revision 1.8  2006-05-14 14:39:55  ericn
+ * -new deviceId, debugPrint
+ *
+ * Revision 1.7  2005/11/06 00:49:41  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.6  2005/03/06 07:37:49  tkisky
@@ -47,6 +50,9 @@
 #include "hexDump.h"
 #include "jsGlobals.h"
 #include "codeQueue.h"
+
+//#define DEBUGPRINT
+#include "debugPrint.h"
 
 #define STAR_VENDOR_ID         0x0519
 #define VENDORCLASS_PRODUCT_ID 0x0002
@@ -128,12 +134,12 @@ starPoll_t :: starPoll_t( void )
          int const intNum = dev->config[0].interface[0].altsetting[0].bInterfaceNumber ;
          usb_claim_interface( udev_, intNum );
          set( 100 );
-         printf( "printer interface claimed\r\n" );
+         debugPrint( "printer interface %d claimed\r\n", intNum );
       } else {
-         printf( "!!!usb_open of printer interface failed\r\n" );
+         debugPrint( "!!!usb_open of printer interface failed\r\n" );
       }
    } else {
-      printf( "!!!printer interface not found\r\n" );
+      debugPrint( "!!!printer interface not found\r\n" );
    }
 }
 
@@ -189,6 +195,13 @@ starPoll_t :: ~starPoll_t( void )
 {
    if( udev_ )
    {
+      if( 0 == usb_release_interface( udev_, 0 ) )
+      {
+         debugPrint( "released printer interface\n" );
+      }
+      else
+         debugPrint( "Error releasing printer interface\n" );
+      debugPrint( "device closed\n" );
       usb_close( udev_ );
       udev_ = 0 ;
    }
@@ -200,7 +213,7 @@ void starPoll_t :: fire( void )
 {
    short availableReadLength = 0;
    if (udev_==0) {
-      printf( "!!!!!Printer has been closed\n" );
+      debugPrint( "!!!!!Printer has been closed\n" );
       fflush( stdout );
       return;
    } else if( 0 <= usb_control_msg(udev_, (char) 0xc0, (char) 3, (short) 256, (short) 0, (char *) &availableReadLength, (short) 2, 100 ))
@@ -214,14 +227,17 @@ void starPoll_t :: fire( void )
             statusWaitTicks = 0;
             if (asb_valid || ((numRead >= 9) && ((inBuf[0] & 0x13) && ((inBuf[0] & 0x91)!=10))) ) {
                if ( ( (unsigned)numRead != prevLen_ ) || ( 0 != memcmp( prevData_, inBuf, prevLen_ ) ) ) {
-                  for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
-                  printf( "\n" );
+#ifdef DEBUGPRINT               
+                  for( int i = 0 ; i < numRead ; i++ ) 
+                     debugPrint( "%02x ", (unsigned char)inBuf[i] );
+                  debugPrint( "\n" );
+#endif                  
                   if (numRead >= 9) {
                      memcpy( prevData_, inBuf, numRead );
                      prevLen_ = numRead ;
                      change = 1;
                   } else {
-                    printf("ASB status too short\n");
+                    debugPrint("ASB status too short\n");
                   }
                }
             } else {
@@ -233,22 +249,24 @@ void starPoll_t :: fire( void )
                   if ((c & 0x13)==0) { lENQ = c; eotNext = 1;}
                   else if ((c & 0x91)==0x10) { lEOT = c; eotNext = 0;}
                   else weird = 1;
-
-//				  printf("Status: %02x\n",c);
                }
 
                if ((lENQ != lastENQ)||(lEOT != lastEOT)||weird) {
                   if (lENQ != lastENQ) {
                      lastENQ = lENQ;
-                     printf( "ENQ status: %02x\n",lastENQ );
+                     debugPrint( "ENQ status: %02x\n",lastENQ );
                   }
                   if (lEOT != lastEOT) {
                      lastEOT = lEOT;
-                     printf( "EOT status: %02x\n",lastEOT );
+                     debugPrint( "EOT status: %02x\n",lastEOT );
                   }
-                  if (weird) printf( "weird status:");
-                  for( int i = 0 ; i < numRead ; i++ ) printf( "%02x ", (unsigned char)inBuf[i] );
-                  printf( "\n" );
+                  if (weird) 
+                     debugPrint( "weird status:");
+#ifdef DEBUGPRINT               
+                  for( int i = 0 ; i < numRead ; i++ ) 
+                     debugPrint( "%02x ", (unsigned char)inBuf[i] );
+                  debugPrint( "\n" );
+#endif                  
                   change = 1;
                }
             }
@@ -256,7 +274,7 @@ void starPoll_t :: fire( void )
             {
                executeCode( statusObj_, statusHandler_, "starUSB:onStatusChange", 0, 0 );
             }
-         } else printf( "read error %d\n", numRead );
+         } else debugPrint( "read error %d\n", numRead );
       } // data available
 	  else {
          if (statusWaitTicks==0) {
@@ -282,7 +300,7 @@ void starPoll_t :: fire( void )
       }
    }
    else
-      printf( "Error issuing ctrl msg\n" );
+      debugPrint( "Error issuing ctrl msg\n" );
 
    fflush( stdout );
    set( 100 );
@@ -693,13 +711,13 @@ static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 		memcpy( nextOut, letterQuality, sizeof( letterQuality ) ); //include 0 terminator
 		nextOut += sizeof( letterQuality );
 
-// printf( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );
+debugPrint( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );
 
 		unsigned const bytesIn = (bmWidth+7)/8 ;
 		unsigned const inBytesPerRow = ((bmWidth+31)/32)*4 ;
 		unsigned const maxBytesPerRow = 3 + bytesIn ;
 
-// printf( "BYTES %u x %u, %u\n", bytesIn, inBytesPerRow, maxBytesPerRow );
+debugPrint( "BYTES %u x %u, %u\n", bytesIn, inBytesPerRow, maxBytesPerRow );
 		//
 		// flush buffer to device when (if) we get to this point
 		//
@@ -765,14 +783,14 @@ static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 			nextOut += copyCnt;
 			nextIn += inBytesPerRow - zeroBytes;
 			if( nextOut >= lastStartOfLine ) {
-// printf( "print: %p..%p\n", outBuf, nextOut );
+debugPrint( "print: %p..%p\n", outBuf, nextOut );
 				dev.print( cx, outBuf, nextOut-outBuf );
 				totalOut += nextOut-outBuf ;
 				nextOut = outBuf ;
 			}
 		}
 
-// printf( "done sending data to printer\n" );
+debugPrint( "done sending data to printer\n" );
 
 		memcpy( nextOut, formFeed, sizeof( formFeed ) );	//include terminating null
 		nextOut += sizeof( formFeed );
@@ -785,8 +803,8 @@ static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 
 		assert( nextOut <= outBuf+sizeof(outBuf) );
 
-//		printf( "%lu total bytes sent to printer\n", totalOut );
-//		printf( "done sending to printer\n" );
+		debugPrint( "%lu total bytes sent to printer\n", totalOut );
+		debugPrint( "done sending to printer\n" );
 	} else JS_ReportError( cx, "Invalid bitmap\n" );
 }
 
@@ -919,6 +937,14 @@ static JSBool jsStarUSB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
                          |JSPROP_READONLY );
       s = JS_NewStringCopyN( cx, letterQuality, sizeof( letterQuality ) );	//include 0 terminator
       JS_DefineProperty( cx, star, "letterQuality",
+                         STRING_TO_JSVAL( s ),
+                         0, 0,
+                         JSPROP_ENUMERATE
+                         |JSPROP_PERMANENT
+                         |JSPROP_READONLY );
+                         
+      s = JS_NewStringCopyZ( cx, "Star TUP900" );
+      JS_DefineProperty( cx, star, "deviceId",
                          STRING_TO_JSVAL( s ),
                          0, 0,
                          JSPROP_ENUMERATE
