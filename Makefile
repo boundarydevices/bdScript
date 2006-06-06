@@ -270,7 +270,7 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 
 odometer: odometer.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odometer odometer.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -p -pg -o odometer odometer.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odometer | sort >odometer.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -293,6 +293,11 @@ sm501reg: sm501reg.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501reg sm501reg.cpp -lstdc++ 
 	arm-linux-nm sm501reg >sm501reg.map
 	$(STRIP) sm501reg
+
+rtsCTS: rtsCTS.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o rtsCTS rtsCTS.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm rtsCTS >rtsCTS.map
+	$(STRIP) rtsCTS
 
 sm501flip: sm501flip.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501flip sm501flip.cpp -lstdc++ 
