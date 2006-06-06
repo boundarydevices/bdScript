@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioOutPoll.cpp,v $
- * Revision 1.1  2006-05-14 14:31:35  ericn
+ * Revision 1.2  2006-06-06 03:08:01  ericn
+ * -add setChannels() call
+ *
+ * Revision 1.1  2006/05/14 14:31:35  ericn
  * -Initial import
  *
  *
@@ -23,6 +26,9 @@
 #include "audioQueue.h"
 #include <sys/ioctl.h>
 #include <sys/soundcard.h>
+
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 static audioOutPoll_t *instance = 0 ;
 
@@ -50,6 +56,18 @@ struct entry_t {
 static entry_t *head_ = 0 ;
 static entry_t *tail_ = 0 ;
 
+static void setChannels( int fd, unsigned channels )
+{
+   int outChannels ;
+   if( 0 == ioctl( fd, SOUND_PCM_READ_CHANNELS, &outChannels ) )
+   {
+      if( outChannels != (int)channels )
+      {
+         ioctl( fd, SNDCTL_DSP_CHANNELS, &channels );
+      }
+   }
+}
+
 void audioOutPoll_t::queuePlayback( audioQueue_t::waveHeader_t &wave )
 {
    entry_t *newOne = new entry_t ;
@@ -60,12 +78,19 @@ void audioOutPoll_t::queuePlayback( audioQueue_t::waveHeader_t &wave )
    newOne->sampleRate_  = wave.sampleRate_ ;
    newOne->next_ = 0 ;
 
+debugPrint( "waveData: %u bytes from %p\n"
+            "channels: %u, rate: %u\n",
+            newOne->length_, wave.samples_,
+            wave.numChannels_, wave.sampleRate_ );
+        
    if( tail_ )
       tail_->next_ = newOne ;
-   else
+   else {
       head_ = newOne ;
+      setChannels( getFd(), newOne->numChannels_ );
+   }
    tail_ = newOne ;
-      
+
    setMask( POLLOUT );
 }
 
@@ -84,6 +109,7 @@ static void removeHead()
 void audioOutPoll_t::onWriteSpace( void )
 {
    gettimeofday( &lastPlayStart_, 0 );
+   
    do {
       if( head_ ) {
          int numWritten = write( getFd(), head_->data_, head_->length_ );
@@ -93,8 +119,10 @@ void audioOutPoll_t::onWriteSpace( void )
             head_->data_   += numWritten ;
             if( 0 == head_->length_ ){
                removeHead();
-            ioctl( getFd(), SNDCTL_DSP_POST, 0 );
+               ioctl( getFd(), SNDCTL_DSP_POST, 0 );
 gettimeofday( &lastPlayEnd_, 0 );
+               if( head_ )
+                  setChannels( getFd(), head_->numChannels_ );
             }
          }
          else
