@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: digitStrip.cpp,v $
- * Revision 1.1  2006-05-07 15:41:21  ericn
+ * Revision 1.2  2006-06-06 03:07:03  ericn
+ * -create thousands separator
+ *
+ * Revision 1.1  2006/05/07 15:41:21  ericn
  * -Initial import
  *
  *
@@ -245,6 +248,30 @@ int main( int argc, char const *const argv[] )
 
 		if( imageToPNG( dollarImg, pngData, pngLength ) ){
 			writePNG( "/tmp/dollarSign.png", pngData, pngLength );
+		}
+
+		//
+		// and a thousands separator
+		//
+		freeTypeString_t comma( font, pointSize, ",", 1, 256 );
+		unsigned short *const commaPix = new unsigned short [ comma.getWidth()*yAdvance ];
+		for( unsigned p = 0 ; p < comma.getWidth()*yAdvance ; p++ )
+			commaPix[p] = bg16 ;
+
+		fb.antialias( comma.data_, 
+			      comma.getWidth(), comma.getHeight(),
+			      0, yAdvance-comma.getHeight()-comma.getBaseline(),
+			      comma.getWidth(), yAdvance,
+			      fgr, fgg, fgb,
+			      commaPix,
+			      comma.getWidth(),
+			      yAdvance );
+
+		image_t commaImg( commaPix, comma.getWidth(), yAdvance );
+		hframe( commaImg );
+
+		if( imageToPNG( commaImg, pngData, pngLength ) ){
+			writePNG( "/tmp/comma.png", pngData, pngLength );
 		}
 
 		//
