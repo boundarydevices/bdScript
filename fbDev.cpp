@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.29  2005-11-06 16:02:02  ericn
+ * Revision 1.30  2006-06-06 03:06:43  ericn
+ * -preliminary double-buffering
+ *
+ * Revision 1.29  2005/11/06 16:02:02  ericn
  * -KERNEL_FB, not CONFIG_BD2003
  *
  * Revision 1.28  2005/11/05 20:22:58  ericn
@@ -110,6 +113,8 @@
 #include <string.h>
 #include <errno.h>
 #include "dither.h"
+#define irqreturn_t int
+#include <linux/sm501-int.h>
 
 static unsigned short rTable[32];
 static unsigned short gTable[64];
@@ -372,10 +377,12 @@ void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
 fbDevice_t :: fbDevice_t( char const *name )
    : fd_( open( name, O_RDWR ) ),
      mem_( 0 ),
+     whichFB_( 0 ),
      memSize_( 0 ),
      width_( 0 ),
      height_( 0 )
 {
+   fbMem_[0] = fbMem_[1] = 0 ;
    InitBoundaryReordering();
 
    if( 0 <= fd_ )
@@ -482,10 +489,15 @@ fbDevice_t :: fbDevice_t( char const *name )
                if( MAP_FAILED != mem_ )
                {
 //                  memset( mem_, 0, fixed_info.smem_len );
+		  fbMem_[0] = mem_ ;
+		  fbMem_[1] = (unsigned short *)mem_ + width_ * height_ ;
+
                   return ;
                }
-               else
+               else {
                   perror( "mmap fb" );
+		  mem_ = 0 ;
+	       }
             } // had or changed to 16-bit color
          }
          else
@@ -520,9 +532,77 @@ fbDevice_t :: fbDevice_t( char const *name )
       width_ = 320 ;
       height_ = 240 ;
       memSize_ = width_ * height_ * sizeof( unsigned short );
-      mem_ = new unsigned short[ width_ * height_ ];
+      mem_  = new unsigned short[ width_ * height_ * 2 ];
+      fbMem_[0] = mem_ ;
+      fbMem_[1] = (unsigned short *)mem_ + width_ * height_ ;
    }
 }
+
+bool fbDevice_t :: syncCount( unsigned long &value ) const 
+{
+	if( isOpen() ) {
+		int result = ioctl( fd_, SM501_GET_SYNCCOUNT, &value );
+		if( 0 == result )
+			return true ;
+	}
+
+	return false ;
+
+}
+
+void fbDevice_t :: doubleBuffer( void )
+{ 
+   rectangle_t screenRect[2] = {0};
+   screenRect[0].width_ = width_ ;
+   screenRect[0].height_ = height_ ;
+   flip(screenRect);
+}
+
+void fbDevice_t :: waitSync() const 
+{
+	if( isOpen() ) {
+		unsigned long whichFB ;
+		ioctl( fd_, SM501_WAITSYNC, &whichFB );
+	}
+}
+
+void fbDevice_t :: flip( rectangle_t const *copyBack )
+{
+	if( isOpen() ) {
+		unsigned long whichFB ;
+		whichFB_ ^= 1 ;
+		int result = ioctl( fd_, SM501_FLIPBUFS, &whichFB );
+		if( 0 == result ){
+
+			whichFB_ = whichFB & 1 ;
+
+         if( copyBack )
+         {
+            unsigned short const *const src = (unsigned short *)fbMem_[whichFB_^1];
+            unsigned short *const dest = (unsigned short *)fbMem_[whichFB_];
+            while( copyBack->width_ )
+            {
+               unsigned const offs = (copyBack->yTop_ *width_)+copyBack->xLeft_ ;
+               unsigned short const *srcRow = src+offs ;
+               unsigned short *destRow = dest+offs ;
+               unsigned const bytesPerRow = copyBack->width_ * sizeof(src[0]);
+               
+               for( unsigned r = 0 ; r < copyBack->height_ ; r++ )
+               {
+                  memcpy( destRow, srcRow, bytesPerRow );
+
+                  srcRow += width_ ;
+                  destRow += width_ ;
+               }
+               copyBack++ ;
+            }
+         }         
+      }
+		else
+			perror( "SM501_FLIPBUFS" );
+	}
+}
+
 
 static inline int min(int x,int y)
 {
@@ -1269,7 +1349,8 @@ fbDevice_t :: ~fbDevice_t( void )
    if( 0 <= fd_ )
    {
 #ifdef KERNEL_FB
-      munmap( mem_, memSize_ );
+      if( 0 != munmap( mem_, 2*memSize_ ) )
+		perror("munmap: fb");
 #else 
       delete [] (unsigned char *)mem_ ;
       delete [] lcdRAM_ ;

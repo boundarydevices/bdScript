@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.20 2006-03-28 04:24:46 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.21 2006-06-06 03:06:45 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.20  2006-03-28 04:24:46  ericn
+ * Revision 1.21  2006-06-06 03:06:45  ericn
+ * -preliminary double-buffering
+ *
+ * Revision 1.20  2006/03/28 04:24:46  ericn
  * -make getMem() public (I know, I know)
  *
  * Revision 1.19  2005/11/06 16:01:58  ericn
@@ -82,9 +85,22 @@
 #include "bitmap.h"
 #endif 
 
+struct rectangle_t {
+   unsigned xLeft_ ;
+   unsigned yTop_ ;
+   unsigned width_ ;
+   unsigned height_ ;
+};
+
 class fbDevice_t {
 public:
    bool isOpen( void ) const { return 0 != mem_ ; }
+
+   bool syncCount( unsigned long &value ) const ;
+   void doubleBuffer(void);
+   void waitSync() const ;
+   
+   void flip( rectangle_t const *copyBack = 0 ); // terminate with zero-width rectangle
 
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }
@@ -206,7 +222,7 @@ public:
                    unsigned short       xRight,
                    unsigned short       yBottom,
                    unsigned char red, unsigned char green, unsigned char blue );
-   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)mem_ + ( y * ( 2*getWidth() ) ) ); }
+   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)getMem() + ( y * ( 2*getWidth() ) ) ); }
    void render( bitmap_t const &bmp,
                 unsigned        x,
                 unsigned        y,
@@ -216,7 +232,7 @@ public:
                 unsigned        x,
                 unsigned        y );      // implicit 1 = black
 #endif 
-   void           *getMem( void ) const { return mem_ ; }
+   void           *getMem( void ) const { return fbMem_[whichFB_]; }
 
 private:
    fbDevice_t( fbDevice_t const &rhs ); // no copies
@@ -224,6 +240,8 @@ private:
    ~fbDevice_t( void );
    int            fd_ ;
    void          *mem_ ;
+   void		 *fbMem_[2];
+   bool		  whichFB_ ;
    unsigned long  memSize_ ;
    unsigned short width_ ;
    unsigned short height_ ;
