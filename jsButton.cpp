@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
- * Revision 1.25  2006-05-14 14:44:30  ericn
+ * Revision 1.26  2006-06-10 16:28:43  ericn
+ * -allow predecoded release sounds
+ *
+ * Revision 1.25  2006/05/14 14:44:30  ericn
  * -allow predecoded audio through audioOutPoll
  *
  * Revision 1.24  2005/11/06 00:49:26  ericn
@@ -375,6 +378,7 @@ static void buttonRelease( box_t         &box,
    else if( 0 != button->fontData_ )
       drawButton( *button, false );
    
+/*
    if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
    {
       audioQueue_t &q = getAudioQueue();
@@ -385,6 +389,25 @@ static void buttonRelease( box_t         &box,
       else
          q.queuePlayback( button->jsObj_, *(audioQueue_t::waveHeader_t *)button->releaseSoundData_ );
 
+   }
+*/
+   if( ( 0 != button->releaseSoundData_ ) && ( 0 != button->releaseSoundLength_ ) )
+   {
+      audioOutPoll_t *ao ;
+      if( button->releaseSoundDecoded_ 
+          && 
+          ( 0 != ( ao = audioOutPoll_t::get() ) ) )
+      {
+         ao->queuePlayback( *(audioQueue_t::waveHeader_t *)button->releaseSoundData_ );
+      }
+      else
+      {
+         audioQueue_t &q = getAudioQueue();
+         if( !button->releaseSoundDecoded_ )
+            q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
+         else
+            q.queuePlayback( button->jsObj_, *(audioQueue_t::waveHeader_t *)button->releaseSoundData_ );
+      }
    }
 
    doit( box, x, y, defaultRelease, "onRelease" );
