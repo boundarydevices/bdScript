@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sm501reg.cpp,v $
- * Revision 1.1  2006-05-07 15:42:14  ericn
+ * Revision 1.2  2006-06-10 16:28:19  ericn
+ * -allow setting of registers
+ *
+ * Revision 1.1  2006/05/07 15:42:14  ericn
  * -Initial import
  *
  *
@@ -34,6 +37,18 @@ int main( int argc, char const * const argv[] )
 			int res = ioctl( fbDev, SM501_READREG, &reg );
 			if( 0 == res ){
 				printf( "%08lx", reg );
+                                if( 2 < argc )
+                                {
+                                    reg_and_value rv ;
+                                    rv.reg_ = strtoul(argv[1], 0, 0 );
+                                    rv.value_ = strtoul(argv[2], 0, 0 );
+                                    printf( "writing value 0x%lx to register 0x%lx\n", rv.value_, rv.reg_ );
+                                    res = ioctl( fbDev, SM501_WRITEREG, &rv );
+                                    if( 0 == res )
+                                       printf( "wrote value 0x%lx to register 0x%lx\n", rv.reg_, rv.value_ );
+                                    else
+                                       perror( "SM501_WRITEREG" );
+                                }
 			}
 			else
 				perror( "SM501_READREG" );
