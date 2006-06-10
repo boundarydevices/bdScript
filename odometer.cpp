@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.1  2006-06-06 03:04:32  ericn
+ * Revision 1.2  2006-06-10 16:31:00  ericn
+ * -digitInfo->videoGraphics rename, save ending image
+ *
+ * Revision 1.1  2006/06/06 03:04:32  ericn
  * -Initial import
  *
  *
@@ -20,12 +23,14 @@
 #include "imgFile.h"
 #include "ftObjs.h"
 #include "memFile.h"
+#include "imgToPNG.h"
 #include <signal.h>
 #include <math.h>
 #include <time.h>
 #include <stdint.h>
 #include <assert.h>
 #include <execinfo.h>
+#include "fbImage.h"
 
 static bool volatile doExit = false ;
 static bool volatile drawing = false ;
@@ -156,7 +161,7 @@ static void drawDigit(
    drawing = false ;
 }
 
-struct digitInfo_t {
+struct valueGraphics_t {
    image_t  background_ ;
    image_t  digitStrip_ ;
    image_t  dollarSign_ ;
@@ -165,13 +170,13 @@ struct digitInfo_t {
    unsigned char  *shadow_ ;
    unsigned char  *highlight_ ;
 
-   digitInfo_t(void){ memset(this,0,sizeof(*this)); }
-   ~digitInfo_t(void);
+   valueGraphics_t(void){ memset(this,0,sizeof(*this)); }
+   ~valueGraphics_t(void);
 private:
-   digitInfo_t(digitInfo_t const &);
+   valueGraphics_t(valueGraphics_t const &);
 };
 
-digitInfo_t::~digitInfo_t( void )
+valueGraphics_t::~valueGraphics_t( void )
 {
    if( shadow_ )
       delete [] shadow_ ;
@@ -198,7 +203,7 @@ static unsigned const numGradientFiles = sizeof(gradientFileNames)/sizeof(gradie
 
 static bool loadDigitInfo( 
    char const  *directory,
-   digitInfo_t &info 
+   valueGraphics_t &info 
 )
 {
    char path[FILENAME_MAX];
@@ -276,20 +281,23 @@ static bool loadDigitInfo(
 }
 
 struct valueInfo_t {
-   valueInfo_t( digitInfo_t const &di,
-                point_t     const &pt,
-           unsigned     maxDigits );
+   valueInfo_t( valueGraphics_t const &vg,
+                point_t         const &pt,
+                unsigned               maxDigits );
    ~valueInfo_t( void );
 
    void setTarget( unsigned v );
    void draw( void );
-
-   digitInfo_t const &di_ ;
+   rectangle_t const &getRect() const { return rect_ ; }
+   
+   valueGraphics_t const &vg_ ;
    unsigned const     maxDigits_ ;
+   unsigned const     x_ ;
    unsigned const     y_ ;
    bool const         needComma_ ;
    unsigned const     totalDigits_ ; // including dollar sign, decimal point and thousands separator
    unsigned const     xRight_ ;
+   image_t            background_ ;
    unsigned           target_ ;
    unsigned           value_ ;
    unsigned long      pixelTarget_ ;
@@ -307,17 +315,20 @@ private:
 };
 
 valueInfo_t::valueInfo_t( 
-   digitInfo_t const &di,
-   point_t     const &pt,
-   unsigned           maxDigits )
-   : di_(di)
+   valueGraphics_t const &vg,
+   point_t     const     &pt,
+   unsigned               maxDigits )
+   : vg_(vg)
    , maxDigits_(maxDigits)
+   , x_(pt.x)
    , y_(pt.y)
    , needComma_( 5<maxDigits )
    , totalDigits_(2+maxDigits+needComma_)
-   , xRight_( maxDigits*di.digitStrip_.width_
-             + di.decimalPoint_.width_
-             + ( needComma_ ? di.comma_.width_ : 0 ) )
+   , xRight_( pt.x 
+             + maxDigits*vg.digitStrip_.width_
+             + vg.decimalPoint_.width_
+             + vg.dollarSign_.width_
+             + ( needComma_ ? vg.comma_.width_ : 0 ) )
    , target_(0)
    , value_(0)
    , pixelTarget_(0)
@@ -331,7 +342,7 @@ valueInfo_t::valueInfo_t(
    rect_.xLeft_  = pt.x ;
    rect_.yTop_   = pt.y ;
    rect_.width_  = xRight_ - pt.x ;
-   rect_.height_ = di.decimalPoint_.height_ ;
+   rect_.height_ = vg.decimalPoint_.height_ ;
 }
 
 valueInfo_t::~valueInfo_t( void )
@@ -382,57 +393,57 @@ void valueInfo_t::draw( void )
              ||
              ( 0 < v ) )
       {
-         unsigned char dig = v % 10 ;
-         v /= 10 ;
+//         unsigned char dig = v % 10 ;
 //         printf( "%u", dig );
+         v /= 10 ;
       
-         x -= di_.digitStrip_.width_ ;
-unsigned const pixOffs = pValue % di_.digitStrip_.height_ ;
+         x -= vg_.digitStrip_.width_ ;
+unsigned const pixOffs = pValue % vg_.digitStrip_.height_ ;
 //fprintf( stderr, "dig %d, pixOffs %u\n", dig, pixOffs );
          drawDigit( fb, x, y_, 
                     rect_.height_,
-                    (unsigned short *)di_.digitStrip_.pixData_,
-                    di_.digitStrip_.width_,
-                    di_.digitStrip_.height_,
+                    (unsigned short *)vg_.digitStrip_.pixData_,
+                    vg_.digitStrip_.width_,
+                    vg_.digitStrip_.height_,
                     pixOffs,
-                    di_.shadow_,
-                    di_.highlight_ );
-//         pValue /= di_.digitStrip_.height_ ;
+                    vg_.shadow_,
+                    vg_.highlight_ );
+//         pValue /= vg_.digitStrip_.height_ ;
          pValue /= 10 ;
 
          digitNum++ ;
          if( 2 == digitNum )
          {
 //            printf( "." );
-            x -= di_.decimalPoint_.width_ ;
+            x -= vg_.decimalPoint_.width_ ;
             if( decimalPos_ != x )
             {
                decimalPos_ = x ;
                drawDigit( fb, x, y_, 
-                          di_.decimalPoint_.height_,
-                          (unsigned short *)di_.decimalPoint_.pixData_,
-                          di_.decimalPoint_.width_,
-                          di_.decimalPoint_.height_,
+                          vg_.decimalPoint_.height_,
+                          (unsigned short *)vg_.decimalPoint_.pixData_,
+                          vg_.decimalPoint_.width_,
+                          vg_.decimalPoint_.height_,
                           0,
-                          di_.shadow_,
-                          di_.highlight_ );
+                          vg_.shadow_,
+                          vg_.highlight_ );
             }
          }
          else if( ( 5 == digitNum ) && ( 0 < v ) )
          {
 //            printf( "," );
-            x -= di_.comma_.width_ ;
+            x -= vg_.comma_.width_ ;
             if( commaPos_ != x )
             {
                commaPos_ = x ;
                drawDigit( fb, x, y_, 
-                          di_.comma_.height_,
-                          (unsigned short *)di_.comma_.pixData_,
-                          di_.comma_.width_,
-                          di_.comma_.height_,
+                          vg_.comma_.height_,
+                          (unsigned short *)vg_.comma_.pixData_,
+                          vg_.comma_.width_,
+                          vg_.comma_.height_,
                           0,
-                          di_.shadow_,
-                          di_.highlight_ );
+                          vg_.shadow_,
+                          vg_.highlight_ );
             }
          }
          
@@ -443,18 +454,18 @@ unsigned const pixOffs = pValue % di_.digitStrip_.height_ ;
            velocity_ = 1 ;
       }
       
-      x -= di_.dollarSign_.width_ ;
+      x -= vg_.dollarSign_.width_ ;
       if( dollarPos_ != x )
       {
          dollarPos_ = x ;
          drawDigit( fb, x, y_, 
-                    di_.dollarSign_.height_,
-                    (unsigned short *)di_.dollarSign_.pixData_,
-                    di_.dollarSign_.width_,
-                    di_.dollarSign_.height_,
+                    vg_.dollarSign_.height_,
+                    (unsigned short *)vg_.dollarSign_.pixData_,
+                    vg_.dollarSign_.width_,
+                    vg_.dollarSign_.height_,
                     0,
-                    di_.shadow_,
-                    di_.highlight_ );
+                    vg_.shadow_,
+                    vg_.highlight_ );
       }
 
 //      printf( "\n" );
@@ -471,8 +482,8 @@ int main( int argc, char const *const argv[] )
    if( ( 1 < argc ) && ( 1 == ( argc & 1 ) ) ) {
       fbDevice_t &fb = getFB();
 
-      digitInfo_t di ;
-      if( !loadDigitInfo( "/tmp", di ) )
+      valueGraphics_t vg ;
+      if( !loadDigitInfo( "/tmp", vg ) )
          return -1 ;
 
       unsigned const numValues = (argc-1)/2 ;
@@ -485,9 +496,9 @@ int main( int argc, char const *const argv[] )
       for( unsigned i = 0 ; i < numValues ; i++ ){
          points[i].x = strtoul(argv[1+i*2],0,0);
          points[i].y = strtoul(argv[2+i*2],0,0);
-         values[i] = new valueInfo_t(di, points[i], maxDigits);
+         values[i] = new valueInfo_t(vg, points[i], maxDigits);
 
-         values[i]->setTarget( 1234567 );
+         values[i]->setTarget( (i+1)*12345678 );
 printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );         
          rects[i] = values[i]->rect_ ;         
       }
@@ -497,13 +508,13 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
       //
       // Initialize screen
       //
-      fb.doubleBuffer();
+//      fb.doubleBuffer();
 
       fb.clear(0xFF, 0xFF, 0xFF);
       fb.render( 0, 0, 
-            di.background_.width_,
-            di.background_.height_,
-            (unsigned short const *)di.background_.pixData_ );
+            vg.background_.width_,
+            vg.background_.height_,
+            (unsigned short const *)vg.background_.pixData_ );
 
       for( unsigned i = 0 ; i < numValues ; i++ ) {
          values[i]->draw();
@@ -535,10 +546,11 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
          ++iterations ;
          
          flipping = true ;
-         fb.flip(); // rects);
+//         fb.flip(); // rects);
          flipping = false ;
          
-         doExit = doExit || ( numSteady == numValues );
+         if( numSteady == numValues )
+            break ;
       }
       unsigned long vsyncEnd ;
       fb.syncCount(vsyncEnd);
@@ -547,6 +559,29 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
          iterations, vsyncEnd-vsyncStart, time(0)-startTick );
       printf( "%u ticks, %u drawing, %u flipping, %u other\n",
               totalTicks_, numDrawing_, numFlipping_, totalTicks_-numDrawing_-numFlipping_ );
+              
+      if( !doExit ){
+         image_t screenImg ;
+         screenImageRect( fb, values[0]->getRect(), screenImg );
+
+         void const *pngData ;
+         unsigned    pngSize ;
+         if( imageToPNG( screenImg, pngData, pngSize ) ){
+            printf( "%u bytes of png\n", pngSize );
+            char const outFileName[] = {
+               "/tmp/odomEnd.png"
+            };
+            FILE *fOut = fopen( outFileName, "wb" );
+            if( fOut )
+            {
+               fwrite( pngData, 1, pngSize, fOut );
+               fclose( fOut );
+            }
+            else
+               perror( outFileName );
+            free((void *)pngData);
+         }
+      }
    }
    else
       fprintf( stderr, "Usage: %s x y [x y...]\n", argv[0] );
