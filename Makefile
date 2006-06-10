@@ -49,6 +49,7 @@ OBJS = \
        dnsPoll.o \
        dumpCPP.o \
        fbDev.o \
+       fbImage.o \
        ftObjs.o \
        gpioPoll.o \
        hexDump.o \
@@ -480,6 +481,14 @@ barcodePoll: barcodePoll.cpp $(LIB)
 
 serialPoll: serialPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o serialPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker serialPoll.map serialPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+pollTimer: pollTimer.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o pollTimer -DSTANDALONE=1 -Xlinker -Map -Xlinker pollTimer.map pollTimer.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+bltTest: bltTest.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o bltTest -DSTANDALONE=1 -Xlinker -Map -Xlinker bltTest.map bltTest.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 touchPoll: touchPoll.cpp $(LIB)
