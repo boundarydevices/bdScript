@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.5  2005-11-06 00:49:23  ericn
+ * Revision 1.6  2006-06-12 13:04:43  ericn
+ * -fix output, add x,y,w,h params to test program
+ *
+ * Revision 1.5  2005/11/06 00:49:23  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.4  2003/11/28 14:53:40  ericn
@@ -431,7 +434,7 @@ static unsigned const numCommands = sizeof( commands )/sizeof( commands[0] );
 
 int main( int argc, char const * const argv[] )
 {
-   if( 2 == argc )
+   if( 2 <= argc )
    {
       memFile_t fIn( argv[1] );
       if( fIn.worked() )
@@ -448,15 +451,34 @@ int main( int argc, char const * const argv[] )
          {
             struct FlashInfo fi;
             FlashGetInfo( hFlash, &fi );
-            debugPrint( "   rate %lu\n"
+            printf( "   rate %lu\n"
                     "   count %lu\n"
                     "   width %lu\n"
                     "   height %lu\n"
                     "   version %lu\n", 
                     fi.frameRate, fi.frameCount, fi.frameWidth, fi.frameHeight, fi.version );
+
             fbDevice_t &fb = getFB();
-            unsigned long const widthMult = fi.frameWidth/fb.getWidth();
-            unsigned long const heightMult = fi.frameHeight/fb.getHeight();
+            
+            unsigned targetX = 0 ;
+            unsigned targetY = 0 ;
+            unsigned targetWidth = fb.getWidth();
+            unsigned targetHeight = fb.getHeight();
+            if( 2 < argc ){
+               targetX = strtoul(argv[2],0,0);
+               if( 3 < argc ){
+                  targetY = strtoul(argv[3],0,0);
+                  if( 4 < argc ){
+                     targetWidth = strtoul(argv[4],0,0);
+                     if( 5 < argc ){
+                        targetHeight = strtoul(argv[5],0,0);
+                     }
+                  }
+               }
+            }
+            
+            unsigned long const widthMult = fi.frameWidth / targetWidth ;
+            unsigned long const heightMult = fi.frameHeight/ targetHeight ;
             unsigned flashWidth, flashHeight ;
             if( widthMult > heightMult )
             {
@@ -468,9 +490,9 @@ int main( int argc, char const * const argv[] )
                flashWidth  = fi.frameWidth/heightMult ;
                flashHeight = fi.frameHeight/heightMult ;
             }
-            debugPrint( "display at %ux%u\n", flashWidth, flashHeight );
+            printf( "display at %ux%u\n", flashWidth, flashHeight );
 
-            flashThread_t flash( hFlash, 0, 0, flashWidth, flashHeight, 0xFFFFFF, true );
+            flashThread_t flash( hFlash, targetX, targetY, flashWidth, flashHeight, 0xFFFFFF, true );
             while( 1 )
             {
                pollfd filedes[2];
@@ -493,7 +515,7 @@ int main( int argc, char const * const argv[] )
                            unsigned cmdId ;
                            if( strTableLookup( cmd, commands, numCommands, cmdId ) )
                            {
-                              debugPrint( "command %u\n", cmdId );
+                              printf( "command %u\n", cmdId );
                               unsigned param = 0 ;
          
                               flash.sendCtrl( (flashThread_t::controlMsg_e) cmdId, param );
@@ -501,10 +523,10 @@ int main( int argc, char const * const argv[] )
                            }
                            else
                            {
-                              debugPrint( "invalid command <%s>!\n"
+                              printf( "invalid command <%s>!\n"
                                       "valid commands are:\n", cmd );
                               for( unsigned i = 0 ; i < numCommands ; i++ )
-                                 debugPrint( "   %s\n", commands[i] );
+                                 printf( "   %s\n", commands[i] );
                            }
                         }
                      }
@@ -517,7 +539,7 @@ int main( int argc, char const * const argv[] )
                      flashThread_t::event_e event ;
                      while( flash.readEvent( event ) )
                      {
-                        debugPrint( "event %u\n", event );
+                        printf( "event %u\n", event );
                      }
                   }
                }
@@ -525,7 +547,7 @@ int main( int argc, char const * const argv[] )
             }
          }
          else
-            debugPrint( "Error 0x%x parsing flash\n", status );
+            printf( "Error 0x%x parsing flash\n", status );
 
          FlashClose( hFlash );
       }
@@ -533,7 +555,7 @@ int main( int argc, char const * const argv[] )
          perror( argv[1] );
    }
    else
-      debugPrint( "Usage: %s fileName.swf\n", argv[0] );
+      printf( "Usage: %s fileName.swf\n", argv[0] );
 
    return 0 ;
 }
