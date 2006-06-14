@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.21 2006-06-06 03:06:45 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.22 2006-06-14 13:51:17 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.21  2006-06-06 03:06:45  ericn
+ * Revision 1.22  2006-06-14 13:51:17  ericn
+ * -return syncCount in waitSync
+ *
+ * Revision 1.21  2006/06/06 03:06:45  ericn
  * -preliminary double-buffering
  *
  * Revision 1.20  2006/03/28 04:24:46  ericn
@@ -98,7 +101,7 @@ public:
 
    bool syncCount( unsigned long &value ) const ;
    void doubleBuffer(void);
-   void waitSync() const ;
+   void waitSync( unsigned long &syncCount ) const ;
    
    void flip( rectangle_t const *copyBack = 0 ); // terminate with zero-width rectangle
 

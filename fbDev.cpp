@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.30  2006-06-06 03:06:43  ericn
+ * Revision 1.31  2006-06-14 13:51:20  ericn
+ * -return syncCount in waitSync
+ *
+ * Revision 1.30  2006/06/06 03:06:43  ericn
  * -preliminary double-buffering
  *
  * Revision 1.29  2005/11/06 16:02:02  ericn
@@ -558,11 +561,10 @@ void fbDevice_t :: doubleBuffer( void )
    flip(screenRect);
 }
 
-void fbDevice_t :: waitSync() const 
+void fbDevice_t :: waitSync(unsigned long &syncCount) const 
 {
 	if( isOpen() ) {
-		unsigned long whichFB ;
-		ioctl( fd_, SM501_WAITSYNC, &whichFB );
+		ioctl( fd_, SM501_WAITSYNC, &syncCount );
 	}
 }
 
