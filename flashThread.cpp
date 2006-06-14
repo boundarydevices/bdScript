@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.6  2006-06-12 13:04:43  ericn
+ * Revision 1.7  2006-06-14 13:55:45  ericn
+ * -track exec and blt time
+ *
+ * Revision 1.6  2006/06/12 13:04:43  ericn
  * -fix output, add x,y,w,h params to test program
  *
  * Revision 1.5  2005/11/06 00:49:23  ericn
@@ -125,6 +128,8 @@ flashThread_t :: flashThread_t
    , fdWriteEvents_( -1 )
    , soundsQueued_( 0 )
    , soundsCompleted_( 0 )
+   , maxExecTime_( 0 )
+   , maxBltTime_( 0 )
 {
    memset( &display_, 0, sizeof( display_ ) );
    int fdCtrl[2];
@@ -359,14 +364,63 @@ void *flashThread( void *param )
       else if( 0 == pollRes )
       {
           struct timeval wakeTime ;
+          long long start = tickMs();
           long wakeUp = FlashExec( tObj.hFlash_, FLASH_WAKEUP, 0, &wakeTime);
-   
+          long long end = tickMs();
+          unsigned long execTime = end-start ;
+          if( execTime > tObj.maxExecTime_ )
+             tObj.maxExecTime_ = 0 ;
+
           if( tObj.display_.flash_refresh )
           {
-             char *pixMem = (char *)tObj.fbMem_ ;
+             char *pixMem   = (char *)tObj.fbMem_ ;
              char *flashMem = (char *)tObj.display_.pixels ;
-             for( int i = 0 ; i < tObj.display_.height ; i++, pixMem += tObj.fbStride_, flashMem += tObj.display_.bpl )
-                memcpy( pixMem, flashMem, tObj.display_.bpl );
+             unsigned const cacheLinesPerRow = tObj.display_.bpl / 32 ;
+             unsigned const leftover = tObj.display_.bpl - (cacheLinesPerRow*32);
+//printf( "%u bpl, %u cache lines, %u left over, fbStride %u\n", tObj.display_.bpl, cacheLinesPerRow, leftover, tObj.fbStride_ );
+             start = tickMs();
+             for( int i = 0 ; i < tObj.display_.height ; i++ ){
+                  __asm__ volatile (
+                     "  pld   [%0, #0]\n"
+                     "  pld   [%0, #32]\n"
+                     "  pld   [%1, #0]\n"
+                     "  pld   [%1, #32]\n"
+                     "  pld   [%0, #64]\n"
+                     "  pld   [%0, #96]\n"
+                     "  pld   [%1, #64]\n"
+                     "  pld   [%1, #96]\n"
+                     :
+                     : "r" (pixMem), "r" (flashMem)
+                  );
+//printf( "%p/%p\n", pixMem, flashMem ); fflush(stdout);
+                  for( unsigned c = 0 ; c < cacheLinesPerRow ; c++ )
+                  {
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+                     __asm__ volatile (
+                        "  pld   [%0, #96]\n"
+                        "  pld   [%1, #96]\n"
+                        :
+                        : "r" (pixMem), "r" (flashMem)
+                     );
+                  }
+                  memcpy( pixMem, flashMem, leftover );
+                  pixMem += leftover ;
+                  flashMem += leftover ;
+
+                  pixMem   += tObj.fbStride_ - tObj.display_.bpl ;
+             }
+
+             end = tickMs();
+             unsigned long bltTime = end-start ;
+             if( bltTime > tObj.maxBltTime_ )
+                tObj.maxBltTime_ = bltTime ;
           }
 
           if( wakeUp )
@@ -519,7 +573,10 @@ int main( int argc, char const * const argv[] )
                               unsigned param = 0 ;
          
                               flash.sendCtrl( (flashThread_t::controlMsg_e) cmdId, param );
-         
+                              printf( "max exec time %lu\n"
+                                      "max blt time  %lu\n", 
+                                      flash.maxExecTime_,
+                                      flash.maxBltTime_ );
                            }
                            else
                            {

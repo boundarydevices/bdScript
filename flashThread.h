@@ -1,5 +1,5 @@
 #ifndef __FLASHTHREAD_H__
-#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.3 2003-11-24 19:42:05 ericn Exp $"
+#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.4 2006-06-14 13:55:43 ericn Exp $"
 
 /*
  * flashThread.h
@@ -31,7 +31,10 @@
  * Change History : 
  *
  * $Log: flashThread.h,v $
- * Revision 1.3  2003-11-24 19:42:05  ericn
+ * Revision 1.4  2006-06-14 13:55:43  ericn
+ * -track exec and blt time
+ *
+ * Revision 1.3  2003/11/24 19:42:05  ericn
  * -polling touch screen
  *
  * Revision 1.2  2003/11/22 19:51:24  ericn
@@ -66,7 +69,6 @@ public:
    ~flashThread_t( void );
 
    bool isAlive( void ) const { return (pthread_t)-1 != threadHandle_ ; }
-
 
    //
    // control interface
@@ -123,6 +125,8 @@ private:
    int                  fdWriteEvents_ ;
    unsigned volatile    soundsQueued_ ;
    unsigned volatile    soundsCompleted_ ;
+   unsigned long        maxExecTime_ ;
+   unsigned long        maxBltTime_ ;
    friend void *flashThread( void *params );
    friend int main( int argc, char const * const argv[] );
    friend void flashSoundComplete( void *param );
