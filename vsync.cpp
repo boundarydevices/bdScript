@@ -2,6 +2,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include "tickMs.h"
 
 typedef int irqreturn_t;
 
@@ -22,9 +23,18 @@ int main( int argc, char const * const argv[] )
 		if( 0 != result )
 			printf( "Error reading next count: %m\n" );
 
-		printf( "%u/%u - %d\n", startCount, next, next-startCount );
+		printf( "%u/%u - %d Hz\n", startCount, next, next-startCount );
 
-		close( fbDev );
+                ioctl( fbDev, SM501_WAITSYNC, &startCount );
+                long long tickStart = tickMs();
+                ioctl( fbDev, SM501_WAITSYNC, &next );
+                long long tickEnd = tickMs();
+
+                printf( "%u ms for one sync (%lu/%lu)\n", 
+                        (unsigned long)(tickEnd-tickStart),
+                        startCount, next );
+
+                close( fbDev );
 	}
 	else {
 		printf( "Error opening fb device\n" );
