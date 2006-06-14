@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.3  2006-06-12 13:04:11  ericn
+ * Revision 1.4  2006-06-14 13:52:40  ericn
+ * -palettize digit images, pre-highlight for 300% speed improvement
+ *
+ * Revision 1.3  2006/06/12 13:04:11  ericn
  * -rework drawing loop, before palettizing
  *
  * Revision 1.2  2006/06/10 16:31:00  ericn
@@ -37,6 +40,7 @@
 #include <alloca.h>
 #include "fbImage.h"
 #include <set>
+#include "dictionary.h"
 
 #define TICKSTOTARGET 60
 
@@ -211,18 +215,27 @@ static void drawDigit(
 // Load all of the graphic (static) parts of an odometer value
 //
 struct valueGraphics_t {
-   image_t  background_ ;
-   image_t  digitStrip_ ;
-   image_t  dollarSign_ ;
-   image_t  decimalPoint_ ;
-   image_t  comma_ ;
-   unsigned char  *shadow_ ;
-   unsigned char  *highlight_ ;
+   image_t               background_ ;
+   image_t               digitStrip_ ;  // palettized after loading
+   image_t               dollarSign_ ;
+   image_t               decimalPoint_ ;
+   image_t               comma_ ;
+   unsigned              numColors_ ;
+   unsigned short const *colors_ ;      // color palette for digitStrip_
+   unsigned char        *shadow_ ;
+   unsigned char        *highlight_ ;
+
+   //
+   // highlight and shadow are applied to each color
+   //
+   unsigned              numShadeComb_ ;
+   unsigned short const *highlightedColors_ ;  // [numShadeComb_][numColors_]
+   unsigned short const *hsIndex_ ;            // which outer array index for each row
 
    valueGraphics_t(void){ memset(this,0,sizeof(*this)); }
    ~valueGraphics_t(void);
 private:
-   valueGraphics_t(valueGraphics_t const &);
+   valueGraphics_t(valueGraphics_t const &); // no copies
 };
 
 valueGraphics_t::~valueGraphics_t( void )
@@ -231,6 +244,8 @@ valueGraphics_t::~valueGraphics_t( void )
       delete [] shadow_ ;
    if( highlight_ )
       delete [] highlight_ ;
+   if( colors_ )
+      delete [] colors_ ;
 }
 
 static char const *const imgFileNames[] = {
@@ -251,7 +266,7 @@ static char const *const gradientFileNames[] = {
 static unsigned const numGradientFiles = sizeof(gradientFileNames)/sizeof(gradientFileNames[0]);
 
 static bool loadValueGraphics( 
-   char const  *directory,
+   char const      *directory,
    valueGraphics_t &info 
 )
 {
@@ -327,15 +342,6 @@ static bool loadValueGraphics(
    
    }
 
-   std::set<unsigned short> shadeComb ;
-   for( unsigned i = 0 ; i < digitHeight ; i++ )
-   {
-      unsigned short highShadow = ( ((unsigned)info.highlight_[i]) << 8 )
-                                  | info.shadow_[i];
-      shadeComb.insert(highShadow);
-   }
-   printf( "%u combinations of highlight and shadow\n", shadeComb.size() );
-
    //
    // pre-highlight symbol images
    //
@@ -344,78 +350,100 @@ static bool loadValueGraphics(
    highlight( info.comma_, info.shadow_, info.highlight_ );
 
    //
-   // find any constant columns
+   // palette-ize the digit strip
    //
-   int *const digitPixels = (int *)alloca(info.digitStrip_.width_*sizeof(int));
-   unsigned short const *inRow = (unsigned short *)info.digitStrip_.pixData_ ;
+   dictionary_t<unsigned short> colors ;
+   unsigned short *nextIn = (unsigned short *)info.digitStrip_.pixData_ ;
 
-   for( unsigned i = 0 ; i < info.digitStrip_.width_ ; i++ )
-      digitPixels[i] = inRow[i];
-
-   unsigned digitBitBytes = (info.digitStrip_.width_+7)/8 ;
-   unsigned char *const digitBitmask = new unsigned char [digitBitBytes];
-   memset( digitBitmask, 0xFF, sizeof( digitBitmask ) );
-
-   std::set<unsigned short> colors ;
-   
-   for( unsigned y = 1 ; y < info.digitStrip_.height_ ; y++ )
+   for( unsigned y = 0 ; y < info.digitStrip_.height_ ; y++ )
    {
-      inRow += info.digitStrip_.width_ ;
       for( unsigned x = 0 ; x < info.digitStrip_.width_ ; x++ )
       {
-         unsigned const byte = x/8 ;
-         unsigned char const mask = (1<<(x&7));
-         unsigned short const pix = inRow[x];
-         if( pix != digitPixels[x] )
-            digitBitmask[byte] &= ~mask; // mismatch
-         colors.insert(pix);
+         unsigned short const pix = *nextIn ;
+         unsigned short paletteIdx = ( colors += pix ); // add to palette
+         *nextIn = paletteIdx ; // save palette entry
+         nextIn++ ;
       }
    }
-   
-   unsigned matching = 0 ; 
-   for( unsigned x = 0 ; x < info.digitStrip_.width_ ; x++ )
+
+   unsigned short *const palette = new unsigned short[colors.size()];
+   for( unsigned i = 0 ; i < colors.size(); i++ )
    {
-      unsigned const byte = x/8 ;
-      unsigned char const mask = (1<<(x&7));
-      if( digitBitmask[byte] & mask )
-         matching++ ;
+      palette[i] = colors[i];
    }
-   printf( "%u constant columns\n", matching );
-   printf( "%u colors\n", colors.size() );
    
-   delete [] digitBitmask ;
+   info.numColors_ = colors.size();
+   info.colors_ = palette ;
+   printf( "%u colors\n", colors.size() );
+
+   //
+   // Get unique combinations of highlight and shadow
+   //
+   dictionary_t<unsigned short> shadeComb ;
+   unsigned short *hsOut = new unsigned short [digitHeight];
+   info.hsIndex_ = hsOut ;
+   
+   for( unsigned i = 0 ; i < digitHeight ; i++ )
+   {
+      unsigned short highShadow = ( ((unsigned)info.highlight_[i]) << 8 )
+                                  | info.shadow_[i];
+      *hsOut++ = ( shadeComb += highShadow ); // save index by pixel row
+   }
+   printf( "%u combinations of highlight and shadow\n", shadeComb.size() );
+   info.numShadeComb_ = shadeComb.size();
+
+/*
+   //
+   // do it again, filling in hsIndex
+   //
+   
+   for( unsigned i = 0 ; i < digitHeight ; i++ )
+   {
+      unsigned short highShadow = ( ((unsigned)info.highlight_[i]) << 8 )
+                                  | info.shadow_[i];
+      *hsOut++ = (shadeComb += highShadow);
+   }
+*/
+   
+   unsigned short *const highlighted = new unsigned short [info.numShadeComb_*info.numColors_];
+   unsigned short *nextOut = highlighted ;
+   for( unsigned s = 0 ; s < info.numShadeComb_ ; s++ )
+   {
+      unsigned short const highShadow = shadeComb[s];
+      unsigned char const shadow = highShadow & 0xFF ;
+      unsigned char const highlight = highShadow >> 8 ;
+
+      for( unsigned c = 0 ; c < info.numColors_ ; c++ )
+      {
+         *nextOut++ = mix(colors[c],shadow,highlight);
+      }
+   }
+   info.highlightedColors_ = highlighted ;
+
    return true ;
 }
 
 
 struct digitInfo_t {
-   digitInfo_t( image_t const       &digitStrip,
-                rectangle_t const   &r,
-                unsigned char const *shade,
-                unsigned char const *highlight );
+   digitInfo_t( valueGraphics_t const &vg,
+                rectangle_t const     &r );
    ~digitInfo_t( void );
 
    void draw( fbDevice_t &fb,
               unsigned offs );
    
-   image_t             const &digitStrip_ ;
+   valueGraphics_t const     &vg_ ;
    rectangle_t          const r_ ;
    image_t                    bg_ ;
-   unsigned char const *const shade_ ;
-   unsigned char const *const highlight_ ;
    unsigned                   lastOffset_ ;
 };
 
 
 digitInfo_t::digitInfo_t   
-   ( image_t const       &digitStrip,
-     rectangle_t const   &r,
-     unsigned char const *shade,
-     unsigned char const *highlight )
-   : digitStrip_( digitStrip )
+   ( valueGraphics_t const &vg,
+     rectangle_t const     &r )
+   : vg_( vg )
    , r_( r )
-   , shade_( shade )
-   , highlight_( highlight )
    , lastOffset_( -1UL )
 {
    screenImageRect( getFB(), r_, bg_ );
@@ -434,15 +462,56 @@ void digitInfo_t::draw(
    if( offs != lastOffset_ )
    {
       lastOffset_ = offs ;
+
+      unsigned short *colors = (unsigned short *)vg_.digitStrip_.pixData_ ;
+      unsigned short const *bottomRow = colors + vg_.digitStrip_.width_*vg_.digitStrip_.height_ ;
+      
+      unsigned short *outRow = fb.getRow(r_.yTop_) + r_.xLeft_ ;
+      unsigned short const *inRow = colors + (offs*r_.width_);
+   //   unsigned short *const lineOut = (unsigned short *)alloca(pixelWidth*2);
+      
+      drawing = true ;
+      for( unsigned y = 0 ; !doExit && ( y < r_.height_ ) ; y++ ) {
+         unsigned short *nextOut = outRow ;
+         outRow += fb.getWidth();
+         unsigned short const shadeIdx = vg_.hsIndex_[y];
+         unsigned short const *shaded = vg_.highlightedColors_+(shadeIdx*vg_.numColors_);
+         
+         unsigned short const *nextIn = inRow ;
+         __asm__ volatile (
+            "  pld   [%0, #0]\n"
+            "  pld   [%0, #32]\n"
+            "  pld   [%1, #0]\n"
+            "  pld   [%1, #32]\n"
+            "  pld   [%0, #64]\n"
+            "  pld   [%0, #96]\n"
+            "  pld   [%1, #64]\n"
+            "  pld   [%1, #96]\n"
+            : 
+            : "r" (nextIn),
+              "r" (shaded)
+         );
+         inRow += r_.width_ ;
+         if( bottomRow <= inRow )
+            inRow = colors ;
+
+         for( unsigned x = 0 ; x < r_.width_ ; x++ ){
+            unsigned short inColor = *nextIn++ ;
+            *nextOut++ = shaded[inColor];
+         }
+      }
+      drawing = false ;
+/*
       drawDigit( fb, r_.
                  xLeft_, r_.yTop_,
                  r_.height_,
-                 (unsigned short *)digitStrip_.pixData_,
+                 (unsigned short *)vg_.digitStrip_.pixData_,
                  digitStrip_.width_,
                  digitStrip_.height_,
                  offs,
                  shade_,
                  highlight_ );
+*/                 
    }
 }
 
@@ -564,7 +633,7 @@ valueInfo_t::valueInfo_t(
          commaPos_ = rdig.xLeft_ ;
          rdig.xLeft_ += vg.comma_.width_ ;
       }
-      digits_[i] = new digitInfo_t( vg.digitStrip_, rdig, vg.shadow_, vg.highlight_ );
+      digits_[i] = new digitInfo_t( vg, rdig );
       rdig.xLeft_ += vg.digitStrip_.width_ ;
    }
 
@@ -815,6 +884,8 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
       
       unsigned long vsyncStart ;
       fb.syncCount(vsyncStart);
+
+      unsigned long syncCount = vsyncStart ;
       time_t startTick = time(0);
       while( !doExit )
       {
@@ -834,6 +905,7 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
          if( numSteady == numValues )
             break ;
 /*
+*/
          if( increment_ )
          {
             increment_ = false ;
@@ -845,7 +917,8 @@ printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );
                value.setTarget( value.target_ + 500000 );
 //            printf( "value[%u] -> %u\n", which, value.target_ );
          }
-*/
+
+         fb.waitSync(syncCount);
       }
       unsigned long vsyncEnd ;
       fb.syncCount(vsyncEnd);
