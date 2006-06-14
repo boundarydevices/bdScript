@@ -1,155 +1,81 @@
 /*
  * Module fbImage.cpp
  *
- * This module defines the methods of the fbImage_t
- * class as declared in fbImage.h
+ * This module defines the frame-buffer image
+ * routines as declared in fbImage.h
  *
  *
  * Change History : 
  *
  * $Log: fbImage.cpp,v $
- * Revision 1.4  2002-12-15 05:41:41  ericn
- * -Added scaleHorizontal() method
- *
- * Revision 1.3  2006/11/06 10:33:54  ericn
- * -allow construction from fbMem
- *
- * Revision 1.2  2006/08/16 02:38:07  ericn
- * -update to use fbPtr_t, allow 4444 support
- *
- * Revision 1.1  2006/06/14 13:55:24  ericn
+ * Revision 1.1  2006-06-14 13:55:24  ericn
  * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2006
  */
 
+
 #include "fbImage.h"
 #include <string.h>
-#include "fbDev.h"
-#include "img4444.h"
-#include <assert.h>
-#include <stdio.h>
 
-fbImage_t::fbImage_t()
-   : mode_(rgb565)
-   , w_( 0 )
-   , h_( 0 )
-   , stride_( 0 )
-   , ptr_()
+
+void screenImage( fbDevice_t &fb,      // input
+                  image_t    &img )    // output
 {
+   if( img.pixData_ )
+      img.unload();
+      
+   img.pixData_ = new unsigned char [fb.getMemSize()];
+   memcpy( (void *)img.pixData_, fb.getMem(), fb.getMemSize() );
+   img.width_ = fb.getWidth();
+   img.height_ = fb.getHeight();
+   img.alpha_ = 0 ;
 }
 
-fbImage_t::fbImage_t( 
-   image_t const &image,
-   mode_t         mode )
-   : mode_(mode)
-   , w_( image.width_ )
-   , h_( image.height_ )
-   , stride_( ((image.width_+7)/8)*8 )
-   , ptr_( h_*stride_*sizeof(unsigned short) )
+void screenImageRect( fbDevice_t        &fb,      // input
+                      rectangle_t const &r,       // input: which portion of the screen
+                      image_t           &img )    // output
 {
-   unsigned short const *inPix = (unsigned short const *)image.pixData_ ;
-   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
-   if( outPix && inPix )
+   if( img.pixData_ )
+      img.unload();
+
+   img.pixData_ = new unsigned char [r.width_*r.height_*sizeof(unsigned short)];
+   img.width_ = r.width_ ;
+   img.height_ = r.height_ ;
+   img.alpha_ = 0 ;
+
+   unsigned short *const pixels = (unsigned short *)img.pixData_ ;
+   for( unsigned y = 0 ; y < (unsigned)r.height_ ; y++ )
    {
-      if( rgb565 == mode ){
-         for( unsigned y = 0 ; y < h_ ; y++ ){
-            memcpy( outPix, inPix, w_*sizeof(*outPix));
-            outPix += stride_ ;
-            inPix  += w_ ;
-         }
+      int const screenY = r.yTop_ + y ;
+      if( ( 0 <= screenY ) 
+          &&
+          ( screenY < fb.getHeight() ) )
+      {
+         for( unsigned x = 0 ; x < (unsigned)r.width_ ; x++ )
+         {
+            int const screenX = x + r.xLeft_ ;
+            if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
+            {
+               pixels[(y*r.width_)+x] = fb.getPixel( screenX, screenY );
+            }
+            else
+               pixels[(y*r.width_)+x] = 0 ;
+         } // for each column
       }
-      else {
-         imgTo4444( inPix, w_, h_, 
-                    (unsigned char *)image.alpha_,
-                    outPix, stride_ );
-      }
-   }
-}
+      else
+         memset( pixels+(y*r.width_), 0, r.width_*sizeof(pixels[0]));
+   } // for each row requested
+}                      
 
-fbImage_t::fbImage_t( 
-   unsigned x,
-   unsigned y,
-   unsigned w,
-   unsigned h
-)
-   : mode_(rgb565)
-   , w_( w )
-   , h_( h )
-   , stride_( ((w+7)/8)*8 )
-   , ptr_( h_*stride_*sizeof(unsigned short) )
+void showImage( fbDevice_t    &fb,
+                unsigned       x,
+                unsigned       y,
+                image_t const &img )
 {
-   fbDevice_t &fb = getFB();
-   unsigned short const *inPix = ((unsigned short const *)fb.getMem()) 
-                                 + y*fb.getWidth()
-                                 + x ;
-   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
-   if( outPix )
-   {
-      for( y = 0 ; y < h_ ; y++ ){
-         memcpy( outPix, inPix, w_*sizeof(*outPix));
-         outPix += stride_ ;
-         inPix  += fb.getWidth();
-      }
-   }
-}
-
-fbImage_t::fbImage_t( fbPtr_t &mem, unsigned w, unsigned h ) // from fb mem
-   : mode_(rgb565)
-   , w_( w )
-   , h_( h )
-   , stride_( ((w+7)/8)*8 )
-   , ptr_(mem)
-{
-}
-
-fbImage_t::~fbImage_t(void)
-{
-}
-
-fbImage_t *fbImage_t::scaleHorizontal( unsigned width ) const 
-{
-   fbImage_t *newOne = new fbImage_t ;
-   newOne->mode_   = mode_ ;
-   newOne->w_      = width ;
-   newOne->stride_ = ((width+7)/8)*8 ;
-   newOne->h_      = h_ ;
-   newOne->ptr_    = fbPtr_t( h_ * newOne->stride_ *sizeof(unsigned short) );
-
-   assert( mode_ == rgba4444 );
-
-   unsigned const inMult = (w_*256)/width ;
-
-   unsigned short const *inPix = (unsigned short const *)ptr_.getPtr();
-   unsigned short *outPix = (unsigned short *)newOne->ptr_.getPtr();
-   for( unsigned y = 0 ; y < h_ ; y++ ){
-      for( unsigned x = 0 ; x < width ; x++ ){
-         unsigned const inPix256 = x*inMult ;
-         unsigned const rightFrac = inPix256 & 255 ;
-         unsigned const inPix0 = (inPix256/256);
-         if( rightFrac ){
-            unsigned leftFrac = (256-rightFrac);
-            unsigned short left = inPix[inPix0];
-            unsigned short right = inPix[inPix0+1];
-            unsigned char alpha = (((left>>12)*leftFrac)+((right>>12)*rightFrac))/256 ;
-            unsigned char red = ((((left>>8)&0x0F)*leftFrac)+(((right>>8)&0x0F)*rightFrac))/256 ;
-            unsigned char green = ((((left>>4)&0x0F)*leftFrac)+(((right>>4)&0x0F)*rightFrac))/256 ;
-            unsigned char blue = (((left&0x0F)*leftFrac)+((right&0x0F)*rightFrac))/256 ;
-            assert( alpha < 16 );
-            assert( red < 16 );
-            assert( green < 16 );
-            assert( blue < 16 );
-            outPix[x] = (alpha<<12)|(red<<8)|(green<<4)|blue ;
-         }
-         else
-            outPix[x] = inPix[inPix0];
-      }
-
-      outPix += newOne->stride_ ;
-      inPix  += stride_ ;
-   }
-   
-   return newOne ;
+   fb.render( x, y, img.width_, img.height_,
+              (unsigned short const *)img.pixData_, 
+              (unsigned char const *)img.alpha_ );
 }
 
