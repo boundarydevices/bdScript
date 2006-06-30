@@ -126,6 +126,7 @@ endif
 endif
 
 KERNEL_FB ?= y
+CONFIG_JSCAIRO ?= n
 ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
 endif
@@ -172,11 +173,9 @@ ifeq (y,$(CONFIG_LIBFLASH))
    OBJS += flashThread.o
 endif       
 
-ifndef INSTALL_ROOT
-INSTALL_ROOT=../install/arm-linux
-endif
+INSTALL_ROOT ?= ../install/arm-linux
 
-CROSS_COMPILE = arm-linux-
+CROSS_COMPILE ?= arm-linux-
 CC= $(CROSS_COMPILE)gcc
 LIBBDGRAPH=bdGraph/libbdGraph.a
 LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
@@ -197,7 +196,7 @@ ifneq (,$(findstring arm, $(CC)))
           -I$(INSTALL_ROOT)/include/nspr \
           -I$(INSTALL_ROOT)/include/freetype2 \
           -I$(INSTALL_ROOT)/include/libavcodec \
-          -I$(TOOLCHAINROOT)/include
+          -I$(TOOLCHAINROOT)/include 
    LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
 #   CC=g++
