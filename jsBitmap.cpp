@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsBitmap.cpp,v $
- * Revision 1.9  2005-11-06 16:02:16  ericn
+ * Revision 1.10  2006-07-04 14:03:12  ericn
+ * -fixed error message
+ *
+ * Revision 1.9  2005/11/06 16:02:16  ericn
  * -KERNEL_FB, not CONFIG_BD2003
  *
  * Revision 1.8  2005/11/05 23:22:48  ericn
@@ -542,7 +545,7 @@ static JSBool bitmapFromImage(JSContext *cx, JSObject *lhObj, JSObject *rhObj)
       return JS_TRUE ;
    }
    else
-      JS_ReportError( cx, "Invalid alphamap properties" );
+      JS_ReportError( cx, "Invalid image properties" );
 
    return JS_FALSE ;
    
