@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.9  2005-11-06 00:49:48  ericn
+ * Revision 1.10  2006-07-30 21:36:20  ericn
+ * -show GOPs
+ *
+ * Revision 1.9  2005/11/06 00:49:48  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.8  2005/08/22 13:12:56  ericn
@@ -51,8 +54,9 @@ extern "C" {
 #include <assert.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#include <linux/sm501-int.h>
 
-#ifdef CONFIG_LIBMPEG2_OLD 
+#if CONFIG_LIBMPEG2_OLD == 1
    #include "mpeg2dec/video_out.h"
    #include "mpeg2dec/convert.h"
    #define mpeg2_sequence_t sequence_t
@@ -60,6 +64,7 @@ extern "C" {
 #else
    #include "mpeg2dec/video_out.h"
    #include "mpeg2dec/mpeg2convert.h"
+   #include "mpeg2dec/convert.h"
 #endif
 
 };
@@ -165,15 +170,15 @@ void yuv_null_start( void * _id, uint8_t * const * dest, int flags )
     id->out_ptr = dest[0];
     switch (flags) {
     case CONVERT_BOTTOM_FIELD:
-	id->out_ptr += id->out_stride_frame ;
-	/* break thru */
+      id->out_ptr += id->out_stride_frame ;
+   /* break thru */
     case CONVERT_TOP_FIELD:
-	id->in_stridex  = id->in_stride_frame << 1;
-	id->out_stridex = id->out_stride_frame << 1 ;
-	break;
+      id->in_stridex  = id->in_stride_frame << 1;
+      id->out_stridex = id->out_stride_frame << 1 ;
+      break;
     default:
-	id->in_stridex = id->in_stride_frame ;
-	id->out_stridex = id->out_stride_frame ;
+      id->in_stridex = id->in_stride_frame ;
+      id->out_stridex = id->out_stride_frame ;
     }
 }
 
@@ -417,7 +422,9 @@ bool mpegDecoder_t :: getPicture
          }
          case STATE_GOP:
          {
-            break;
+            picture = INFOPTR->gop ;
+            type = ptGOP_e ;
+            return true ;
          }
          case STATE_PICTURE:
          {
@@ -518,13 +525,18 @@ printf( "yuv:%p, y:%p, u:%p, v:%p\n",
             break;
          }
       }
-   } while( -1 != mpState_ );
+   } while( ( -1 != mpState_ ) && ( STATE_BUFFER != mpState_ ) );
    
    return false ;
 }
 
+void const *mpegDecoder_t::gop(void) const 
+{
+   return INFOPTR->gop ;
+}
+
 static char const cPicTypes[] = {
-   'I', 'P', 'B', 'D'
+   'I', 'P', 'B', 'D', 'G', '?'
 };
 
 char mpegDecoder_t :: getPicType( picType_e t )
@@ -561,6 +573,7 @@ int main( int argc, char const * const argv[] )
       unsigned yPos = 0 ;
       unsigned outWidth  = 0 ;
       unsigned outHeight = 0 ;
+      unsigned picTypeMask = (unsigned)-1 ;
       if( 2 < argc )
       {
          xPos = (unsigned)strtoul( argv[2], 0, 0 );
@@ -573,6 +586,10 @@ int main( int argc, char const * const argv[] )
                if( 5 < argc )
                {
                   outHeight = (unsigned)strtoul( argv[5], 0, 0 );
+                  if( 6 < argc ){
+                     picTypeMask = (unsigned)strtoul( argv[6], 0, 0 );
+                     printf( "picTypeMask == 0x%08X\n", picTypeMask );
+                  }
                }
             }
          }
@@ -637,7 +654,6 @@ int main( int argc, char const * const argv[] )
             
             long long prevPTS = -1LL ;
             do {
-// printf( "feed: %p/%u/%llu\n", next->data_, next->length_, next->when_ms_ );
                long long pts = next->when_ms_ ;
                decoder.feed( next->data_, next->length_ );
                next++ ;
@@ -664,25 +680,34 @@ int main( int argc, char const * const argv[] )
                         perror( "setPlane" );
                         return 0 ;
                      }
+                     else
+                        printf( "setPlane success\n" );
                   }
+                  else
+                     printf( "not yet\n" );
                }
-
                while( decoder.getPicture( picture, picType ) )
                {
 
-printf( "%c - %llu\n", 
-        ( mpegDecoder_t::ptD_e >= picType )
-        ? cPicTypes[picType]
-        : '?',
-        pts );
+printf( "%c - %llu\n", decoder.getPicType(picType), pts );
+
                   ++numPictures ;
                   if( haveHeader )
                   {
+                     if( mpegDecoder_t::ptGOP_e == picType ){
+                     mpeg2_gop_t *gop = (mpeg2_gop_t *)picture ;
+                     if( gop )
+                        printf( "   %02u:%02u:%02u %u 0x%X\n", 
+                                gop->hours, gop->minutes, gop->seconds, 
+                                gop->pictures, gop->flags );
+                        continue ;
+                     }
                      if( pts != prevPTS )
                      {
                         prevPTS = pts ;
                         if( 0 <= fdYUV )
                         {
+if( picTypeMask & ( 1 << picType ) ){
                            int const numWritten = write( fdYUV, picture, bytesPerPicture );
                            if( numWritten != bytesPerPicture )
                            {
@@ -690,6 +715,7 @@ printf( "%c - %llu\n",
                               numLeft = 0 ;
                               break;
                            }
+}
    if( 'g' != keyvalue )
    {
                            while( 0 >= read(0,&keyvalue,1) )
@@ -770,6 +796,7 @@ int main( int argc, char const * const argv[] )
       unsigned yPos = 0 ;
       unsigned outWidth  = 0 ;
       unsigned outHeight = 0 ;
+      unsigned picTypeMask = (unsigned)-1 ;
       if( 2 < argc )
       {
          xPos = (unsigned)strtoul( argv[2], 0, 0 );
@@ -782,6 +809,10 @@ int main( int argc, char const * const argv[] )
                if( 5 < argc )
                {
                   outHeight = (unsigned)strtoul( argv[5], 0, 0 );
+                  if( 6 < argc ){
+                     picTypeMask = (unsigned)strtoul( argv[6], 0, 0 );
+                     printf( "picTypeMask == 0x%08X\n", picTypeMask );
+                  }
                }
             }
          }
@@ -876,7 +907,7 @@ int main( int argc, char const * const argv[] )
                   }
                   void const *picture ;
                   mpegDecoder_t::picType_e picType ;
-                  while( decoder.getPicture( picture, picType ) )
+                  while( decoder.getPicture( picture, picType, picTypeMask ) )
                   {
    printf( "%c - %llu\n", 
            ( mpegDecoder_t::ptD_e >= picType )
@@ -891,11 +922,13 @@ int main( int argc, char const * const argv[] )
                            prevPTS = when ;
                            if( 0 <= fdYUV )
                            {
+if( picTypeMask & ( 1 << picType ) ){
                               int const numWritten = write( fdYUV, picture, bytesPerPicture );
                               if( numWritten != bytesPerPicture )
                               {
                                  printf( "write %d of %u bytes\n", numWritten, bytesPerPicture );
                               }
+}
                            }
                         }
                      }

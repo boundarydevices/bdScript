@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.3 2004-10-30 18:55:31 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.4 2006-07-30 21:36:17 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.3  2004-10-30 18:55:31  ericn
+ * Revision 1.4  2006-07-30 21:36:17  ericn
+ * -show GOPs
+ *
+ * Revision 1.3  2004/10/30 18:55:31  ericn
  * -Neon YUV support
  *
  * Revision 1.2  2003/07/20 18:35:35  ericn
@@ -47,7 +50,8 @@ public:
       ptP_e       = 1,    // P (Predicted) video frame
       ptB_e       = 2,    // B (Bidirectional) video frame
       ptD_e       = 3,    // D (???) video frame 
-      ptUnknown_e = 4,
+      ptGOP_e     = 4,    // GOP header
+      ptUnknown_e = 5,
       ptNoB_e     = 3,
       ptAll_e     = 15
    };
@@ -69,7 +73,7 @@ public:
    inline unsigned numParsed( void ) const { return numParsed_ ; }
    inline unsigned numDrawn( void ) const { return numDraw_ ; }
    inline timeval const &usDecodeTime( void ) const { return usDecodeTime_ ; }
-
+   void const *gop(void) const ;
 private:
    typedef enum state_e {
       end_e,
