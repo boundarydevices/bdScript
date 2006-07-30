@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegYUV.cpp,v $
- * Revision 1.1  2005-04-24 18:55:03  ericn
+ * Revision 1.2  2006-07-30 21:35:48  ericn
+ * -compile under latest libmpeg2
+ *
+ * Revision 1.1  2005/04/24 18:55:03  ericn
  * -Initial import (temporary file)
  *
  *
@@ -26,8 +29,8 @@
 mpegYUV_t :: mpegYUV_t( void )
    : state_( needData )
    , firstPts_( 0 )
-   , pts_( 0 )
    , iframePts_( 0 )
+   , pts_( 0 )
    , decoder_( mpeg2_init() )
    , mpegInfo_( (mpeg2_info_t *)mpeg2_info( decoder_ ) )
    , stride_( 0 )
@@ -210,14 +213,16 @@ void mpegYUV_t :: yuvBufs
 
 
 
-#ifdef __MODULETEST__
+#ifdef MODULETEST
 #include <stdio.h>
 #include "rawKbd.h"
 #include "mpegStream.h"
-#include "yuvDev.h" 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/errno.h>
+#include <fcntl.h>
+#include <linux/sm501yuv.h>
+#include <linux/sm501-int.h>
 
 static void interleaveYUV
    ( int                  width, 
@@ -227,12 +232,11 @@ static void interleaveYUV
      unsigned char const *u, 
      unsigned char const *v )
 {
-   unsigned char const * const startU = u ;
-   for( unsigned row = 0 ; row < height ; row++ )
+   for( int row = 0 ; row < height ; row++ )
    {
       unsigned char const *uRow = u ;
       unsigned char const *vRow = v ;
-      for( unsigned col = 0 ; col < width ; col++ )
+      for( int col = 0 ; col < width ; col++ )
       {
          *yuv++ = *y++ ;
          if( 0 == ( col & 1 ) )
@@ -249,7 +253,6 @@ static void interleaveYUV
          v += width/2 ;
       }
    }
-
 }
                
 
@@ -299,197 +302,223 @@ int main( int argc, char const * const argv[] )
       FILE *fIn = fopen(argv[1], "rb" );
       if( fIn )
       {
-         yuvDev_t     yuvDev ;
-         if( yuvDev.isOpen() )
-         {
-            rawKbd_t     kbd ;
-            mpegYUV_t    decoder ;
-            mpegStream_t stream ;
-            unsigned state = NEEDINDATA | FEEDVIDEO | NEEDPICTURE ;
-            unsigned char inBuf[4096];
-            int      numRead ;
-            unsigned inOffs = 0 ;
-            mpegStream_t::frameType_e type ;
-            unsigned frameOffs ;
-            unsigned frameLen ;
-            long long pts ;
-            long long dts ;
-            long long headerTick = 0 ;
-            unsigned char streamId ;
-
-            while( 0 == ( state & ENDOFFILE ) )
-            {
-               debugPrint( "state == %08lx\n", state );
-
-               if( NEEDINDATA == ( state & INDATAMASK ) )
-               {
-debugPrint( "readInData\n" );
-                  if( 0 < ( numRead = fread( inBuf, 1, sizeof(inBuf)/2, fIn ) ) )
-                  {
-                     state |= PARSEINDATA ;
-                     inOffs = 0 ;
-                  }
-                  else
-                     state |= ENDOFFILE ;
-               } // read some more input
-
-               if( (PARSEINDATA|FEEDVIDEO) == ( state & (INDATAMASK|VIDEOMASK) ) )
-               {
-debugPrint( "parseInData: %x, %x&%x\n", PARSEINDATA|FEEDVIDEO, state, (INDATAMASK|VIDEOMASK) );
-                  if( ( numRead > inOffs )
-                      &&
-                      stream.getFrame( inBuf+inOffs, 
-                                       numRead-inOffs,
-                                       type,
-                                       frameOffs,
-                                       frameLen,
-                                       pts, dts,
-                                       streamId ) )
-                  {
-                     unsigned end = inOffs+frameOffs+frameLen ;
-                     if( end > numRead )
-                     {
-                        unsigned left = end-numRead ;
-                        unsigned max = sizeof(inBuf)-numRead ;
-                        if( max > left )
-                        {
-                           int numRead2 = fread( inBuf+numRead, 1, left, fIn );
-                           if( numRead2 == left )
-                           {
-                              fprintf( stderr, "tail end %u bytes\n", left );
-                           }
-                           else
-                           {
-                              fprintf( stderr, "packet underflow: %d of %u bytes read\n", numRead, left );
-                              state |= ENDOFFILE ;
-                           }
-                        }
-                        else
-                        {
-                           fprintf( stderr, "packet overflow: %lu bytes needed, %lu bytes avail\n", left, max );
-                           return 0 ;
-                        }
-                     }
-
-                     unsigned char const *frameData = inBuf+inOffs+frameOffs ;
-
-                     if( mpegStream_t::videoFrame_e == type )
-                     {
-debugPrint( "videoFrame\n" );
-                        decoder.feed( frameData, frameLen, pts );
-                        state &= ~VIDEOMASK ;
-                        state |= PARSEVIDEO ;
-                     } // video frame
-                     
-                     inOffs += frameOffs+frameLen ;
-                  }
-                  else
-                  {
-                     state &= ~INDATAMASK ;
-                     state |= NEEDINDATA ;
-                  }
-               } // have data and somewhere to put it
-
-               if( PARSEVIDEO == ( state & VIDEOMASK ) )
-               {
-debugPrint( "parseVideo\n" );
-                  switch( decoder.parse() )
-                  {
-                     case mpegYUV_t::header :
-                     {
-                        if( !yuvDev.haveHeaders() )
-                        {
-                           yuvDev.initHeader( xPos, yPos, 
-                                              decoder.width(),
-                                              decoder.height(),
-                                              ( 0 != outWidth ) ? outWidth : decoder.width(),
-                                              ( 0 != outHeight ) ? outHeight : decoder.height() );
-debugPrint( "haveHeader: %u x %u\n", decoder.width(), decoder.height() );
-                           headerTick = tickMs();
-                        }
-                        else
-                           debugPrint( "!!! double headers\n" );
-
-                        break;
-                     }
-
-                     case mpegYUV_t::picture :
-                     {
-                        state &= ~PARSEVIDEO ;
-                        state |= EATVIDEO ;
-                        state |= SENDPICTURE ;
-                        break;
-                     }
-
-                     case mpegYUV_t::needData :
-                     case mpegYUV_t::needParse :
-                     default:
-                        state &= ~PARSEVIDEO ; 
-                        state |= FEEDVIDEO ;
-                        break;
-                  }
-               } // something to decode
-
-               if( SENDPICTURE == ( state & PICTUREMASK ) )
-               {
-debugPrint( "sendPicture\n" );
-                  unsigned index ;
-                  void *picMem ; 
-                  while( 0 == ( picMem = yuvDev.getBuf( index ) ) )
-                  {
-                     pollfd filedes[2];
-                     filedes[0].fd = yuvDev.getFd() ;
-                     filedes[0].events = POLLOUT ;
-                     filedes[1].fd = 0 ;
-                     filedes[1].events = POLLIN ;
-
-                     int pollRes = poll( filedes, 2, 10000 );
-                     if( 0 < pollRes )
-                     {
-                        char c ;
-                        if( kbd.read( c ) )
-                           break;
-                     }
-                     else
-                     {
-                        fprintf( stderr, "stall:%m\n" );
-                        return 0 ;
-                     }
-                  }
-                  
-                  if( 0 != picMem )
-                  {
-debugPrint( "writePicture\n" );
-                     unsigned char *yBuf ;
-                     unsigned char *uBuf ;
-                     unsigned char *vBuf ;
-
-                     decoder.yuvBufs( yBuf, uBuf, vBuf );
-
-                     interleaveYUV( yuvDev.getRowStride(), 
-                                    yuvDev.getInHeight(), 
-                                    (unsigned char *)picMem, yBuf, uBuf, vBuf );
-                     long long whenMs = headerTick + decoder.relativePTS()/90 ;
-                     if( yuvDev.write( index, whenMs ) )
-                     {
-debugPrint( "%u at %lld\n", index, whenMs );
-                        state |= PARSEVIDEO ;
-                        state &= ~(EATVIDEO|SENDPICTURE);
-                     }
-                     else
-                     {
-                        fprintf( stderr, "Write error: %m" );
-                        return 0 ;
-                     }
-
-                  }
-                  else
-                     perror( "GETBUF" );
-               } // need to send a picture to the output device
-            }
-         }
-         else
+         int fdYUV = open( "/dev/yuv", O_WRONLY );
+         if( 0 > fdYUV ){
             perror( "/dev/yuv" );
+            return -1 ;
+         }
+
+         rawKbd_t     kbd ;
+         mpegYUV_t    decoder ;
+         mpegStream_t stream ;
+         unsigned state = NEEDINDATA | FEEDVIDEO | NEEDPICTURE ;
+         unsigned char inBuf[4096];
+         int numRead = 0 ;
+         int inOffs = 0 ;
+         mpegStream_t::frameType_e type ;
+         unsigned frameOffs ;
+         unsigned frameLen ;
+         long long pts ;
+         long long dts ;
+         unsigned char streamId ;
+         unsigned       yuvSize = 0 ;
+         unsigned char *yuvBuf = 0 ;
+
+         while( 0 == ( state & ENDOFFILE ) )
+         {
+            debugPrint( "state == %08x\n", state );
+
+            if( NEEDINDATA == ( state & INDATAMASK ) )
+            {
+debugPrint( "readInData\n" );
+               if( 0 < ( numRead = fread( inBuf, 1, sizeof(inBuf)/2, fIn ) ) )
+               {
+                  state |= PARSEINDATA ;
+                  inOffs = 0 ;
+               }
+               else
+                  state |= ENDOFFILE ;
+            } // read some more input
+
+            if( (PARSEINDATA|FEEDVIDEO) == ( state & (INDATAMASK|VIDEOMASK) ) )
+            {
+debugPrint( "parseInData: %x, %x&%x\n", PARSEINDATA|FEEDVIDEO, state, (INDATAMASK|VIDEOMASK) );
+               if( ( numRead > inOffs )
+                   &&
+                   stream.getFrame( inBuf+inOffs, 
+                                    numRead-inOffs,
+                                    type,
+                                    frameOffs,
+                                    frameLen,
+                                    pts, dts,
+                                    streamId ) )
+               {
+                  int end = inOffs+frameOffs+frameLen ;
+                  if( end > numRead )
+                  {
+                     int left = end-numRead ;
+                     int max = sizeof(inBuf)-numRead ;
+                     if( max > left )
+                     {
+                        int numRead2 = fread( inBuf+numRead, 1, left, fIn );
+                        if( numRead2 == left )
+                        {
+                           debugPrint( "tail end %u bytes\n", left );
+                        }
+                        else
+                        {
+                           fprintf( stderr, "packet underflow: %d of %u bytes read\n", numRead, left );
+                           state |= ENDOFFILE ;
+                        }
+                     }
+                     else
+                     {
+                        fprintf( stderr, "packet overflow: %lu bytes needed, %lu bytes avail\n", left, max );
+                        return 0 ;
+                     }
+                  }
+
+                  unsigned char const *frameData = inBuf+inOffs+frameOffs ;
+
+                  if( mpegStream_t::videoFrame_e == type )
+                  {
+debugPrint( "videoFrame\n" );
+                     decoder.feed( frameData, frameLen, pts );
+                     state &= ~VIDEOMASK ;
+                     state |= PARSEVIDEO ;
+                  } // video frame
+                  
+                  inOffs += frameOffs+frameLen ;
+               }
+               else
+               {
+                  state &= ~INDATAMASK ;
+                  state |= NEEDINDATA ;
+               }
+            } // have data and somewhere to put it
+
+            if( PARSEVIDEO == ( state & VIDEOMASK ) )
+            {
+debugPrint( "parseVideo\n" );
+               switch( decoder.parse() )
+               {
+                  case mpegYUV_t::header :
+                  {
+debugPrint( "haveHeader: %u x %u\n", decoder.width(), decoder.height() );
+                     if( yuvBuf )
+                        delete [] yuvBuf ;
+                     yuvSize = decoder.width() * decoder.height() * 2;
+                     yuvBuf = new unsigned char [yuvSize];
+
+                     sm501yuvPlane_t plane_ ;
+                     plane_.xLeft_     = 0 ;
+                     plane_.yTop_      = 0 ;
+                     plane_.inWidth_   = decoder.width();
+                     plane_.inHeight_  = decoder.height();
+                     plane_.outWidth_  = decoder.width();
+                     plane_.outHeight_ = decoder.height();
+                     if( 0 != ioctl( fdYUV, SM501YUV_SETPLANE, &plane_ ) ){
+                        perror( "SM501YUV_SETPLANE" );
+                        return -1 ;
+                     }
+
+                     break;
+                  }
+
+                  case mpegYUV_t::picture :
+                  {
+                     state &= ~PARSEVIDEO ;
+                     state |= EATVIDEO ;
+                     state |= SENDPICTURE ;
+                     break;
+                  }
+
+                  case mpegYUV_t::needData :
+                  case mpegYUV_t::needParse :
+                  default:
+                     state &= ~PARSEVIDEO ; 
+                     state |= FEEDVIDEO ;
+                     break;
+               }
+            } // something to decode
+
+            if( SENDPICTURE == ( state & PICTUREMASK ) )
+            {
+debugPrint( "sendPicture\n" );
+               state |= PARSEVIDEO ;
+               state &= ~(EATVIDEO|SENDPICTURE);
+               if( yuvBuf ){
+                  unsigned char *yBuf ;
+                  unsigned char *uBuf ;
+                  unsigned char *vBuf ;
+
+                  decoder.yuvBufs( yBuf, uBuf, vBuf );
+                  interleaveYUV( decoder.width(),
+                                 decoder.height(), 
+                                 yuvBuf, yBuf, uBuf, vBuf );
+                  write( fdYUV, yuvBuf, yuvSize );
+               }
+               else {
+                  fprintf( stderr, "picture without header!\n" );
+                  return -1 ;
+               }
+
+/*
+               unsigned index ;
+               void *picMem ; 
+               while( 0 == ( picMem = yuvDev.getBuf( index ) ) )
+               {
+                  pollfd filedes[2];
+                  filedes[0].fd = yuvDev.getFd() ;
+                  filedes[0].events = POLLOUT ;
+                  filedes[1].fd = 0 ;
+                  filedes[1].events = POLLIN ;
+
+                  int pollRes = poll( filedes, 2, 10000 );
+                  if( 0 < pollRes )
+                  {
+                     char c ;
+                     if( kbd.read( c ) )
+                        break;
+                  }
+                  else
+                  {
+                     fprintf( stderr, "stall:%m\n" );
+                     return 0 ;
+                  }
+               }
+               
+               if( 0 != picMem )
+               {
+debugPrint( "writePicture\n" );
+                  unsigned char *yBuf ;
+                  unsigned char *uBuf ;
+                  unsigned char *vBuf ;
+
+                  decoder.yuvBufs( yBuf, uBuf, vBuf );
+
+                  interleaveYUV( yuvDev.getRowStride(), 
+                                 yuvDev.getInHeight(), 
+                                 (unsigned char *)picMem, yBuf, uBuf, vBuf );
+                  long long whenMs = headerTick + decoder.relativePTS()/90 ;
+                  if( yuvDev.write( index, whenMs ) )
+                  {
+debugPrint( "%u at %lld\n", index, whenMs );
+                     state |= PARSEVIDEO ;
+                     state &= ~(EATVIDEO|SENDPICTURE);
+                  }
+                  else
+                  {
+                     fprintf( stderr, "Write error: %m" );
+                     return 0 ;
+                  }
+
+               }
+               else
+                  perror( "GETBUF" );
+*/                  
+            } // need to send a picture to the output device
+         }
          fclose( fIn );
       }
       else

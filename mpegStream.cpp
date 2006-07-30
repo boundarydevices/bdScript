@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegStream.cpp,v $
- * Revision 1.1  2005-04-24 18:55:03  ericn
+ * Revision 1.2  2006-07-30 21:37:00  ericn
+ * -compile under latest libmpeg2
+ *
+ * Revision 1.1  2005/04/24 18:55:03  ericn
  * -Initial import (temporary file)
  *
  *
@@ -376,16 +379,20 @@ trace( "MPEG2\n" );
 }
 
 
-#ifdef __MODULETEST__
+#ifdef MODULETEST
 #include "hexDump.h"
 #include <zlib.h>
 #include <string.h>
 
 static char const *cFrameTypes_[] = {
-     "video"
+     "other 0"
+   , "video"
    , "audio"
-   , "other"
+   , "other 3"
+   , "other 4"
 };
+
+static unsigned const numFrameTypes = sizeof(cFrameTypes_)/sizeof(cFrameTypes_[0]);
 
 int main( int argc, char const * const argv[] )
 {
@@ -396,16 +403,20 @@ int main( int argc, char const * const argv[] )
       {
          mpegStream_t mpeg ;
          
-         unsigned long frameCounts[5] = { 0, 0, 0, 0, 0 };
-         unsigned long byteCounts[5] = { 0, 0, 0, 0, 0 };
-         unsigned long crc[2] = { 0, 0 };
+         unsigned long byteCounts[2] = {
+            0, 0
+         };
+
+         unsigned long frameCounts[2] = {
+            0, 0
+         };
 
          unsigned long globalOffs = 0 ;
          unsigned char inBuf[4096];
          int  numRead ;
          while( 0 < ( numRead = fread( inBuf, 1, sizeof(inBuf)/2, fIn ) ) )
          {
-            unsigned                  inOffs = 0 ;
+            int                  inOffs = 0 ;
             
             mpegStream_t::frameType_e type ;
             unsigned                  frameOffs ;
@@ -414,7 +425,7 @@ int main( int argc, char const * const argv[] )
             long long                 dts ;
             unsigned char             streamId ;
 
-            while( ( numRead > inOffs )
+            while( ( numRead > (int)inOffs )
                    &&
                    mpeg.getFrame( inBuf+inOffs, 
                                   numRead-inOffs,
@@ -424,18 +435,20 @@ int main( int argc, char const * const argv[] )
                                   pts, dts,
                                   streamId ) )
             {
-               fprintf( stderr, "%02x:%lu:%u:%u:%llu:%llu %02x %02x %02x\n", streamId, globalOffs, frameOffs, frameLen, pts, dts, inBuf[inOffs+frameOffs], inBuf[inOffs+frameOffs+1], inBuf[inOffs+frameOffs+2] );
-               unsigned end = inOffs+frameOffs+frameLen ;
+               bool const isVideo = (mpegStream_t::videoFrame_e == type );
+               byteCounts[isVideo] += frameLen ;
+               frameCounts[isVideo]++ ;
+
+               int end = inOffs+frameOffs+frameLen ;
                if( end > numRead )
                {
-                  unsigned left = end-numRead ;
-                  unsigned max = sizeof(inBuf)-numRead ;
+                  int left = end-numRead ;
+                  int max = sizeof(inBuf)-numRead ;
                   if( max > left )
                   {
                      int numRead2 = fread( inBuf+numRead, 1, left, fIn );
                      if( numRead2 == left )
                      {
-                        fprintf( stderr, "tail end %u bytes\n", left );
                         globalOffs += numRead2 ;
                      }
                      else
@@ -451,28 +464,15 @@ int main( int argc, char const * const argv[] )
                   }
                }
 
-               fprintf( stderr, "offs %lx, frame type 0x%02x (%s), %u bytes\n", globalOffs, type, cFrameTypes_[type], frameLen );
-               frameCounts[type]++ ;
-               byteCounts[type] += frameLen ;
+               if( type >= (int)numFrameTypes )
+                  fprintf( stderr, "unknown frame type %u\n", type ); 
                
-               unsigned char const *frameData = inBuf+inOffs+frameOffs ;
-               if( mpegStream_t::otherFrame_e == type )
-               {
-                  hexDumper_t dump( frameData, frameLen );
-                  while( dump.nextLine() )
-                     fprintf( stderr, "%s\n", dump.getLine() );
-               }
-               else
-               {
-                  crc[type] = adler32( crc[type], frameData, frameLen );
-               }
-
                inOffs += frameOffs+frameLen ;
             }
             globalOffs += numRead ;
          }
-         for( unsigned i = 0 ; i < 2 ; i++ )
-            printf( "%u %s frames, %u bytes, crc 0x%08lx\n", frameCounts[i], cFrameTypes_[i], byteCounts[i], crc[i] );
+         printf( "%lu bytes of audio in %lu frames\n", byteCounts[0], frameCounts[0] );
+         printf( "%lu bytes of video in %lu frames\n", byteCounts[1], frameCounts[1] );
          fclose( fIn );
       }
       else

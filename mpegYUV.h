@@ -1,5 +1,5 @@
 #ifndef __MPEGYUV_H__
-#define __MPEGYUV_H__ "$Id: mpegYUV.h,v 1.1 2005-04-24 18:55:03 ericn Exp $"
+#define __MPEGYUV_H__ "$Id: mpegYUV.h,v 1.2 2006-07-30 21:35:42 ericn Exp $"
 
 /*
  * mpegYUV.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegYUV.h,v $
- * Revision 1.1  2005-04-24 18:55:03  ericn
+ * Revision 1.2  2006-07-30 21:35:42  ericn
+ * -compile under latest libmpeg2
+ *
+ * Revision 1.1  2005/04/24 18:55:03  ericn
  * -Initial import (temporary file)
  *
  *
@@ -33,7 +36,6 @@
 extern "C" {
 #include <inttypes.h>
 #include <mpeg2dec/mpeg2.h>
-#include <linux/videodev.h>
 #include <sys/mman.h>
 };
 #include "tickMs.h"
@@ -72,8 +74,8 @@ public:
    //
 
    // returned in libmpeg yuv form, must be interleaved
-   inline picture_t const &getPicture( void ) const { return *mpegInfo_->display_picture ; }
-   inline fbuf_t const &getDisplayBuf( void ) const { return *mpegInfo_->display_fbuf ; }
+   inline mpeg2_picture_t const &getPicture( void ) const { return *mpegInfo_->display_picture ; }
+   inline mpeg2_fbuf_t const &getDisplayBuf( void ) const { return *mpegInfo_->display_fbuf ; }
    void yuvBufs( unsigned char *&yBuf,
                  unsigned char *&uBuf,
                  unsigned char *&vBuf ) const ;
@@ -96,9 +98,9 @@ public:
    long long         firstPts_ ;
    long long         iframePts_ ;
    long long         pts_ ;
-   decoder_t        *decoder_ ;
+   mpeg2dec_t       *decoder_ ;
    mpeg2_info_t     *mpegInfo_ ;
-   sequence_t        sequence_ ;
+   mpeg2_sequence_t  sequence_ ;
    unsigned          stride_ ;
    unsigned          frameRate_ ;
    unsigned          ptsPerFrame_ ;
