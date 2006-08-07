@@ -141,19 +141,18 @@ OBJS += \
        jsCamera.o \
        jsFlash.o \
        jsMP3.o \
-       jsMPEG.o \
        jsVolume.o \
        madDecode.o \
        madHeaders.o \
-       mpDemux.o \
-       mpegDecode.o \
        touchPoll.o \
-       videoFrames.o \
-       videoQueue.o \
        zOrder.o \
 
 HARDWARE_TYPE += -DKERNEL_FB=1
 else
+endif
+
+ifeq (y,$(CONFIG_MPEG))
+   OBJS += mpegDecode.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o 
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))

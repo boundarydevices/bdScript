@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.39  2006-05-14 14:43:17  ericn
+ * Revision 1.40  2006-08-07 18:20:29  tkisky
+ * -separate mpeg stuff
+ *
+ * Revision 1.39  2006/05/14 14:43:17  ericn
  * -expose fd routines, timestamp variables
  *
  * Revision 1.38  2005/11/06 20:26:25  ericn
@@ -147,9 +150,11 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <poll.h>
-#include "videoQueue.h"
 #include "tickMs.h"
+#ifdef CONFIG_MPEG
+#include "videoQueue.h"
 #include "videoFrames.h"
+#endif
 #include <pthread.h>
 #include "fbDev.h"
 #include "debugPrint.h"
@@ -347,6 +352,7 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
+#ifdef CONFIG_MPEG
 struct playbackStreams_t {
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
@@ -434,6 +440,7 @@ printf( "%u bytes/frame\n", bytesPerFrame );
    
    return 0 ;
 }
+#endif
 
 void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
 {
@@ -1063,6 +1070,7 @@ wrote += numWritten ;
             else
                perror( "audioReadFd" );
          }
+#ifdef CONFIG_MPEG
          else if( audioQueue_t :: mpegPlay_ == item->type_ )
          {
             writeFd = openWriteFd();
@@ -1320,6 +1328,7 @@ printf( "allocate frames: %u x %u\n", width, height );
             else
                perror( "audioWriteFd" );
          }
+#endif
          else
             fprintf( stderr, "unknown audio queue request %d\n", item->type_ );
       }
