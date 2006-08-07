@@ -151,7 +151,7 @@ HARDWARE_TYPE += -DKERNEL_FB=1
 else
 endif
 
-ifeq (y,$(CONFIG_MPEG))
+ifeq (y,$(CONFIG_JSMPEG))
    OBJS += mpegDecode.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o 
 endif
 

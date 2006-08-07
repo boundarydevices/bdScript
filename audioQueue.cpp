@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.40  2006-08-07 18:20:29  tkisky
+ * Revision 1.41  2006-08-07 18:34:03  tkisky
+ * -change CONFIG_MPEG to CONFIG_JSMPEG
+ *
+ * Revision 1.40  2006/08/07 18:20:29  tkisky
  * -separate mpeg stuff
  *
  * Revision 1.39  2006/05/14 14:43:17  ericn
@@ -151,7 +154,7 @@
 #include <linux/fb.h>
 #include <poll.h>
 #include "tickMs.h"
-#ifdef CONFIG_MPEG
+#ifdef CONFIG_JSMPEG
 #include "videoQueue.h"
 #include "videoFrames.h"
 #endif
@@ -352,7 +355,7 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
-#ifdef CONFIG_MPEG
+#ifdef CONFIG_JSMPEG
 struct playbackStreams_t {
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
@@ -1070,7 +1073,7 @@ wrote += numWritten ;
             else
                perror( "audioReadFd" );
          }
-#ifdef CONFIG_MPEG
+#ifdef CONFIG_JSMPEG
          else if( audioQueue_t :: mpegPlay_ == item->type_ )
          {
             writeFd = openWriteFd();
