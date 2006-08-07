@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.5 2005-11-17 03:47:53 ericn Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.6 2006-08-07 16:47:23 tkisky Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.5  2005-11-17 03:47:53  ericn
+ * Revision 1.6  2006-08-07 16:47:23  tkisky
+ * -...
+ *
+ * Revision 1.5  2005/11/17 03:47:53  ericn
  * -change default device name param to something recognizable internally
  *
  * Revision 1.4  2004/11/26 15:28:52  ericn
@@ -33,6 +36,9 @@
  */
 
 #include "pollHandler.h"
+typedef unsigned long kernel_ulong_t;
+#define BITS_PER_LONG 32
+#include <linux/types.h>
 #include <linux/input.h>
 
 class touchPoll_t : public pollHandler_t {
