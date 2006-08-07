@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.8  2006-05-14 14:39:55  ericn
+ * Revision 1.9  2006-08-07 16:49:09  tkisky
+ * -partial cut flag
+ *
+ * Revision 1.8  2006/05/14 14:39:55  ericn
  * -new deviceId, debugPrint
  *
  * Revision 1.7  2005/11/06 00:49:41  ericn
@@ -494,9 +497,11 @@ static char const skipLine[] = {
 };
 
 //include 0 terminator
-static char const formFeed[] = {
-   "\x1b\x0C"
-};
+static char const formFeed[] = { "\x1b\x0C"};
+
+//include 0 terminator
+static char const partialCut[] = {   "\x1b*rE12"};
+//static char const stdPartialCut[] = {   "\x1b\x64\x03"};
 
 static char const exitRaster[] = {
    "\x1b*rB"            // exit raster mode
@@ -675,7 +680,24 @@ static JSPropertySpec properties_[] = {
   {0,0,0}
 };
 
-static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
+#if DEBUGPRINT
+void DbgPrintHex(unsigned char* p, int cnt)
+{
+	int i = 0;
+	while (cnt) {
+		unsigned int ch = *p++;
+		cnt--;
+		printf("%02x ",ch);
+		i++;
+		if ( (i & 0xf)==0) printf("\r\n");
+	}
+	if (i & 0xf) printf("\r\n");
+}
+#else
+#define DbgPrintHex(a,b)
+#endif
+
+static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj, bool partial )
 {
 	jsval     vPixMap ;
 	jsval     vWidth ;
@@ -702,14 +724,20 @@ static void printBitmap( starPoll_t &dev, JSContext  *cx, JSObject   *bmpObj )
 		nextOut += sizeof( initRaster )-1 ;
 
 		memcpy( nextOut, reverseForTopMargin, sizeof( reverseForTopMargin ) );
-		nextOut += sizeof( reverseForTopMargin ) ;	//include terminating null
+		nextOut += sizeof( reverseForTopMargin ) ;      //include terminating null
 
-			//avoid a bug in printer software where 3 ft ticket is printed if bmHeight is small
+		if (partial) {
+			memcpy( nextOut, partialCut, sizeof( partialCut ) );    //include terminating null
+			nextOut += sizeof( partialCut );
+debugPrint("moved partial cut string\n");
+		} 
+		//avoid a bug in printer software where 3 ft ticket is printed if bmHeight is small
 		int hSpecLen = sprintf( nextOut, "%s%d", setPageHeight, (bmHeight >= 200)? bmHeight : 0 ) + 1 ;
 		nextOut += hSpecLen ;
 
 		memcpy( nextOut, letterQuality, sizeof( letterQuality ) ); //include 0 terminator
 		nextOut += sizeof( letterQuality );
+
 
 debugPrint( "done sending header to printer: %u x %u\n", bmWidth, bmHeight );
 
@@ -792,14 +820,26 @@ debugPrint( "print: %p..%p\n", outBuf, nextOut );
 
 debugPrint( "done sending data to printer\n" );
 
-		memcpy( nextOut, formFeed, sizeof( formFeed ) );	//include terminating null
-		nextOut += sizeof( formFeed );
+
+//		memcpy( nextOut, partialCut, sizeof( partialCut ) );	//include terminating null
+//		nextOut += sizeof( partialCut );
+
+//		memcpy( nextOut, formFeed, sizeof( formFeed ) );	//include terminating null
+//		nextOut += sizeof( formFeed );
+
+//		memcpy( nextOut, exitRaster, sizeof( exitRaster )-1 );
+//		nextOut += sizeof( exitRaster )-1 ;
+
+//		memcpy( nextOut, stdPartialCut, sizeof( stdPartialCut) -1 );
+//		nextOut += sizeof( stdPartialCut )-1;
 
 		memcpy( nextOut, exitRaster, sizeof( exitRaster )-1 );
 		nextOut += sizeof( exitRaster )-1 ;
 
 		dev.print( cx, outBuf, nextOut-outBuf );
 		totalOut += nextOut-outBuf ;
+
+		DbgPrintHex((unsigned char *)outBuf,nextOut-outBuf);
 
 		assert( nextOut <= outBuf+sizeof(outBuf) );
 
@@ -817,7 +857,7 @@ static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
    starPoll_t *const star = (starPoll_t *)JS_GetInstancePrivate( cx, obj, &jsStarUSBClass_, NULL );
    if( ( 0 != star ) && ( 0 != star->udev_ ) )
    {
-      if( ( 1 == argc )
+      if( ( 1 <= argc )
           &&
           JSVAL_IS_OBJECT( argv[0] ) 
           &&
@@ -842,7 +882,9 @@ static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
          }
          else if( JS_InstanceOf( cx, rhObj, &jsBitmapClass_, NULL ) )
          {
-            printBitmap( *star, cx, rhObj );
+            bool partial = (2 == argc) && JSVAL_IS_BOOLEAN(argv[1]) && JSVAL_TO_BOOLEAN(argv[1]);
+debugPrint( "partial:%u argc:%u isBool:%u bool:%u\n", partial,argc,JSVAL_IS_BOOLEAN(argv[1]),JSVAL_TO_BOOLEAN(argv[1]) );
+            printBitmap( *star, cx, rhObj, partial );
          }
          else
             JS_ReportError( cx, "Unknown conversion" );
@@ -857,7 +899,7 @@ static JSBool jsPrint( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
       }
       else
       {
-         JS_ReportError( cx, "Usage: printer.print( alphaMap|string )" );
+         JS_ReportError( cx, "Usage: printer.print( alphaMap|string, [partial=false] )" );
          sArg = 0 ; // just in case
       }
    }
