@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sm501reg.cpp,v $
- * Revision 1.2  2006-06-10 16:28:19  ericn
+ * Revision 1.3  2006-08-16 02:27:49  ericn
+ * -fix register/value labels
+ *
+ * Revision 1.2  2006/06/10 16:28:19  ericn
  * -allow setting of registers
  *
  * Revision 1.1  2006/05/07 15:42:14  ericn
@@ -28,7 +31,6 @@
 
 int main( int argc, char const * const argv[] )
 {
-	printf( "Hello, %s\n", argv[0] );
 	if( 1 < argc ){
 		unsigned long reg = strtoul(argv[1], 0, 0 );
 		printf( "register[0x%08lx] == ", reg );
@@ -36,7 +38,7 @@ int main( int argc, char const * const argv[] )
 		if( 0 <= fbDev ) {
 			int res = ioctl( fbDev, SM501_READREG, &reg );
 			if( 0 == res ){
-				printf( "%08lx", reg );
+				printf( "%08lx\n", reg );
                                 if( 2 < argc )
                                 {
                                     reg_and_value rv ;
@@ -45,7 +47,7 @@ int main( int argc, char const * const argv[] )
                                     printf( "writing value 0x%lx to register 0x%lx\n", rv.value_, rv.reg_ );
                                     res = ioctl( fbDev, SM501_WRITEREG, &rv );
                                     if( 0 == res )
-                                       printf( "wrote value 0x%lx to register 0x%lx\n", rv.reg_, rv.value_ );
+                                       printf( "wrote value 0x%lx to register 0x%lx\n", rv.value_, rv.reg_ );
                                     else
                                        perror( "SM501_WRITEREG" );
                                 }
