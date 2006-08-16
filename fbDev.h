@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.22 2006-06-14 13:51:17 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.23 2006-08-16 14:49:22 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.22  2006-06-14 13:51:17  ericn
+ * Revision 1.23  2006-08-16 14:49:22  ericn
+ * -no double-buffering
+ *
+ * Revision 1.22  2006/06/14 13:51:17  ericn
  * -return syncCount in waitSync
  *
  * Revision 1.21  2006/06/06 03:06:45  ericn
@@ -88,6 +91,13 @@
 #include "bitmap.h"
 #endif 
 
+#include "config.h"
+
+struct point_t {
+   unsigned x ;
+   unsigned y ;
+};
+
 struct rectangle_t {
    unsigned xLeft_ ;
    unsigned yTop_ ;
@@ -95,15 +105,29 @@ struct rectangle_t {
    unsigned height_ ;
 };
 
+inline rectangle_t makeRect( 
+   unsigned __x,
+   unsigned __y,
+   unsigned __w,
+   unsigned __h )
+{
+   rectangle_t r ;
+   r.xLeft_  = __x;
+   r.yTop_   = __y;
+   r.width_  = __w;
+   r.height_ = __h;
+   return r ;
+}
+
 class fbDevice_t {
 public:
    bool isOpen( void ) const { return 0 != mem_ ; }
 
+#ifdef KERNEL_FB_SM501
    bool syncCount( unsigned long &value ) const ;
-   void doubleBuffer(void);
+
    void waitSync( unsigned long &syncCount ) const ;
-   
-   void flip( rectangle_t const *copyBack = 0 ); // terminate with zero-width rectangle
+#endif
 
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }
@@ -215,6 +239,8 @@ public:
                    unsigned short       imageWidth,
                    unsigned short       imageHeight );
 
+   int getFd() const { return fd_ ; }
+
    // draw a box with specified background color and button highlighting.
    // pressed will highlight bottom-right and shade upper left
 #ifdef KERNEL_FB
@@ -235,7 +261,11 @@ public:
                 unsigned        x,
                 unsigned        y );      // implicit 1 = black
 #endif 
-   void           *getMem( void ) const { return fbMem_[whichFB_]; }
+   void           *getMem( void ) const { return mem_ ; }
+   unsigned        getRamOffs( void ) const { return 0 ; }
+   unsigned long   pageSize( void ) const { return width_*height_*sizeof(unsigned short); }
+
+   unsigned long   fbOffset( void *pixAddr ) const { return (unsigned long)pixAddr - (unsigned long)mem_ ; }
 
 private:
    fbDevice_t( fbDevice_t const &rhs ); // no copies
@@ -243,11 +273,10 @@ private:
    ~fbDevice_t( void );
    int            fd_ ;
    void          *mem_ ;
-   void		 *fbMem_[2];
-   bool		  whichFB_ ;
    unsigned long  memSize_ ;
    unsigned short width_ ;
    unsigned short height_ ;
+
    friend fbDevice_t &getFB( char const *devName );
    friend void *flashThread( void *param );
    friend class flashThread_t ;

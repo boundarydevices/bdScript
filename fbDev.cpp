@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.31  2006-06-14 13:51:20  ericn
+ * Revision 1.32  2006-08-16 14:49:25  ericn
+ * -no double-buffering
+ *
+ * Revision 1.31  2006/06/14 13:51:20  ericn
  * -return syncCount in waitSync
  *
  * Revision 1.30  2006/06/06 03:06:43  ericn
@@ -118,6 +121,11 @@
 #include "dither.h"
 #define irqreturn_t int
 #include <linux/sm501-int.h>
+#include <assert.h>
+#include "tickMs.h"
+
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 static unsigned short rTable[32];
 static unsigned short gTable[64];
@@ -131,12 +139,12 @@ static unsigned char *lcdRAM_ = 0 ;
 //15 14 13 10  9    8  4  3  2 12 11     7  6  5  1  0
 
 #if 1
-#define LCD_REORDER_BLUE  15,14,13,10, 9		//10.4 on new board,and 640x240
+#define LCD_REORDER_BLUE  15,14,13,10, 9     //10.4 on new board,and 640x240
 #define LCD_REORDER_GREEN  8, 4, 3, 2, 12, 11
 #define LCD_REORDER_RED    7, 6, 5, 1, 0
 #else
 #define LCD_REORDER
-#define LCD_REORDER_BLUE  15,14, 8, 7, 6		//5.7 on 1st board
+#define LCD_REORDER_BLUE  15,14, 8, 7, 6     //5.7 on 1st board
 #define LCD_REORDER_GREEN 13,12,11, 5, 4, 3
 #define LCD_REORDER_RED   10, 9, 2, 1, 0
 #endif
@@ -154,33 +162,33 @@ static unsigned char *lcdRAM_ = 0 ;
 #define Make6Masks(a) M6Masks(a)
 static void InitBoundaryReordering(void)
 {
-	const char bMap[] = {LCD_REORDER_BLUE};
-	const char gMap[] = {LCD_REORDER_GREEN};
-	const char rMap[] = {LCD_REORDER_RED};
-	int i,j;
+   const char bMap[] = {LCD_REORDER_BLUE};
+   const char gMap[] = {LCD_REORDER_GREEN};
+   const char rMap[] = {LCD_REORDER_RED};
+   int i,j;
 
    memset( rTable, 0, sizeof( rTable ) );
    memset( gTable, 0, sizeof( gTable ) );
    memset( bTable, 0, sizeof( bTable ) );
 
    for (j=0;j<5;j++)
-	{
-		int bm = 1<<j;
-		unsigned short mask = 1<<rMap[j];
-		for (i=0;i<32;i++) if (i & bm) rTable[i]|=mask;
-	}
-	for (j=0;j<6;j++)
-	{
-		int bm = 1<<j;
-		unsigned short mask = 1<<gMap[j];
-		for (i=0;i<64;i++) if (i & bm) gTable[i]|=mask;
-	}
-	for (j=0;j<5;j++)
-	{
-		int bm = 1<<j;
-		unsigned short mask = 1<<bMap[j];
-		for (i=0;i<32;i++) if (i & bm) bTable[i]|=mask;
-	}
+   {
+      int bm = 1<<j;
+      unsigned short mask = 1<<rMap[j];
+      for (i=0;i<32;i++) if (i & bm) rTable[i]|=mask;
+   }
+   for (j=0;j<6;j++)
+   {
+      int bm = 1<<j;
+      unsigned short mask = 1<<gMap[j];
+      for (i=0;i<64;i++) if (i & bm) gTable[i]|=mask;
+   }
+   for (j=0;j<5;j++)
+   {
+      int bm = 1<<j;
+      unsigned short mask = 1<<bMap[j];
+      for (i=0;i<32;i++) if (i & bm) bTable[i]|=mask;
+   }
 }
 
 unsigned short fbDevice_t :: get16( unsigned char red, unsigned char green, unsigned char blue )
@@ -190,10 +198,10 @@ unsigned short fbDevice_t :: get16( unsigned char red, unsigned char green, unsi
 
 void fbDevice_t :: ConvertRgb24LineTo16(unsigned short* fbMem, unsigned char const *video,int cnt)
 {
-	do {
-		*fbMem++ = rTable[video[0]>>3] | gTable[video[1]>>2] | bTable[video[2]>>3];
-		video += 3;
-	} while ((--cnt)>0);
+   do {
+      *fbMem++ = rTable[video[0]>>3] | gTable[video[1]>>2] | bTable[video[2]>>3];
+      video += 3;
+   } while ((--cnt)>0);
 }
 
 
@@ -243,27 +251,108 @@ unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
 #endif
 }
 
+#ifdef KERNEL_FB_SM501
+static unsigned long const fillCmd_[] = {
+    0x30100000    // -- load register immediate 0x100000 - 2d source
+,   0x00000014    // -- 14 DWORDS
+,   0x00000000    //   _2D_Source
+,   0x00000000    //   _2D_Destination
+,   0x04000300    //   _2D_Dimension
+,   0x00000000    //   _2D_Control
+,   0x04000001    //   _2D_Pitch
+,   0x0000f800    //   _2D_Foreground
+,   0x000007E0    //   _2D_Background
+,   0x00100001    //   _2D_Stretch_Format
+,   0x00000000    //   _2D_Color_Compare
+,   0x00000000    //   _2D_Color_Compare_Mask
+,   0xFFFFFFFF    //   _2D_Mask
+,   0x00000000    //   _2D_Clip_TL
+,   0x04000300    //   _2D_Clip_BR
+,   0x00000000    //   _2D_Mono_Pattern_Low
+,   0x00000000    //   _2D_Mono_Pattern_High
+,   0x04000400    //   _2D_Window_Width
+,   0x00180000    //   _2D_Source_Base
+,   0x00000000    //   _2D_Destination_Base
+,   0x00000000    //   _2D_Alpha
+,   0x00000000    //   _2D_Wrap
+,   0x1010000C    // -- load register 0x10000C  _2D_Control
+,   0x808100CC    //    fillrect source with stretch
+,   0x80000001    // FINISH
+,   0x00000000    // PAD
+};
+
+#define FILLREG(REGNUM) ( ( ((REGNUM)-(SMIDRAW_2D_Source)) / sizeof(fillCmd_[0]) ) + 2 )
+
+static unsigned long const stretchCmd_[] = {
+    0x30100000    // -- load register immediate 0x100000 - 2d source
+,   0x00000014    // -- 14 DWORDS
+,   0x00000000    //   _2D_Source
+,   0x00000000    //   _2D_Destination
+,   0x04000300    //   _2D_Dimension
+,   0x00000000    //   _2D_Control
+,   0x04000001    //   _2D_Pitch
+,   0x0000f800    //   _2D_Foreground
+,   0x000007E0    //   _2D_Background
+,   0x00100001    //   _2D_Stretch_Format
+,   0x00000000    //   _2D_Color_Compare
+,   0x00000000    //   _2D_Color_Compare_Mask
+,   0xFFFFFFFF    //   _2D_Mask
+,   0x00000000    //   _2D_Clip_TL
+,   0x04000300    //   _2D_Clip_BR
+,   0x00000000    //   _2D_Mono_Pattern_Low
+,   0x00000000    //   _2D_Mono_Pattern_High
+,   0x04000400    //   _2D_Window_Width
+,   0x00180000    //   _2D_Source_Base
+,   0x00000000    //   _2D_Destination_Base
+,   0x00000000    //   _2D_Alpha
+,   0x00000000    //   _2D_Wrap
+,   0x1010000C    // -- load register 0x10000C  _2D_Control
+,   0x808000CC    //    (bitblt)alpha blend with stretch
+,   0x80000001    // FINISH
+,   0x00000000    // PAD
+};
+
+#define STRETCHREG(REGNUM) ( ( ((REGNUM)-(SMIDRAW_2D_Source)) / sizeof(stretchCmd_[0]) ) + 2 )
+#define STRETCHCMDREG      ((sizeof(stretchCmd_)/sizeof(stretchCmd_[0]))-3)
+#define STRETCHWITHALPHA 0x808400CC
+#define STRETCHBLT       0x808000CC
+#define STRETCHCMD_TRANSPARENT 0x00000500
+
+#define ISVIDEORAM(ptr) ((((unsigned long)ptr) >= (unsigned long)mem_) && \
+                         (((unsigned long)ptr) < ((unsigned long)mem_+0x700000)))
+#ifdef VIDEORAMPTR
+#undef VIDEORAMPTR
+#endif
+#define VIDEORAMPTR(ptr) (((unsigned long)ptr) - (unsigned long)mem_)
+
+#endif
+
+
 void fbDevice_t :: clear( void )
 {
-#ifdef KERNEL_FB
-   memset( getMem(), 0, getMemSize() );
+#if defined( KERNEL_FB_SM501 )
+   clear( 0xFF, 0xFF, 0xFF );
+#elif defined( KERNEL_FB )
+   memset( getMem(), 0, pageSize() );
 #else
-   memset( getMem(), 0xFF, getMemSize() );
+   memset( getMem(), 0xFF, pageSize() );
    refresh();
 #endif
 }
 
 void fbDevice_t :: clear( unsigned char red, unsigned char green, unsigned char blue )
 {
+#if defined( KERNEL_FB_SM501 )
+   rect( 0, 0, getWidth()-1, getHeight()-1, red, green, blue, (unsigned short *)getMem(), getWidth(), getHeight() );
+#elif defined( KERNEL_FB )
    unsigned short color16 = get16( red, green, blue );
-#ifdef KERNEL_FB
    unsigned short *start = (unsigned short *)getMem();
    unsigned short *end   = start + getHeight() * getWidth();
    while( start < end )
       *start++ = color16 ;
 #else
    unsigned char const value = ( 0 == color16 ) ? 0xFF : 0 ;
-   memset( getMem(), value, getMemSize() );
+   memset( getMem(), value, pageSize() );
    refresh();
 #endif
 }
@@ -274,7 +363,7 @@ void fbDevice_t :: refresh( void )
 
    unsigned char const *const src = (unsigned char const *)getMem();
    unsigned char *const dest = lcdRAM_ ;
-   unsigned const max = getMemSize();
+   unsigned const max = pageSize();
 
    unsigned offs = 0 ;
    //
@@ -305,7 +394,7 @@ void fbDevice_t :: refresh( void )
 /*
    unsigned char const *const src = (unsigned char const *)getMem();
    unsigned char *const dest = lcdRAM_ ;
-   unsigned const max = getMemSize();
+   unsigned const max = pageSize();
 
    for( unsigned offs = 0 ; offs < max ; )
    {
@@ -332,7 +421,7 @@ void fbDevice_t :: refresh( void )
       } // found mismatch
    }
    lseek( fd_, 0, SEEK_SET );
-   write( fd_, getMem(), getMemSize() );
+   write( fd_, getMem(), pageSize() );
 */   
 #endif
 }
@@ -377,15 +466,32 @@ void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
    }
 }
 
-fbDevice_t :: fbDevice_t( char const *name )
-   : fd_( open( name, O_RDWR ) ),
-     mem_( 0 ),
-     whichFB_( 0 ),
-     memSize_( 0 ),
-     width_( 0 ),
-     height_( 0 )
+static unsigned long sm501_fb( fbDevice_t &fb )
 {
-   fbMem_[0] = fbMem_[1] = 0 ;
+   unsigned long reg = 0x8000c ;
+   int res = ioctl( fb.getFd(), SM501_READREG, &reg );
+   if( 0 != res )
+      perror( "READREG" );
+   return reg ;
+}
+
+static void writeReg( int fd, unsigned long reg, unsigned long value )
+{
+   reg_and_value rv ;
+   rv.reg_ = reg ;
+   rv.value_ = value ; // disable
+   int res = ioctl( fd, SM501_WRITEREG, &rv );
+   if( res )
+      perror( "SM501_WRITEREG" );
+}
+
+fbDevice_t :: fbDevice_t( char const *name )
+   : fd_( open( name, O_RDWR ) )
+   , mem_( 0 )
+   , memSize_( 0 )
+   , width_( 0 )
+   , height_( 0 )
+{
    InitBoundaryReordering();
 
    if( 0 <= fd_ )
@@ -397,62 +503,62 @@ fbDevice_t :: fbDevice_t( char const *name )
       if( 0 == err )
       {
 #if 0
-         printf( "id %s\n", fixed_info.id );
-         printf( "smem_start %lu\n", fixed_info.smem_start );
-         printf( "smem_len   %lu\n", fixed_info.smem_len );
-         printf( "type       %lu\n", fixed_info.type );
-         printf( "type_aux   %lu\n", fixed_info.type_aux );
-         printf( "visual     %lu\n", fixed_info.visual );
-         printf( "xpan       %u\n", fixed_info.xpanstep );
-         printf( "ypan       %u\n", fixed_info.ypanstep );
-         printf( "ywrap      %u\n", fixed_info.ywrapstep );
-         printf( "line_len   %u\n", fixed_info.line_length );
-         printf( "mmio_start %lu\n", fixed_info.mmio_start );
-         printf( "mmio_len   %lu\n", fixed_info.mmio_len );
-         printf( "accel      %lu\n", fixed_info.accel );
+         debugPrint( "id %s\n", fixed_info.id );
+         debugPrint( "smem_start %lu\n", fixed_info.smem_start );
+         debugPrint( "smem_len   %lu\n", fixed_info.smem_len );
+         debugPrint( "type       %lu\n", fixed_info.type );
+         debugPrint( "type_aux   %lu\n", fixed_info.type_aux );
+         debugPrint( "visual     %lu\n", fixed_info.visual );
+         debugPrint( "xpan       %u\n", fixed_info.xpanstep );
+         debugPrint( "ypan       %u\n", fixed_info.ypanstep );
+         debugPrint( "ywrap      %u\n", fixed_info.ywrapstep );
+         debugPrint( "line_len   %u\n", fixed_info.line_length );
+         debugPrint( "mmio_start %lu\n", fixed_info.mmio_start );
+         debugPrint( "mmio_len   %lu\n", fixed_info.mmio_len );
+         debugPrint( "accel      %lu\n", fixed_info.accel );
 #endif
          struct fb_var_screeninfo variable_info;
 
-	      err = ioctl( fd_, FBIOGET_VSCREENINFO, &variable_info );
+         err = ioctl( fd_, FBIOGET_VSCREENINFO, &variable_info );
          if( 0 == err )
          {
 #if 0
-            printf( "xres              = %lu\n", variable_info.xres );			//  visible resolution
-            printf( "yres              = %lu\n", variable_info.yres );
-            printf( "xres_virtual      = %lu\n", variable_info.xres_virtual );		//  virtual resolution
-            printf( "yres_virtual      = %lu\n", variable_info.yres_virtual );
-            printf( "xoffset           = %lu\n", variable_info.xoffset );			//  offset from virtual to visible
-            printf( "yoffset           = %lu\n", variable_info.yoffset );			//  resolution
-            printf( "bits_per_pixel    = %lu\n", variable_info.bits_per_pixel );		//  guess what
-            printf( "grayscale         = %lu\n", variable_info.grayscale );		//  != 0 Graylevels instead of colors
+            debugPrint( "xres              = %lu\n", variable_info.xres );        //  visible resolution
+            debugPrint( "yres              = %lu\n", variable_info.yres );
+            debugPrint( "xres_virtual      = %lu\n", variable_info.xres_virtual );      //  virtual resolution
+            debugPrint( "yres_virtual      = %lu\n", variable_info.yres_virtual );
+            debugPrint( "xoffset           = %lu\n", variable_info.xoffset );        //  offset from virtual to visible
+            debugPrint( "yoffset           = %lu\n", variable_info.yoffset );        //  resolution
+            debugPrint( "bits_per_pixel    = %lu\n", variable_info.bits_per_pixel );    //  guess what
+            debugPrint( "grayscale         = %lu\n", variable_info.grayscale );      //  != 0 Graylevels instead of colors
 
-            printf( "red               = offs %lu, len %lu, msbr %lu\n",
+            debugPrint( "red               = offs %lu, len %lu, msbr %lu\n",
                     variable_info.red.offset,
                     variable_info.red.length,
                     variable_info.red.msb_right );
-            printf( "green             = offs %lu, len %lu, msbr %lu\n",
+            debugPrint( "green             = offs %lu, len %lu, msbr %lu\n",
                     variable_info.green.offset,
                     variable_info.green.length,
                     variable_info.green.msb_right );
-            printf( "blue              = offs %lu, len %lu, msbr %lu\n",
+            debugPrint( "blue              = offs %lu, len %lu, msbr %lu\n",
                     variable_info.blue.offset,
                     variable_info.blue.length,
                     variable_info.blue.msb_right );
 
-            printf( "nonstd            = %lu\n", variable_info.nonstd );			//  != 0 Non standard pixel format
-            printf( "activate          = %lu\n", variable_info.activate );			//  see FB_ACTIVATE_*
-            printf( "height            = %lu\n", variable_info.height );			//  height of picture in mm
-            printf( "width             = %lu\n", variable_info.width );			//  width of picture in mm
-            printf( "accel_flags       = %lu\n", variable_info.accel_flags );		//  acceleration flags (hints)
-            printf( "pixclock          = %lu\n", variable_info.pixclock );			//  pixel clock in ps (pico seconds)
-            printf( "left_margin       = %lu\n", variable_info.left_margin );		//  time from sync to picture
-            printf( "right_margin      = %lu\n", variable_info.right_margin );		//  time from picture to sync
-            printf( "upper_margin      = %lu\n", variable_info.upper_margin );		//  time from sync to picture
-            printf( "lower_margin      = %lu\n", variable_info.lower_margin );
-            printf( "hsync_len         = %lu\n", variable_info.hsync_len );		//  length of horizontal sync
-            printf( "vsync_len         = %lu\n", variable_info.vsync_len );		//  length of vertical sync
-            printf( "sync              = %lu\n", variable_info.sync );			//  see FB_SYNC_*
-            printf( "vmode             = %lu\n", variable_info.vmode );			//  see FB_VMODE_*
+            debugPrint( "nonstd            = %lu\n", variable_info.nonstd );         //  != 0 Non standard pixel format
+            debugPrint( "activate          = %lu\n", variable_info.activate );       //  see FB_ACTIVATE_*
+            debugPrint( "height            = %lu\n", variable_info.height );         //  height of picture in mm
+            debugPrint( "width             = %lu\n", variable_info.width );       //  width of picture in mm
+            debugPrint( "accel_flags       = %lu\n", variable_info.accel_flags );    //  acceleration flags (hints)
+            debugPrint( "pixclock          = %lu\n", variable_info.pixclock );       //  pixel clock in ps (pico seconds)
+            debugPrint( "left_margin       = %lu\n", variable_info.left_margin );    //  time from sync to picture
+            debugPrint( "right_margin      = %lu\n", variable_info.right_margin );      //  time from picture to sync
+            debugPrint( "upper_margin      = %lu\n", variable_info.upper_margin );      //  time from sync to picture
+            debugPrint( "lower_margin      = %lu\n", variable_info.lower_margin );
+            debugPrint( "hsync_len         = %lu\n", variable_info.hsync_len );      //  length of horizontal sync
+            debugPrint( "vsync_len         = %lu\n", variable_info.vsync_len );      //  length of vertical sync
+            debugPrint( "sync              = %lu\n", variable_info.sync );        //  see FB_SYNC_*
+            debugPrint( "vmode             = %lu\n", variable_info.vmode );       //  see FB_VMODE_*
 #endif
             if( ( 16 != variable_info.bits_per_pixel )
                 ||
@@ -487,20 +593,19 @@ fbDevice_t :: fbDevice_t( char const *name )
                width_   = variable_info.xres ;
                height_  = variable_info.yres ;
                memSize_ = fixed_info.smem_len ;
+
                mem_ = mmap( 0, memSize_, PROT_WRITE|PROT_WRITE,
                             MAP_SHARED, fd_, 0 );
                if( MAP_FAILED != mem_ )
                {
 //                  memset( mem_, 0, fixed_info.smem_len );
-		  fbMem_[0] = mem_ ;
-		  fbMem_[1] = (unsigned short *)mem_ + width_ * height_ ;
 
                   return ;
                }
                else {
                   perror( "mmap fb" );
-		  mem_ = 0 ;
-	       }
+               mem_ = 0 ;
+          }
             } // had or changed to 16-bit color
          }
          else
@@ -531,80 +636,37 @@ fbDevice_t :: fbDevice_t( char const *name )
    else
    {
       perror( name );
-      printf( "simulating fbDevice" );
+      debugPrint( "simulating fbDevice" );
       width_ = 320 ;
       height_ = 240 ;
       memSize_ = width_ * height_ * sizeof( unsigned short );
       mem_  = new unsigned short[ width_ * height_ * 2 ];
-      fbMem_[0] = mem_ ;
-      fbMem_[1] = (unsigned short *)mem_ + width_ * height_ ;
    }
 }
 
+
+#ifdef KERNEL_FB_SM501
+
 bool fbDevice_t :: syncCount( unsigned long &value ) const 
 {
-	if( isOpen() ) {
-		int result = ioctl( fd_, SM501_GET_SYNCCOUNT, &value );
-		if( 0 == result )
-			return true ;
-	}
+   if( isOpen() ) {
+      int result = ioctl( fd_, SM501_GET_SYNCCOUNT, &value );
+      if( 0 == result )
+         return true ;
+   }
 
-	return false ;
+   return false ;
 
-}
-
-void fbDevice_t :: doubleBuffer( void )
-{ 
-   rectangle_t screenRect[2] = {0};
-   screenRect[0].width_ = width_ ;
-   screenRect[0].height_ = height_ ;
-   flip(screenRect);
 }
 
 void fbDevice_t :: waitSync(unsigned long &syncCount) const 
 {
-	if( isOpen() ) {
-		ioctl( fd_, SM501_WAITSYNC, &syncCount );
-	}
+   if( isOpen() ) {
+      ioctl( fd_, SM501_WAITSYNC, &syncCount );
+   }
 }
 
-void fbDevice_t :: flip( rectangle_t const *copyBack )
-{
-	if( isOpen() ) {
-		unsigned long whichFB ;
-		whichFB_ ^= 1 ;
-		int result = ioctl( fd_, SM501_FLIPBUFS, &whichFB );
-		if( 0 == result ){
-
-			whichFB_ = whichFB & 1 ;
-
-         if( copyBack )
-         {
-            unsigned short const *const src = (unsigned short *)fbMem_[whichFB_^1];
-            unsigned short *const dest = (unsigned short *)fbMem_[whichFB_];
-            while( copyBack->width_ )
-            {
-               unsigned const offs = (copyBack->yTop_ *width_)+copyBack->xLeft_ ;
-               unsigned short const *srcRow = src+offs ;
-               unsigned short *destRow = dest+offs ;
-               unsigned const bytesPerRow = copyBack->width_ * sizeof(src[0]);
-               
-               for( unsigned r = 0 ; r < copyBack->height_ ; r++ )
-               {
-                  memcpy( destRow, srcRow, bytesPerRow );
-
-                  srcRow += width_ ;
-                  destRow += width_ ;
-               }
-               copyBack++ ;
-            }
-         }         
-      }
-		else
-			perror( "SM501_FLIPBUFS" );
-	}
-}
-
+#endif
 
 static inline int min(int x,int y)
 {
@@ -612,21 +674,21 @@ static inline int min(int x,int y)
 }
 
 void fbDevice_t :: render
-   ( int xPos,				//placement on screen
+   ( int xPos,          //placement on screen
      int yPos,
      int w,
-     int h,	 			// width and height of image
+     int h,          // width and height of image
      unsigned short const *pixels,
-     int imagexPos,			//offset within image to start display
+     int imagexPos,        //offset within image to start display
      int imageyPos,
-     int imageDisplayWidth,		//portion of image to display
+     int imageDisplayWidth,      //portion of image to display
      int imageDisplayHeight
    )
 {
    if (xPos<0)
    {
-      imagexPos -= xPos;		//increase offset
-      imageDisplayWidth += xPos;	//reduce width
+      imagexPos -= xPos;      //increase offset
+      imageDisplayWidth += xPos; //reduce width
       xPos = 0;
    }
    if (yPos<0)
@@ -688,24 +750,24 @@ void fbDevice_t :: render
 
 
 void fbDevice_t :: render
-   ( int xPos,				//placement on screen
+   ( int xPos,          //placement on screen
      int yPos,
      int w,
-     int h,	 			// width and height of image
+     int h,          // width and height of image
      unsigned short const *pixels,
      unsigned short       *dest,
      unsigned short        destW,
      unsigned short        destH,
-     int imagexPos,			//offset within image to start display
+     int imagexPos,        //offset within image to start display
      int imageyPos,
-     int imageDisplayWidth,		//portion of image to display
+     int imageDisplayWidth,      //portion of image to display
      int imageDisplayHeight
    )
 {
    if (xPos<0)
    {
-      imagexPos -= xPos;		//increase offset
-      imageDisplayWidth += xPos;	//reduce width
+      imagexPos -= xPos;      //increase offset
+      imageDisplayWidth += xPos; //reduce width
       xPos = 0;
    }
    if (yPos<0)
@@ -824,7 +886,7 @@ void fbDevice_t :: render
                break; // only going further off the screen
          }
 #else
-printf( "!!!!!!!!!!!! ignoring transparency !!!!!!!!!!!\n" );
+debugPrint( "!!!!!!!!!!!! ignoring transparency !!!!!!!!!!!\n" );
    render( xPos, yPos, w, h, pixels );
 #endif 
       }
@@ -924,15 +986,14 @@ void fbDevice_t :: rect
 
    if( ( x1 < imageWidth ) && ( y1 < imageHeight ) )
    {
+      unsigned short const rgb = get16( red, green, blue );
       if( x2 >= imageWidth )
          x2 = imageWidth - 1 ;
-      unsigned short const w = x2 - x1 + 1 ;
-
+      unsigned long const w = x2 - x1 + 1 ;
       if( y2 >= imageHeight )
          y2 = imageHeight - 1 ;
 
-      unsigned short const rgb = get16( red, green, blue );
-#ifdef KERNEL_FB
+#if defined( KERNEL_FB )
       unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
       unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
       while( row <= endRow )
@@ -1301,7 +1362,7 @@ void fbDevice_t :: render
    unsigned const inStride = bmp.bytesPerRow();
    unsigned char *const outStart = (unsigned char *)getMem();
 
-printf( "inStride: %u\n"
+debugPrint( "inStride: %u\n"
         "y: %u..%u\n"
         "x: %u..%u\n"
         , inStride, yStart, bottom, xStart, right );
@@ -1352,7 +1413,7 @@ fbDevice_t :: ~fbDevice_t( void )
    {
 #ifdef KERNEL_FB
       if( 0 != munmap( mem_, 2*memSize_ ) )
-		perror("munmap: fb");
+      perror("munmap: fb");
 #else 
       delete [] (unsigned char *)mem_ ;
       delete [] lcdRAM_ ;
@@ -1387,8 +1448,8 @@ int main( int argc, char const * const argv[] )
       {
 #ifdef ALLCOLORS
          unsigned short * const memStart = (unsigned short *)fb.getMem();
-         unsigned short * const memEnd = (unsigned short *)( (char *)fb.getMem() + fb.getMemSize() );
-   
+         unsigned short * const memEnd = (unsigned short *)( (char *)fb.getMem() + fb.pageSize() );
+
          for( unsigned i = 0 ; i < 65536 ; i++ )
          {
             for( unsigned short *p = memStart ; p < memEnd ; p++ )
