@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.4 2006-07-30 21:36:17 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.5 2006-08-16 02:29:19 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.4  2006-07-30 21:36:17  ericn
+ * Revision 1.5  2006-08-16 02:29:19  ericn
+ * -add temp_ref, timestamp to feed/pull interface
+ *
+ * Revision 1.4  2006/07/30 21:36:17  ericn
  * -show GOPs
  *
  * Revision 1.3  2004/10/30 18:55:31  ericn
@@ -52,6 +55,7 @@ public:
       ptD_e       = 3,    // D (???) video frame 
       ptGOP_e     = 4,    // GOP header
       ptUnknown_e = 5,
+      ptOnlyI_e   = 1,
       ptNoB_e     = 3,
       ptAll_e     = 15
    };
@@ -59,10 +63,13 @@ public:
    static char getPicType( picType_e );
 
    void feed( void const   *inData, 
-              unsigned long inBytes );
+              unsigned long inBytes,
+              long long     pts );
 
    bool getPicture( void const *&picture,
                     picType_e   &type,
+                    unsigned    &temp_ref,
+                    long long   &when,
                     unsigned     ptMask = ptAll_e );
 
    inline bool haveHeader( void ) const { return haveVideoHeader_ ; } 
@@ -73,7 +80,10 @@ public:
    inline unsigned numParsed( void ) const { return numParsed_ ; }
    inline unsigned numDrawn( void ) const { return numDraw_ ; }
    inline timeval const &usDecodeTime( void ) const { return usDecodeTime_ ; }
+   inline unsigned char frameRate( void ) const { return mpegFrameRate_ ; }
+
    void const *gop(void) const ;
+
 private:
    typedef enum state_e {
       end_e,
@@ -89,13 +99,18 @@ private:
    unsigned short       mpegStride_ ;
    unsigned short       mpegHeight_ ;
    unsigned char        mpegFrameType_ ; // 
+   unsigned char        mpegFrameRate_ ;
    picType_e            lastPicType_ ;
+   unsigned             tempRef_ ;
    timeval              usStartDecode_ ;
    timeval              usDecodeTime_ ;
    bool                 skippedP_ ;
    unsigned             numSkipped_ ;
    unsigned             numParsed_ ;
    unsigned             numDraw_ ;
+   long long            msPerPic_ ;
+   long long            ptsIn_ ;
+   long long            ptsOut_ ;
 
 #ifdef NEON
    //

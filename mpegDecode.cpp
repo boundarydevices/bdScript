@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.10  2006-07-30 21:36:20  ericn
+ * Revision 1.11  2006-08-16 02:29:12  ericn
+ * -add temp_ref, timestamp to feed/pull interface
+ *
+ * Revision 1.10  2006/07/30 21:36:20  ericn
  * -show GOPs
  *
  * Revision 1.9  2005/11/06 00:49:48  ericn
@@ -66,8 +69,9 @@ extern "C" {
    #include "mpeg2dec/mpeg2convert.h"
    #include "mpeg2dec/convert.h"
 #endif
-
 };
+#include "yuyv.h"
+
 #include <stdio.h>
 
 #define DECODER ((mpeg2dec_t *)mpegDecoder_ )
@@ -82,11 +86,15 @@ mpegDecoder_t :: mpegDecoder_t( void )
      mpegStride_( 0 ),
      mpegHeight_( 0 ),
      mpegFrameType_( 0 ),
+     mpegFrameRate_( 0 ),
      lastPicType_( ptUnknown_e ),
+     tempRef_(UINT_MAX),
      skippedP_( false ),
      numSkipped_( 0 )
    , numParsed_( 0 )
    , numDraw_( 0 )
+   , ptsIn_( 0 )
+   , ptsOut_( 0 )
 {
    if( mpegDecoder_ && mpegInfo_ )
    {
@@ -110,10 +118,14 @@ mpegDecoder_t :: ~mpegDecoder_t( void )
 
 void mpegDecoder_t :: feed
    ( void const   *inData, 
-     unsigned long inBytes )
+     unsigned long inBytes,
+     long long     pts )
 {
    if( mpegDecoder_ && mpegInfo_ )
    {
+      if( ( 0 != pts ) && ( 0 == ptsIn_ ) ){
+         ptsIn_ = ptsOut_ = pts ;
+      }
       unsigned char *bIn = (unsigned char *)inData ;
       mpeg2_buffer( DECODER, bIn, bIn + inBytes );
    }
@@ -365,9 +377,12 @@ void interleaveYUV( int                  width,
 bool mpegDecoder_t :: getPicture
    ( void const *&picture,
      picType_e   &type,
+     unsigned    &temp_ref,
+     long long   &when,
      unsigned     ptMask )
 {
    type = ptUnknown_e ;
+   temp_ref = tempRef_ ;
    do {
 ++numParsed_ ;
       mpState_ = mpeg2_parse( DECODER );
@@ -386,6 +401,35 @@ bool mpegDecoder_t :: getPicture
                mpegWidth_ = seq.width ;
 #endif 
                mpegHeight_ = seq.height ;
+               switch( seq.frame_period )
+               {
+                  case 1126125 :	// 1 (23.976) - NTSC FILM interlaced
+                  case 1125000 :	// 2 (24.000) - FILM
+                     mpegFrameRate_ = 24 ;
+                     break;
+                  case 1080000 :	// 3 (25.000) - PAL interlaced
+                     mpegFrameRate_ = 25 ;
+                     break;
+                  case  900900 : // 4 (29.970) - NTSC color interlaced
+                  case  900000 : // 5 (30.000) - NTSC b&w progressive
+                     mpegFrameRate_ = 30 ;
+                     break;
+                  case  540000 : // 6 (50.000) - PAL progressive
+                     mpegFrameRate_ = 50 ;
+                     break;
+                  case  450450 : // 7 (59.940) - NTSC color progressive
+                  case  450000 : // 8 (60.000) - NTSC b&w progressive
+                     mpegFrameRate_ = 60 ;
+                     break;
+                  default:
+                     mpegFrameRate_ = 0 ;
+               }
+
+               if( 0 != mpegFrameRate_ )
+                  msPerPic_ = 1000/mpegFrameRate_ ;
+               else
+                  msPerPic_ = 0 ;
+
 //printf( "mpegw: %u, stride: %u, mpegh:%u\n", mpegWidth_, mpegStride_, mpegHeight_ );
 //printf( "dispw: %u, disph:%u\n", seq.display_width, seq.picture_height );
 //printf( "pixw: %u, pixh:%u\n", seq.pixel_width, seq.pixel_height );
@@ -397,7 +441,7 @@ bool mpegDecoder_t :: getPicture
             }
 
 #ifdef NEON
-//            mpeg2_convert( DECODER, convert_null_128, NULL );
+            mpeg2_convert( DECODER, mpeg2convert_yuyv, NULL );
             mpeg2_custom_fbuf (DECODER, 1);
 #else
             mpeg2_convert( DECODER, mpeg2convert_rgb16, NULL );
@@ -428,13 +472,17 @@ bool mpegDecoder_t :: getPicture
          }
          case STATE_PICTURE:
          {
-//printf( "picture\n" );
             int picType = ( INFOPTR->current_picture->flags & PIC_MASK_CODING_TYPE ) - 1;
             bool skip ;
             if( picType <= ptD_e )
             {
+               tempRef_ = temp_ref = INFOPTR->current_picture->temporal_reference ;
+//printf( "picture (%u)\n", temp_ref );
                lastPicType_ = (picType_e)picType ;
                skip = ( 0 == ( ptMask & ( 1 << picType ) ) );
+//               if( PIC_FLAG_CODING_TYPE_I == picType )
+//                  ptsOut_ = ptsIn_ ;
+
                if( PIC_FLAG_CODING_TYPE_I - 1 != picType ) 
                {
                   if( ( PIC_FLAG_CODING_TYPE_I - 1 == picType ) && skip )
@@ -494,9 +542,10 @@ bool mpegDecoder_t :: getPicture
                      unsigned char *vBuf = uBuf+uvSize ;
                      unsigned char *yuv  = vBuf+uvSize ;
 
-                     picture = yuv ;
+//                     picture = yuv ;
 
-                     interleaveYUV( mpegStride_, mpegHeight_, yuv, yBuf, uBuf, vBuf );
+//                     interleaveYUV( mpegStride_, mpegHeight_, yuv, yBuf, uBuf, vBuf );
+picture = buf ;
                      freeBufs_.push_back( buf );
 /*
 printf( "buf == %p/%p/%p --> %p\n",
@@ -514,6 +563,8 @@ printf( "yuv:%p, y:%p, u:%p, v:%p\n",
                   
                   gettimeofday( &usDecodeTime_, 0 );
                   diffTime( usDecodeTime_, usStartDecode_, usDecodeTime_ );
+                  when = ptsOut_ ;
+                  ptsOut_ += msPerPic_ ;
 
                   ++numDraw_ ;
                   return true ;
@@ -564,6 +615,35 @@ static char const * const frameTypes_[] = {
 #include "tickMs.h"
 #include <termios.h>
 #include <linux/sm501yuv.h>
+#include <openssl/md5.h>
+
+static void setPlane( mpegDecoder_t &decoder,
+                      int            fdYUV,
+                      unsigned       xPos,
+                      unsigned       yPos,
+                      unsigned       outWidth,
+                      unsigned       outHeight,
+                      unsigned      &bytesPerPicture )
+{
+   bytesPerPicture = decoder.width() * decoder.height() * 2;
+   printf( "%u x %u: %u bytes per picture\n"
+           "frame rate: %u fps\n", 
+           decoder.width(), decoder.height(), bytesPerPicture,
+           decoder.frameRate() );
+   struct sm501yuvPlane_t plane ;
+   plane.xLeft_     = xPos ;
+   plane.yTop_      = yPos ;
+   plane.inWidth_   = decoder.width();
+   plane.inHeight_  = decoder.height();
+   plane.outWidth_  = ( 0 == outWidth ) ? decoder.width() : outWidth ;
+   plane.outHeight_ = ( 0 == outHeight ) ? decoder.height() : outHeight ;
+   if( 0 != ioctl( fdYUV, SM501YUV_SETPLANE, &plane ) )
+   {
+      perror( "setPlane" );
+   }
+   else
+      printf( "setPlane success\n" );
+}
 
 int main( int argc, char const * const argv[] )
 {
@@ -612,6 +692,9 @@ int main( int argc, char const * const argv[] )
 
          int videoIdx = -1 ;
 
+         MD5_CTX videoMD5 ;
+         MD5_Init( &videoMD5 );
+
          for( unsigned char sIdx = 0 ; sIdx < bi->count_ ; sIdx++ )
          {
             mpegDemux_t::streamAndFrames_t const &sAndF = *bi->streams_[sIdx];
@@ -648,48 +731,40 @@ int main( int argc, char const * const argv[] )
             unsigned numPictures = 0 ;
             long long startMs = tickMs();
             bool haveHeader = false ;
-            unsigned long bytesPerPicture = 0 ;
+            unsigned bytesPerPicture = 0 ;
             int const fdYUV = open( "/dev/yuv", O_WRONLY );
             char keyvalue = '\0' ;
             
+            unsigned long videoBytes = 0 ;
+
             long long prevPTS = -1LL ;
             do {
                long long pts = next->when_ms_ ;
-               decoder.feed( next->data_, next->length_ );
+               decoder.feed( next->data_, next->length_, next->when_ms_ );
+
+               MD5_Update(&videoMD5, next->data_, next->length_ );
+               videoBytes += next->length_ ;
+
                next++ ;
                numLeft-- ;
                void const *picture ;
                mpegDecoder_t::picType_e picType ;
-               if( !haveHeader )
+               
+               unsigned temp_ref ;
+               long long when ;
+               while( decoder.getPicture( picture, picType, temp_ref, when ) )
                {
-                  haveHeader = decoder.haveHeader();
-                  if( haveHeader )
+                  if( !haveHeader )
                   {
-                     bytesPerPicture = decoder.width() * decoder.height() * 2;
-                     printf( "%u x %u: %u bytes per picture\n", 
-                             decoder.width(), decoder.height(), bytesPerPicture );
-                     struct sm501yuvPlane_t plane ;
-                     plane.xLeft_     = xPos ;
-                     plane.yTop_      = yPos ;
-                     plane.inWidth_   = decoder.width();
-                     plane.inHeight_  = decoder.height();
-                     plane.outWidth_  = ( 0 == outWidth ) ? decoder.width() : outWidth ;
-                     plane.outHeight_ = ( 0 == outHeight ) ? decoder.height() : outHeight ;
-                     if( 0 != ioctl( fdYUV, SM501YUV_SETPLANE, &plane ) )
+                     haveHeader = decoder.haveHeader();
+                     if( haveHeader )
                      {
-                        perror( "setPlane" );
-                        return 0 ;
+                        setPlane( decoder, fdYUV, xPos, yPos, outWidth, outHeight, bytesPerPicture );
                      }
                      else
-                        printf( "setPlane success\n" );
+                        printf( "not yet\n" );
                   }
-                  else
-                     printf( "not yet\n" );
-               }
-               while( decoder.getPicture( picture, picType ) )
-               {
-
-printf( "%c - %llu\n", decoder.getPicType(picType), pts );
+printf( "%c - %llu (%u)\n", decoder.getPicType(picType), when, temp_ref );
 
                   ++numPictures ;
                   if( haveHeader )
@@ -702,7 +777,7 @@ printf( "%c - %llu\n", decoder.getPicType(picType), pts );
                                 gop->pictures, gop->flags );
                         continue ;
                      }
-                     if( pts != prevPTS )
+//                     if( pts != prevPTS )
                      {
                         prevPTS = pts ;
                         if( 0 <= fdYUV )
@@ -727,14 +802,24 @@ if( picTypeMask & ( 1 << picType ) ){
                               numLeft = 0 ;
                               break;
                            }
+   } else {
+      // still watch for <Ctrl-C>
+      char c2 ;
+      if( 0 >= read(0,&c2,1) ){
+         c2 = tolower(c2);
+         if( ( '\x03' == c2 ) || ( 'x' == c2 ) ){
+            numLeft = 0 ;
+            break ;
+         }
+      }
    }
                         }
                      }
-                     else
-                        printf( "skip\n" );
+//                     else
+//                        printf( "skip\n" );
                   }
                   else
-                     printf( "picture without header\n" );
+                     printf( "picture without header: %s\n", decoder.haveHeader() ? "true" : "false" );
                }
             } while( 0 < numLeft );
 
@@ -744,11 +829,17 @@ if( picTypeMask & ( 1 << picType ) ){
                close( fdYUV );
 
             unsigned elapsed = (unsigned)( endMs-startMs );
-            printf( "%u pictures, %u ms\n", numPictures, elapsed );
-            if( decoder.haveHeader() )
-            {
-            }
+            printf( "%u pictures, %lu bytes, %u ms\n", numPictures, videoBytes, elapsed );
             
+            unsigned char md5[MD5_DIGEST_LENGTH];
+            MD5_Final( md5, &videoMD5 );
+
+            printf( "   md5: " );
+            for( unsigned i = 0 ; i < MD5_DIGEST_LENGTH ; i++ ){
+               printf( "%02x ", md5[i] );
+            }
+            printf( "\n" );
+
             fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
             tcsetattr( 0, TCSANOW, &oldTermState );
          }
@@ -907,13 +998,13 @@ int main( int argc, char const * const argv[] )
                   }
                   void const *picture ;
                   mpegDecoder_t::picType_e picType ;
-                  while( decoder.getPicture( picture, picType, picTypeMask ) )
+                  while( decoder.getPicture( picture, picType, temp_ref, when, picTypeMask ) )
                   {
-   printf( "%c - %llu\n", 
+   printf( "%c - %llu (%u)\n", 
            ( mpegDecoder_t::ptD_e >= picType )
            ? cPicTypes[picType]
            : '?',
-           when );
+           when, temp_ref );
                      ++numPictures ;
                      if( haveHeader )
                      {
@@ -933,7 +1024,7 @@ if( picTypeMask & ( 1 << picType ) ){
                         }
                      }
                      else
-                        printf( "picture without header\n" );
+                        printf( "picture without header: %d\n", decoder.haveHeader() );
                   }
    
                }
