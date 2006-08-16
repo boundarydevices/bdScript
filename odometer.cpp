@@ -1,962 +1,394 @@
 /*
- * Program odometer.cpp
+ * Module odometer.cpp
  *
- * This program displays an odometer
- *
+ * This module defines the methods of the odometer_t
+ * and odometerSet_t classes as declared in odometer.h
  *
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.4  2006-06-14 13:52:40  ericn
- * -palettize digit images, pre-highlight for 300% speed improvement
- *
- * Revision 1.3  2006/06/12 13:04:11  ericn
- * -rework drawing loop, before palettizing
- *
- * Revision 1.2  2006/06/10 16:31:00  ericn
- * -digitInfo->videoGraphics rename, save ending image
- *
- * Revision 1.1  2006/06/06 03:04:32  ericn
- * -Initial import
+ * Revision 1.5  2006-08-16 02:31:35  ericn
+ * -rewrite based on command lists
  *
  *
  * Copyright Boundary Devices, Inc. 2006
  */
 
-
-#include <stdio.h>
-#include "fbDev.h"
-#include "imgFile.h"
-#include "ftObjs.h"
-#include "memFile.h"
-#include "imgToPNG.h"
+#include "odometer.h"
+#include <map>
+#include <string>
+#include "fbCmdFinish.h"
+#include <sys/ioctl.h>
 #include <signal.h>
-#include <math.h>
-#include <time.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <assert.h>
-#include <execinfo.h>
-#include <alloca.h>
-#include "fbImage.h"
-#include <set>
-#include "dictionary.h"
+#include "fbDev.h"
+#include <fcntl.h>
+#include "rtSignal.h"
 
-#define TICKSTOTARGET 60
-
-static bool volatile doExit = false ;
-static bool volatile drawing = false ;
-static bool volatile mixing = false ;
-static bool volatile flipping = false ;
-
-static unsigned numDrawing_ = 0 ;
-static unsigned numMixing_ = 0 ;
-static unsigned numFlipping_ = 0 ;
-static unsigned totalTicks_ = 0 ;
-static bool volatile increment_ = false ;
-
-static void tick( int signo )
+odometer_t::odometer_t
+   ( odomGraphics_t const &graphics,
+     unsigned              initValue,
+     unsigned              x,
+     unsigned              y,
+     unsigned              maxVelocity,
+     odometerMode_e        mode )
+   : cmdList_()
+   , cmdListMem_()
+   , target_( initValue )
+   , value_( cmdList_, graphics, x, y, mode )
+   , velocity_( 1 )
+   , maxVelocity_( maxVelocity )
 {
-   ++totalTicks_ ;
-   if( 7 == ( totalTicks_ & 7 ) )
-      increment_ = true ;
-   if( drawing )
-      ++numDrawing_ ;
-   else if( flipping )
-      ++numFlipping_ ;
-      
-   if( mixing )
-      ++numMixing_ ;
+   cmdList_.push( new fbFinish_t );
+
+   cmdListMem_ = fbPtr_t( cmdList_.size() );
+   cmdList_.copy( cmdListMem_.getPtr() );
+
+   value_.set( initValue );
 }
 
-static void printBackTrace()
+odometer_t::~odometer_t( void )
 {
-   void *btArray[128];
-   int const btSize = backtrace(btArray, sizeof(btArray) / sizeof(void *) );
-   fprintf( stderr, "########## Backtrace ##########\n"
-                    "Number of elements in backtrace: %u\n", btSize );
-
-   if (btSize > 0)
-      backtrace_symbols_fd( btArray, btSize, fileno(stderr) );
 }
 
-static void ctrlcHandler( int signo )
+void odometer_t::setValue( unsigned newValue )
 {
-   printf( "<ctrl-c>\n" );
-   printf( drawing ? "drawing\n" : "not drawing\n" );
-   printf( flipping ? "flipping\n" : "not flipping\n" );
-
-   printBackTrace();
-
-   doExit = true ;
+   value_.set( newValue );
 }
 
-struct point_t {
-   unsigned x ;
-   unsigned y ;
-};
-
-inline void rgbParts( unsigned long rgb,
-            unsigned    &r,
-            unsigned     &g,
-            unsigned    &b )
+void odometer_t::setTarget( unsigned newValue )
 {
-   r = rgb >> 16 ;
-   g = ( rgb >> 8 ) & 0xff ;
-   b = rgb & 0xff ;
-}
-
-inline unsigned short make16( unsigned r, unsigned g, unsigned b )
-{
-   return ((r>>3)<<11) | ((g>>2)<<5) | (b>>3);
-}
-
-static unsigned short mix( 
-   unsigned short in16,
-   unsigned char  opacity,
-   unsigned char  highlight )
-{
-/*   
-   return in16 ;
-*/
-   unsigned short b = (((in16 & 0x1f))*opacity)/255;
-   in16 >>= 5 ;
-   unsigned short g = (((in16 & 0x3f))*opacity)/255;
-   in16 >>= 6 ;
-   unsigned short r = (((in16 & 0x1f))*opacity)/255;
-
-   // diffs from white
-   unsigned short ldb = (0x1f-b);
-   b += (ldb*highlight)/255 ;
-   unsigned short ldg = (0x3f-g);
-   g += (ldg*highlight)/255 ;
-   unsigned short ldr = (0x1f-r);
-   r += (ldr*highlight)/255 ;
-
-   unsigned short out16 = (r<<11)|(g<<5)|b ;
-   return out16 ;
-}
-
-static void highlight( 
-   image_t &img
-,  unsigned char const *darkGrad
-,  unsigned char const *lightGrad
-)
-{
-   unsigned short *pixels = (unsigned short *)img.pixData_ ;
-   for( unsigned y = 0 ; y < img.height_ ; y++ ) {
-      unsigned char o = darkGrad[y];
-      unsigned char l = lightGrad[y];
-      for( unsigned x = 0 ; x < img.width_ ; x++ ){
-         unsigned short in = *pixels ;
-         unsigned short out16 = mix(in,o,l);
-         *pixels++ = out16 ;
-      }
-   }
-}
-
-static void drawDigit( 
-   fbDevice_t &fb
-,  unsigned x
-,  unsigned y
-,  unsigned digitHeight
-,  unsigned short const *pixels
-,  unsigned pixelWidth
-,  unsigned pixelHeight
-,  unsigned offset
-,  unsigned char const *darkGrad
-,  unsigned char const *lightGrad
-)
-{
-   static bool first = true ;
-
-   drawing = true ;
-   unsigned short const *bottomRow = pixels + pixelWidth*pixelHeight ;
-   unsigned short *outRow = fb.getRow(y) + x ;
-   unsigned short const *inRow = pixels + (offset*pixelWidth);
-//   unsigned short *const lineOut = (unsigned short *)alloca(pixelWidth*2);
-   
-   for( unsigned y = 0 ; !doExit && ( y < digitHeight ) ; y++ ) {
-      unsigned char o = darkGrad[y];
-      unsigned char l = lightGrad[y];
-      unsigned short *nextOut = outRow ;
-      outRow += fb.getWidth();
-      unsigned short const *nextIn = inRow ;
-      __asm__ volatile (
-         "  pld   [%0, #0]\n"
-         "  pld   [%0, #32]\n"
-         "  pld   [%0, #64]\n"
-         "  pld   [%0, #96]\n"
-         : 
-         : "r" (nextIn)
-      );
-      inRow += pixelWidth ;
-      if( bottomRow <= inRow )
-         inRow = pixels ;
-      
-      for( unsigned x = 0 ; x < pixelWidth ; x++ ){
-         unsigned short in = *nextIn++ ;
-         mixing = true ;
-         unsigned short out16 = mix(in,o,l);
-         mixing = false ;
-         *nextOut++ = out16 ;
-      }
-   }
-
-   if( first ){
-//      printBackTrace();
-      first = false ;
-   }
-   drawing = false ;
+   target_ = newValue ;
 }
 
 
-//
-// Load all of the graphic (static) parts of an odometer value
-//
-struct valueGraphics_t {
-   image_t               background_ ;
-   image_t               digitStrip_ ;  // palettized after loading
-   image_t               dollarSign_ ;
-   image_t               decimalPoint_ ;
-   image_t               comma_ ;
-   unsigned              numColors_ ;
-   unsigned short const *colors_ ;      // color palette for digitStrip_
-   unsigned char        *shadow_ ;
-   unsigned char        *highlight_ ;
-
-   //
-   // highlight and shadow are applied to each color
-   //
-   unsigned              numShadeComb_ ;
-   unsigned short const *highlightedColors_ ;  // [numShadeComb_][numColors_]
-   unsigned short const *hsIndex_ ;            // which outer array index for each row
-
-   valueGraphics_t(void){ memset(this,0,sizeof(*this)); }
-   ~valueGraphics_t(void);
-private:
-   valueGraphics_t(valueGraphics_t const &); // no copies
-};
-
-valueGraphics_t::~valueGraphics_t( void )
+static unsigned log2(unsigned long v)
 {
-   if( shadow_ )
-      delete [] shadow_ ;
-   if( highlight_ )
-      delete [] highlight_ ;
-   if( colors_ )
-      delete [] colors_ ;
+   unsigned bits = 31 ;
+   unsigned long mask = 0x80000000 ;
+   while( 0 == ( v & mask ) ){
+      bits-- ;
+      mask >>= 1 ;
+   }
+   return bits ;
 }
 
-static char const *const imgFileNames[] = {
-   "background.png"
-,  "digitStrip.png"
-,  "dollarSign.png"
-,  "decimalPt.png"
-,  "comma.png"
-};
-
-static unsigned const numImgFiles = sizeof(imgFileNames)/sizeof(imgFileNames[0]);
-
-static char const *const gradientFileNames[] = {
-   "vshadow.dat"
-,  "vhighlight.dat"
-};
-
-static unsigned const numGradientFiles = sizeof(gradientFileNames)/sizeof(gradientFileNames[0]);
-
-static bool loadValueGraphics( 
-   char const      *directory,
-   valueGraphics_t &info 
-)
+static unsigned calcVelocity( unsigned target, unsigned value, unsigned maxV )
 {
-   char path[FILENAME_MAX];
-   char *fname = stpcpy(path,directory);
-   if( '/' != fname[-1] )
-      *fname++ = '/' ;
-
-   //
-   // load images
-   //
-   image_t *const images[numImgFiles] = {
-      &info.background_,
-      &info.digitStrip_,
-      &info.dollarSign_,
-      &info.decimalPoint_,
-      &info.comma_
-   };
-   
-   for( unsigned i = 0 ; i < numImgFiles ; i++ )
-   {
-      strcpy(fname, imgFileNames[i]);
-      if( !imageFromFile( path, *images[i] ) ){
-         perror( path );
-         return false ;
-      }
-   }
-
-   //
-   // validate matching heights 
-   //
-   unsigned const digitHeight = info.digitStrip_.height_ / 10 ;
-
-   if( info.dollarSign_.height_ != digitHeight ){
-      fprintf( stderr, "Invalid dollar sign height %d/%d\n", info.dollarSign_.height_, digitHeight );
-      return false ;
-   }
-
-   if( info.decimalPoint_.height_ != digitHeight ){
-      fprintf( stderr, "Invalid decimal point height %d/%d\n", info.decimalPoint_.height_, digitHeight );
-      return false ;
-   }  
-
-   if( info.comma_.height_ != digitHeight ){
-      fprintf( stderr, "Invalid comma height %d/%d\n", info.comma_.height_, digitHeight );
-      return false ;
-   }
-
-   //
-   // load gradient files
-   //
-   unsigned char **gradients[numGradientFiles] = {
-      &info.shadow_
-   ,  &info.highlight_
-   };
-   
-   for( unsigned i = 0 ; i < numGradientFiles ; i++ ){
-      strcpy( fname, gradientFileNames[i] );
-      memFile_t fgrad( path );
-      if( !fgrad.worked() ){
-         perror( path );
-         return false ;
-      }
-   
-      if( fgrad.getLength() != digitHeight ){
-         fprintf(stderr, "gradient file %s should be %u bytes long, not %u\n",
-            path, digitHeight, fgrad.getLength() );
-         return false ;
-      }
-      
-      *gradients[i] = new unsigned char[fgrad.getLength()];
-      memcpy( *gradients[i], fgrad.getData(), fgrad.getLength() );
-   
-   }
-
-   //
-   // pre-highlight symbol images
-   //
-   highlight( info.dollarSign_, info.shadow_, info.highlight_ );
-   highlight( info.decimalPoint_, info.shadow_, info.highlight_ );
-   highlight( info.comma_, info.shadow_, info.highlight_ );
-
-   //
-   // palette-ize the digit strip
-   //
-   dictionary_t<unsigned short> colors ;
-   unsigned short *nextIn = (unsigned short *)info.digitStrip_.pixData_ ;
-
-   for( unsigned y = 0 ; y < info.digitStrip_.height_ ; y++ )
-   {
-      for( unsigned x = 0 ; x < info.digitStrip_.width_ ; x++ )
-      {
-         unsigned short const pix = *nextIn ;
-         unsigned short paletteIdx = ( colors += pix ); // add to palette
-         *nextIn = paletteIdx ; // save palette entry
-         nextIn++ ;
-      }
-   }
-
-   unsigned short *const palette = new unsigned short[colors.size()];
-   for( unsigned i = 0 ; i < colors.size(); i++ )
-   {
-      palette[i] = colors[i];
-   }
-   
-   info.numColors_ = colors.size();
-   info.colors_ = palette ;
-   printf( "%u colors\n", colors.size() );
-
-   //
-   // Get unique combinations of highlight and shadow
-   //
-   dictionary_t<unsigned short> shadeComb ;
-   unsigned short *hsOut = new unsigned short [digitHeight];
-   info.hsIndex_ = hsOut ;
-   
-   for( unsigned i = 0 ; i < digitHeight ; i++ )
-   {
-      unsigned short highShadow = ( ((unsigned)info.highlight_[i]) << 8 )
-                                  | info.shadow_[i];
-      *hsOut++ = ( shadeComb += highShadow ); // save index by pixel row
-   }
-   printf( "%u combinations of highlight and shadow\n", shadeComb.size() );
-   info.numShadeComb_ = shadeComb.size();
-
+   unsigned v ;
 /*
-   //
-   // do it again, filling in hsIndex
-   //
+   log2 of difference used as 32nd multiplier against maxV
    
-   for( unsigned i = 0 ; i < digitHeight ; i++ )
-   {
-      unsigned short highShadow = ( ((unsigned)info.highlight_[i]) << 8 )
-                                  | info.shadow_[i];
-      *hsOut++ = (shadeComb += highShadow);
-   }
+   unsigned l2 = log2( target-value );
+   v = (l2*maxV)/32 ;
 */
-   
-   unsigned short *const highlighted = new unsigned short [info.numShadeComb_*info.numColors_];
-   unsigned short *nextOut = highlighted ;
-   for( unsigned s = 0 ; s < info.numShadeComb_ ; s++ )
-   {
-      unsigned short const highShadow = shadeComb[s];
-      unsigned char const shadow = highShadow & 0xFF ;
-      unsigned char const highlight = highShadow >> 8 ;
 
-      for( unsigned c = 0 ; c < info.numColors_ ; c++ )
-      {
-         *nextOut++ = mix(colors[c],shadow,highlight);
-      }
-   }
-   info.highlightedColors_ = highlighted ;
-
-   return true ;
-}
-
-
-struct digitInfo_t {
-   digitInfo_t( valueGraphics_t const &vg,
-                rectangle_t const     &r );
-   ~digitInfo_t( void );
-
-   void draw( fbDevice_t &fb,
-              unsigned offs );
-   
-   valueGraphics_t const     &vg_ ;
-   rectangle_t          const r_ ;
-   image_t                    bg_ ;
-   unsigned                   lastOffset_ ;
-};
-
-
-digitInfo_t::digitInfo_t   
-   ( valueGraphics_t const &vg,
-     rectangle_t const     &r )
-   : vg_( vg )
-   , r_( r )
-   , lastOffset_( -1UL )
-{
-   screenImageRect( getFB(), r_, bg_ );
-}
-
-
-digitInfo_t::~digitInfo_t( void )
-{
-//   showImage( getFB(), r_.xLeft_, r_.yTop_, bg_ );
-}
-
-void digitInfo_t::draw( 
-   fbDevice_t &fb,
-   unsigned    offs )
-{
-   if( offs != lastOffset_ )
-   {
-      lastOffset_ = offs ;
-
-      unsigned short *colors = (unsigned short *)vg_.digitStrip_.pixData_ ;
-      unsigned short const *bottomRow = colors + vg_.digitStrip_.width_*vg_.digitStrip_.height_ ;
-      
-      unsigned short *outRow = fb.getRow(r_.yTop_) + r_.xLeft_ ;
-      unsigned short const *inRow = colors + (offs*r_.width_);
-   //   unsigned short *const lineOut = (unsigned short *)alloca(pixelWidth*2);
-      
-      drawing = true ;
-      for( unsigned y = 0 ; !doExit && ( y < r_.height_ ) ; y++ ) {
-         unsigned short *nextOut = outRow ;
-         outRow += fb.getWidth();
-         unsigned short const shadeIdx = vg_.hsIndex_[y];
-         unsigned short const *shaded = vg_.highlightedColors_+(shadeIdx*vg_.numColors_);
-         
-         unsigned short const *nextIn = inRow ;
-         __asm__ volatile (
-            "  pld   [%0, #0]\n"
-            "  pld   [%0, #32]\n"
-            "  pld   [%1, #0]\n"
-            "  pld   [%1, #32]\n"
-            "  pld   [%0, #64]\n"
-            "  pld   [%0, #96]\n"
-            "  pld   [%1, #64]\n"
-            "  pld   [%1, #96]\n"
-            : 
-            : "r" (nextIn),
-              "r" (shaded)
-         );
-         inRow += r_.width_ ;
-         if( bottomRow <= inRow )
-            inRow = colors ;
-
-         for( unsigned x = 0 ; x < r_.width_ ; x++ ){
-            unsigned short inColor = *nextIn++ ;
-            *nextOut++ = shaded[inColor];
-         }
-      }
-      drawing = false ;
-/*
-      drawDigit( fb, r_.
-                 xLeft_, r_.yTop_,
-                 r_.height_,
-                 (unsigned short *)vg_.digitStrip_.pixData_,
-                 digitStrip_.width_,
-                 digitStrip_.height_,
-                 offs,
-                 shade_,
-                 highlight_ );
-*/                 
-   }
-}
-
-//
-// returns the number of significant (non-zero) digits
-//
-static unsigned toDecimal( 
-   unsigned value
-,  unsigned numDigits
-,  char    *output )
-{
-   output += numDigits ;
-   *output-- = '\0' ;
-   unsigned rval = 0 ;
-   unsigned pos = 1 ;
-   while( numDigits-- )
-   {
-      char const decimal = '0' + (value%10);
-      *output-- = decimal ;
-      if( '0' != decimal )
-         rval = pos ;
-      pos++ ;
-      value /= 10 ;
-   }
-   
-   return rval ;
-}                
-
-//
-// Place and update a value at a specific point on the screen
-//
-struct valueInfo_t {
-   valueInfo_t( valueGraphics_t const &vg,
-                point_t         const &pt,
-                unsigned               maxDigits );
-   ~valueInfo_t( void );
-
-   void setTarget( unsigned v );
-   void draw( void );
-   
-   valueGraphics_t const &vg_ ;
-   unsigned const     maxDigits_ ;
-   unsigned const     x_ ;
-   unsigned const     y_ ;
-   bool const         needComma_ ;
-   unsigned const     totalDigits_ ; // including dollar sign, decimal point and thousands separator
-   unsigned const     xRight_ ;
-   image_t            background_ ;
-   digitInfo_t **const digits_ ;
-   unsigned           target_ ;
-   unsigned           value_ ;
-   unsigned long      pixelTarget_ ;
-   unsigned long      pixelValue_ ;
-   unsigned long      velocity_ ;
-   rectangle_t        rect_ ;
-   unsigned           commaPos_ ;
-   unsigned           dollarPos_ ;
-   char               sTargetValue_[11];
-   char               sValue_[11];
-   unsigned           targetSD_ ; // significant digits
-   unsigned           valueSD_ ;  //         "
-   unsigned           frozen_ ;   // number of frozen leftmost digits
-private:
-   valueInfo_t( valueInfo_t const & );
-
-};
-
-valueInfo_t::valueInfo_t( 
-   valueGraphics_t const &vg,
-   point_t     const     &pt,
-   unsigned               maxDigits )
-   : vg_(vg)
-   , maxDigits_(maxDigits)
-   , x_(pt.x)
-   , y_(pt.y)
-   , needComma_( 5<maxDigits )
-   , totalDigits_(2+maxDigits+needComma_)
-   , xRight_( pt.x 
-             + maxDigits*vg.digitStrip_.width_
-             + vg.decimalPoint_.width_
-             + vg.dollarSign_.width_
-             + ( needComma_ ? vg.comma_.width_ : 0 ) )
-   , digits_( new digitInfo_t *[maxDigits] )
-   , target_(0)
-   , value_(0)
-   , pixelTarget_(0)
-   , pixelValue_(0)
-   , velocity_(0)
-   , rect_()
-   , commaPos_( -1U )
-   , dollarPos_( -1U )
-   , targetSD_( 0 )
-   , valueSD_( 0 )
-   , frozen_( 0 )
-{
-   rect_.xLeft_  = pt.x ;
-   rect_.yTop_   = pt.y ;
-   rect_.width_  = xRight_ - pt.x ;
-   rect_.height_ = vg.decimalPoint_.height_ ;
-   
-   fbDevice_t &fb = getFB();
-   screenImageRect( fb, rect_, background_ );
-
-   rectangle_t rdig ;
-   
-   rdig.xLeft_  = pt.x + vg.dollarSign_.width_ ;
-   rdig.yTop_   = pt.y ;
-   rdig.width_  = vg.digitStrip_.width_ ;
-   rdig.height_ = vg.decimalPoint_.height_ ;
-
-   unsigned decimalPos = 0 ;
-   for( unsigned i = 0 ; i < maxDigits ; i++ )
-   {
-      if( maxDigits-2 == i ){
-         decimalPos = rdig.xLeft_ ;
-         rdig.xLeft_ += vg.decimalPoint_.width_ ;
-      }
-      else if( maxDigits-5 == i ){
-         commaPos_ = rdig.xLeft_ ;
-         rdig.xLeft_ += vg.comma_.width_ ;
-      }
-      digits_[i] = new digitInfo_t( vg, rdig );
-      rdig.xLeft_ += vg.digitStrip_.width_ ;
-   }
-
-   showImage( fb, decimalPos, pt.y, vg.decimalPoint_ );
-}
-
-valueInfo_t::~valueInfo_t( void )
-{
-   for( unsigned i = 0 ; i < maxDigits_ ; i++ )
-      delete digits_[i];
-   delete [] digits_ ;
-}
-
-void valueInfo_t::setTarget( unsigned v )
-{
-   target_ = v ;
-   pixelTarget_ = v*rect_.height_ ;
-   
-   if( v < value_ )
-   {
-      value_ = 0 ;
-      pixelValue_ = 0 ;
-   }
-
-   targetSD_ = toDecimal( target_, maxDigits_, sTargetValue_ );
-//   snprintf( sTargetValue_, sizeof(sTargetValue_), "%010u", target_ );
-   frozen_   = 0 ;
-   velocity_    = ( pixelTarget_ - pixelValue_ ) / TICKSTOTARGET ;
-//   velocity_ = 60000 ;
-
-}
-
-void valueInfo_t::draw( void )
-{
-   if( pixelTarget_ != pixelValue_ )
-   {
-      fbDevice_t &fb = getFB();
-
-      unsigned long pValue = pixelValue_ + velocity_ ;
-      if( pValue > pixelTarget_ )
-         pValue = pixelTarget_ ;
-
-// printf( "%lu->%lu\n", pValue, pixelTarget_ );
-
-      pixelValue_ = pValue ;
-      value_ = pValue / rect_.height_ ;
-
-      bool showDollar = false ;
-      unsigned sigDigits = toDecimal( value_, maxDigits_, sValue_ );
-      if( sigDigits != valueSD_ )
-      {
-         valueSD_ = sigDigits ;
-         if( 5 < sigDigits ){
-            showImage( fb, commaPos_, rect_.yTop_, vg_.comma_ );
-         }
-         showDollar = true ;
-      } // increased number of significant digits
-
-//      snprintf( sValue_, sizeof(sValue_), "%010u", value_ );
-
-//      
-      // re-count digits to freeze
-      unsigned matching = 0 ;
-      for( unsigned i = 0 ; i < maxDigits_ ; i++ ){
-         if( sValue_[i] == sTargetValue_[i] )
-            matching++ ;
-         else
-            break ;
-      }
-
-      unsigned dig = maxDigits_ ; 
-      while( 0 < dig )
-      {
-         --dig ;
-         char const target = sTargetValue_[dig];
-         if( dig >= matching )
-            digits_[dig]->draw(fb, pValue % vg_.digitStrip_.height_ );
-         else if( dig >= frozen_ )
-         {
-/*
-printf( "freeze on digit %d/'%c'/%u/%u\n", dig, target, matching, frozen_ );
-printf( "%s:%s:%12lu:%10u:%u\n", sTargetValue_, sValue_, pixelValue_, value_, rect_.height_ );
-*/
-            digits_[dig]->draw(fb, (target-'0')*rect_.height_ );
-            frozen_++ ;
-            break ;
-         }
-         else {
-            break ;
-         }
-         pValue /= 10 ;
-         sigDigits-- ;
-      }
-
-      unsigned pos = digits_[dig]->r_.xLeft_ - vg_.dollarSign_.width_ ;
-      if( showDollar ){
-         dollarPos_ = pos ;
-         showImage( fb, pos, rect_.yTop_, vg_.dollarSign_ );
-      } // move dollar sign
-         
-/*
-      unsigned v = value_ ;
-
-      while( ( 3 > digitNum )
-             ||
-             ( 0 < v ) )
-      {
-//         unsigned char dig = v % 10 ;
-//         printf( "%u", dig );
-         v /= 10 ;
-      
-         x -= vg_.digitStrip_.width_ ;
-unsigned const pixOffs = pValue % vg_.digitStrip_.height_ ;
-//fprintf( stderr, "dig %d, pixOffs %u\n", dig, pixOffs );
-         drawDigit( fb, x, y_, 
-                    rect_.height_,
-                    (unsigned short *)vg_.digitStrip_.pixData_,
-                    vg_.digitStrip_.width_,
-                    vg_.digitStrip_.height_,
-                    pixOffs,
-                    vg_.shadow_,
-                    vg_.highlight_ );
-//         pValue /= vg_.digitStrip_.height_ ;
-         pValue /= 10 ;
-
-         digitNum++ ;
-         if( 2 == digitNum )
-         {
-//            printf( "." );
-            x -= vg_.decimalPoint_.width_ ;
-            if( decimalPos_ != x )
-            {
-               decimalPos_ = x ;
-               drawDigit( fb, x, y_, 
-                          vg_.decimalPoint_.height_,
-                          (unsigned short *)vg_.decimalPoint_.pixData_,
-                          vg_.decimalPoint_.width_,
-                          vg_.decimalPoint_.height_,
-                          0,
-                          vg_.shadow_,
-                          vg_.highlight_ );
-            }
-         }
-         else if( ( 5 == digitNum ) && ( 0 < v ) )
-         {
-//            printf( "," );
-            x -= vg_.comma_.width_ ;
-            if( commaPos_ != x )
-            {
-               commaPos_ = x ;
-               drawDigit( fb, x, y_, 
-                          vg_.comma_.height_,
-                          (unsigned short *)vg_.comma_.pixData_,
-                          vg_.comma_.width_,
-                          vg_.comma_.height_,
-                          0,
-                          vg_.shadow_,
-                          vg_.highlight_ );
-            }
-         }
-      }
-*/
-// velocity_ = 60000 ;         
-
-/*
-      if( matching != frozen_ ){
-         printf( "%s:%s:%12lu:%10u:%u\n", sTargetValue_, sValue_, pixelValue_, value_, rect_.height_ );
-         frozen_ = matching ;
-         printf( "%u digits frozen\n", frozen_ );
-      }
-*/      
-      velocity_ = ( pixelTarget_ - pixelValue_ ) / TICKSTOTARGET ;
-      if( ( 0 == velocity_ )
-          && 
-          ( pixelTarget_ > pixelValue_ ) )
-        velocity_ = 1 ;
-
-/*      
-      x -= vg_.dollarSign_.width_ ;
-      if( dollarPos_ != x )
-      {
-         dollarPos_ = x ;
-         showImage( fb, x, y_, vg_.dollarSign_ );
-      }
-*/
-//      printf( "\n" );
-   }
-}
-
-unsigned const maxDigits = 8 ;
-
-int main( int argc, char const *const argv[] )
-{
-   //
-   // odd number of parameters > 1
-   //
-   if( ( 1 < argc ) && ( 1 == ( argc & 1 ) ) ) {
-      fbDevice_t &fb = getFB();
-
-      valueGraphics_t vg ;
-      if( !loadValueGraphics( "/tmp", vg ) )
-         return -1 ;
-
-      //
-      // Initialize screen
-      //
-      fb.clear(0xFF, 0xFF, 0xFF);
-      fb.render( 0, 0, 
-            vg.background_.width_,
-            vg.background_.height_,
-            (unsigned short const *)vg.background_.pixData_ );
-
-      unsigned const numValues = (argc-1)/2 ;
- 
-      printf( "%u values\n", numValues );
- 
-      rectangle_t *const rects = new rectangle_t [numValues+1];
-      point_t *const points = new point_t[numValues];
-      valueInfo_t ** const values = new valueInfo_t *[numValues];
-      for( unsigned i = 0 ; i < numValues ; i++ ){
-         points[i].x = strtoul(argv[1+i*2],0,0);
-         points[i].y = strtoul(argv[2+i*2],0,0);
-         values[i] = new valueInfo_t(vg, points[i], maxDigits);
-
-         values[i]->setTarget( (i+1)*12345678 );
-printf( "value %u at %u:%u\n", i, points[i].x, points[i].y );         
-         rects[i] = values[i]->rect_ ;         
-      }
-      
-      memset( rects+numValues, 0, sizeof(rects[numValues]) );
-
-      for( unsigned i = 0 ; i < numValues ; i++ ) {
-         values[i]->draw();
-      }
-
-      signal( SIGINT, ctrlcHandler );
-      signal( SIGVTALRM, tick );
-
-      struct itimerval timer;
-
-      memset( &timer, 0, sizeof(timer) );
-      /* Configure the timer to expire after 250 msec... */
-      timer.it_value.tv_usec    =
-      timer.it_interval.tv_usec = 250000;
-      setitimer (ITIMER_VIRTUAL, &timer, NULL);
-   
-      unsigned iterations = 0 ;
-      
-      unsigned long vsyncStart ;
-      fb.syncCount(vsyncStart);
-
-      unsigned long syncCount = vsyncStart ;
-      time_t startTick = time(0);
-      while( !doExit )
-      {
-         unsigned numSteady = 0 ;
-         for( unsigned i = 0 ; !doExit && ( i < numValues ) ; i++ ){
-            values[i]->draw();
-            numSteady += ( values[i]->pixelValue_ == values[i]->pixelTarget_ );
-         }
-         ++iterations ;
-         
-         flipping = true ;
-//         fb.flip(); // rects);
-         flipping = false ;
- 
-//   sleep(1);
-           
-         if( numSteady == numValues )
-            break ;
-/*
-*/
-         if( increment_ )
-         {
-            increment_ = false ;
-            unsigned which = iterations%numValues ;
-            valueInfo_t &value = *( values[which] );
-            if( iterations & 2 )
-               value.setTarget( value.target_ + 50000 );
-            else
-               value.setTarget( value.target_ + 500000 );
-//            printf( "value[%u] -> %u\n", which, value.target_ );
-         }
-
-         fb.waitSync(syncCount);
-      }
-      unsigned long vsyncEnd ;
-      fb.syncCount(vsyncEnd);
-
-      unsigned const elapsedS = time(0)-startTick ;
-      printf( "%u iterations, %lu refreshes in %u seconds, (%u per s)\n",
-         iterations, vsyncEnd-vsyncStart, elapsedS, iterations/elapsedS );
-      printf( "%u ticks, %u drawing (%u mixing), %u flipping, %u other\n",
-              totalTicks_, numDrawing_, numMixing_, numFlipping_, totalTicks_-numDrawing_-numFlipping_ );
-              
-      if( !doExit ){
-         image_t screenImg ;
-         screenImageRect( fb, values[0]->rect_, screenImg );
-
-         void const *pngData ;
-         unsigned    pngSize ;
-         if( imageToPNG( screenImg, pngData, pngSize ) ){
-            printf( "%u bytes of png\n", pngSize );
-            char const outFileName[] = {
-               "/tmp/odomEnd.png"
-            };
-            FILE *fOut = fopen( outFileName, "wb" );
-            if( fOut )
-            {
-               fwrite( pngData, 1, pngSize, fOut );
-               fclose( fOut );
-            }
-            else
-               perror( outFileName );
-            free((void *)pngData);
-         }
-         
-         for( unsigned i = 0 ; i < numValues ; i++ )
-            delete values[i];
-         delete [] values ;
-      }
-   }
+   /*
+    * maxV unless we're within 1024
+    */
+   unsigned const diff = target-value ;
+   if( diff & 0xfffffc00 )
+      v = maxV ;
    else
-      fprintf( stderr, "Usage: %s x y [x y...]\n", argv[0] );
+      v = (diff*maxV)/1024 ;
+
+   if( 0 == v )
+      v = 1 ;
+
+   return v ;
+}
+
+void odometer_t::advance( unsigned numTicks )
+{
+   while( ( target_ > value_.value() ) && numTicks-- ){
+      velocity_ = calcVelocity(target_, value_.value(), maxVelocity_ );
+      value_.advance(velocity_);
+   }
+}
+
+static odometerSet_t *inst_ = 0 ;
+
+odometerSet_t &odometerSet_t::get(){
+   if( 0 == inst_ )
+      inst_ = new odometerSet_t ;
+
+   return *inst_ ;
+}
+
+typedef std::map<std::string,odometer_t *> odomsByName_t ;
+static odomsByName_t odomsByName_ ;
+
+void odometerSet_t::add( char const *name, odometer_t *odom )
+{
+   unsigned const prevSize = odomsByName_.size();
+   odomsByName_[name] = odom ;
+   if( odomsByName_.size() != prevSize ){
+      if( cmdList_ )
+         delete [] cmdList_ ;
+      cmdList_ = new unsigned long [odomsByName_.size()];
+      unsigned next = 0 ;
+      cmdListBytes_ = 0 ;
+      for( odomsByName_t::const_iterator it = odomsByName_.begin()
+           ; it != odomsByName_.end()
+           ; it++ ){
+         odometer_t *odom = (*it).second ;
+         if( odom ){
+            cmdList_[next++] = odom->cmdListOffs();
+            cmdListBytes_ += sizeof(*cmdList_);
+         }
+      }
+   }
+}
+
+odometer_t *odometerSet_t::get( char const *name )
+{
+   return odomsByName_[name];
+}
+
+void odometerSet_t::setValue( char const *name, unsigned pennies )
+{
+   odometer_t *odom = odomsByName_[name];
+   if( odom )
+      odom->setValue( pennies );
+}
+
+void odometerSet_t::setTarget( char const *name, unsigned pennies )
+{
+   odometer_t *odom = odomsByName_[name];
+   if( odom )
+      odom->setTarget( pennies );
+}
+
+unsigned long odometerSet_t::syncCount(void) const {
+   return prevSync_ ;
+}
+
+unsigned maxSigDepth = 0 ;
+unsigned sigDepth = 0 ;
+
+void odometerSet_t::sigio(void){
+   fprintf( stderr, "sigio (overflow)\n" );
+   exit(1);
+}
+
+void odometerSet_t::sigCmdList(void){
+   if( ++sigDepth > maxSigDepth )
+      maxSigDepth = sigDepth ;
+
+   ++completionCount_ ;
+   if( !stopping_ ){
+      unsigned long curSync ;
+      getFB().syncCount( curSync );
+
+      unsigned long elapsedTicks = curSync-prevSync_ ;
+      prevSync_ = curSync ;
+
+      for( odomsByName_t::const_iterator it = odomsByName_.begin()
+           ; it != odomsByName_.end()
+           ; it++ ){
+         odometer_t *odom = (*it).second ;
+         if( odom ){
+            odom->advance(elapsedTicks);
+         }
+      }
+   }
+
+   --sigDepth ;
+}
+
+void odometerSet_t::sigVsync(void){
+   
+   if( ++sigDepth > maxSigDepth )
+      maxSigDepth = sigDepth ;
+   
+   if( !stopping_ 
+       && 
+       ( 0 < cmdListBytes_ ) 
+       &&
+       ( issueCount_ == completionCount_ ) )
+   {
+      int numWritten = write( fdCmd_, cmdList_, cmdListBytes_ );
+      if( cmdListBytes_ == (unsigned)numWritten )
+         ++issueCount_ ;
+   }
+   
+   if( handler_ )
+      handler_( handlerParam_ );
+   
+   --sigDepth ;
+}
+
+static void cmdListHandler( int signo, siginfo_t *info, void *context )
+{
+   if( inst_ )
+      inst_->sigCmdList();
+}
+
+static void sigioHandler( int signo, siginfo_t *info, void *context )
+{
+   if( inst_ )
+      inst_->sigio();
+}
+
+static void vsyncHandler( int signo, siginfo_t *info, void *context )
+{
+   if( inst_ )
+      inst_->sigVsync();
+}
+
+void odometerSet_t::stop( void )
+{
+   stopping_ = true ;
+   isRunning_ = false ;
+
+   while( completionCount_ != issueCount_ ){
+      pause();
+   }
+
+   sigset_t signals ;
+   sigemptyset( &signals );
+   sigaddset( &signals, cmdListSignal_ );
+   sigaddset( &signals, vsyncSignal_ );
+   sigprocmask( SIG_BLOCK, &signals, 0 );
+   stopping_ = false ;
+}
+
+void odometerSet_t::run( void )
+{
+   sigset_t signals ;
+   sigemptyset( &signals );
+   sigaddset( &signals, cmdListSignal_ );
+   sigaddset( &signals, vsyncSignal_ );
+   sigprocmask( SIG_UNBLOCK, &signals, 0 );
+   isRunning_ = true ;
+}
+
+odometerSet_t::odometerSet_t( void )
+   : cmdListSignal_( nextRtSignal() )
+   , vsyncSignal_( nextRtSignal() )
+   , pid_( getpid() )
+   , fdCmd_( open("/dev/sm501cmdlist", O_RDWR ) )
+   , fdSync_( open( "/dev/sm501vsync", O_RDONLY ) )
+   , cmdList_( 0 )
+   , cmdListBytes_( 0 )
+   , stopping_( false )
+   , issueCount_( 0 )
+   , completionCount_( 0 )
+   , isRunning_(false)
+   , handler_( 0 )
+   , handlerParam_( 0 )
+{
+   if( isOpen() )
+   {
+      getFB().syncCount( prevSync_ );
+
+      stop();
+   
+      struct sigaction sa ;
+      sa.sa_flags = SA_SIGINFO|SA_RESTART ;
+      sa.sa_restorer = 0 ;
+      sigemptyset( &sa.sa_mask );
+   
+      fcntl(fdCmd_, F_SETOWN, pid_ );
+      fcntl(fdCmd_, F_SETSIG, cmdListSignal_ );
+      sa.sa_sigaction = cmdListHandler ;
+      sigaddset( &sa.sa_mask, cmdListSignal_ );
+      sigaddset( &sa.sa_mask, vsyncSignal_ );
+      sigaction(cmdListSignal_, &sa, 0 );
+   
+      fcntl(fdSync_, F_SETOWN, pid_);
+      fcntl(fdSync_, F_SETSIG, vsyncSignal_ );
+      sa.sa_sigaction = vsyncHandler ;
+      sigaddset( &sa.sa_mask, cmdListSignal_ );
+      sigaddset( &sa.sa_mask, vsyncSignal_ );
+      sigaction(vsyncSignal_, &sa, 0 );
+   
+      sa.sa_sigaction = sigioHandler ;
+      sigaction(SIGIO, &sa, 0 );
+   
+      int flags = fcntl( fdCmd_, F_GETFL, 0 );
+      fcntl( fdCmd_, F_SETFL, flags | O_NONBLOCK | FASYNC );
+      flags = fcntl( fdSync_, F_GETFL, 0 );
+      fcntl( fdSync_, F_SETFL, flags | O_NONBLOCK | FASYNC );
+   }
+}
+
+void odometerSet_t::setHandler( vsyncHandler_t handler, void *opaque )
+{
+   handlerParam_ = opaque ;
+   handler_ = handler ;
+}
+
+void odometerSet_t::dump( void )
+{
+   printf( "max signal depth: %u\n", maxSigDepth );
+   
+   odomsByName_t::const_iterator it = odomsByName_.begin();
+   for( ; it != odomsByName_.end(); it++ ){
+      printf( "%s\n", (*it).first.c_str() );
+   }
+}
+
+#ifdef MODULETEST
+
+int main( int argc, char const * const argv[] )
+{
+   printf( "Hello, %s\n", argv[0] );
+   odometerSet_t &odometers = odometerSet_t::get();
+   odomGraphics_t const graphics( "/mmc/odometer" );
+   if( !graphics.worked() ){
+      fprintf( stderr, "Error loading graphics\n" );
+      return -1 ;
+   }
+
+   fbDevice_t &fb = getFB();
+   
+   unsigned const digitHeight = graphics.decimalPoint_.height();
+   unsigned numOdoms = fb.getHeight()/digitHeight ;
+   printf( "%u values will fit on the screen: digitHeight == %u\n", numOdoms, digitHeight );
+
+   unsigned maxV = ( 1 < argc ) ? strtoul(argv[1], 0, 0) : 1 ;
+   unsigned const initVal  = ( 2 < argc ) ? strtoul(argv[2], 0, 0 ) : 0 ;
+
+   unsigned y = 0 ;
+   for( unsigned i = 0 ; i < numOdoms ; i++ ){
+      char name[2];
+      sprintf( name, "%c", 'a' + i );
+      odometers.add( name, new odometer_t( graphics, initVal, 0, y, maxV ) );
+      odometers.setValue( name, initVal );
+      unsigned target = initVal*(i+1);
+      odometers.setTarget( name, target );
+      y += digitHeight ;
+   }
+
+   odometers.run();
+
+   char inBuf[256];
+   printf( "hit <Enter> to continue\n" );
+   fgets( inBuf,sizeof(inBuf),stdin);
+
+   odometers.stop();
+
+   for( unsigned i = 0 ; i < numOdoms ; i++ ){
+      char name[2];
+      sprintf( name, "%c", 'a' + i );
+      
+      odometer_t *const odom = odometers.get(name);
+
+      unsigned pennies = odom->value().value();
+      unsigned dollars = pennies / 100 ;
+      pennies %= 100 ;
+   
+      printf( "value[%u] == %u.%02u, ", i, dollars, pennies );
+      
+      pennies = odom->target();
+      dollars = pennies / 100 ;
+      pennies %= 100 ;
+
+      printf( "target == %u.%02u\n", dollars, pennies );
+   }
+   printf( "%lu blts\n", odometers.bltCount() );
+   
    return 0 ;
 }
+
+#endif
