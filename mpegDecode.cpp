@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.11  2006-08-16 02:29:12  ericn
+ * Revision 1.12  2006-08-16 21:22:39  ericn
+ * -remove convert_null
+ *
+ * Revision 1.11  2006/08/16 02:29:12  ericn
  * -add temp_ref, timestamp to feed/pull interface
  *
  * Revision 1.10  2006/07/30 21:36:20  ericn
@@ -67,7 +70,6 @@ extern "C" {
 #else
    #include "mpeg2dec/video_out.h"
    #include "mpeg2dec/mpeg2convert.h"
-   #include "mpeg2dec/convert.h"
 #endif
 };
 #include "yuyv.h"
@@ -164,187 +166,6 @@ inline void diffTime( timeval       &diff,
    diff.tv_usec = usecs ;
 }
 
-#ifdef NEON
-struct yuv_internal_t {
-   unsigned char *out_ptr;
-   unsigned       width; // in pixels
-   unsigned       outPad; // in pixels
-   unsigned       in_stridex;
-   unsigned       out_stridex;
-   unsigned       in_stride_frame;  // in bytes
-   unsigned       out_stride_frame; // in bytes
-};
-
-void yuv_null_start( void * _id, uint8_t * const * dest, int flags )
-{
-//fprintf( stderr, "null start\n" );
-    yuv_internal_t * id = (yuv_internal_t *) _id;
-    id->out_ptr = dest[0];
-    switch (flags) {
-    case CONVERT_BOTTOM_FIELD:
-      id->out_ptr += id->out_stride_frame ;
-   /* break thru */
-    case CONVERT_TOP_FIELD:
-      id->in_stridex  = id->in_stride_frame << 1;
-      id->out_stridex = id->out_stride_frame << 1 ;
-      break;
-    default:
-      id->in_stridex = id->in_stride_frame ;
-      id->out_stridex = id->out_stride_frame ;
-    }
-}
-
-static bool first = true ;
-static bool second = false ;
-
-void yuv_null_copy( void * _id, uint8_t * const * src, unsigned int v_offset)
-{
-   yuv_internal_t * id = (yuv_internal_t *) _id;
-   unsigned char * dst0 = ( id->out_ptr + (id->out_stridex * v_offset) );
-   unsigned char * dst1 = ( dst0+id->out_stridex );
-
-   uint8_t const * pyIn0 = src[0];
-   uint8_t const * pyIn1 = pyIn0 + id->in_stridex ;
-   uint8_t const * pu    = src[1];
-   uint8_t const * pv    = src[2];
-   
-   unsigned const width4 = id->width/4 ;
-
-   if( first || second )
-   {
-      fprintf( stderr, "null copy: id = %p\n" 
-               "    y0 == %p\n"
-               "    y1 == %p\n"
-               "     u == %p\n"
-               "     v == %p\n"
-               "  dst0 == %p\n"
-               "  dst1 == %p\n"
-               "  vOff == %u\n"
-               "width  == %u\n"
-               "wid4   == %u\n"
-               , id, pyIn0, pyIn1, pu, pv, 
-               dst0, dst1, v_offset,
-               id->width, width4 );
-   }
-   //
-   // called for each 16 lines of input
-   // each U and V apply to 2 lines of output, so we loop 8 times
-   //
-   //
-   int loop = 8 ;
-   do {
-      // for each block of 2 lines, 2 pixels of width
-      for( unsigned i = 0 ; i < id->width ; i += 4 )
-      {
-         unsigned char u ;
-         unsigned char v ;
-         unsigned char y0 ;
-         unsigned char y1 ;
-         
-         // first block of 2
-         u = *pu++ ;
-         v = *pv++ ;
-         
-         y0 = *pyIn0++ ;
-         *dst0++ = y0 ;
-         *dst0++ = u ;
-         y0 = *pyIn0++ ;
-         *dst0++ = y0 ;
-         *dst0++ = v ;
-
-         y1 = *pyIn1++ ;
-         *dst1++ = y1 ;
-         *dst1++ = u ;
-         y1 = *pyIn1++ ;
-         *dst1++ = y1 ;
-         *dst1++ = v ;
-
-         // second block of 2
-         u = *pu++ ;
-         v = *pv++ ;
-         
-         y0 = *pyIn0++ ;
-         *dst0++ = y0 ;
-         *dst0++ = u ;
-         y0 = *pyIn0++ ;
-         *dst0++ = y0 ;
-         *dst0++ = v ;
-
-         y1 = *pyIn1++ ;
-         *dst1++ = y1 ;
-         *dst1++ = u ;
-         y1 = *pyIn1++ ;
-         *dst1++ = y1 ;
-         *dst1++ = v ;
-      }
-/*
-if( first || second )
-   printf( "inner1 %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
-           first ? "first" : "second",
-           dst0, dst1, pyIn0, pyIn1 );
-*/           
-      dst0 += id->outPad ;
-      dst1 += id->outPad ;
-      dst0 = dst1 ;
-      dst1 = dst0 + id->out_stridex ;
-/*
-if( first || second )
-   printf( "inner2 %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
-           first ? "first" : "second",
-           dst0, dst1, pyIn0, pyIn1 );
-*/
-   } while (--loop);
-
-if( first || second )
-{
-   printf( "outer %s --> dst0: %p, dst1: %p, in0: %p, in1: %p\n", 
-           first ? "first" : "second",
-           dst0, dst1, pyIn0, pyIn1 );
-/*
-   if( first )
-   {
-      first = false ;
-      second = true ;
-   }
-   else
-      second = false ;
-*/      
-}
-}
-
-void convert_null_128(int width, int height, uint32_t accel, void * arg, convert_init_t * result)
-{
-   if( 0 == result->id )
-   {
-      result->id_size = sizeof( yuv_internal_t );
-   } // initial call before alloc
-   else
-   {
-      yuv_internal_t *const id = (yuv_internal_t *)result->id ;
-      assert( 0 != id );
-      assert( result->id_size == sizeof( yuv_internal_t ) );
-
-      id->width = width ;
-      id->in_stridex = 0 ;
-      id->in_stride_frame  = width ;
-      id->out_stridex = 0 ;
-      id->out_stride_frame = (((width+127)/128)*128);
-      id->outPad = (id->out_stride_frame - width)*2;
-      id->out_stride_frame *= 2 ; // 2 bytes per pixel
-
-printf( "--> width %u, in stride: %u, out: %u\n", 
-        width,
-        id->in_stride_frame,
-        id->out_stride_frame );
-
-      result->buf_size[0] = id->out_stride_frame * height * 2 ;
-      result->buf_size[1] = result->buf_size[2] = 0;
-      result->start = yuv_null_start;
-      result->copy  = yuv_null_copy ;
-   } // second call to fill in details
-}
-
-#endif
 
 void interleaveYUV( int                  width, 
                     int                  height, 
