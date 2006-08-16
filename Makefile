@@ -26,7 +26,7 @@ else
    KERNEL_VER=-DKERNEL_2_4
 endif
 
-MPEG2LIBS = -lmpeg2 -lvo
+MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
 
 #
 # These are needed with newer (0.4.0) mpeg2dec library
@@ -49,7 +49,7 @@ OBJS = \
        dnsPoll.o \
        dumpCPP.o \
        fbDev.o \
-       fbImage.o \
+       ffit.o \
        ftObjs.o \
        gpioPoll.o \
        hexDump.o \
@@ -60,6 +60,7 @@ OBJS = \
        imgJPEG.o \
        imgPNG.o \
        imgToPNG.o \
+       imgTransparent.o \
        jsAlphaMap.o \
        jsBCWidths.o \
        jsBitmap.o \
@@ -92,6 +93,7 @@ OBJS = \
        jsUse.o \
        md5.o \
        memFile.o \
+       mpegStream.o \
        openFds.o \
        palette.o \
        parsedFlash.o \
@@ -100,9 +102,12 @@ OBJS = \
        pollHandler.o \
        pollTimer.o \
        popen.o \
+       rawKbd.o \
        relativeURL.o \
        rollingMean.o \
        rollingMedian.o \
+       rtSignal.o \
+       screenImage.o \
        semClasses.o \
        serialPoll.o \
        sniffWLAN.o \
@@ -155,6 +160,19 @@ ifeq (y,$(CONFIG_JSMPEG))
    OBJS += mpegDecode.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o 
 endif
 
+ifeq (y,$(KERNEL_FB_SM501))
+OBJS += fbMem.o yuyv.o
+SM501LIB = $(INSTALL_ROOT)/lib/libSM501.a
+SM501OBJS = fbCmdBlt.o \
+            fbCmdFinish.o \
+            fbCmdList.o \
+            fbCmdWait.o \
+            fbImage.o \
+            fbMem.o \
+            img4444.o \
+            sm501alpha.o
+endif
+
 ifeq (y,$(CONFIG_JSSTARUSB))
    OBJS += jsPrinter.o \
        jsStar.o \
@@ -169,7 +187,7 @@ endif
 
 CONFIG_LIBFLASH?=y
 ifeq (y,$(CONFIG_LIBFLASH))       
-   OBJS += flashThread.o
+   OBJS += flashThread.o fbFlash.o
 endif       
 
 INSTALL_ROOT ?= ../install/arm-linux
@@ -185,6 +203,7 @@ ifneq (,$(findstring arm, $(CC)))
    AR=$(CROSS_COMPILE)ar
    NM=$(CROSS_COMPILE)nm
    LD=$(CROSS_COMPILE)ld
+   RANLIB=$(CROSS_COMPILE)ranlib
    STRIP=$(CROSS_COMPILE)strip
    OBJCOPY=$(CROSS_COMPILE)objcopy
    LIBS=-L./ -L$(INSTALL_ROOT)/lib
@@ -202,6 +221,7 @@ else
    AR=ar
    NM=nm
    LIBS=-L./
+   RANLIB=ranlib
    IFLAGS=-I$(INSTALL_ROOT)/include/g++-3 -I$(INSTALL_ROOT)/include/nspr -I$(INSTALL_ROOT)/include/freetype2
    STRIP=strip
    OBJCOPY=objcopy
@@ -220,6 +240,30 @@ IFLAGS += -I$(INSTALL_ROOT)/include/cairo
 LIBS   +=-lCurlCache -lcairo -lpixman -lfontconfig -lexpat
 endif
 
+ODOMOBJS = \
+       mpegRxUDP.o \
+       odomCommand.o \
+       odomDigit.o \
+       odomGraphics.o \
+       odomHighlight2.o \
+       odomPlaylist.o \
+       odomStream.o \
+       odomTTY.o \
+       odomValue.o \
+       odomVideo.o \
+       odomVQ.o \
+       odometer.o
+
+ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
+
+ODOMOBJS2 = \
+       odomVG2.o        \
+       odomHighlight2.o \
+       odomDigit2.o \
+       odomGraphics.o
+
+ODOMLIB2 = $(INSTALL_ROOT)/lib/libOdometer2.a
+
 #
 # build empty version to avoid configuration
 #
@@ -237,6 +281,18 @@ $(LIBBDGRAPH):
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
+
+$(SM501LIB): Makefile $(SM501OBJS)
+	$(AR) r $(SM501LIB) $(SM501OBJS)
+	$(RANLIB) $(SM501LIB)
+
+$(ODOMLIB): Makefile $(ODOMOBJS)
+	$(AR) r $(ODOMLIB) $(ODOMOBJS)
+	$(RANLIB) $(ODOMLIB)
+
+$(ODOMLIB2): Makefile $(ODOMOBJS2)
+	$(AR) r $(ODOMLIB2) $(ODOMOBJS2)
+	$(RANLIB) $(ODOMLIB2)
 
 dirTest.o: dirByATime.cpp dirByATime.h Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o dirTest.o -O2 -DSTANDALONE dirByATime.cpp
@@ -267,10 +323,63 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
-odometer: odometer.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+odometerMain.o: odometer.cpp odometer.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odometer: odometerMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odometer odometer.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odometer odometerMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odometer | sort >odometer.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+odomCommandMain.o: odomCommand.cpp odomCommand.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomCommand: odomCommandMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomCommand odomCommandMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle odomCommand | sort >odomCommand.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+odomTTYMain.o: odomTTY.cpp odomTTY.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomTTY odomTTYMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle odomTTY | sort >odomTTY.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+odomVQMain.o: odomVQ.cpp odomVQ.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomVQ: odomVQMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomVQ odomVQMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle odomVQ | sort >odomVQ.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+mpegStreamMain.o: mpegStream.cpp mpegStream.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+mpegStream: mpegStreamMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegStream mpegStreamMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegStream | sort >mpegStream.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+mpegYUVMain.o: mpegYUV.cpp mpegYUV.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+mpegYUV: mpegYUVMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegYUV mpegYUVMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegYUV | sort >mpegYUV.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -298,10 +407,137 @@ dictionary: dictionary.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
+odomDigitMain.o: odomDigit.cpp odomDigit.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomDigit: odomDigitMain.o $(ODOMLIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomDigit odomDigitMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+odomValueMain.o: odomValue.cpp odomValue.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomValue: odomValueMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue odomValueMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+	arm-linux-nm --demangle odomValue | sort >odomValue.map
+
+odomDigitMain2.o: odomDigit2.cpp odomDigit2.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomDigit2: odomDigitMain2.o $(LIB) $(ODOMLIB2)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomDigit2 odomDigitMain2.o $(LIBS) -lCurlCache -lstdc++ -lOdometer2 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+odomVGMain2.o: odomVG2.cpp odomVG2.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomVG2: odomVGMain2.o $(LIB) $(ODOMLIB2)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomVG2 odomVGMain2.o $(LIBS) -lCurlCache -lstdc++ -lOdometer2 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+odomValueMain2.o: odomValue2.cpp odomValue2.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomValue2: odomValueMain2.o $(LIB) $(ODOMLIB2)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue2 odomValueMain2.o $(LIBS) -lCurlCache -lstdc++ -lOdometer2 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+fbAlpha: fbAlpha.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbAlpha fbAlpha.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+usleep: usleep.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usleep usleep.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+sm501mem: sm501mem.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o sm501mem sm501mem.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+digitAlpha: digitAlpha.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o digitAlpha digitAlpha.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+fbMemMain.o: fbMem.cpp fbMem.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbMem: fbMemMain.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbMem fbMemMain.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+asyncTest: asyncTest.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o asyncTest asyncTest.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+blacken: blacken.o $(LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o blacken blacken.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+fbCmdListMain.o: fbCmdList.cpp fbCmdList.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbCmdList: fbCmdListMain.o $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbCmdList fbCmdListMain.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lSM501 -lpng -ljpeg -lungif -lfreetype -lm -lz
+
+
 sm501reg: sm501reg.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501reg sm501reg.cpp -lstdc++ 
 	arm-linux-nm sm501reg >sm501reg.map
 	$(STRIP) sm501reg
+
+sm501poke: sm501poke.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501poke sm501poke.cpp -lstdc++ 
+	arm-linux-nm sm501poke >sm501poke.map
+	$(STRIP) sm501poke
+
+sm501dump: sm501dump.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501dump sm501dump.cpp hexDump.o -lstdc++ 
+	arm-linux-nm sm501dump >sm501dump.map
+	$(STRIP) sm501dump
+
+sm501cmdlist: sm501cmdlist.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501cmdlist sm501cmdlist.cpp -lstdc++ 
+	arm-linux-nm sm501cmdlist >sm501cmdlist.map
+	$(STRIP) sm501cmdlist
+
+cmdListSync: cmdListSync.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o cmdListSync cmdListSync.cpp -lstdc++ 
+	arm-linux-nm cmdListSync >cmdListSync.map
+	$(STRIP) cmdListSync
+
+sm501alpha: sm501alpha.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o sm501alpha sm501alpha.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm sm501alpha >sm501alpha.map
+	$(STRIP) sm501alpha
+
+videoSet: videoSet.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o videoSet videoSet.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm videoSet >videoSet.map
+	$(STRIP) videoSet
+
+img4444: img4444.cpp $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o img4444 img4444.cpp $(LIBS) -lCurlCache -lSM501 -lpng -ljpeg -lungif -lz -lstdc++ 
+	arm-linux-nm img4444 >img4444.map
+	$(STRIP) img4444
+
+fbPageGrab: fbPageGrab.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o fbPageGrab fbPageGrab.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm fbPageGrab >fbPageGrab.map
+	$(STRIP) fbPageGrab
+
+flashInt: flashInt.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o flashInt flashInt.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lm -lz -lssl -lcrypto -ldl -lstdc++
+	arm-linux-nm flashInt >flashInt.map
+	$(STRIP) flashInt
+
+flashPlay: flashPlay.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o flashPlay flashPlay.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lm -lz -lssl -lcrypto -ldl -lstdc++
+	arm-linux-nm flashPlay >flashPlay.map
+	$(STRIP) flashPlay
+
+fbFlash: fbFlash.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -O2 -o fbFlash fbFlash.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lm -lz -lssl -lcrypto -ldl -lstdc++
+	arm-linux-nm fbFlash >fbFlash.map
+	$(STRIP) fbFlash
+
+bltRects: bltRects.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o bltRects bltRects.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm bltRects >bltRects.map
+	$(STRIP) bltRects
+
+fbPage: fbPage.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o fbPage fbPage.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm fbPage >fbPage.map
+	$(STRIP) fbPage
 
 rtsCTS: rtsCTS.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o rtsCTS rtsCTS.cpp $(LIBS) -lCurlCache -lstdc++ 
@@ -382,7 +618,7 @@ imgPNGMain.o : imgPNG.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o imgPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) imgPNG.cpp
 
 imgPNG : imgPNGMain.o memFile.o hexDump.o fbDev.o
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o -lstdc++ -lpng -lz
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgPNG imgPNGMain.o memFile.o hexDump.o fbDev.o $(LIBS) $(LIB) -lstdc++ -lpng -lz
 	$(STRIP) imgPNG
 
 imgToPNGMain.o : imgToPNG.cpp Makefile
@@ -463,6 +699,9 @@ md5: md5.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o md5 -DSTANDALONE=1 -Xlinker -Map -Xlinker md5.map md5.cpp $(LIBS) -lcrypto -lCurlCache
 	$(STRIP) $@
 
+backtrace: backtrace.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -rdynamic -o backtrace -DSTANDALONE=1 -Xlinker -Map -Xlinker backtrace.map backtrace.cpp $(LIBS) -lcrypto -lCurlCache
+
 avSendTo: avSendTo.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lcrypto -lz -lm -lpthread -lsupc++
 	$(STRIP) $@
@@ -530,8 +769,8 @@ tsTest: tsTest.cpp Makefile $(LIB)
 mpegDecodeMain.o: mpegDecode.o
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D__MODULETEST__ -c $(IFLAGS) -O2 -o mpegDecodeMain.o mpegDecode.cpp
 
-mpegDecode: mpegDecodeMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegDecode mpegDecodeMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+mpegDecode: mpegDecodeMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegDecode mpegDecodeMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle mpegDecode | sort >mpegDecode.map
 	$(STRIP) $@
 
@@ -566,7 +805,14 @@ imgFile: $(IMGFILEOBJS) Makefile
       -o $@ -D__STANDALONE__ -Xlinker -Map \
       -Xlinker imgFile.map \
       $(IMGFILEOBJS) \
-      $(LIBS) -ljpeg -lungif -lpng -lz -lstdc++ 
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
+imgTransparentMain.o: imgTransparent.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DMODULETEST=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+imgTransparent: imgTransparentMain.o Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o imgTransparent -Xlinker -Map -Xlinker imgTransparent.map imgTransparentMain.o $(LIBS) -lCurlCache -ljpeg -lpng -lungif -lz -lstdc++
 	$(STRIP) $@
    
 #
