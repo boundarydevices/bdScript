@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgToPNG.cpp,v $
- * Revision 1.1  2006-05-07 15:41:17  ericn
+ * Revision 1.2  2006-08-16 02:30:06  ericn
+ * -use alpha if present
+ *
+ * Revision 1.1  2006/05/07 15:41:17  ericn
  * -Initial import
  *
  *
@@ -126,7 +129,8 @@ static void collapse_png_data(
 
 static void rgb16_to_24( 
 	unsigned short const *inRow,
-	unsigned	      width,
+	unsigned	             width,
+   unsigned char const  *alpha,
 	unsigned char        *outRow
 )
 {
@@ -137,6 +141,8 @@ static void rgb16_to_24(
 		*nextOut++ = fbDevice_t::getRed(rgb16);
 		*nextOut++ = fbDevice_t::getGreen(rgb16);
 		*nextOut++  =fbDevice_t::getBlue(rgb16);
+      unsigned char const a = (0 != alpha) ? *alpha++ : 255 ;
+      *nextOut++ = a ;
 	}
 }
 	
@@ -157,16 +163,16 @@ bool imageToPNG( image_t const &img,
 			if( 0 == setjmp( png_jmpbuf( png_ptr ) ) ) {
 				png_set_write_fn( png_ptr, 0, write_png_data, flush_png_data );
 				png_set_IHDR( png_ptr, info_ptr, img.width_, img.height_, 8,
-						PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, 
+						PNG_COLOR_TYPE_RGB_ALPHA, PNG_INTERLACE_NONE, 
 						PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT );
 				png_write_info( png_ptr, info_ptr );
 				
 				unsigned short const *nextIn = (unsigned short const *)img.pixData_ ;
-				unsigned char *const outRow = new unsigned char [img.width_*3];
+				unsigned char *const outRow = new unsigned char [img.width_*4];
 
 				for( unsigned row = 0; row < img.height_ ; row++, nextIn += img.width_ )
 				{
-					rgb16_to_24(nextIn,img.width_,outRow);
+					rgb16_to_24(nextIn,img.width_,(unsigned char *)img.alpha_,outRow);
 					png_write_row( png_ptr, outRow );
 				}
 
