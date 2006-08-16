@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.87  2006-05-14 14:42:19  ericn
+ * Revision 1.88  2006-08-16 21:11:10  ericn
+ * -allow GPIO support
+ *
+ * Revision 1.87  2006/05/14 14:42:19  ericn
  * -add jsPNG, audioOutPoll
  *
  * Revision 1.86  2005/12/11 16:02:30  ericn
@@ -307,7 +310,6 @@
 #endif
 
 #if CONFIG_JSGPIO == 1
-#error gpio support include
 #include "jsGpio.h"
 #endif
 
