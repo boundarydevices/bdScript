@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomDigit.cpp,v $
- * Revision 1.1  2006-08-06 13:19:34  ericn
+ * Revision 1.2  2006-08-16 02:32:31  ericn
+ * -support alpha mode
+ *
+ * Revision 1.1  2006/08/06 13:19:34  ericn
  * -Initial import
  *
  *
@@ -20,14 +23,20 @@
 #include "fbCmdBlt.h"
 #include "fbCmdWait.h"
 #include "fbDev.h"
+#include "sm501alpha.h"
 
 odomDigit_t::odomDigit_t( 
-   fbCommandList_t &cmdList,
-   fbImage_t const &digitStrip,
-   unsigned         x,
-   unsigned         y )
+   fbCommandList_t  &cmdList,
+   fbImage_t const  &digitStrip,
+   unsigned          x,
+   unsigned          y,
+   odometerMode_e    mode )
    : digitStrip_( digitStrip )
+   , fbOffs_( (mode==graphicsLayer)
+               ? 0
+               : sm501alpha_t::get(sm501alpha_t::rgba4444).fbRamOffset() )
    , r_( makeRect(x,y,digitStrip_.width(), digitStrip_.height()/10) )
+   , mode_( mode )
    , pos9_( 9*r_.height_ )
    , pixelOffs_( 0 )
    , background_( x, y, r_.width_, r_.height_ )
@@ -38,7 +47,7 @@ odomDigit_t::odomDigit_t(
    cmdList.push( new fbWait_t( WAITFORDRAWINGENGINE, DRAWINGENGINEIDLE ) );
    bltIdx_[0] = cmdList.size();
    blts_[0] = new fbBlt_t(
-      fb.getRamOffs(), // FB ram
+      fbOffs_, // FB ram
       x, y, 
       fb.getWidth(), fb.getHeight(),
       digitStrip_,
@@ -51,7 +60,7 @@ odomDigit_t::odomDigit_t(
    cmdList.push( new fbWait_t( WAITFORDRAWINGENGINE, DRAWINGENGINEIDLE ) );
    bltIdx_[1] = cmdList.size();
    blts_[1] = new fbBlt_t(
-      fb.getRamOffs(), // FB ram
+      fbOffs_, // FB ram
       x, y, 
       fb.getWidth(), fb.getHeight(),
       digitStrip_,
@@ -116,7 +125,7 @@ void odomDigit_t::update()
    {
       unsigned const firstBltHeight = r_.height_-(pixelOffs_-pos9_);
       blts_[0]->set(
-         fb.getRamOffs(), // FB ram
+         fbOffs_, // FB ram
          r_.xLeft_, r_.yTop_, 
          fb.getWidth(), fb.getHeight(),
          digitStrip_,
@@ -127,7 +136,7 @@ void odomDigit_t::update()
 
       blts_[1]->perform();
       blts_[1]->set(
-         fb.getRamOffs(), // FB ram
+         fbOffs_, // FB ram
          r_.xLeft_, r_.yTop_ + firstBltHeight, 
          fb.getWidth(), fb.getHeight(),
          digitStrip_,
@@ -141,7 +150,7 @@ void odomDigit_t::update()
       // single blt
       blts_[1]->skip();
       blts_[0]->set(
-         fb.getRamOffs(), // FB ram
+         fbOffs_, // FB ram
          r_.xLeft_, r_.yTop_, 
          fb.getWidth(), fb.getHeight(),
          digitStrip_,
@@ -173,8 +182,11 @@ void odomDigit_t::hide( void )
       blts_[1]->skip();
 
       // re-draw background
-      fbBlt( fb.getRamOffs(), r_.xLeft_, r_.yTop_, fb.getWidth(), fb.getHeight(),
-             background_, 0, 0, r_.width_, r_.height_ );
+      if( graphicsLayer == mode_ )
+         fbBlt( fbOffs_, r_.xLeft_, r_.yTop_, fb.getWidth(), fb.getHeight(),
+                background_, 0, 0, r_.width_, r_.height_ );
+      else
+         sm501alpha_t::get(alphaMode(mode_)).clear( r_ );
    }
 }
 
@@ -207,51 +219,58 @@ int main( int argc, char const * const argv[] )
 {
    fprintf( stderr, "Hello, %s\n", argv[0] );
 
-   image_t dsImage ;
-   if( !imageFromFile( "/mmc/odometer/digitStrip.png", dsImage ) ){
-      fprintf( stderr, "Error loading digit strip\n" );
-      return -1 ;
-   }
-
-   fbImage_t digitImage( dsImage );
-   
-   fbCommandList_t cmdList ;
-
-   odomDigit_t digit( cmdList, digitImage, 0, 0 );
-
-   cmdList.push( new fbFinish_t );
-
-   fbPtr_t cmdListMem( cmdList.size() );
-   cmdList.copy( cmdListMem.getPtr() );
-
-   fbDevice_t &fb = getFB();
-
-   signal( SIGINT, ctrlcHandler );
-
-   unsigned advance  = ( 1 < argc ) ? strtoul(argv[1], 0, 0) : 1 ;
-   unsigned sleep_ms = ( 2 < argc ) ? strtoul(argv[2], 0, 0 ) : 1 ;
-   unsigned initPos  = ( 3 < argc ) ? strtoul(argv[3], 0, 0 ) : 0 ;
-
-   digit.set( initPos );
-
-   while( !die ){
-      unsigned fraction ;
-      printf( "%u.%02u: %4u\r", digit.digitValue(fraction), fraction, digit.pixelOffset() );
-      unsigned carry = digit.advance(advance);
-      if( carry )
-         printf( "\n   +%u\n", carry );
-      fflush(stdout);
-      int rval = ioctl( fb.getFd(), SM501_EXECCMDLIST, cmdListMem.getOffs() );
-      if( rval ){
-         printf( "result: %d\n", rval );
-         break ;
+   if( 2 <= argc ){
+      image_t dsImage ;
+      if( !imageFromFile( argv[1], dsImage ) ){
+         fprintf( stderr, "loading digit strip: %m\n" );
+         return -1 ;
       }
-      usleep(sleep_ms*1000);
+   
+      odometerMode_e mode = ( ( 2 < argc ) && ( '4' == *argv[2] ) )
+                            ? alphaLayer
+                            : graphicsLayer ;
+      fbImage_t digitImage( dsImage, imageMode(mode) );
+      
+      fbCommandList_t cmdList ;
+   
+      odomDigit_t digit( cmdList, digitImage, 0, 0, mode );
+   
+      cmdList.push( new fbFinish_t );
+   
+      fbPtr_t cmdListMem( cmdList.size() );
+      cmdList.copy( cmdListMem.getPtr() );
+   
+      fbDevice_t &fb = getFB();
+   
+      signal( SIGINT, ctrlcHandler );
+   
+      unsigned advance  = ( 3 < argc ) ? strtoul(argv[3], 0, 0) : 1 ;
+      unsigned sleep_ms = ( 4 < argc ) ? strtoul(argv[4], 0, 0 ) : 1 ;
+      unsigned initPos  = ( 5 < argc ) ? strtoul(argv[5], 0, 0 ) : 0 ;
+   
+      digit.set( initPos );
+   
+      while( !die ){
+         unsigned fraction ;
+         printf( "%u.%02u: %4u\r", digit.digitValue(fraction), fraction, digit.pixelOffset() );
+         unsigned carry = digit.advance(advance);
+         if( carry )
+            printf( "\n   +%u\n", carry );
+         fflush(stdout);
+         int rval = ioctl( fb.getFd(), SM501_EXECCMDLIST, cmdListMem.getOffs() );
+         if( rval ){
+            printf( "result: %d\n", rval );
+            break ;
+         }
+         usleep(sleep_ms*1000);
+      }
+   
+      digit.hide();
+   
+      cmdList.dump();
    }
-
-   digit.hide();
-
-   cmdList.dump();
+   else                     //    0             1        2                 3       4      5
+      fprintf( stderr, "Usage: odomDigit digitStripPath mode(565|4444) [advance [sleep [initPos]]]\n" );
 
    return 0 ;
 }

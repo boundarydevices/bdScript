@@ -1,5 +1,5 @@
 #ifndef __ODOMDIGIT_H__
-#define __ODOMDIGIT_H__ "$Id: odomDigit.h,v 1.1 2006-08-06 13:19:32 ericn Exp $"
+#define __ODOMDIGIT_H__ "$Id: odomDigit.h,v 1.2 2006-08-16 02:32:22 ericn Exp $"
 
 /*
  * odomDigit.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: odomDigit.h,v $
- * Revision 1.1  2006-08-06 13:19:32  ericn
+ * Revision 1.2  2006-08-16 02:32:22  ericn
+ * -support alpha mode
+ *
+ * Revision 1.1  2006/08/06 13:19:32  ericn
  * -Initial import
  *
  *
@@ -26,13 +29,15 @@
 #include "fbImage.h"
 #include "fbCmdBlt.h"
 #include "fbDev.h"
+#include "odomMode.h"
 
 class odomDigit_t {
 public:
-   odomDigit_t( fbCommandList_t &cmdList,
-                fbImage_t const &digitStrip,
-                unsigned         x,
-                unsigned         y );
+   odomDigit_t( fbCommandList_t  &cmdList,
+                fbImage_t const  &digitStrip,
+                unsigned          x,
+                unsigned          y,
+                odometerMode_e    mode );
    ~odomDigit_t( void );
 
    //
@@ -66,7 +71,9 @@ private:
    void update( void ); 
    
    fbImage_t const &digitStrip_ ;
+   unsigned const   fbOffs_ ; // either 0 (graphics layer) or alpha layer offset
    rectangle_t      r_ ;
+   odometerMode_e   mode_ ;
    unsigned const   pos9_ ;
    unsigned         pixelOffs_ ;
    fbImage_t const  background_ ;
