@@ -1,5 +1,5 @@
 #ifndef __MPEGSTREAM_H__
-#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.1 2005-04-24 18:55:03 ericn Exp $"
+#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.2 2006-08-16 02:32:50 ericn Exp $"
 
 /*
  * mpegStream.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: mpegStream.h,v $
- * Revision 1.1  2005-04-24 18:55:03  ericn
+ * Revision 1.2  2006-08-16 02:32:50  ericn
+ * -add convenience function
+ *
+ * Revision 1.1  2005/04/24 18:55:03  ericn
  * -Initial import (temporary file)
  *
  *
@@ -54,6 +57,8 @@ public:
                   unsigned char       &streamId );     // output: which stream if video or audio, frame type if other
 
    stream_t const &getStream( unsigned char streamId ) const { return streams_[streamId]; }
+
+   inline static long long ptsToMs( long long pts ){ return pts/90 ; }
 
    //
    // MPEG-2 ps parsing state:
