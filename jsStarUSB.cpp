@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.10  2006-08-07 18:21:26  tkisky
+ * Revision 1.11  2006-08-16 02:35:09  ericn
+ * -use *rE1 for no cut command
+ *
+ * Revision 1.10  2006/08/07 18:21:26  tkisky
  * -change partialCut to cutMode
  *
  * Revision 1.9  2006/08/07 16:49:09  tkisky
@@ -506,7 +509,7 @@ static char const formFeed[] = { "\x1b\x0C"};
 static char const partialCut[] = {   "\x1b*rE13"};
 //static char const stdPartialCut[] = {   "\x1b\x64\x03"};
 
-static char const noCut[] = { "\x1b*rE3"};
+static char const noCut[] = { "\x1b*rE1"};
 
 static char const exitRaster[] = {
    "\x1b*rB"            // exit raster mode
