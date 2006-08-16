@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMPEG.cpp,v $
- * Revision 1.9  2005-11-06 00:49:35  ericn
+ * Revision 1.10  2006-08-16 02:35:27  ericn
+ * -match new mpegDecoder interface
+ *
+ * Revision 1.9  2005/11/06 00:49:35  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.8  2004/10/30 19:37:14  ericn
@@ -274,11 +277,13 @@ static void mpegOnComplete( jsCurlRequest_t &req, void const *data, unsigned lon
                for( unsigned i = 0 ; ( 0 == width ) && ( i < sAndF.numFrames_ ); i++ )
                {
                   mpegDemux_t::frame_t const &frame = sAndF.frames_[i];
-                  decoder.feed( frame.data_, frame.length_ );
+                  decoder.feed( frame.data_, frame.length_, frame.when_ms_ );
                   void const *picture ;
                   mpegDecoder_t::picType_e type ;
 // if( 10 < i ){ printf( "getPicture %u\n", i ); fflush( stdout ); sleep( 1 ); }
-                  while( decoder.getPicture( picture, type ) )
+                  unsigned temp_ref ;
+                  long long when ;
+                  while( decoder.getPicture( picture, type, temp_ref, when ) )
                   {
                      if( decoder.haveHeader() )
                      {

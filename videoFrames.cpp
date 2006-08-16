@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: videoFrames.cpp,v $
- * Revision 1.3  2005-11-06 00:49:55  ericn
+ * Revision 1.4  2006-08-16 02:33:14  ericn
+ * -match new mpegDecoder interface
+ *
+ * Revision 1.3  2005/11/06 00:49:55  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.2  2004/10/30 18:48:52  ericn
@@ -67,11 +70,13 @@ bool videoFrames_t :: preload( void )
       if( 0 != frame.when_ms_ )
          lastPTS = frame.when_ms_ ;
 
-      decoder_.feed( frame.data_, frame.length_ );
+      decoder_.feed( frame.data_, frame.length_, frame.when_ms_ );
       void const *picture ;
       mpegDecoder_t::picType_e type ;
+      unsigned temp_ref ;
+      long long when ;
 
-      while( decoder_.getPicture( picture, type, decoder_.ptAll_e ) )
+      while( decoder_.getPicture( picture, type, temp_ref, when, decoder_.ptAll_e ) )
       {
          if( 0 == queue_ )
          {
@@ -94,7 +99,7 @@ bool videoFrames_t :: preload( void )
 
          if( queue_->isFull() )
          {
-            if( decoder_.getPicture( picture, type, decoder_.ptAll_e ) )
+            if( decoder_.getPicture( picture, type, temp_ref, when, decoder_.ptAll_e ) )
                printf( "tail-end picture discarded\n" );
             break;
          }
@@ -149,7 +154,7 @@ bool videoFrames_t :: pull( videoQueue_t :: entry_t *&entry )
                if( 0 != frame.when_ms_ )
                   lastPTS_ = frame.when_ms_ ;
 
-               decoder_.feed( frame.data_, frame.length_ );
+               decoder_.feed( frame.data_, frame.length_, frame.when_ms_ );
                
                mpegDecoder_t::picType_e which ;
                if( queue_->isEmpty() )
@@ -164,7 +169,9 @@ bool videoFrames_t :: pull( videoQueue_t :: entry_t *&entry )
                void const *picture ;
                void const *lastPicture = 0 ;
                mpegDecoder_t::picType_e type ;
-               while( decoder_.getPicture( picture, type, which ) )
+               unsigned temp_ref ;
+               long long when ;
+               while( decoder_.getPicture( picture, type, temp_ref, when, which ) )
                {
                   lastPicture = picture ;
                }
