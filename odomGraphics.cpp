@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomGraphics.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-16 21:22:14  ericn
+ * -rename header
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -22,7 +25,7 @@
 #include "imgFile.h"
 #include "memFile.h"
 #include "fbImage.h"
-#include "odomHighlight2.h"
+#include "odomHighlight.h"
 
 static char const *const imgFileNames[] = {
    "digitStrip.png"
