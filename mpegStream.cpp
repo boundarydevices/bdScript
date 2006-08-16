@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegStream.cpp,v $
- * Revision 1.2  2006-07-30 21:37:00  ericn
+ * Revision 1.3  2006-08-16 02:34:03  ericn
+ * -produce MD5 of output
+ *
+ * Revision 1.2  2006/07/30 21:37:00  ericn
  * -compile under latest libmpeg2
  *
  * Revision 1.1  2005/04/24 18:55:03  ericn
@@ -93,19 +96,19 @@ enum CodecType {
 };
 
 #define MAX_SYNC_SIZE 100000
-#define PACK_START_CODE             '\xba'
-#define SYSTEM_HEADER_START_CODE    '\xbb'
+unsigned char const PACK_START_CODE             = '\xba' ;
+unsigned char const SYSTEM_HEADER_START_CODE    = '\xbb' ;
   
 /* mpeg2 */
-#define PROGRAM_STREAM_MAP          '\xbc'
-#define PRIVATE_STREAM_1            '\xbd'
-#define PADDING_STREAM              '\xbe'
-#define PRIVATE_STREAM_2            '\xbf'
+unsigned char const PROGRAM_STREAM_MAP          = '\xbc' ;
+unsigned char const PRIVATE_STREAM_1            = '\xbd' ;
+unsigned char const PADDING_STREAM              = '\xbe' ;
+unsigned char const PRIVATE_STREAM_2            = '\xbf' ;
 
-#define AUDIO_ID                    '\xc0'
-#define MAX_AUDIO_ID                '\xdf'
-#define VIDEO_ID                    '\xe0'
-#define MAX_VIDEO_ID                '\xef'
+unsigned char const AUDIO_ID                    = '\xc0' ;
+unsigned char const MAX_AUDIO_ID                = '\xdf' ;
+unsigned char const VIDEO_ID                    = '\xe0' ;
+unsigned char const MAX_VIDEO_ID                = '\xef' ;
 
 mpegStream_t :: mpegStream_t( void )
    : state_( startCode_e )
@@ -121,9 +124,13 @@ mpegStream_t :: ~mpegStream_t( void )
 
 mpegStream_t :: frameType_e frameType( unsigned char headerCode )
 {
-   if( (AUDIO_ID <= headerCode) && (MAX_AUDIO_ID >= headerCode) )
+   if( (AUDIO_ID <= headerCode) 
+       && 
+       (MAX_AUDIO_ID >= headerCode) )
       return mpegStream_t::audioFrame_e ;
-   else if( (VIDEO_ID <= headerCode) && (MAX_VIDEO_ID >= headerCode) )
+   else if( (VIDEO_ID <= headerCode) 
+            && 
+            (MAX_VIDEO_ID >= headerCode) )
       return mpegStream_t::videoFrame_e ;
    else
       return mpegStream_t::otherFrame_e ;
@@ -252,7 +259,7 @@ trace( "MPEG2\n" );
             {
                if( ( mpeg1_ && ( next & '\x80' ) )
                    ||
-                   ( !mpeg1_ && ( next == '\xff' ) ) )
+                   ( !mpeg1_ && ( next == (unsigned char)'\xff' ) ) )
                {
                   // eat
                   if( 0 < packLength_ )
@@ -380,9 +387,9 @@ trace( "MPEG2\n" );
 
 
 #ifdef MODULETEST
-#include "hexDump.h"
-#include <zlib.h>
 #include <string.h>
+#include <openssl/md5.h>
+#include <limits.h>
 
 static char const *cFrameTypes_[] = {
      "other 0"
@@ -401,6 +408,7 @@ int main( int argc, char const * const argv[] )
       FILE *fIn = fopen(argv[1], "rb" );
       if( fIn )
       {
+         printf( "-------> %s\n", argv[1] );
          mpegStream_t mpeg ;
          
          unsigned long byteCounts[2] = {
@@ -410,6 +418,16 @@ int main( int argc, char const * const argv[] )
          unsigned long frameCounts[2] = {
             0, 0
          };
+
+         MD5_CTX md5_ctx[2];
+         MD5_Init(md5_ctx);
+         MD5_Init(md5_ctx+1);
+
+         unsigned maxPacket = 0 ;
+         unsigned minPacket = UINT_MAX ;
+
+         long long startPTS = 0 ;
+         long long endPTS = 0 ;
 
          unsigned long globalOffs = 0 ;
          unsigned char inBuf[4096];
@@ -439,6 +457,12 @@ int main( int argc, char const * const argv[] )
                byteCounts[isVideo] += frameLen ;
                frameCounts[isVideo]++ ;
 
+               if( 0 != pts ){
+                  if( 0 == startPTS )
+                     startPTS = pts ;
+                  endPTS = pts ; 
+               }
+
                int end = inOffs+frameOffs+frameLen ;
                if( end > numRead )
                {
@@ -464,15 +488,42 @@ int main( int argc, char const * const argv[] )
                   }
                }
 
+               MD5_Update(md5_ctx+isVideo, inBuf+inOffs+frameOffs, frameLen );
+
                if( type >= (int)numFrameTypes )
                   fprintf( stderr, "unknown frame type %u\n", type ); 
                
+               if( frameLen > maxPacket )
+                  maxPacket = frameLen ;
+               if( frameLen < minPacket )
+                  minPacket = frameLen ;
+
                inOffs += frameOffs+frameLen ;
             }
             globalOffs += numRead ;
          }
+         unsigned char md5sum[MD5_DIGEST_LENGTH];
+         MD5_Final( md5sum, md5_ctx);
          printf( "%lu bytes of audio in %lu frames\n", byteCounts[0], frameCounts[0] );
+         printf( "   md5 == " );
+         for( unsigned i = 0 ; i < MD5_DIGEST_LENGTH ; i++ )
+            printf( "%02x ", md5sum[i] );
+         printf( "\n" );
+
+         MD5_Final( md5sum, md5_ctx+1);
          printf( "%lu bytes of video in %lu frames\n", byteCounts[1], frameCounts[1] );
+         printf( "   md5 == " );
+         for( unsigned i = 0 ; i < MD5_DIGEST_LENGTH ; i++ )
+            printf( "%02x ", md5sum[i] );
+         printf( "\n" );
+
+         printf( "min/max packet size == %u/%u\n", minPacket, maxPacket );
+         long durationPTS = (long)(endPTS-startPTS);
+         long durationMs = durationPTS/90 ;
+         printf( "pts range: %llu/%llu - %ld (%ld.%lu seconds)\n", startPTS, endPTS, durationPTS, 
+                 durationMs/1000, 
+                 (unsigned long)(durationMs%1000));
+
          fclose( fIn );
       }
       else
