@@ -1,81 +1,93 @@
 /*
  * Module fbImage.cpp
  *
- * This module defines the frame-buffer image
- * routines as declared in fbImage.h
+ * This module defines the methods of the fbImage_t
+ * class as declared in fbImage.h
  *
  *
  * Change History : 
  *
  * $Log: fbImage.cpp,v $
- * Revision 1.1  2006-06-14 13:55:24  ericn
+ * Revision 1.2  2006-08-16 02:38:07  ericn
+ * -update to use fbPtr_t, allow 4444 support
+ *
+ * Revision 1.1  2006/06/14 13:55:24  ericn
  * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2006
  */
 
-
 #include "fbImage.h"
 #include <string.h>
+#include "fbDev.h"
+#include "img4444.h"
 
-
-void screenImage( fbDevice_t &fb,      // input
-                  image_t    &img )    // output
+fbImage_t::fbImage_t()
+   : mode_(rgb565)
+   , w_( 0 )
+   , h_( 0 )
+   , stride_( 0 )
+   , ptr_()
 {
-   if( img.pixData_ )
-      img.unload();
-      
-   img.pixData_ = new unsigned char [fb.getMemSize()];
-   memcpy( (void *)img.pixData_, fb.getMem(), fb.getMemSize() );
-   img.width_ = fb.getWidth();
-   img.height_ = fb.getHeight();
-   img.alpha_ = 0 ;
 }
 
-void screenImageRect( fbDevice_t        &fb,      // input
-                      rectangle_t const &r,       // input: which portion of the screen
-                      image_t           &img )    // output
+fbImage_t::fbImage_t( 
+   image_t const &image,
+   mode_t         mode )
+   : mode_(mode)
+   , w_( image.width_ )
+   , h_( image.height_ )
+   , stride_( ((image.width_+7)/8)*8 )
+   , ptr_( h_*stride_*sizeof(unsigned short) )
 {
-   if( img.pixData_ )
-      img.unload();
-
-   img.pixData_ = new unsigned char [r.width_*r.height_*sizeof(unsigned short)];
-   img.width_ = r.width_ ;
-   img.height_ = r.height_ ;
-   img.alpha_ = 0 ;
-
-   unsigned short *const pixels = (unsigned short *)img.pixData_ ;
-   for( unsigned y = 0 ; y < (unsigned)r.height_ ; y++ )
+   unsigned short const *inPix = (unsigned short const *)image.pixData_ ;
+   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
+   if( outPix && inPix )
    {
-      int const screenY = r.yTop_ + y ;
-      if( ( 0 <= screenY ) 
-          &&
-          ( screenY < fb.getHeight() ) )
-      {
-         for( unsigned x = 0 ; x < (unsigned)r.width_ ; x++ )
-         {
-            int const screenX = x + r.xLeft_ ;
-            if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
-            {
-               pixels[(y*r.width_)+x] = fb.getPixel( screenX, screenY );
-            }
-            else
-               pixels[(y*r.width_)+x] = 0 ;
-         } // for each column
+      if( rgb565 == mode ){
+         for( unsigned y = 0 ; y < h_ ; y++ ){
+            memcpy( outPix, inPix, w_*sizeof(*outPix));
+            outPix += stride_ ;
+            inPix  += w_ ;
+         }
       }
-      else
-         memset( pixels+(y*r.width_), 0, r.width_*sizeof(pixels[0]));
-   } // for each row requested
-}                      
+      else {
+         imgTo4444( inPix, w_, h_, 
+                    (unsigned char *)image.alpha_,
+                    outPix, stride_ );
+      }
+   }
+}
 
-void showImage( fbDevice_t    &fb,
-                unsigned       x,
-                unsigned       y,
-                image_t const &img )
+fbImage_t::fbImage_t( 
+   unsigned x,
+   unsigned y,
+   unsigned w,
+   unsigned h
+)
+   : mode_(rgb565)
+   , w_( w )
+   , h_( h )
+   , stride_( ((w+7)/8)*8 )
+   , ptr_( h_*stride_*sizeof(unsigned short) )
 {
-   fb.render( x, y, img.width_, img.height_,
-              (unsigned short const *)img.pixData_, 
-              (unsigned char const *)img.alpha_ );
+   fbDevice_t &fb = getFB();
+   unsigned short const *inPix = ((unsigned short const *)fb.getMem()) 
+                                 + y*fb.getWidth()
+                                 + x ;
+   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
+   if( outPix )
+   {
+      for( y = 0 ; y < h_ ; y++ ){
+         memcpy( outPix, inPix, w_*sizeof(*outPix));
+         outPix += stride_ ;
+         inPix  += fb.getWidth();
+      }
+   }
+}
+
+fbImage_t::~fbImage_t(void)
+{
 }
 
