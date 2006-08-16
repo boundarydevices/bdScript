@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.41  2006-08-07 18:34:03  tkisky
+ * Revision 1.42  2006-08-16 02:36:46  ericn
+ * -use linux/sm501-int.h for ioctl consts
+ *
+ * Revision 1.41  2006/08/07 18:34:03  tkisky
  * -change CONFIG_MPEG to CONFIG_JSMPEG
  *
  * Revision 1.40  2006/08/07 18:20:29  tkisky
@@ -162,6 +165,7 @@
 #include "fbDev.h"
 #include "debugPrint.h"
 typedef int irqreturn_t ;
+#include "linux/sm501-int.h"
 #include "linux/sm501yuv.h"
 
 static bool volatile _cancel = false ;
@@ -419,9 +423,9 @@ printf( "queue size: %u x %u, %u, %u\n",
       pi.inHeight_  = frames.queue_->height_ ;
       pi.outWidth_  = params.width_ ;
       pi.outHeight_ = params.height_ ;
-      
+
       int const ior = ioctl( fdYUV, SM501YUV_SETPLANE, &pi );
-      printf( "setplane: %d\n", ior );
+      printf( "setplane: %d/0x%08x\n", ior, SM501YUV_SETPLANE );
 
       unsigned const bytesPerFrame = rowStride*height ;
 printf( "%u bytes/frame\n", bytesPerFrame );
