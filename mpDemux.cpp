@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpDemux.cpp,v $
- * Revision 1.7  2005-11-06 00:49:47  ericn
+ * Revision 1.8  2006-08-16 02:34:29  ericn
+ * -use pts_to_ms() routine
+ *
+ * Revision 1.7  2005/11/06 00:49:47  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.6  2003/07/27 15:13:43  ericn
@@ -435,7 +438,7 @@ mpegDemux_t :: frameType_e
       {
          fData = packetData ;
          length = packetLen ;
-         when_ms = when_pts / 90 ;
+         when_ms = pts_to_ms(when_pts);
       }
       else
          state_ = end_e ;
