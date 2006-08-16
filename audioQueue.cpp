@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.42  2006-08-16 02:36:46  ericn
+ * Revision 1.43  2006-08-16 21:10:52  ericn
+ * -include config.h
+ *
+ * Revision 1.42  2006/08/16 02:36:46  ericn
  * -use linux/sm501-int.h for ioctl consts
  *
  * Revision 1.41  2006/08/07 18:34:03  tkisky
@@ -157,9 +160,12 @@
 #include <linux/fb.h>
 #include <poll.h>
 #include "tickMs.h"
+#include "config.h"
+
 #ifdef CONFIG_JSMPEG
 #include "videoQueue.h"
 #include "videoFrames.h"
+#include "mpDemux.h"
 #endif
 #include <pthread.h>
 #include "fbDev.h"
