@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegSendUDP.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-20 19:40:52  ericn
+ * -keep track of biggest packet
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -27,8 +30,6 @@
 #include "mpegStream.h"
 #include "mpegUDP.h"
 #include "tickMs.h"
-
-static unsigned const SENDSIZE = 16384 ;
 
 int main( int argc, char const * const argv[] )
 {
@@ -104,6 +105,7 @@ int main( int argc, char const * const argv[] )
                      unsigned long        videoPackets = 0 ;
 
                      long long firstTS = 0 ;
+                     unsigned maxData = 0 ;
 
                      while( 0 < numLeft ){
                         mpegStream_t::frameType_e frameType ;
@@ -136,6 +138,8 @@ int main( int argc, char const * const argv[] )
                            frame.frameLen_ = frameLength ;
                            frame.streamId_ = streamId ;
                            if( frameLength < MPEGUDP_MAXDATA ){
+                              if( maxData < frameLength )
+                                 maxData = frameLength ;
                               memcpy( frame.data_, nextIn+offset, frameLength );
                               int msgSize = (frame.data_+frameLength) - (unsigned char *)&outPacket ;
                               numSent = sendto( sFd, &outPacket, msgSize, 0, 
@@ -162,8 +166,12 @@ int main( int argc, char const * const argv[] )
                      }
 
                      long long endTick = tickMs();
-                     printf( "sent %s in %ld ms (%lu bytes, %lu packets of video)\n", 
-                             fileName, (long)(endTick-startTick), videoBytes, videoPackets );
+                     printf( "sent %s in %ld ms\n"
+                             "    (%lu bytes, %lu packets of video)\n"
+                             "    biggest: %u bytes\n", 
+                             fileName, (long)(endTick-startTick), 
+                             videoBytes, videoPackets, 
+                             maxData );
                      sleep(1);
                   }
                   else
