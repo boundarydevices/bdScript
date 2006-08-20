@@ -1,5 +1,5 @@
 #ifndef __ODOMPLAYLIST_H__
-#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.2 2006-08-20 18:16:54 ericn Exp $"
 
 /*
  * odomPlaylist.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-20 18:16:54  ericn
+ * -fix speeling
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -26,12 +29,12 @@
 class odomCmdInterp_t ;
 
 typedef enum playlistType_t {
-   PLAYLIST_NONE      = -1,
-   PLAYLIST_STILIMAGE = 0,
-   PLAYLIST_MPEG      = 1,
-   PLAYLIST_FLASH     = 2,
-   PLAYLIST_CMD       = 3,        // fileName_ is interpreted as a command
-   PLAYLIST_STREAM    = 4
+   PLAYLIST_NONE       = -1,
+   PLAYLIST_STILLIMAGE = 0,
+   PLAYLIST_MPEG       = 1,
+   PLAYLIST_FLASH      = 2,
+   PLAYLIST_CMD        = 3,        // fileName_ is interpreted as a command
+   PLAYLIST_STREAM     = 4
 };
 
 typedef struct playlistEntry_t {

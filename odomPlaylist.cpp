@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-20 18:16:59  ericn
+ * -fix speeling
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -131,7 +134,7 @@ void odomPlaylist_t::play( unsigned long syncCount )
          next(syncCount);
          break ;
       }
-      case PLAYLIST_STILIMAGE : {
+      case PLAYLIST_STILLIMAGE : {
          closeYUV();
          long int diff = ( syncCount - ((unsigned long)playing_) );
          if( 0 <= diff ){
@@ -185,7 +188,7 @@ void odomPlaylist_t::next( unsigned long syncCount )
             break ;
          }
 
-         case PLAYLIST_STILIMAGE : {
+         case PLAYLIST_STILLIMAGE : {
             image_t image ;
             if( imageFromFile( current_.fileName_, image ) ){
                getFB().render( current_.x_, current_.y_, 
@@ -300,7 +303,7 @@ bool odomPlaylist_t::dispatch(
                entry.type_ = PLAYLIST_FLASH ;
             } // SWF
             else {
-               entry.type_ = PLAYLIST_STILIMAGE ;
+               entry.type_ = PLAYLIST_STILLIMAGE ;
                if( 7 < numParams ){
                   entry.numTicks_ = strtoul(params[7],0,0);
                }
