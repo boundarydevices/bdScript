@@ -1,5 +1,5 @@
 #ifndef __ODOMETER_H__
-#define __ODOMETER_H__ "$Id: odometer.h,v 1.2 2006-08-16 02:31:56 ericn Exp $"
+#define __ODOMETER_H__ "$Id: odometer.h,v 1.3 2006-08-20 18:16:31 ericn Exp $"
 
 /*
  * odometer.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odometer.h,v $
- * Revision 1.2  2006-08-16 02:31:56  ericn
+ * Revision 1.3  2006-08-20 18:16:31  ericn
+ * -fix typo
+ *
+ * Revision 1.2  2006/08/16 02:31:56  ericn
  * -rewrite based on command lists
  *
  * Revision 1.1  2006/06/06 03:04:30  ericn
@@ -36,7 +39,7 @@ public:
                unsigned              initValue,
                unsigned              x,
                unsigned              y,
-               unsigned              maxVelocity_,
+               unsigned              maxVelocity,
                odometerMode_e        mode );
    ~odometer_t( void );
 
