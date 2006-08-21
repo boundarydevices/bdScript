@@ -35,6 +35,8 @@ typedef struct {
     uint8_t * out;
 } convert_yuyv_t;
 
+bool volatile convertingYUYV_ = false ;
+
 static void yuyv_start (void * _id, const mpeg2_fbuf_t * fbuf,
                         const mpeg2_picture_t * picture,
                         const mpeg2_gop_t * gop)
@@ -105,6 +107,8 @@ static void yuyv_copy (void * id, uint8_t * const * src, unsigned int v_offset)
     uint8_t * dst;
     int height;
 
+convertingYUYV_ = true ;
+
     dst = instance->out + 2 * instance->stride * v_offset;
     py = src[0]; pu = src[1]; pv = src[2];
 
@@ -118,6 +122,8 @@ static void yuyv_copy (void * id, uint8_t * const * src, unsigned int v_offset)
             pv += instance->stride >> 1;
         }
     } while (height);
+
+convertingYUYV_ = false ;
 }
 
 int mpeg2convert_yuyv (int stage, void * _id, const mpeg2_sequence_t * seq,
