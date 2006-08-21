@@ -30,3 +30,5 @@ imgFile
 fbSet
 
 odomTTY
+odomVQ
+mpegSendUDP
