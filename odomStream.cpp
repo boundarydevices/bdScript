@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-22 15:58:22  ericn
+ * -match new mpegDecoder interface
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -51,7 +54,7 @@ void odomVideoStream_t::onNewFile(
    state_ = INIT ;
 }
 
-static mpegDecoder_t::picType_e picTypesByState_[] = {
+static mpegDecoder_t::picMask_e picTypesByState_[] = {
    mpegDecoder_t::ptNoB_e   // INIT       = 0,
 ,  mpegDecoder_t::ptNoB_e   // WAITIFRAME = 1,
 ,  mpegDecoder_t::ptAll_e   // PLAYBACK   = 2
