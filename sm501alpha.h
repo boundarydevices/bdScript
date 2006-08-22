@@ -1,5 +1,5 @@
 #ifndef __SM501ALPHA_H__
-#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.2 2006-08-22 17:05:23 ericn Exp $"
 
 /*
  * sm501alpha.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: sm501alpha.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-22 17:05:23  ericn
+ * -rearrange declarations
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -36,17 +39,21 @@ public:
 
    static sm501alpha_t &get( mode_t mode ); // get singleton
    
-   bool isOpen( void ) const { return 0 <= fd_ ; }
 
+   // -------------- valid in either mode
+   bool isOpen( void ) const { return 0 <= fd_ ; }
+   // clear rectangle to transparent
+   void clear( rectangle_t const &r );
+   mode_t getMode( void ) const { return mode_ ; }
+   unsigned fbRamOffset(void) const { return ramOffs_ ; }
+
+   // -------------- only valid in 4:4 mode
    //
    // input should be a packed set of pixel values in 4:4 format
    // high nibble is transparency, low nibble is color palette entry
    //
    void set( rectangle_t const   &r,
              unsigned char const *ac44 );
-
-   // clear rectangle to transparent
-   void clear( rectangle_t const &r );
 
    //
    // draw text (alpha) into palettized buffer
@@ -60,15 +67,13 @@ public:
                   unsigned             desty,
                   unsigned char        colorIdx );
 
+
+   // -------------- only valid in 4:4 mode
    void draw4444( unsigned short const *rgba4444,
                   unsigned              x,
                   unsigned              y,
                   unsigned              w,      // padded to 16-bytes
                   unsigned              h );
-
-   unsigned fbRamOffset(void) const { return ramOffs_ ; }
-
-   mode_t getMode( void ) const { return mode_ ; }
 
    unsigned short *getRow( unsigned y );
 
