@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-22 15:50:10  ericn
+ * -remove GOP pseudo-pic from mpegDecode
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -147,15 +150,13 @@ bool odomVideo_t::playback( void )
       long long when ;
 
       if( decoder_.getPicture( picture, type, temp_ref, when, decoder_.ptAll_e ) ){
-         if( mpegDecoder_t::ptGOP_e != type ){
-            unsigned char *frameMem = outQueue_.pullEmpty();
-            if( 0 == frameMem ){
-               fprintf( stderr, "Error pulling free frame\n" );
-               exit(-1);
-            }
-            memcpy( frameMem, picture, bytesPerPicture_ );
-            outQueue_.putFull( frameMem, when );
+         unsigned char *frameMem = outQueue_.pullEmpty();
+         if( 0 == frameMem ){
+            fprintf( stderr, "Error pulling free frame\n" );
+            exit(-1);
          }
+         memcpy( frameMem, picture, bytesPerPicture_ );
+         outQueue_.putFull( frameMem, when );
       }
       else {
          decoder_.feed( next_->data_, next_->length_, next_->when_ms_ );

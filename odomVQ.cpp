@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVQ.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-22 15:51:03  ericn
+ * -remove GOP pseudo-pic from mpegDecode
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -414,15 +417,6 @@ printf( "%c - %llu\n", decoder.getPicType(picType), pts );
                   ++numPictures ;
                   if( haveHeader )
                   {
-                     if( mpegDecoder_t::ptGOP_e == picType ){
-                     mpeg2_gop_t *gop = (mpeg2_gop_t *)picture ;
-                     if( gop )
-                        printf( "   %02u:%02u:%02u %u 0x%X\n", 
-                                gop->hours, gop->minutes, gop->seconds, 
-                                gop->pictures, gop->flags );
-                        continue ;
-                     }
-
                      if( picTypeMask & ( 1 << picType ) ){
                         unsigned char *out = vq.pullEmpty();
                         if( !out ){
