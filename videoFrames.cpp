@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: videoFrames.cpp,v $
- * Revision 1.4  2006-08-16 02:33:14  ericn
+ * Revision 1.5  2006-08-22 15:50:49  ericn
+ * -match new mpegDecoder interface
+ *
+ * Revision 1.4  2006/08/16 02:33:14  ericn
  * -match new mpegDecoder interface
  *
  * Revision 1.3  2005/11/06 00:49:55  ericn
@@ -156,7 +159,7 @@ bool videoFrames_t :: pull( videoQueue_t :: entry_t *&entry )
 
                decoder_.feed( frame.data_, frame.length_, frame.when_ms_ );
                
-               mpegDecoder_t::picType_e which ;
+               mpegDecoder_t::picMask_e which ;
                if( queue_->isEmpty() )
                {
                   printf( "." );
