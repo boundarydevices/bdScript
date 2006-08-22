@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.5 2006-08-16 02:29:19 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.6 2006-08-22 15:49:40 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.5  2006-08-16 02:29:19  ericn
+ * Revision 1.6  2006-08-22 15:49:40  ericn
+ * -remove GOP, separate mask from picType
+ *
+ * Revision 1.5  2006/08/16 02:29:19  ericn
  * -add temp_ref, timestamp to feed/pull interface
  *
  * Revision 1.4  2006/07/30 21:36:17  ericn
@@ -53,8 +56,10 @@ public:
       ptP_e       = 1,    // P (Predicted) video frame
       ptB_e       = 2,    // B (Bidirectional) video frame
       ptD_e       = 3,    // D (???) video frame 
-      ptGOP_e     = 4,    // GOP header
-      ptUnknown_e = 5,
+      ptUnknown_e = 4
+   };
+
+   enum picMask_e {
       ptOnlyI_e   = 1,
       ptNoB_e     = 3,
       ptAll_e     = 15

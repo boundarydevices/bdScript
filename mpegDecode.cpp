@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.12  2006-08-16 21:22:39  ericn
+ * Revision 1.13  2006-08-22 15:49:42  ericn
+ * -remove GOP, separate mask from picType
+ *
+ * Revision 1.12  2006/08/16 21:22:39  ericn
  * -remove convert_null
  *
  * Revision 1.11  2006/08/16 02:29:12  ericn
@@ -287,9 +290,7 @@ bool mpegDecoder_t :: getPicture
          }
          case STATE_GOP:
          {
-            picture = INFOPTR->gop ;
-            type = ptGOP_e ;
-            return true ;
+            break ;
          }
          case STATE_PICTURE:
          {
@@ -590,14 +591,6 @@ printf( "%c - %llu (%u)\n", decoder.getPicType(picType), when, temp_ref );
                   ++numPictures ;
                   if( haveHeader )
                   {
-                     if( mpegDecoder_t::ptGOP_e == picType ){
-                     mpeg2_gop_t *gop = (mpeg2_gop_t *)picture ;
-                     if( gop )
-                        printf( "   %02u:%02u:%02u %u 0x%X\n", 
-                                gop->hours, gop->minutes, gop->seconds, 
-                                gop->pictures, gop->flags );
-                        continue ;
-                     }
 //                     if( pts != prevPTS )
                      {
                         prevPTS = pts ;
