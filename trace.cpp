@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: trace.cpp,v $
- * Revision 1.1  2006-08-21 12:37:15  ericn
+ * Revision 1.2  2006-08-23 15:47:21  ericn
+ * -use more specific name for callback
+ *
+ * Revision 1.1  2006/08/21 12:37:15  ericn
  * -Initial import
  *
  *
@@ -27,8 +30,8 @@ typedef std::map<unsigned long,unsigned long> longByLong_t ;
 static longByLong_t traceAddrs_ ;
 static unsigned long volatile numAlarms_ = 0 ;
 static unsigned long volatile numAddrs_ = 0 ;
-static callback_t callback_ = 0 ;
-static void      *callbackParam_ = 0 ; 
+static traceCallback_t callback_ = 0 ;
+static void           *callbackParam_ = 0 ; 
 
 bool traceEntry_t::operator<(traceEntry_t const &rhs) const {
    return this->count_ < rhs.count_ ;

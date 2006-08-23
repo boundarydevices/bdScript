@@ -1,5 +1,5 @@
 #ifndef __TRACE_H__
-#define __TRACE_H__ "$Id: trace.h,v 1.1 2006-08-21 12:37:15 ericn Exp $"
+#define __TRACE_H__ "$Id: trace.h,v 1.2 2006-08-23 15:47:19 ericn Exp $"
 
 /*
  * trace.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: trace.h,v $
- * Revision 1.1  2006-08-21 12:37:15  ericn
+ * Revision 1.2  2006-08-23 15:47:19  ericn
+ * -use more specific name for callback
+ *
+ * Revision 1.1  2006/08/21 12:37:15  ericn
  * -Initial import
  *
  *
@@ -23,9 +26,9 @@
  */
 
 
-typedef void (*callback_t)( void * );
+typedef void (*traceCallback_t)( void * );
 
-void startTrace( callback_t cb, void *cbParam );
+void startTrace( traceCallback_t cb, void *cbParam );
 
 struct traceEntry_t {
    unsigned long pc_ ;
