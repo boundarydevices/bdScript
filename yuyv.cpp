@@ -59,30 +59,15 @@ static void yuyv_line (uint8_t * py, uint8_t * pu, uint8_t * pv, void * _dst,
 {
     uint32_t * dst = (uint32_t *) _dst;
 
-    __asm__ volatile (
-       "  pld   [%0, #0]\n"
-       "  pld   [%0, #32]\n"
-       "  pld   [%1, #0]\n"
-       "  pld   [%1, #32]\n"
-       "  pld   [%2, #0]\n"
-       "  pld   [%2, #32]\n"
-       "  pld   [%3, #0]\n"
-       "  pld   [%3, #32]\n"
-       "  pld   [%0, #64]\n"
-       "  pld   [%0, #96]\n"
-       "  pld   [%1, #64]\n"
-       "  pld   [%1, #96]\n"
-       "  pld   [%2, #64]\n"
-       "  pld   [%2, #96]\n"
-       "  pld   [%3, #64]\n"
-       "  pld   [%3, #96]\n"
-       :
-       : "r" (py), "r" (pu), "r" (pv), "r" (dst)
-    );
-
-
     width >>= 4;
     do {
+        __asm__ volatile (
+           "  pld   [%0, #64]\n"
+           "  pld   [%1, #32]\n"
+           "  pld   [%2, #32]\n"
+           :
+           : "r" (py), "r" (pu), "r" (pv)
+        );
         dst[0] = PACK ( py[0], pu[0],  py[1], pv[0]);
         dst[1] = PACK ( py[2], pu[1],  py[3], pv[1]);
         dst[2] = PACK ( py[4], pu[2],  py[5], pv[2]);
