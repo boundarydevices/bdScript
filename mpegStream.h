@@ -1,5 +1,5 @@
 #ifndef __MPEGSTREAM_H__
-#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.2 2006-08-16 02:32:50 ericn Exp $"
+#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.3 2006-08-24 23:59:11 ericn Exp $"
 
 /*
  * mpegStream.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: mpegStream.h,v $
- * Revision 1.2  2006-08-16 02:32:50  ericn
+ * Revision 1.3  2006-08-24 23:59:11  ericn
+ * -gutted in favor of mpegPS.h/.cpp
+ *
+ * Revision 1.2  2006/08/16 02:32:50  ericn
  * -add convenience function
  *
  * Revision 1.1  2005/04/24 18:55:03  ericn
@@ -60,47 +63,9 @@ public:
 
    inline static long long ptsToMs( long long pts ){ return pts/90 ; }
 
-   //
-   // MPEG-2 ps parsing state:
-   //
-   enum state_e {
-      error_e,
-      startCode_e,
-      startCode1_e,
-      startCode2_e,
-      startCode3_e,
-      packLength_e,
-      packLength1_e,
-      skipStuff_e,
-      bufferScale_e,
-      bufferSize_e,
-      pts_e,
-      pts1_e,
-      pts2_e,
-      dts_e,
-      dts1_e,
-      dts2_e,
-      mpeg2Header_e,
-      headerTail_e,
-      pesHeaderData_e,
-      eatBytes_e,
-      numStates_e 
-   };
-
 private:
    long long getPTS(unsigned char next,unsigned char pos) const ;
 
-   state_e       state_ ;
-   unsigned char headerCode_ ;
-   bool          mpeg1_ ; // !mpeg2
-   unsigned char ptsFlags_ ;
-   long long     ptsValue_ ;
-   long long     dtsValue_ ;
-   unsigned      packLength_ ;
-   unsigned char tsLeft_ ;
-   unsigned char pesHeaderLen_ ;
-   unsigned char pesHeaderPos_ ;
-   unsigned char pesHeaderData_[256];
    unsigned      numStreams_ ;
    stream_t      streams_[4];
 };
