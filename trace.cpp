@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: trace.cpp,v $
- * Revision 1.2  2006-08-23 15:47:21  ericn
+ * Revision 1.3  2006-08-24 02:28:02  ericn
+ * -complete the rename
+ *
+ * Revision 1.2  2006/08/23 15:47:21  ericn
  * -use more specific name for callback
  *
  * Revision 1.1  2006/08/21 12:37:15  ericn
@@ -44,11 +47,13 @@ bool first = false ; // set true to capture first frame
 
 static void handler(int signo, siginfo_t *info, void *context )
 {
+#ifdef DUMPFIRSTSTACK
    if( 0 == traceAddrs_.size() ){
       hexDumper_t dumpStack( &signo, 512, (unsigned long)&signo );
       while( dumpStack.nextLine() )
          printf( "%s\n", dumpStack.getLine() );
    }
+#endif
 
    void *btArray[128];
    int const btSize = backtrace(btArray, sizeof(btArray) / sizeof(btArray[0]) );
@@ -90,7 +95,7 @@ void dumpTraces( traceEntry_t const *traces,
 }
 
 
-void startTrace(callback_t cb, void *cbParam){
+void startTrace(traceCallback_t cb, void *cbParam){
    callback_ = cb ;
    callbackParam_ = cbParam ; 
 
