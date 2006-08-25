@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.1  2006-08-25 00:29:45  ericn
+ * Revision 1.2  2006-08-25 14:54:19  ericn
+ * -add timing support
+ *
+ * Revision 1.1  2006/08/25 00:29:45  ericn
  * -Initial import
  *
  *
@@ -127,6 +130,7 @@ mpegQueue_t::mpegQueue_t
    , inRate_( 0 )
    , msPerPic_( 0 )
    , ptsOut_( 0LL )
+   , startPts_( 0LL )
    , decoder_( mpeg2_init() )
 {
    videoFull_.locked_ = 0 ;
@@ -153,7 +157,7 @@ mpegQueue_t::mpegQueue_t
 
 mpegQueue_t::~mpegQueue_t( void )
 {
-   printf( "destroying mpegQueue\n" );
+   debugPrint( "destroying mpegQueue\n" );
    lockAndClean( videoFull_ );
    lockAndClean( videoEmpty_ );
    lockAndClean( audioFull_ );
@@ -229,13 +233,43 @@ mpegQueue_t::videoEntry_t *mpegQueue_t::getPictureBuf(void)
 
 void mpegQueue_t::startPlayback( void )
 {
-   flags_ |= STARTED ;
+   if( 0 == ( flags_ & STARTED ) ){
+      flags_ |= STARTED ;
+   
+      long long const now = tickMs();
+
+      queueLock_t lockVideoQ( &videoFull_.locked_ );
+      assert( lockVideoQ.weLocked() );
+   
+      entryHeader_t *entry = videoFull_.header_.next_ ;
+      startPts_ = now - entry->when_ms_ ;
+      while( entry != &videoFull_.header_ ){
+         entry->when_ms_ += startPts_ ;
+         entry = entry->next_ ;
+      }
+   
+      queueLock_t lockAudioQ( &audioFull_.locked_ );
+      assert( lockAudioQ.weLocked() );
+   
+      entry = audioFull_.header_.next_ ;
+      while( entry != &audioFull_.header_ ){
+         entry->when_ms_ += startPts_ ;
+         entry = entry->next_ ;
+      }
+   }
 }
 
 void mpegQueue_t::queuePicture(videoEntry_t *ve)
 {
    queueLock_t lockVideoQ( &videoFull_.locked_ );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
+
+   debugPrint( "adjust new entry: %llu -> ", ve->header_.when_ms_ );
+
+   ve->header_.when_ms_ += startPts_ ;
+
+   debugPrint( "%llu\n", ve->header_.when_ms_ );
+
    pushTail( videoFull_.header_, &ve->header_ );
 }
 
@@ -315,10 +349,18 @@ void mpegQueue_t::feedVideo
          case STATE_PICTURE:
          {
             int picType = ( infoptr->current_picture->flags & PIC_MASK_CODING_TYPE );
+            if( flags_ & STARTED ){
+                if( msVideoQueued() <= msHalfBuffer() )
+                   flags_ |= NEEDIFRAME ;
+            }
+
             if( ( 0 == ( flags_ & NEEDIFRAME ) )
                 ||
-                ( PIC_FLAG_CODING_TYPE_I == picType ) )
+                ( PIC_FLAG_CODING_TYPE_I == picType ) 
+                ||
+                ( PIC_FLAG_CODING_TYPE_P == picType ) )
             {
+               mpeg2_skip( decoder_, 0 );
                videoEntry_t *const ve = getPictureBuf();
                unsigned char *buf = ve->data_ ;
                unsigned ySize = inBufferLength_/2 ; 
@@ -329,10 +371,17 @@ void mpegQueue_t::feedVideo
                   buf+ySize+uvSize
                };
                mpeg2_set_buf(decoder_, planes, ve);
-               flags_ &= ~NEEDIFRAME ;
+
+               if( PIC_FLAG_CODING_TYPE_I == picType ){
+                  if( msVideoQueued() >= msToBuffer() ){
+                     flags_ &= ~NEEDIFRAME ;
+                     printf( "play b-frames...\n" );
+                  }
+               }
             }
-            else
+            else {
                mpeg2_skip( decoder_, 1 );
+            }
             
             break;
          } // PICTURE
@@ -362,6 +411,7 @@ assert( ve->length_ == inBufferLength_ );
          case STATE_BUFFER :
          case STATE_SEQUENCE_REPEATED:
          case STATE_GOP:
+         case STATE_END:
             break ;
          case STATE_INVALID:
             printf( "invalid state\n" );
@@ -438,7 +488,7 @@ void mpegQueue_t::playVideo( long long when )
          while( !isEmpty( videoFull_.header_ ) ){
             videoEntry_t *const ve = (videoEntry_t *)videoFull_.header_.next_ ;
             if( 0 <= ( when-ve->header_.when_ms_ ) ){
-
+// printf( "play: %llu/%llu\n", ve->header_.when_ms_, when );
                // peek ahead (maybe we can skip a write
                if( ( ve->header_.next_ != &videoFull_.header_ )
                    &&
@@ -556,7 +606,7 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
                } // no peek ahead
             } // time to play
             else
-               printf( "idle: %llu/%llu\n", when, ve->header_.when_ms_ );
+               debugPrint( "idle: %llu/%llu\n", when, ve->header_.when_ms_ );
 
             // continue from the middle
             break ;
@@ -791,6 +841,8 @@ debugPrint( "need more: %u/%u/%u\n", numLeft, offset, frameLen );
 //printf( "%d/%u/%08lX/%08lx\n", frameType, frameLen, adler32( 0, frameStart, frameLen ), adler );
 
                if( mpegStream_t::videoFrame_e == frameType ){
+                  while( q.msDoubleBuffer() <= q.msVideoQueued() )
+                     pause();
                   q.feedVideo( frameStart, frameLen, false, pts );
                } else if( mpegStream_t::audioFrame_e == frameType ){
                   q.feedAudio( frameStart, frameLen, false, pts );
@@ -803,16 +855,19 @@ debugPrint( "need more: %u/%u/%u\n", numLeft, offset, frameLen );
             }
 
             unsigned const used = nextIn - inBuf ;
-            if( used < (unsigned)numRead )
+            if( used < (unsigned)numRead ){
                globalOffs = numRead - (nextIn-inBuf);
+            }
             else
                globalOffs = 0 ;
-if( (unsigned)globalOffs >= inSize ){
-   printf( "%p out of range: %p/%p\n", nextIn, inBuf, inBuf+numRead );
-}
+
             if( globalOffs )
                memcpy( inBuf, nextIn, globalOffs );
          }
+
+         while( 0 < q.msVideoQueued() )
+            pause();
+
          long long endMs = tickMs();
          printf( "%lu ms elapsed\n", (unsigned long)(endMs-startMs) );
          
