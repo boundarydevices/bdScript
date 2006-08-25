@@ -112,6 +112,7 @@ OBJS = \
        serialPoll.o \
        sniffWLAN.o \
        tcpPoll.o \
+       trace.o \
        ttyPoll.o \
        udpPoll.o \
        ultoa.o \
@@ -157,7 +158,7 @@ else
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o 
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o
 endif
 
 ifeq (y,$(KERNEL_FB_SM501))
@@ -348,6 +349,16 @@ odomVQ: odomVQMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomVQ odomVQMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odomVQ | sort >odomVQ.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+mpegQueueMain.o: mpegQueue.cpp mpegQueue.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -DMD5OUTPUT -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+mpegQueue: mpegQueueMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegQueue mpegQueueMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegQueue | sort >mpegQueue.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -596,7 +607,7 @@ ffTest: ffTest.cpp $(LIB)
 #	$(STRIP) $@
 
 mpDemux: mpDemux.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) -lavformat -lavcodec $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread -lsupc++
 	$(STRIP) $@
 
 mpeg2mp3: mpeg2mp3.cpp $(LIB)
