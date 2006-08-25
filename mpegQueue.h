@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.1 2006-08-25 00:29:45 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.2 2006-08-25 14:53:48 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.1  2006-08-25 00:29:45  ericn
+ * Revision 1.2  2006-08-25 14:53:48  ericn
+ * -add timing support, queuing info methods
+ *
+ * Revision 1.1  2006/08/25 00:29:45  ericn
  * -Initial import
  *
  *
@@ -96,6 +99,9 @@ public:
    // stats 
    //
    unsigned long msVideoQueued( void ) const ;
+   inline unsigned long msToBuffer( void ) const { return bufferMs_ ; }
+   inline unsigned long msHalfBuffer( void ) const { return halfBuffer_ ; }
+   inline unsigned long msDoubleBuffer( void ) const { return doubleBuffer_ ; }
 
 private:
    mpegQueue_t( mpegQueue_t const & );
@@ -165,6 +171,7 @@ private:
    unsigned      inRate_ ;
    long long     msPerPic_ ;
    long long     ptsOut_ ;
+   long long     startPts_ ;
 
    queueHeader_t videoFull_ ;
    queueHeader_t videoEmpty_ ;
