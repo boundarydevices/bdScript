@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.3  2006-08-26 16:11:32  ericn
+ * Revision 1.4  2006-08-26 17:12:51  ericn
+ * -clean decoder on input discontinuity
+ *
+ * Revision 1.3  2006/08/26 16:11:32  ericn
  * Moved inlines into .cpp module
  * Added bookkeeping of allocations
  * Reworked MPEG decoder buffering to free allocations
@@ -403,6 +406,7 @@ void mpegQueue_t::feedVideo
    if( discontinuity ){
       flags_ |= NEEDIFRAME ;
       mpeg2_reset( decoder_, 1 );
+      cleanDecoderBufs();
    }
 
    mpeg2_buffer( decoder_, (uint8_t *)data, (uint8_t *)data + length );
