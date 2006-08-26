@@ -1,5 +1,5 @@
 #ifndef __ODOMPLAYLIST_H__
-#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.2 2006-08-20 18:16:54 ericn Exp $"
+#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.3 2006-08-26 16:05:16 ericn Exp $"
 
 /*
  * odomPlaylist.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.h,v $
- * Revision 1.2  2006-08-20 18:16:54  ericn
+ * Revision 1.3  2006-08-26 16:05:16  ericn
+ * -allow access to YUV without geometry
+ *
+ * Revision 1.2  2006/08/20 18:16:54  ericn
  * -fix speeling
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -75,6 +78,7 @@ public:
    // 
    // interface for media players (flash, MPEG)
    //
+   int fdYUV( void );
    int fdYUV( unsigned inw,
               unsigned inh,
               unsigned outx, 
