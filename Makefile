@@ -718,6 +718,14 @@ mpegDecode: mpegDecodeMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARY
 	arm-linux-nm --demangle mpegDecode | sort >mpegDecode.map
 	$(STRIP) $@
 
+mpegRxUDPMain.o: mpegRxUDP.o
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST -c $(IFLAGS) -O2 -o mpegRxUDPMain.o mpegRxUDP.cpp
+
+mpegRxUDP: mpegRxUDPMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegRxUDP mpegRxUDPMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegRxUDP | sort >mpegRxUDP.map
+	$(STRIP) $@
+
 hexDump: hexDump.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o hexDump -D__STANDALONE__ -Xlinker -Map -Xlinker hexDump.map hexDump.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
