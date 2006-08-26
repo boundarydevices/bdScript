@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.2 2006-08-25 14:53:48 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.3 2006-08-26 16:07:39 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.2  2006-08-25 14:53:48  ericn
+ * Revision 1.3  2006-08-26 16:07:39  ericn
+ * -move inlines into .cpp module, add output rect
+ *
+ * Revision 1.2  2006/08/25 14:53:48  ericn
  * -add timing support, queuing info methods
  *
  * Revision 1.1  2006/08/25 00:29:45  ericn
@@ -68,24 +71,31 @@ extern "C" {
 #include <openssl/md5.h>
 #endif
 
+#include "fbDev.h"
+
 class mpegQueue_t {
 public:
-   mpegQueue_t( int      dspFd,
-                int      yuvFd,
-                unsigned secondsToBuffer );
+   mpegQueue_t( int                dspFd,
+                int                yuvFd,
+                unsigned           secondsToBuffer,
+                rectangle_t const &outRect );
    ~mpegQueue_t( void );
+   void cleanup( void ); // allows memory-allocation checking before destructor
 
    // feeder-side interface
    void feedAudio
          ( unsigned char const *data, 
            unsigned             length,
            bool                 discontinuity,
-           long long            pts ); // transport PTS
+           long long            offset_ms ); // adjusted to real-time after buffer is full
    void feedVideo
          ( unsigned char const *data, 
            unsigned             length,
            bool                 discontinuity,
-           long long            pts ); // transport PTS
+           long long            offset_ms ); // adjusted to real-time after buffer is full
+   // used by streaming when a 'new' file starts
+   void adjustPTS( long long startPts );
+
 
    //
    // reader-side interface
@@ -102,6 +112,11 @@ public:
    inline unsigned long msToBuffer( void ) const { return bufferMs_ ; }
    inline unsigned long msHalfBuffer( void ) const { return halfBuffer_ ; }
    inline unsigned long msDoubleBuffer( void ) const { return doubleBuffer_ ; }
+
+   inline static long long ptsToMs( long long pts ){ return pts/90 ; }
+
+   inline unsigned numAllocated( void ) const { return allocCount_ ; }
+   inline unsigned numFreed( void ) const { return freeCount_ ; }
 
 private:
    mpegQueue_t( mpegQueue_t const & );
@@ -120,6 +135,7 @@ private:
    inline static bool isEmpty( entryHeader_t const & );
    inline static entryHeader_t *pullHead( entryHeader_t & );
    inline static void pushTail( entryHeader_t &head, entryHeader_t *entry );
+   inline static void unlink( entryHeader_t &entry );
    inline static void freeEntry( entryHeader_t *e );
 
    struct queueHeader_t {
@@ -139,6 +155,8 @@ private:
 
    videoEntry_t *getPictureBuf();
    void queuePicture(videoEntry_t *);
+   void addDecoderBuf();
+   void cleanDecoderBufs();
 
    void startPlayback( void );
 
@@ -149,8 +167,10 @@ private:
       unsigned char  data_[1];
    };
 
-   int const dspFd_ ;
-   int const yuvFd_ ;
+   int const  dspFd_ ;
+   int const  yuvFd_ ;
+
+   rectangle_t const outRect_ ;
    
    unsigned long const bufferMs_ ;
    unsigned long const halfBuffer_ ;
@@ -170,14 +190,18 @@ private:
 
    unsigned      inRate_ ;
    long long     msPerPic_ ;
-   long long     ptsOut_ ;
-   long long     startPts_ ;
+   long long     msOut_ ;
+   long long     startMs_ ;
 
    queueHeader_t videoFull_ ;
    queueHeader_t videoEmpty_ ;
+   queueHeader_t decoderBufs_ ;
 
    queueHeader_t audioFull_ ;
    queueHeader_t audioEmpty_ ;
+
+   unsigned      allocCount_ ;
+   unsigned      freeCount_ ;
 
    mpeg2dec_t * const decoder_ ;
 
@@ -188,41 +212,6 @@ private:
    friend class queueLock_t ;
 };
 
-
-bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
-{
-   return ( eh.prev_ == eh.next_ )
-          &&
-          ( eh.prev_ == &eh );
-}
-   
-mpegQueue_t::entryHeader_t *mpegQueue_t::pullHead( entryHeader_t &eh )
-{
-   entryHeader_t *e = eh.next_ ;
-   if( e != &eh ){
-      e->next_->prev_ = &eh ;
-      eh.next_ = e->next_ ;
-      
-      e->next_ = e->prev_ = e ;     // decouple
-      return e ;
-   }
-
-   return 0 ;
-}
-
-void mpegQueue_t::pushTail( entryHeader_t &head, 
-                            entryHeader_t *entry )
-{
-   entry->prev_ = head.prev_;
-   entry->next_ = &head ;
-   head.prev_->next_ = entry ;
-   head.prev_ = entry ;
-}
-
-void mpegQueue_t::freeEntry( entryHeader_t *e )
-{
-   delete [] (char *)e ;
-}
 
 #endif
 
