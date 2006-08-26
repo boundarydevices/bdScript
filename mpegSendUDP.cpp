@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegSendUDP.cpp,v $
- * Revision 1.2  2006-08-20 19:40:52  ericn
+ * Revision 1.3  2006-08-26 16:07:00  ericn
+ * -show PTS range for each file
+ *
+ * Revision 1.2  2006/08/20 19:40:52  ericn
  * -keep track of biggest packet
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -94,6 +97,8 @@ int main( int argc, char const * const argv[] )
 
                      printf( "--- sending " ); fwrite( header.name_, header.nameLength_, 1, stdout ); printf( "\n" );
 
+                     long long firstPTS = 0LL ;
+                     long long lastPTS = 0LL ;
                      mpegFrame_t &frame = outPacket.d.frame_ ;
                      outPacket.type_ = MPEGUDP_DATA ;
                      outPacket.sequence_++ ;
@@ -116,6 +121,10 @@ int main( int argc, char const * const argv[] )
                                              frame.pts_, frame.dts_, streamId ) ){
                            frame.pts_ = mpegStream_t::ptsToMs(frame.pts_);
                            frame.dts_ = mpegStream_t::ptsToMs(frame.dts_);
+                           if( 0LL == firstPTS )
+                              firstPTS = frame.pts_ ;
+                           if( 0 != frame.pts_ )
+                              lastPTS = frame.pts_ ;
 // printf( "   %llu\n", frame.pts_ );
                            if( 0 != frame.pts_ ){
                               if( 0 == firstTS ){
@@ -168,10 +177,14 @@ int main( int argc, char const * const argv[] )
                      long long endTick = tickMs();
                      printf( "sent %s in %ld ms\n"
                              "    (%lu bytes, %lu packets of video)\n"
-                             "    biggest: %u bytes\n", 
+                             "    biggest: %u bytes\n"
+                             "    pts range: %u (%llu->%llu)\n", 
                              fileName, (long)(endTick-startTick), 
                              videoBytes, videoPackets, 
-                             maxData );
+                             maxData,
+                             (unsigned)(lastPTS-firstPTS),
+                             firstPTS, lastPTS
+                              );
                      sleep(1);
                   }
                   else
