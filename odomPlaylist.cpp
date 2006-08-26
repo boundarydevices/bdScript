@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.2  2006-08-20 18:16:59  ericn
+ * Revision 1.3  2006-08-26 16:05:44  ericn
+ * -allow access to YUV without geometry, use new video stream interface
+ *
+ * Revision 1.2  2006/08/20 18:16:59  ericn
  * -fix speeling
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -47,7 +50,7 @@ odomPlaylist_t::odomPlaylist_t( void )
    : playing_( 0 )
    , add_( 0 )
    , take_( 0 )
-   , fdYUV_(-1)
+   , fdYUV_(open( "/dev/yuv", O_WRONLY ))
    , yuvInW_(-1U)
    , yuvInH_(-1U)
    , yuvOutX_(-1U)
@@ -233,12 +236,12 @@ void odomPlaylist_t::next( unsigned long syncCount )
          
          case PLAYLIST_STREAM : {
             printf( "-----> starting stream on port %s\n", current_.fileName_ );
-            odomVideoStream_t *stream = new odomVideoStream_t( *this, 
-                                                        strtoul(current_.fileName_,0,0),
-                                                        current_.x_,
-                                                        current_.y_,
-                                                        current_.w_,
-                                                        current_.h_ );
+            rectangle_t outRect ;
+            outRect.xLeft_  = current_.x_ ;
+            outRect.yTop_   = current_.y_ ;
+            outRect.width_  = current_.w_ ;
+            outRect.height_ = current_.h_ ;
+            odomVideoStream_t *stream = new odomVideoStream_t( *this, strtoul(current_.fileName_,0,0), outRect );
             if( stream->isBound() ) 
                playing_ = stream ;
             else {
@@ -378,6 +381,15 @@ bool odomPlaylist_t::dispatch(
    return false ;
 }
 
+int odomPlaylist_t::fdYUV( void )
+{
+   if( 0 > fdYUV_ ) {
+      fdYUV_ = open( "/dev/yuv", O_WRONLY );
+      yuvInW_ = -1U ; // force ioctl
+   }
+   return fdYUV_ ;
+}
+
 int odomPlaylist_t::fdYUV( 
    unsigned inw,
    unsigned inh,
@@ -386,11 +398,8 @@ int odomPlaylist_t::fdYUV(
    unsigned outw, 
    unsigned outh )
 {
-   if( 0 > fdYUV_ ) {
-      fdYUV_ = open( "/dev/yuv", O_WRONLY );
-      yuvInW_ = -1U ; // force ioctl
-   }
-   
+   fdYUV(); // force open
+
    if( ( inw != yuvInW_ )
        ||
        ( inh != yuvInH_ )
