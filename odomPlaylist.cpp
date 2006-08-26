@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.3  2006-08-26 16:05:44  ericn
+ * Revision 1.4  2006-08-26 17:13:04  ericn
+ * -add dump for streams
+ *
+ * Revision 1.3  2006/08/26 16:05:44  ericn
  * -allow access to YUV without geometry, use new video stream interface
  *
  * Revision 1.2  2006/08/20 18:16:59  ericn
@@ -259,7 +262,8 @@ static char const * const fileTypes_[] = {
    "STILL",
    "MPEG",
    "FLASH",
-   "CMD"
+   "CMD",
+   "STREAM"
 };
 
 void odomPlaylist_t::dump( void ){
@@ -273,6 +277,8 @@ void odomPlaylist_t::dump( void ){
    printf( "current == %s/%s\n", fileTypes_[current_.type_+1], current_.fileName_ );
    if( PLAYLIST_MPEG == current_.type_ ){
       ((odomVideo_t *)playing_)->dump();
+   } else if( PLAYLIST_STREAM == current_.type_ ){
+      ((odomVideoStream_t *)playing_)->dump();
    }
 }
 
