@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.3  2006-08-26 16:06:18  ericn
+ * Revision 1.4  2006-08-26 17:13:22  ericn
+ * -dump output queue stats
+ *
+ * Revision 1.3  2006/08/26 16:06:18  ericn
  * -use new mpegQueue instead of decoder+odomVQ
  *
  * Revision 1.2  2006/08/22 15:58:22  ericn
@@ -95,6 +98,13 @@ void odomVideoStream_t::doOutput( void )
 
 void odomVideoStream_t::dump( void )
 {
+   printf( "%lu ms of video queued\n"
+           "   %u buffers allocated\n"
+           "   %u buffers freed\n"
+         ,  outQueue_.msVideoQueued()
+         ,  outQueue_.numAllocated()
+         ,  outQueue_.numFreed()
+         );
 }
 
 
