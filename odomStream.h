@@ -1,5 +1,5 @@
 #ifndef __ODOMSTREAM_H__
-#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.2 2006-08-26 16:06:15 ericn Exp $"
 
 /*
  * odomStream.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomStream.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-26 16:06:15  ericn
+ * -use new mpegQueue instead of decoder+odomVQ
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -22,17 +25,14 @@
 
 #include "mpegRxUDP.h"
 #include "odomPlaylist.h"
-#include "odomVQ.h"
-#include "mpegDecode.h"
+#include "mpegQueue.h"
+#include "fbDev.h"
 
 class odomVideoStream_t : public mpegRxUDP_t {
 public:
-   odomVideoStream_t( odomPlaylist_t &playlist, // used to get video fd
-                      unsigned        port,
-                      unsigned        outx = 0,
-                      unsigned        outy = 0,
-                      unsigned        outw = 0,
-                      unsigned        outh = 0 );
+   odomVideoStream_t( odomPlaylist_t    &playlist, // used to get video fd
+                      unsigned           port,
+                      rectangle_t const &outRect );
    virtual ~odomVideoStream_t( void );
 
    virtual void onNewFile( char const *fileName,
@@ -60,17 +60,14 @@ private:
       PLAYBACK   = 2
    };
 
-   odomVideoStream_t( odomVideoStream_t const & );
+   odomVideoStream_t( odomVideoStream_t const & ); // no copies
    odomPlaylist_t                 &playlist_ ;
-   mpegDecoder_t                   decoder_ ;
-   odometerVideoQueue_t            outQueue_ ;
-   unsigned                        outX_ ;
-   unsigned                        outY_ ;
-   unsigned                        outW_ ;
-   unsigned                        outH_ ;
+   rectangle_t               const outRect_ ;
+   mpegQueue_t                     outQueue_ ;
    unsigned                        bytesPerPicture_ ;
-   long long                       start_ ;
-   state_e                         state_ ;
+   long long                       startMs_ ;
+   long long                       lastMs_ ;
+   bool                            firstFrame_ ;
 };
 
 

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.2  2006-08-22 15:58:22  ericn
+ * Revision 1.3  2006-08-26 16:06:18  ericn
+ * -use new mpegQueue instead of decoder+odomVQ
+ *
+ * Revision 1.2  2006/08/22 15:58:22  ericn
  * -match new mpegDecoder interface
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -20,25 +23,21 @@
 
 
 #include "odomStream.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "tickMs.h"
 
 odomVideoStream_t::odomVideoStream_t
-   ( odomPlaylist_t &playlist, // used to get video fd
-     unsigned        port,
-     unsigned        outx,
-     unsigned        outy,
-     unsigned        outw,
-     unsigned        outh )
+   ( odomPlaylist_t    &playlist, // used to get video fd
+     unsigned           port,
+     rectangle_t const &outRect )
    : mpegRxUDP_t( port )
    , playlist_( playlist )
-   , decoder_()
-   , outQueue_()
-   , outX_( outx )
-   , outY_( outy )
-   , outW_( outw )
-   , outH_( outh )
-   , bytesPerPicture_( 0 )
-   , start_( 0LL )
-   , state_( INIT )
+   , outRect_( outRect )
+   , outQueue_( open( "/dev/dsp", O_WRONLY ), playlist.fdYUV(), 1, outRect )
+   , firstFrame_( true )
 {
 }
 
@@ -51,14 +50,8 @@ void odomVideoStream_t::onNewFile(
    unsigned    fileNameLen )
 {
    printf( "new file %s\n", fileName );
-   state_ = INIT ;
+   firstFrame_ = true ;
 }
-
-static mpegDecoder_t::picMask_e picTypesByState_[] = {
-   mpegDecoder_t::ptNoB_e   // INIT       = 0,
-,  mpegDecoder_t::ptNoB_e   // WAITIFRAME = 1,
-,  mpegDecoder_t::ptAll_e   // PLAYBACK   = 2
-};
 
 void odomVideoStream_t::onRx( 
    bool                 isVideo,
@@ -68,55 +61,20 @@ void odomVideoStream_t::onRx(
    long long            pts,
    long long            dts )
 {
+   discont = discont | firstFrame_ ;
+
    if( isVideo ){
-      decoder_.feed( fData, length, pts );
-      void const *picture = 0 ;
-      unsigned temp_ref ;
-      long long when = 0LL ;
-      mpegDecoder_t::picType_e type ;
-
-      unsigned mask = discont 
-                    ? mpegDecoder_t::ptNoB_e
-                    : mpegDecoder_t::ptAll_e ;
-
-      while( decoder_.getPicture( picture, type, temp_ref, when, picTypesByState_[state_] & mask ) ){
-//         printf( "state %d, picture: %d/%p\n", state_, type, picture );
-         switch( state_ ){
-            case INIT : {
-               if( !decoder_.haveHeader() )
-                  break ;
-               
-               outQueue_.init( decoder_.width(), decoder_.height() );
-               bytesPerPicture_ = decoder_.width() * decoder_.height() * 2 ;
-               printf( "%u x %u\n", decoder_.width(), decoder_.height() );
-
-               state_ = WAITIFRAME ;
-               // intentional fall-through
-            }
-            case WAITIFRAME: {
-               if( mpegDecoder_t::ptI_e != type )
-                  break ;
-               
-               // intentional fall-through
-               state_ = PLAYBACK ;
-            }
-            
-            case PLAYBACK: {
-               if( mpegDecoder_t::ptD_e > type ){
-                  unsigned char *frameMem = outQueue_.pullEmpty();
-                  if( 0 == frameMem ){
-                     fprintf( stderr, "Error pulling free frame\n" );
-                  } else {
-                     memcpy( frameMem, picture, bytesPerPicture_ );
-                     outQueue_.putFull( frameMem, when );
-                     if( outQueue_.isFull() && !outQueue_.started() )
-                        outQueue_.start();
-                  }
-               }
-            }
-         }
+      if( firstFrame_ ){
+         outQueue_.adjustPTS( pts );
+         firstFrame_ = false ;
+         startMs_ = pts ;
       }
+      if( 0 != pts )
+         lastMs_ = pts ;
+      outQueue_.feedVideo( fData, length, discont, pts );
    }
+   else
+      outQueue_.feedAudio( fData, length, discont, pts );
 }
 
 void odomVideoStream_t::onEOF( 
@@ -126,34 +84,13 @@ void odomVideoStream_t::onEOF(
    unsigned long audioBytes )
 {
    printf( "eof(%s): %lu bytes (%lu video, %lu audio)\n", fileName, totalBytes, videoBytes, audioBytes );
-   state_ = INIT ;
+   printf( "ms: %ld... %llu->%llu\n", (unsigned long)(lastMs_-startMs_), startMs_, lastMs_ );
 }
 
 void odomVideoStream_t::doOutput( void )
 {
-   if( outQueue_.started() && !outQueue_.isEmpty() ){
-      long long pts ;
-
-      unsigned char *playbackFrame = outQueue_.pull( 0, &pts );
-
-      if( playbackFrame ){
-         int fd = playlist_.fdYUV( decoder_.width(),
-                                   decoder_.height(),
-                                   outX_,
-                                   outY_,
-                                   outW_,
-                                   outH_ );
-         if( 0 <= fd ){
-            int const numWritten = write( fd, playbackFrame, bytesPerPicture_ );
-            if( (unsigned)numWritten != bytesPerPicture_ )
-               fprintf( stderr, "write %d of %lu bytes\n", numWritten, bytesPerPicture_ );
-         }
-         else
-            fprintf( stderr, "Invalid fdYUV\n" );
-         
-         outQueue_.putEmpty( playbackFrame );
-      }
-   }
+   long long const now = tickMs();
+   outQueue_.playVideo( now );
 }
 
 void odomVideoStream_t::dump( void )
