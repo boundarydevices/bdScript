@@ -8,7 +8,14 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.2  2006-08-25 14:54:19  ericn
+ * Revision 1.3  2006-08-26 16:11:32  ericn
+ * Moved inlines into .cpp module
+ * Added bookkeeping of allocations
+ * Reworked MPEG decoder buffering to free allocations
+ * Reworked test program to support multiple file names on the command line
+ * Added output rectangle parameter
+ *
+ * Revision 1.2  2006/08/25 14:54:19  ericn
  * -add timing support
  *
  * Revision 1.1  2006/08/25 00:29:45  ericn
@@ -18,6 +25,7 @@
  * Copyright Boundary Devices, Inc. 2006
  */
 
+// #define DEBUGPRINT
 
 #include "mpegQueue.h"
 #include <assert.h>
@@ -82,10 +90,11 @@ queueLock_t::queueLock_t( unsigned volatile *lock )
    debugPrint( "locking: %p/%d...", this, *lock );
    unsigned old ;
    unsigned newval = 1 ;
-   __asm__ __volatile__ ("swp %0, %1, [%2]"
-					: "=&r" (old)
-					: "r" (newval), "r" (lock)
-					: "memory", "cc");
+   __asm__ __volatile__ (
+      "swp %0, %1, [%2]"
+      : "=&r" (old)
+      : "r" (newval), "r" (lock)
+      : "memory", "cc");
    prevVal_ = old ;
    debugPrint( "%d\n", *lock );
 }
@@ -98,23 +107,76 @@ queueLock_t::~queueLock_t( void )
       unsigned newval = 0 ;
       unsigned volatile *lock = lock_ ; // need it in a register
 
-      __asm__ __volatile__ ("swp %0, %1, [%2]"
-   					: "=&r" (ret)
-   					: "r" (newval), "r" (lock)
-   					: "memory", "cc");
+      __asm__ __volatile__ (
+         "swp %0, %1, [%2]"
+   	 : "=&r" (ret)
+   	 : "r" (newval), "r" (lock)
+   	 : "memory", "cc");
       assert( 1 == ret );
-      debugPrint( "%d\n", *lock );
+      debugPrint( "%d\n", *lock );
    }
    else
       debugPrint( "don't unlock\n" );
 }
 
+bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
+{
+   return ( eh.prev_ == eh.next_ )
+          &&
+          ( eh.prev_ == &eh );
+}
+   
+mpegQueue_t::entryHeader_t *mpegQueue_t::pullHead( entryHeader_t &eh )
+{
+   entryHeader_t *e = eh.next_ ;
+   if( e != &eh ){
+      e->next_->prev_ = &eh ;
+      eh.next_ = e->next_ ;
+      
+      e->next_ = e->prev_ = e ;     // decouple
+      return e ;
+   }
+
+   return 0 ;
+}
+
+void mpegQueue_t::pushTail( entryHeader_t &head, 
+                            entryHeader_t *entry )
+{
+   assert( entry );
+   assert( entry->next_ == entry );
+   assert( entry->prev_ == entry );
+
+   entry->prev_ = head.prev_;
+   entry->next_ = &head ;
+   head.prev_->next_ = entry ;
+   head.prev_ = entry ;
+}
+
+void mpegQueue_t::freeEntry( entryHeader_t *e )
+{
+   assert( e && ( e->next_ == e ) && ( e->prev_ == e ) );
+   delete [] (char *)e ;
+}
+   
+void mpegQueue_t::unlink( entryHeader_t &entry )
+{
+   assert( entry.next_ && ( entry.next_ != &entry ) );
+   assert( entry.prev_ && ( entry.prev_ != &entry ) );
+   entry.next_->prev_ = entry.prev_ ;
+   entry.prev_->next_ = entry.next_ ;
+
+   entry.next_ = entry.prev_ = &entry ;
+}
+
 mpegQueue_t::mpegQueue_t
    ( int      dspFd,
      int      yuvFd,
-     unsigned bufferSeconds )
+     unsigned bufferSeconds,
+     rectangle_t const &outRect )
    : dspFd_( dspFd )
    , yuvFd_( yuvFd )
+   , outRect_( outRect )
    , bufferMs_( bufferSeconds*1000 )
    , halfBuffer_(bufferMs_/2)
    , doubleBuffer_(bufferMs_*2)
@@ -129,10 +191,13 @@ mpegQueue_t::mpegQueue_t
    , inBufferLength_( 0 )
    , inRate_( 0 )
    , msPerPic_( 0 )
-   , ptsOut_( 0LL )
-   , startPts_( 0LL )
+   , msOut_( 0LL )
+   , startMs_( 0LL )
+   , allocCount_( 0 )
+   , freeCount_( 0 )
    , decoder_( mpeg2_init() )
 {
+printf( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
    videoFull_.locked_ = 0 ;
    videoFull_.header_.prev_ 
       = videoFull_.header_.next_ 
@@ -141,6 +206,10 @@ mpegQueue_t::mpegQueue_t
    videoEmpty_.header_.prev_ 
       = videoEmpty_.header_.next_ 
       = &videoEmpty_.header_ ;
+   decoderBufs_.locked_ = 0 ;
+   decoderBufs_.header_.prev_ 
+      = decoderBufs_.header_.next_ 
+      = &decoderBufs_.header_ ;
    audioFull_.locked_ = 0 ;
    audioFull_.header_.prev_ 
       = audioFull_.header_.next_ 
@@ -155,13 +224,19 @@ mpegQueue_t::mpegQueue_t
 #endif
 }
 
-mpegQueue_t::~mpegQueue_t( void )
+void mpegQueue_t::cleanup( void )
 {
-   debugPrint( "destroying mpegQueue\n" );
+   cleanDecoderBufs();
+   lockAndClean( decoderBufs_ );
    lockAndClean( videoFull_ );
    lockAndClean( videoEmpty_ );
    lockAndClean( audioFull_ );
    lockAndClean( audioEmpty_ );
+}
+
+mpegQueue_t::~mpegQueue_t( void )
+{
+   cleanup();
 
    if( decoder_ )
       mpeg2_close(decoder_);
@@ -211,22 +286,29 @@ mpegQueue_t::videoEntry_t *mpegQueue_t::getPictureBuf(void)
    while( 0 != ( next = pullHead( videoEmpty_.header_ ) ) ){
       videoEntry_t *const ve = (videoEntry_t *)next ;
       if( ve->length_ == inBufferLength_ ){
+debugPrint( "recycle buffer: %p\n", ve );
          ve->width_ = inWidth_ ;
          ve->height_ = inHeight_ ;
+         ++allocCount_ ;
          return ve ;
       }
-      else
+      else {
          freeEntry( next );
+      }
    }
 
    unsigned size = sizeof(videoEntry_t)
                   -fieldsize(videoEntry_t,data_)
                   +inBufferLength_ ;
+debugPrint( "allocate buffer of size : %u\n", size );
+   ++allocCount_ ;
+
    unsigned char * const data = new unsigned char [ size ];
    videoEntry_t *const ve = (videoEntry_t *)data ;
    ve->length_ = inBufferLength_ ;
    ve->width_ = inWidth_ ;
    ve->height_ = inHeight_ ;
+   ve->header_.next_ = ve->header_.prev_ = &ve->header_ ;
 
    return ve ;
 }
@@ -240,22 +322,33 @@ void mpegQueue_t::startPlayback( void )
 
       queueLock_t lockVideoQ( &videoFull_.locked_ );
       assert( lockVideoQ.weLocked() );
-   
+
       entryHeader_t *entry = videoFull_.header_.next_ ;
-      startPts_ = now - entry->when_ms_ ;
+      startMs_ = now - entry->when_ms_ ;
+
       while( entry != &videoFull_.header_ ){
-         entry->when_ms_ += startPts_ ;
+         entry->when_ms_ += startMs_ ;
          entry = entry->next_ ;
       }
-   
+
       queueLock_t lockAudioQ( &audioFull_.locked_ );
       assert( lockAudioQ.weLocked() );
-   
+
       entry = audioFull_.header_.next_ ;
       while( entry != &audioFull_.header_ ){
-         entry->when_ms_ += startPts_ ;
+         entry->when_ms_ += startMs_ ;
          entry = entry->next_ ;
       }
+   }
+}
+
+void mpegQueue_t::adjustPTS( long long startPts )
+{
+   if( flags_ & STARTED ){
+      long long nowPlus = tickMs() + bufferMs_ - startPts ;
+
+      startMs_ = nowPlus ;
+      msOut_ = startPts ;
    }
 }
 
@@ -264,25 +357,48 @@ void mpegQueue_t::queuePicture(videoEntry_t *ve)
    queueLock_t lockVideoQ( &videoFull_.locked_ );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
 
-   debugPrint( "adjust new entry: %llu -> ", ve->header_.when_ms_ );
-
-   ve->header_.when_ms_ += startPts_ ;
-
-   debugPrint( "%llu\n", ve->header_.when_ms_ );
+   ve->header_.when_ms_ += startMs_ ;
 
    pushTail( videoFull_.header_, &ve->header_ );
+}
+
+void mpegQueue_t::addDecoderBuf()
+{
+   videoEntry_t *const ve = getPictureBuf();
+   unsigned char *buf = ve->data_ ;
+   unsigned ySize = inBufferLength_/2 ; 
+   unsigned uvSize = ySize / 2 ;
+   unsigned char *planes[3] = { 
+      buf,
+      buf+ySize,
+      buf+ySize+uvSize
+   };
+   mpeg2_set_buf(decoder_, planes, ve);
+   pushTail( decoderBufs_.header_, &ve->header_ );
+}
+
+void mpegQueue_t::cleanDecoderBufs()
+{
+   queueLock_t lockEmptyQ( &videoEmpty_.locked_ );
+   assert( lockEmptyQ.weLocked() );
+
+   entryHeader_t *e ;
+   while( 0 != ( e = pullHead( decoderBufs_.header_ ) ) ){
+      ++freeCount_ ;
+      pushTail( videoEmpty_.header_, e );
+   }
 }
 
 void mpegQueue_t::feedVideo
    ( unsigned char const *data, 
      unsigned             length,
      bool                 discontinuity,
-     long long            pts ) // transport PTS
+     long long            offset_ms ) // 
 {
-   if( ( 0LL != pts )
+   if( ( 0LL != offset_ms )
        &&
-       ( 0LL == ptsOut_ ) )
-      ptsOut_ = pts ;
+       ( 0LL == msOut_ ) )
+      msOut_ = offset_ms ;
 
    if( discontinuity ){
       flags_ |= NEEDIFRAME ;
@@ -292,11 +408,12 @@ void mpegQueue_t::feedVideo
    mpeg2_buffer( decoder_, (uint8_t *)data, (uint8_t *)data + length );
 
    mpeg2_info_t const *const infoptr = mpeg2_info( decoder_ );
-   int mpState ;
+   int mpState = -1 ;
    do {
       in_mpeg2_parse = 1 ;
       mpState = mpeg2_parse( decoder_ );
       in_mpeg2_parse = 0 ;
+
       switch( mpState )
       {
          case STATE_SEQUENCE:
@@ -341,6 +458,9 @@ void mpegQueue_t::feedVideo
 
             mpeg2_convert( decoder_, mpeg2convert_yuyv, NULL );
             mpeg2_custom_fbuf(decoder_, 1);
+            for( unsigned i = 0 ; i < 2 ; i++ ){
+               addDecoderBuf();
+            }
 
             break;
 
@@ -350,8 +470,10 @@ void mpegQueue_t::feedVideo
          {
             int picType = ( infoptr->current_picture->flags & PIC_MASK_CODING_TYPE );
             if( flags_ & STARTED ){
-                if( msVideoQueued() <= msHalfBuffer() )
+                if( msVideoQueued() <= msHalfBuffer() ){
+                   debugPrint( "skipping b-frames w/%lu ms queued\n", msVideoQueued() );
                    flags_ |= NEEDIFRAME ;
+                }
             }
 
             if( ( 0 == ( flags_ & NEEDIFRAME ) )
@@ -360,31 +482,32 @@ void mpegQueue_t::feedVideo
                 ||
                 ( PIC_FLAG_CODING_TYPE_P == picType ) )
             {
+               debugPrint( "picture type %d\n", picType );
                mpeg2_skip( decoder_, 0 );
-               videoEntry_t *const ve = getPictureBuf();
-               unsigned char *buf = ve->data_ ;
-               unsigned ySize = inBufferLength_/2 ; 
-               unsigned uvSize = ySize / 2 ;
-               unsigned char *planes[3] = { 
-                  buf,
-                  buf+ySize,
-                  buf+ySize+uvSize
-               };
-               mpeg2_set_buf(decoder_, planes, ve);
+               debugPrint( "add decoder buf\n" );
+               addDecoderBuf();
 
-               if( PIC_FLAG_CODING_TYPE_I == picType ){
+               debugPrint( "flags %lx\n", flags_ );
+
+               if( ( PIC_FLAG_CODING_TYPE_I == picType )
+                   &&
+                   ( 0 != (flags_ & NEEDIFRAME) ) ){
+
                   if( msVideoQueued() >= msToBuffer() ){
                      flags_ &= ~NEEDIFRAME ;
-                     printf( "play b-frames...\n" );
+                     debugPrint( "play b-frames...\n" );
                   }
                }
             }
             else {
+               debugPrint( "skip picture type %d\n", picType );
                mpeg2_skip( decoder_, 1 );
             }
             
             break;
          } // PICTURE
+         case STATE_END:
+         case STATE_INVALID_END:
          case STATE_SLICE:
          {
             if( (0 != infoptr->display_fbuf)
@@ -399,36 +522,41 @@ void mpegQueue_t::feedVideo
 assert( ve->width_ == inWidth_ );
 assert( ve->height_ == inHeight_ );
 assert( ve->length_ == inBufferLength_ );
-                  ve->header_.when_ms_ = ptsOut_ ;
-                  ptsOut_ += msPerPic_ ;
+                  ve->header_.when_ms_ = msOut_ ;
+                  msOut_ += msPerPic_ ;
+                  unlink(ve->header_);
                   queuePicture( ve );
                }
                else
                   fprintf( stderr, "Invalid fbuf id!\n" );
+            }
+
+            if( mpState != STATE_SLICE ){
+               cleanDecoderBufs();
             }
             break;
          } // SLICE
          case STATE_BUFFER :
          case STATE_SEQUENCE_REPEATED:
          case STATE_GOP:
-         case STATE_END:
             break ;
          case STATE_INVALID:
-            printf( "invalid state\n" );
             mpeg2_reset(decoder_,1);
+            cleanDecoderBufs();
             break ;
          default: 
-            printf( "state: %d\n", mpState );
+            debugPrint( "unknown state: %d\n", mpState );
       } // switch
+      debugPrint( "out_mpeg2_pars: state == %d\n", mpState );
 
       if( 0 == (flags_ & STARTED) )
       {
           if( msVideoQueued() >= bufferMs_ ){
-             printf( "start playback\n" );
              startPlayback();
           }
       }
    } while( ( -1 != mpState ) && ( STATE_BUFFER != mpState ) );
+
 }
 
 void mpegQueue_t::playAudio
@@ -484,16 +612,20 @@ void mpegQueue_t::playVideo( long long when )
 {
    if( flags_ & STARTED ){
       queueLock_t lockVideoQ( &videoFull_.locked_ );
-      if( lockVideoQ.weLocked() ){
+      queueLock_t lockEmptyQ( &videoEmpty_.locked_ );
+      if( lockVideoQ.weLocked() && lockEmptyQ.weLocked() ){
          while( !isEmpty( videoFull_.header_ ) ){
             videoEntry_t *const ve = (videoEntry_t *)videoFull_.header_.next_ ;
             if( 0 <= ( when-ve->header_.when_ms_ ) ){
-// printf( "play: %llu/%llu\n", ve->header_.when_ms_, when );
                // peek ahead (maybe we can skip a write
                if( ( ve->header_.next_ != &videoFull_.header_ )
                    &&
                    ( 0 <= ( when-ve->header_.next_->when_ms_ ) ) ){
-debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->header_.next_->when_ms_ );
+                  debugPrint( "peek ahead: %llu/%llu/%llu (%lu ms queued)\n", 
+                              when, 
+                              ve->header_.when_ms_, 
+                              ve->header_.next_->when_ms_, 
+                              msVideoQueued() );
                   entryHeader_t *const e = pullHead( videoFull_.header_ );
                   assert( e );
                   assert( e == (entryHeader_t *)ve );
@@ -502,6 +634,7 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
    MD5_Update(&videoMD5_, ve->data_, ve->length_ );
 #endif
 
+                  ++freeCount_ ;
                   pushTail( videoEmpty_.header_, e );
                   continue ;
                } // skip: more than one frame is ready
@@ -514,13 +647,12 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
                      prevOutBufferLength_ = ve->length_ ;
 
                      struct sm501yuvPlane_t plane ;
-                     plane.xLeft_     = 0 ;
-                     plane.yTop_      = 0 ;
+                     plane.xLeft_     = outRect_.xLeft_ ;
+                     plane.yTop_      = outRect_.yTop_ ;
                      plane.inWidth_   = ve->width_ ;
                      plane.inHeight_  = ve->height_ ;
-                     fbDevice_t &fb = getFB();
-                     plane.outWidth_  = fb.getWidth();
-                     plane.outHeight_ = fb.getHeight();
+                     plane.outWidth_  = outRect_.width_ ;
+                     plane.outHeight_ = outRect_.height_ ;
 
                      if( 0 != ioctl( yuvFd_, SM501YUV_SETPLANE, &plane ) )
                      {
@@ -529,7 +661,13 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
                      }
                      else {
                         debugPrint( "setPlane success\n"
-                                    "offset == 0x%x\n", plane.planeOffset_ );
+                                    "%u:%u %ux%u -> %ux%u\n"
+                                    "offset == 0x%x\n", 
+                                    plane.xLeft_, plane.yTop_,
+                                    plane.inWidth_, plane.inHeight_,
+                                    plane.outWidth_, plane.outHeight_,
+                                    plane.planeOffset_ );
+                        fbDevice_t &fb = getFB();
                         yuvOut_ = (unsigned *)( (char *)fb.getMem() + plane.planeOffset_ );
                         reg_and_value rv ;
                         rv.reg_ = SMIVIDEO_CTRL ;
@@ -545,9 +683,7 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
 #if 1
                   assert( 0 != yuvOut_ );
                   in_write = 1 ;
-#if 0
-                  memcpyAlign4( yuvOut_, ve->data_, ve->length_ );
-#else
+                  
                   unsigned numCacheLines = ve->length_ / 32 ;
                   unsigned long const *nextIn = (unsigned long const *)ve->data_ ;
                   unsigned long *nextOut = (unsigned long *)yuvOut_ ;
@@ -581,11 +717,13 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
                     nextOut += 8 ;
                     nextIn += 8 ;
                   }
-#endif                  
+
                   in_write = 0 ;
+
                   entryHeader_t *const e = pullHead( videoFull_.header_ );
                   assert( e );
                   assert( e == (entryHeader_t *)ve );
+                  ++freeCount_ ;
                   pushTail( videoEmpty_.header_, e );
                   continue ;
 #else
@@ -597,6 +735,7 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
                      entryHeader_t *const e = pullHead( videoFull_.header_ );
                      assert( e );
                      assert( e == (entryHeader_t *)ve );
+                     ++freeCount_ ;
                      pushTail( videoEmpty_.header_, e );
                      continue ;
                   }
@@ -613,10 +752,11 @@ debugPrint( "peek ahead: %llu/%llu/%llu\n", when, ve->header_.when_ms_, ve->head
          }
       }
       else {
-         flags_ |= AUDIOIDLE ;
-         printf( "not locked\n" );
+         debugPrint( "not locked\n" );
       }
    } // if we've started playback
+   else
+      debugPrint( "idle\n" );
 }
 
 
@@ -756,159 +896,186 @@ int main( int argc, char const * const argv[] )
          }
       }
 
-      FILE *fIn = fopen( argv[1], "rb" );
-      if( fIn )
-      {
-         long long startMs = tickMs();
+      int const fdYUV = open( "/dev/yuv", O_WRONLY );
+      if( 0 > fdYUV ){
+         perror( "/dev/yuv" );
+         return -1 ;
+      }
 
-         int const fdYUV = open( "/dev/yuv", O_WRONLY );
-         if( 0 > fdYUV ){
-            perror( "/dev/yuv" );
-            return -1 ;
-         }
+      stats_t stats ;
+      memset( &stats, 0, sizeof(stats) );
+      startTrace( traceCallback, &stats );
 
-         stats_t stats ;
-         memset( &stats, 0, sizeof(stats) );
-         startTrace( traceCallback, &stats );
+      int const pid_ = getpid();
+      int const vsyncSignal = nextRtSignal();
+      int const fdSync = open( "/dev/sm501vsync", O_RDONLY );
+      if( 0 > fdSync ){
+         perror( "/dev/sm501sync" );
+         exit(-1);
+      }
+      fcntl(fdSync, F_SETOWN, pid_);
+      fcntl(fdSync, F_SETSIG, vsyncSignal );
+      
+      struct sigaction sa ;
+   
+      sa.sa_flags = SA_SIGINFO|SA_RESTART ;
+      sa.sa_restorer = 0 ;
+      sigemptyset( &sa.sa_mask );
+      sa.sa_sigaction = vsyncHandler ;
+      sigaddset( &sa.sa_mask, vsyncSignal );
+      sigaction(vsyncSignal, &sa, 0 );
+      
+      fbDevice_t &fb = getFB();
+      rectangle_t outRect ;
+      outRect.xLeft_ = outRect.yTop_ = 0 ;
+      outRect.width_ = fb.getWidth();
+      outRect.height_ = fb.getHeight();
 
-         int const pid_ = getpid();
-         int const vsyncSignal = nextRtSignal();
-         int const fdSync = open( "/dev/sm501vsync", O_RDONLY );
-         if( 0 > fdSync ){
-            perror( "/dev/sm501sync" );
-            exit(-1);
-         }
-         fcntl(fdSync, F_SETOWN, pid_);
-         fcntl(fdSync, F_SETSIG, vsyncSignal );
-         
-         struct sigaction sa ;
-         sa.sa_flags = SA_SIGINFO|SA_RESTART ;
-         sa.sa_restorer = 0 ;
-         sigemptyset( &sa.sa_mask );
-         sa.sa_sigaction = vsyncHandler ;
-         sigaddset( &sa.sa_mask, vsyncSignal );
-         sigaction(vsyncSignal, &sa, 0 );
-         
-         mpegQueue_t q( dspFd, fdYUV, 1 );
-         inst_ = &q ;
-         
-         int flags = fcntl( fdSync, F_GETFL, 0 );
-         fcntl( fdSync, F_SETFL, flags | O_NONBLOCK | FASYNC );
-         
-         mpegStream_t mpStream ;
+      mpegQueue_t q( dspFd, fdYUV, 1, outRect );
+      inst_ = &q ;
+      
+      int flags = fcntl( fdSync, F_GETFL, 0 );
+      fcntl( fdSync, F_SETFL, flags | O_NONBLOCK | FASYNC );
 
-         // only ready 1/2 in normal case, to allow read of tail-end
-         // if necessary
-         unsigned char inBuf[8192];
-         unsigned const inSize = sizeof(inBuf)/2 ;
-
-         int globalOffs = 0 ;
-         int numRead ;
-         unsigned long adler = 0 ;
-
-         while( 0 < ( numRead = fread( inBuf+globalOffs, 1, inSize-globalOffs, fIn ) ) ){
-debugPrint( "read: %p/%d\n", inBuf+globalOffs, numRead );
-            unsigned char const *nextIn = inBuf ;
-            unsigned numLeft = numRead ;
-
-            mpegStream_t::frameType_e frameType ;
-            unsigned offset ;
-            unsigned frameLen ;
-            long long pts, dts ;
-            unsigned char streamId ;
-
-            while( // printf( "feed:%p/%u\n", nextIn, numLeft ) 
-                   // &&
-                   mpStream.getFrame( nextIn, numLeft,
-                                      frameType,
-                                      offset, frameLen, 
-                                      pts, dts, streamId ) )
-            {
-               assert( offset <= numLeft );
-               unsigned const end = offset+frameLen ;
-debugPrint( "frame: %u/%u/%u/%u\n", numLeft, offset, frameLen, end );
-               if( end > (unsigned)numLeft ){
-debugPrint( "need more: %u/%u/%u\n", numLeft, offset, frameLen );
-                  unsigned const needed = end-numLeft ;
-                  assert( needed < inSize );
-                  numRead = fread( (unsigned char *)nextIn+numLeft, 1, needed, fIn );
-                  assert( numRead == (int)needed );
-                  numLeft = end ;
-               } // read the rest of this packet
-
-               unsigned char const *frameStart = nextIn+offset ;
-               adler = adler32( adler, frameStart, frameLen );
-//printf( "%d/%u/%08lX/%08lx\n", frameType, frameLen, adler32( 0, frameStart, frameLen ), adler );
-
-               if( mpegStream_t::videoFrame_e == frameType ){
-                  while( q.msDoubleBuffer() <= q.msVideoQueued() )
-                     pause();
-                  q.feedVideo( frameStart, frameLen, false, pts );
-               } else if( mpegStream_t::audioFrame_e == frameType ){
-                  q.feedAudio( frameStart, frameLen, false, pts );
+      for( int arg = 1 ; arg < argc ; arg++ ){
+         char const *const fileName = argv[arg];
+         FILE *fIn = fopen( fileName, "rb" );
+         if( fIn )
+         {
+printf( "----> playing file %s\n", fileName );
+            long long startMs = tickMs();
+   
+            mpegStream_t mpStream ;
+   
+            // only ready 1/2 in normal case, to allow read of tail-end
+            // if necessary
+            unsigned char inBuf[8192];
+            unsigned const inSize = sizeof(inBuf)/2 ;
+   
+            int globalOffs = 0 ;
+            int numRead ;
+            unsigned long adler = 0 ;
+            bool firstVideo = true ;
+   
+            while( 0 < ( numRead = fread( inBuf+globalOffs, 1, inSize-globalOffs, fIn ) ) ){
+               unsigned char const *nextIn = inBuf ;
+               unsigned numLeft = numRead ;
+   
+               mpegStream_t::frameType_e frameType ;
+               unsigned offset ;
+               unsigned frameLen ;
+               long long pts, dts ;
+               unsigned char streamId ;
+   
+               while( // printf( "feed:%p/%u\n", nextIn, numLeft ) 
+                      // &&
+                      mpStream.getFrame( nextIn, numLeft,
+                                         frameType,
+                                         offset, frameLen, 
+                                         pts, dts, streamId ) )
+               {
+                  assert( offset <= numLeft );
+                  unsigned const end = offset+frameLen ;
+                  if( end > (unsigned)numLeft ){
+                     unsigned const needed = end-numLeft ;
+                     assert( needed < inSize );
+                     numRead = fread( (unsigned char *)nextIn+numLeft, 1, needed, fIn );
+                     assert( numRead == (int)needed );
+                     numLeft = end ;
+                  } // read the rest of this packet
+   
+                  unsigned char const *frameStart = nextIn+offset ;
+                  adler = adler32( adler, frameStart, frameLen );
+   //printf( "%d/%u/%08lX/%08lx\n", frameType, frameLen, adler32( 0, frameStart, frameLen ), adler );
+   
+                  if( mpegStream_t::videoFrame_e == frameType ){
+                     while( q.msDoubleBuffer() <= q.msVideoQueued() )
+                        pause();
+                     if( 1 != arg ){
+                        if( firstVideo && ( 0LL != pts ) )
+                           q.adjustPTS( q.ptsToMs(pts) );
+                     }
+                     q.feedVideo( frameStart, frameLen, firstVideo, q.ptsToMs(pts) );
+                     if( firstVideo && (0LL != pts) )
+                        firstVideo = false ;
+                  } else if( mpegStream_t::audioFrame_e == frameType ){
+                     q.feedAudio( frameStart, frameLen, false, q.ptsToMs(pts) );
+                  }
+                  else
+                     printf( "unknown frame type: %d\n", frameType );
+   
+                  nextIn += end ;
+                  numLeft -= end ;
+               }
+   
+               unsigned const used = nextIn - inBuf ;
+               if( used < (unsigned)numRead ){
+                  globalOffs = numRead - (nextIn-inBuf);
                }
                else
-                  printf( "unknown frame type: %d\n", frameType );
-
-               nextIn += end ;
-               numLeft -= end ;
+                  globalOffs = 0 ;
+   
+               if( globalOffs )
+                  memcpy( inBuf, nextIn, globalOffs );
             }
 
-            unsigned const used = nextIn - inBuf ;
-            if( used < (unsigned)numRead ){
-               globalOffs = numRead - (nextIn-inBuf);
-            }
-            else
-               globalOffs = 0 ;
+            while( 0 < q.msVideoQueued() )
+               pause();
 
-            if( globalOffs )
-               memcpy( inBuf, nextIn, globalOffs );
+            long long endMs = tickMs();
+            printf( "%lu ms elapsed\n"
+                    "%u allocations\n"
+                    "%u frees\n", 
+                    (unsigned long)(endMs-startMs),
+                    q.numAllocated(),
+                    q.numFreed() );
+
+            fclose( fIn );
          }
-
-         while( 0 < q.msVideoQueued() )
-            pause();
-
-         long long endMs = tickMs();
-         printf( "%lu ms elapsed\n", (unsigned long)(endMs-startMs) );
-         
-         unsigned traceCount ;
-         traceEntry_t *traces = endTrace( traceCount );
-         dumpTraces( traces, traceCount );
-         delete [] traces ;
-
-         printf( "%u ticks\n"
-                 "%u parsing\n"
-#ifdef TRACEMPEG2                    
-                 "%u slicing\n"
-                 "%u converting\n"
-                 "      %u idct row\n"
-                 "      %u idct col\n"
-                 "      %u idct copy\n"
-                 "      %u idct add\n"
-                 "      %u idct init\n"
-                 "%u motion estimation\n"
-#endif
-                 "%u writing\n",
-                 stats.ticks_,
-                 stats.inParse_,
-#ifdef TRACEMPEG2                    
-                 stats.inSlice_,
-                 stats.inConvert_,
-                 stats.idctRow_,
-                 stats.idctCol_,
-                 stats.idctCopy_,
-                 stats.idctAdd_,
-                 stats.idctInit_,
-                 stats.inMe_,
-#endif
-                 stats.inWrite_ );
-         if( 0 <= fdYUV )
-            close( fdYUV );
-
-         fclose( fIn );
+         else
+            perror( argv[arg] );
       }
-      else
-         perror( argv[1] );
+      q.cleanup();
+
+      printf( "after all files:\n"
+              "%u allocations\n"
+              "%u frees\n", 
+              q.numAllocated(),
+              q.numFreed() );
+
+      unsigned traceCount ;
+      traceEntry_t *traces = endTrace( traceCount );
+      dumpTraces( traces, traceCount );
+      delete [] traces ;
+
+      printf( "%u ticks\n"
+              "%u parsing\n"
+#ifdef TRACEMPEG2                    
+              "%u slicing\n"
+              "%u converting\n"
+              "      %u idct row\n"
+              "      %u idct col\n"
+              "      %u idct copy\n"
+              "      %u idct add\n"
+              "      %u idct init\n"
+              "%u motion estimation\n"
+#endif
+              "%u writing\n",
+              stats.ticks_,
+              stats.inParse_,
+#ifdef TRACEMPEG2                    
+              stats.inSlice_,
+              stats.inConvert_,
+              stats.idctRow_,
+              stats.idctCol_,
+              stats.idctCopy_,
+              stats.idctAdd_,
+              stats.idctInit_,
+              stats.inMe_,
+#endif
+              stats.inWrite_ );
+      if( 0 <= fdYUV )
+         close( fdYUV );
    }
    else
       fprintf( stderr, "Usage: mpegDecode fileName [x [,y [,width [,height]]]]\n" );
