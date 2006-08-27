@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegRxUDP.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-27 18:14:24  ericn
+ * -remove unsupported dts
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -79,8 +82,7 @@ void mpegRxUDP_t::onRx(
    bool                 discont,
    unsigned char const *fData,
    unsigned             length,
-   long long            pts,
-   long long            dts )
+   long long            pts )
 {
 }
 
@@ -154,7 +156,7 @@ void mpegRxUDP_t::poll( void )
                   onRx( ( MPEGUDP_VIDEO == frame.type_ ), 
                         discontinuity, 
                         frame.data_, frame.frameLen_,
-                        frame.pts_, frame.dts_ );
+                        frame.pts_ );
                   if( discontinuity )
                      printf( "discontinuity: %u/%u\n", prevSeq_, inPacket.sequence_ );
                   prevSeq_ = inPacket.sequence_ ;
@@ -202,8 +204,7 @@ public:
                       bool                 discont,
                       unsigned char const *fData,
                       unsigned             length,
-                      long long            pts,
-                      long long            dts );
+                      long long            pts );
    virtual void onEOF( char const   *fileName,
                        unsigned long totalBytes,
                        unsigned long videoBytes,
@@ -242,10 +243,9 @@ void mpegRxUDP_MD5_t::onRx
      bool                 discont,
      unsigned char const *fData,
      unsigned             length,
-     long long            pts,
-     long long            dts )
+     long long            pts )
 {
-   mpegRxUDP_t::onRx( isVideo, discont, fData, length, pts, dts );
+   mpegRxUDP_t::onRx( isVideo, discont, fData, length, pts );
    if( isVideo ){
       videoPackets++ ;
       if( 0 <= videoMD5.num ){
