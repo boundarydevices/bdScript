@@ -34,3 +34,6 @@ odomVQ
 mpegSendUDP
 mpegQueue
 mpegStream
+mpegRxUDP
+touchSignal
+
