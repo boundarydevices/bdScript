@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.4  2006-08-26 17:12:51  ericn
+ * Revision 1.5  2006-08-27 19:14:44  ericn
+ * -use mpegFileStream_t
+ *
+ * Revision 1.4  2006/08/26 17:12:51  ericn
  * -clean decoder on input discontinuity
  *
  * Revision 1.3  2006/08/26 16:11:32  ericn
@@ -684,7 +687,7 @@ void mpegQueue_t::playVideo( long long when )
                      }
                   }
 
-#if 1
+#if 0
                   assert( 0 != yuvOut_ );
                   in_write = 1 ;
                   
@@ -948,79 +951,41 @@ int main( int argc, char const * const argv[] )
          {
 printf( "----> playing file %s\n", fileName );
             long long startMs = tickMs();
-   
-            mpegStream_t mpStream ;
-   
+
             // only ready 1/2 in normal case, to allow read of tail-end
             // if necessary
-            unsigned char inBuf[8192];
-            unsigned const inSize = sizeof(inBuf)/2 ;
-   
-            int globalOffs = 0 ;
-            int numRead ;
             unsigned long adler = 0 ;
             bool firstVideo = true ;
    
-            while( 0 < ( numRead = fread( inBuf+globalOffs, 1, inSize-globalOffs, fIn ) ) ){
-               unsigned char const *nextIn = inBuf ;
-               unsigned numLeft = numRead ;
-   
-               mpegStream_t::frameType_e frameType ;
-               unsigned offset ;
-               unsigned frameLen ;
-               long long pts, dts ;
-               unsigned char streamId ;
-   
-               while( // printf( "feed:%p/%u\n", nextIn, numLeft ) 
-                      // &&
-                      mpStream.getFrame( nextIn, numLeft,
-                                         frameType,
-                                         offset, frameLen, 
-                                         pts, dts, streamId ) )
-               {
-                  assert( offset <= numLeft );
-                  unsigned const end = offset+frameLen ;
-                  if( end > (unsigned)numLeft ){
-                     unsigned const needed = end-numLeft ;
-                     assert( needed < inSize );
-                     numRead = fread( (unsigned char *)nextIn+numLeft, 1, needed, fIn );
-                     assert( numRead == (int)needed );
-                     numLeft = end ;
-                  } // read the rest of this packet
-   
-                  unsigned char const *frameStart = nextIn+offset ;
-                  adler = adler32( adler, frameStart, frameLen );
-   //printf( "%d/%u/%08lX/%08lx\n", frameType, frameLen, adler32( 0, frameStart, frameLen ), adler );
-   
-                  if( mpegStream_t::videoFrame_e == frameType ){
-                     while( q.msDoubleBuffer() <= q.msVideoQueued() )
-                        pause();
-                     if( 1 != arg ){
-                        if( firstVideo && ( 0LL != pts ) )
-                           q.adjustPTS( q.ptsToMs(pts) );
-                     }
-                     q.feedVideo( frameStart, frameLen, firstVideo, q.ptsToMs(pts) );
-                     if( firstVideo && (0LL != pts) )
-                        firstVideo = false ;
-                  } else if( mpegStream_t::audioFrame_e == frameType ){
-                     q.feedAudio( frameStart, frameLen, false, q.ptsToMs(pts) );
+            mpegStreamFile_t stream( fIn );
+            unsigned char const *frame ;
+            unsigned             frameLen ;
+            CodecType type ;
+            CodecID codecId ;
+            long long pts ;
+            unsigned char streamId ;
+
+            while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
+            {
+               adler = adler32( adler, frame, frameLen );
+//               printf( "%d/%u/%08lX/%08lx\n", type, frameLen, adler32( 0, frame, frameLen ), adler );
+               bool isVideo = ( CODEC_TYPE_VIDEO == type );
+               
+               adler = adler32( adler, frame, frameLen );
+
+               if( isVideo ){
+                  while( q.msDoubleBuffer() <= q.msVideoQueued() )
+                     pause();
+                  if( 1 != arg ){
+                     if( firstVideo && ( 0LL != pts ) )
+                        q.adjustPTS( q.ptsToMs(pts) );
                   }
-                  else
-                     printf( "unknown frame type: %d\n", frameType );
-   
-                  nextIn += end ;
-                  numLeft -= end ;
+                  q.feedVideo( frame, frameLen, firstVideo, q.ptsToMs(pts) );
+                  if( firstVideo && (0LL != pts) )
+                     firstVideo = false ;
+               } else {
+                  q.feedAudio( frame, frameLen, false, q.ptsToMs(pts) );
                }
-   
-               unsigned const used = nextIn - inBuf ;
-               if( used < (unsigned)numRead ){
-                  globalOffs = numRead - (nextIn-inBuf);
-               }
-               else
-                  globalOffs = 0 ;
-   
-               if( globalOffs )
-                  memcpy( inBuf, nextIn, globalOffs );
             }
 
             while( 0 < q.msVideoQueued() )
