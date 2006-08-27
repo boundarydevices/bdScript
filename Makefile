@@ -49,7 +49,6 @@ OBJS = \
        dnsPoll.o \
        dumpCPP.o \
        fbDev.o \
-       ffit.o \
        ftObjs.o \
        gpioPoll.o \
        hexDump.o \
@@ -372,13 +371,13 @@ mpegStream: mpegStreamMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREF
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
-mpegYUVMain.o: mpegYUV.cpp mpegYUV.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+mpegStreamMain2.o: mpegStream.cpp mpegStream.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST2 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
-mpegYUV: mpegYUVMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+mpegStream2: mpegStreamMain2.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegYUV mpegYUVMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegYUV | sort >mpegYUV.map
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegStream2 mpegStreamMain2.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle mpegStream2 | sort >mpegStream2.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -766,7 +765,10 @@ imgTransparentMain.o: imgTransparent.cpp
 imgTransparent: imgTransparentMain.o Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o imgTransparent -Xlinker -Map -Xlinker imgTransparent.map imgTransparentMain.o $(LIBS) -lCurlCache -ljpeg -lpng -lungif -lz -lstdc++
 	$(STRIP) $@
-   
+
+mpegSendUDP: mpegSendUDP.cpp mpegUDP.h mpegPS.cpp mpegPS.h mpegStream.cpp mpegStream.h
+	gcc -o mpegSendUDP mpegSendUDP.cpp memFile.cpp mpegPS.cpp mpegStream.cpp -lsupc++
+
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
 #
@@ -800,5 +802,5 @@ clean:
 	rm -f *.o *.a *.map *.lst *.sym bc curlGet dirTest urlTest \
          jsExec testJS ftRender madHeaders backtrace \
          cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
-         mpeg2mp3 pixmanTest \
+         mpeg2mp3 pixmanTest mpegQueue odomTTY mpegDecode \
          $(LIB)
