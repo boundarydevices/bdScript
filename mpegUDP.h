@@ -1,5 +1,5 @@
 #ifndef __MPEGUDP_H__
-#define __MPEGUDP_H__ "$Id: mpegUDP.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __MPEGUDP_H__ "$Id: mpegUDP.h,v 1.2 2006-08-27 19:12:48 ericn Exp $"
 
 /*
  * mpegUDP.h
@@ -20,15 +20,12 @@ enum mpegFrameType_e {
 ,  MPEGUDP_AUDIO = 2
 };
 
-
-
 #define MPEGUDP_MAXDATA    4096
 
 struct mpegFrame_t {
    mpegFrameType_e type_ ;
    unsigned short  frameLen_ ;
    unsigned short  streamId_ ;
-   long long       dts_ ;
    long long       pts_ ;
    unsigned char   data_[MPEGUDP_MAXDATA];
 } __attribute__ ((aligned (2)));

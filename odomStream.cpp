@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.4  2006-08-26 17:13:22  ericn
+ * Revision 1.5  2006-08-27 19:12:32  ericn
+ * -remove unsupported dts
+ *
+ * Revision 1.4  2006/08/26 17:13:22  ericn
  * -dump output queue stats
  *
  * Revision 1.3  2006/08/26 16:06:18  ericn
@@ -61,9 +64,13 @@ void odomVideoStream_t::onRx(
    bool                 discont,
    unsigned char const *fData,
    unsigned             length,
-   long long            pts,
-   long long            dts )
+   long long            pts )
 {
+   if( 0 != pts ){
+      if( 0 == startMs_ )
+         startMs_ = pts ;
+      lastMs_ = pts ;
+   }
    discont = discont | firstFrame_ ;
 
    if( isVideo ){
@@ -76,8 +83,9 @@ void odomVideoStream_t::onRx(
          lastMs_ = pts ;
       outQueue_.feedVideo( fData, length, discont, pts );
    }
-   else
+   else {
       outQueue_.feedAudio( fData, length, discont, pts );
+   }
 }
 
 void odomVideoStream_t::onEOF( 

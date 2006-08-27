@@ -1,5 +1,5 @@
 #ifndef __ODOMSTREAM_H__
-#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.2 2006-08-26 16:06:15 ericn Exp $"
+#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.3 2006-08-27 19:12:15 ericn Exp $"
 
 /*
  * odomStream.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomStream.h,v $
- * Revision 1.2  2006-08-26 16:06:15  ericn
+ * Revision 1.3  2006-08-27 19:12:15  ericn
+ * -remove unsupported dts
+ *
+ * Revision 1.2  2006/08/26 16:06:15  ericn
  * -use new mpegQueue instead of decoder+odomVQ
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -41,8 +44,7 @@ public:
                       bool                 discont,
                       unsigned char const *fData,
                       unsigned             length,
-                      long long            pts,
-                      long long            dts );
+                      long long            pts );
    virtual void onEOF( char const   *fileName,
                        unsigned long totalBytes,
                        unsigned long videoBytes,

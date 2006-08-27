@@ -1,5 +1,5 @@
 #ifndef __MPEGRXUDP_H__
-#define __MPEGRXUDP_H__ "$Id: mpegRxUDP.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __MPEGRXUDP_H__ "$Id: mpegRxUDP.h,v 1.2 2006-08-27 19:11:51 ericn Exp $"
 
 /*
  * mpegRxUDP.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: mpegRxUDP.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-27 19:11:51  ericn
+ * -remove unsupported dts
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -40,8 +43,7 @@ public:
                       bool                 discont,
                       unsigned char const *fData,
                       unsigned             length,
-                      long long            pts,
-                      long long            dts );
+                      long long            pts );
    virtual void onEOF( char const   *fileName,
                        unsigned long totalBytes,
                        unsigned long videoBytes,
