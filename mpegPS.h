@@ -1,5 +1,5 @@
 #ifndef __MPEGPS_H__
-#define __MPEGPS_H__ "$Id: mpegPS.h,v 1.1 2006-08-24 23:59:43 ericn Exp $"
+#define __MPEGPS_H__ "$Id: mpegPS.h,v 1.2 2006-08-27 18:13:54 ericn Exp $"
 
 /*
  * mpegPS.h
@@ -10,7 +10,10 @@
  * Change History : 
  *
  * $Log: mpegPS.h,v $
- * Revision 1.1  2006-08-24 23:59:43  ericn
+ * Revision 1.2  2006-08-27 18:13:54  ericn
+ * -remove unused constant
+ *
+ * Revision 1.1  2006/08/24 23:59:43  ericn
  * -expose mpeg parsing function from mpegDecode
  *
  *
@@ -66,7 +69,6 @@ enum CodecID {
 };
 
 enum CodecType {
-    CODEC_TYPE_UNKNOWN = -1,
     CODEC_TYPE_VIDEO,
     CODEC_TYPE_AUDIO,
 };
