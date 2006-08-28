@@ -685,6 +685,10 @@ touchPoll: touchPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
+touchSignal: touchSignal.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o touchSignal -DSTANDALONE=1 -Xlinker -Map -Xlinker touchSignal.map touchSignal.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
 urlPoll: urlPoll.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o urlPoll -D__MODULETEST__ -Xlinker -Map -Xlinker urlPoll.map urlPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread
 	$(STRIP) $@
