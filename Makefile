@@ -149,7 +149,9 @@ OBJS += \
        jsVolume.o \
        madDecode.o \
        madHeaders.o \
+       touchCalibrate.o \
        touchPoll.o \
+       touchSignal.o \
        zOrder.o \
 
 HARDWARE_TYPE += -DKERNEL_FB=1
@@ -248,6 +250,7 @@ ODOMOBJS = \
        odomHighlight.o \
        odomPlaylist.o \
        odomStream.o \
+       odomTouch.o \
        odomTTY.o \
        odomValue.o \
        odomVideo.o \
