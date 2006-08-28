@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchSignal.cpp,v $
- * Revision 1.1  2006-08-28 15:45:31  ericn
+ * Revision 1.2  2006-08-28 18:23:33  ericn
+ * -read the touch data
+ *
+ * Revision 1.1  2006/08/28 15:45:31  ericn
  * -Initial import
  *
  *
@@ -25,6 +28,14 @@
 #include "rtSignal.h"
 #include <signal.h>
 
+struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
+	unsigned short pressure;
+	unsigned short x;
+	unsigned short y;
+	unsigned short pad;
+	struct timeval stamp;
+};
+
 static char const *getTouchDev(void)
 {
    char const *devName = "/dev/misc/touchscreen/ucb1x00" ;
@@ -35,21 +46,42 @@ static char const *getTouchDev(void)
 }
 
 static touchSignal_t *inst_ = 0 ;
+static touchHandler_t handler_ = 0 ;
 
 touchSignal_t &touchSignal_t::get( touchHandler_t handler )
 {
    if( 0 == inst_ )
       inst_ = new touchSignal_t ;
 
+   if( handler )
+      handler_ = handler ;
+
    return *inst_ ;
 }
-
 
 static void touchHandler( int signo, siginfo_t *info, void *context )
 {
    if( inst_ ){
-      printf( "handler!\n" );
-      exit(-1);
+      ts_event nextEvent ;
+      ts_event event ;
+      unsigned count = 0 ;
+      int numRead ;
+
+      timeval firstTime ;
+      
+      while( sizeof( nextEvent ) == ( numRead = read( info->si_fd, &nextEvent, sizeof( nextEvent ) ) ) )
+      {
+         if( 0 == count )
+            firstTime = nextEvent.stamp ;
+         event = nextEvent ;
+         count++ ;
+      }
+
+      if( 0 < count )
+      {
+         if( handler_ )
+            handler_( event.x, event.y, event.pressure, firstTime );
+      }
    }
 }
 
