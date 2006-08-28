@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomTTY.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-28 18:23:54  ericn
+ * -add touch handler
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -50,6 +53,7 @@ void odomTTY_t::onCtrlC( void )
 #include <execinfo.h>
 #include "hexDump.h"
 #include <signal.h>
+#include "odomTouch.h"
 
 static struct sigaction sa;
 static struct sigaction oldint;
@@ -101,7 +105,9 @@ int main( int argc, char const * const argv[] )
       else
          printf( "error %s\n", interp.getErrorMsg() );
    }
-   
+
+   odomTouch_t::get();
+
    pollHandlerSet_t handlers ;
    odomTTY_t tty( handlers, interp );
 
