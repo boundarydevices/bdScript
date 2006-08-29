@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomTouch.cpp,v $
- * Revision 1.1  2006-08-28 18:24:43  ericn
+ * Revision 1.2  2006-08-29 01:08:23  ericn
+ * -draw dots in alpha layer
+ *
+ * Revision 1.1  2006/08/28 18:24:43  ericn
  * -Initial import
  *
  *
@@ -20,6 +23,8 @@
 #include <stdio.h>
 #include "touchCalibrate.h"
 #include "touchSignal.h"
+#include "sm501alpha.h"
+#include "odomMode.h"
 
 static odomTouch_t *inst_ = 0 ;
 
@@ -33,6 +38,7 @@ odomTouch_t &odomTouch_t::get(void)
 void odomTouch_t::onTouch( unsigned x, unsigned y )
 {
    printf( "touch: %u:%u\n", x, y );
+   sm501alpha_t::get(alphaMode(alphaLayer)).setPixel4444( x, y, 0 ); // black point
 }
 
 void odomTouch_t::onRelease( void )
