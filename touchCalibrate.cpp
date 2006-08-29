@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
- * Revision 1.1  2006-08-28 18:24:43  ericn
+ * Revision 1.2  2006-08-29 01:07:59  ericn
+ * -clamp to screen bounds
+ *
+ * Revision 1.1  2006/08/28 18:24:43  ericn
  * -Initial import
  *
  *
@@ -35,8 +38,19 @@ void touchCalibration_t::translate
      point_t       &translated ) const 
 {
    if( haveData_ ){
-      translated.x = (coef_[0]*input.x + coef_[1]*input.y + coef_[2])/65536 ;
-      translated.y = (coef_[3]*input.x + coef_[4]*input.y + coef_[5])/65536 ;
+      fbDevice_t &fb = getFB();
+      long int x = (coef_[0]*input.x + coef_[1]*input.y + coef_[2])/65536 ;
+      if( 0 > x )
+         x = 0 ;
+      if( x >= fb.getWidth() )
+         x = fb.getWidth()-1 ;
+      long int y = (coef_[3]*input.x + coef_[4]*input.y + coef_[5])/65536 ;
+      if( 0 > y )
+         y = 0 ;
+      if( y >= fb.getHeight() )
+         y = fb.getHeight()-1 ;
+      translated.x = x ;
+      translated.y = y ;
    }
    else
       translated = input ;
