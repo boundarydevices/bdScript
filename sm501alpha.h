@@ -1,5 +1,5 @@
 #ifndef __SM501ALPHA_H__
-#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.2 2006-08-22 17:05:23 ericn Exp $"
+#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.3 2006-08-29 01:07:41 ericn Exp $"
 
 /*
  * sm501alpha.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: sm501alpha.h,v $
- * Revision 1.2  2006-08-22 17:05:23  ericn
+ * Revision 1.3  2006-08-29 01:07:41  ericn
+ * -add setPixel4444 method
+ *
+ * Revision 1.2  2006/08/22 17:05:23  ericn
  * -rearrange declarations
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -74,6 +77,7 @@ public:
                   unsigned              y,
                   unsigned              w,      // padded to 16-bytes
                   unsigned              h );
+   void setPixel4444( unsigned x, unsigned y, unsigned long rgb );
 
    unsigned short *getRow( unsigned y );
 

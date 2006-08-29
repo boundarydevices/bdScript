@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: sm501alpha.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-08-29 01:07:43  ericn
+ * -add setPixel4444 method
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -183,6 +186,28 @@ void sm501alpha_t::draw4444(
       }
       outWords += pos_.width_ ;
       in += stride ;
+   }
+}
+   
+void sm501alpha_t::setPixel4444( unsigned x, unsigned y, unsigned long rgb )
+{
+   if( ( pos_.xLeft_ <= x )
+       &&
+       ( pos_.xLeft_ + pos_.width_ > x ) ){
+      if( ( pos_.yTop_ <= y )
+          &&
+          ( pos_.yTop_ + pos_.height_ > y ) ){
+         unsigned xOffs = x-pos_.xLeft_ ;
+         unsigned yOffs = y-pos_.yTop_ ;
+         unsigned short rgba = 0xF000
+                             + ((rgb>>(20-8))&0x0F00)    // top 4 of red in bits 8..11
+                             + ((rgb>>(12-4))&0x00F0)    // top 4 of green in bits 4..7
+                             + ((rgb>>4)&0x0F);          // top 4 of blue in 0..3
+
+         unsigned short *outWords = ((unsigned short *)ram_ )
+                                  + yOffs*pos_.width_ + xOffs ;
+         *outWords = rgba ;
+      }
    }
 }
 
