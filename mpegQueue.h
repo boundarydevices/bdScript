@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.3 2006-08-26 16:07:39 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.4 2006-08-30 02:10:50 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.3  2006-08-26 16:07:39  ericn
+ * Revision 1.4  2006-08-30 02:10:50  ericn
+ * -add statistics
+ *
+ * Revision 1.3  2006/08/26 16:07:39  ericn
  * -move inlines into .cpp module, add output rect
  *
  * Revision 1.2  2006/08/25 14:53:48  ericn
@@ -117,6 +120,10 @@ public:
 
    inline unsigned numAllocated( void ) const { return allocCount_ ; }
    inline unsigned numFreed( void ) const { return freeCount_ ; }
+
+   inline unsigned vFramesQueued( void ) const { return vFramesQueued_ ; }
+   inline unsigned vFramesPlayed( void ) const { return vFramesPlayed_ ; }
+   inline unsigned vFramesSkipped( void ) const { return vFramesSkipped_ ; }
 
 private:
    mpegQueue_t( mpegQueue_t const & );
@@ -205,6 +212,9 @@ private:
 
    mpeg2dec_t * const decoder_ ;
 
+   unsigned      vFramesQueued_ ;
+   unsigned      vFramesPlayed_ ;
+   unsigned      vFramesSkipped_ ;
 #ifdef MD5OUTPUT
    MD5_CTX       videoMD5_ ;
 #endif

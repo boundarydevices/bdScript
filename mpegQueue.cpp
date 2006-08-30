@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.5  2006-08-27 19:14:44  ericn
+ * Revision 1.6  2006-08-30 02:10:53  ericn
+ * -add statistics
+ *
+ * Revision 1.5  2006/08/27 19:14:44  ericn
  * -use mpegFileStream_t
  *
  * Revision 1.4  2006/08/26 17:12:51  ericn
@@ -47,6 +50,8 @@
 #include <linux/sm501-int.h>
 #include <string.h>
 #include "fbDev.h"
+
+// #define USE_MMAP
 
 #ifdef MD5OUTPUT
 #undef MD5OUTPUT
@@ -202,6 +207,9 @@ mpegQueue_t::mpegQueue_t
    , allocCount_( 0 )
    , freeCount_( 0 )
    , decoder_( mpeg2_init() )
+   , vFramesQueued_( 0 )
+   , vFramesPlayed_( 0 )
+   , vFramesSkipped_( 0 )
 {
 printf( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
    videoFull_.locked_ = 0 ;
@@ -366,6 +374,7 @@ void mpegQueue_t::queuePicture(videoEntry_t *ve)
    ve->header_.when_ms_ += startMs_ ;
 
    pushTail( videoFull_.header_, &ve->header_ );
+   ++vFramesQueued_ ;
 }
 
 void mpegQueue_t::addDecoderBuf()
@@ -643,10 +652,12 @@ void mpegQueue_t::playVideo( long long when )
 
                   ++freeCount_ ;
                   pushTail( videoEmpty_.header_, e );
+                  ++vFramesSkipped_ ;
                   continue ;
                } // skip: more than one frame is ready
                else {
-                  if( ( ve->width_ != prevOutWidth_)
+                     ++vFramesPlayed_ ;
+                     if( ( ve->width_ != prevOutWidth_)
                       ||
                       ( ve->height_ != prevOutHeight_ ) ){
                      prevOutWidth_ = ve->width_ ;
@@ -687,7 +698,7 @@ void mpegQueue_t::playVideo( long long when )
                      }
                   }
 
-#if 0
+#ifdef USE_MMAP
                   assert( 0 != yuvOut_ );
                   in_write = 1 ;
                   
@@ -908,6 +919,7 @@ int main( int argc, char const * const argv[] )
          perror( "/dev/yuv" );
          return -1 ;
       }
+      fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
 
       stats_t stats ;
       memset( &stats, 0, sizeof(stats) );
@@ -967,6 +979,7 @@ printf( "----> playing file %s\n", fileName );
 
             while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
             {
+               pts /= 90 ;
                adler = adler32( adler, frame, frameLen );
 //               printf( "%d/%u/%08lX/%08lx\n", type, frameLen, adler32( 0, frame, frameLen ), adler );
                bool isVideo = ( CODEC_TYPE_VIDEO == type );
@@ -1016,6 +1029,13 @@ printf( "----> playing file %s\n", fileName );
       traceEntry_t *traces = endTrace( traceCount );
       dumpTraces( traces, traceCount );
       delete [] traces ;
+
+      printf( "%u pictures queued\n"
+              "   %u skipped\n"
+              "   %u played\n"
+            , q.vFramesQueued()
+            , q.vFramesSkipped()
+            , q.vFramesPlayed() );
 
       printf( "%u ticks\n"
               "%u parsing\n"
