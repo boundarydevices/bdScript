@@ -1,5 +1,5 @@
 #ifndef __VIDEOQUEUE_H__
-#define __VIDEOQUEUE_H__ "$Id: videoQueue.h,v 1.1 2003-07-27 15:19:12 ericn Exp $"
+#define __VIDEOQUEUE_H__ "$Id: videoQueue.h,v 1.2 2006-08-31 15:49:13 ericn Exp $"
 
 /*
  * videoQueue.h
@@ -26,7 +26,10 @@
  * Change History : 
  *
  * $Log: videoQueue.h,v $
- * Revision 1.1  2003-07-27 15:19:12  ericn
+ * Revision 1.2  2006-08-31 15:49:13  ericn
+ * -align for DMA
+ *
+ * Revision 1.1  2003/07/27 15:19:12  ericn
  * -Initial import
  *
  *
@@ -44,7 +47,8 @@ struct videoQueue_t {
       entry_t      *next_ ;
       entry_t      *prev_ ;
       long long     when_ms_ ;
-      unsigned      type_ ; // mpegDecoder_t::type_e
+      unsigned      type_ ;  // mpegDecoder_t::type_e
+      unsigned      pad_[1]; // align on 8-byte boundary
       unsigned char data_[1];
    };
 
