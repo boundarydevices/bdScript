@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.15  2006-08-31 03:45:27  ericn
+ * Revision 1.16  2006-08-31 15:51:06  ericn
+ * -remove unused code
+ *
+ * Revision 1.15  2006/08/31 03:45:27  ericn
  * -use non-blocking I/O on YUV device
  *
  * Revision 1.14  2006/08/27 19:15:22  ericn
@@ -363,16 +366,6 @@ bool mpegDecoder_t :: getPicture
                   unsigned char *buf = (unsigned char *)INFOPTR->display_fbuf->id ;
                   if( buf )
                   {
-                     unsigned ySize = mpegStride_*mpegHeight_ ;
-                     unsigned uvSize = ySize / 2 ;
-                     unsigned char *yBuf = buf ;
-                     unsigned char *uBuf = yBuf+ySize ;
-                     unsigned char *vBuf = uBuf+uvSize ;
-                     unsigned char *yuv  = vBuf+uvSize ;
-
-//                     picture = yuv ;
-
-//                     interleaveYUV( mpegStride_, mpegHeight_, yuv, yBuf, uBuf, vBuf );
 picture = buf ;
                      freeBufs_.push_back( buf );
 /*

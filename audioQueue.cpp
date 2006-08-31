@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.43  2006-08-16 21:10:52  ericn
+ * Revision 1.44  2006-08-31 15:51:13  ericn
+ * -remove unused code
+ *
+ * Revision 1.43  2006/08/16 21:10:52  ericn
  * -include config.h
  *
  * Revision 1.42  2006/08/16 02:36:46  ericn
@@ -274,6 +277,8 @@ void setVolume( unsigned char volParam )
       perror( "audioWriteFd" );
 }
 
+
+#ifdef NORMALIZE_AUDIO
 //
 // This number is magic and was determined by the scientific process
 // of trying to record something soft.
@@ -315,6 +320,8 @@ static void normalize( short int *samples,
 		}
 	}
 }
+
+#endif
 
 static void audioCallback( void *cbParam )
 {
