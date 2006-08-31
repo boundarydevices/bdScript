@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.4  2006-08-26 17:13:04  ericn
+ * Revision 1.5  2006-08-31 03:45:20  ericn
+ * -use non-blocking I/O on YUV device
+ *
+ * Revision 1.4  2006/08/26 17:13:04  ericn
  * -add dump for streams
  *
  * Revision 1.3  2006/08/26 16:05:44  ericn
@@ -53,7 +56,7 @@ odomPlaylist_t::odomPlaylist_t( void )
    : playing_( 0 )
    , add_( 0 )
    , take_( 0 )
-   , fdYUV_(open( "/dev/yuv", O_WRONLY ))
+   , fdYUV_(-1)
    , yuvInW_(-1U)
    , yuvInH_(-1U)
    , yuvOutX_(-1U)
@@ -66,6 +69,8 @@ odomPlaylist_t::odomPlaylist_t( void )
    odometerSet_t::get().setHandler( playlist_vsync, this );
 
    lastPlaylistInst_ = this ;
+   
+   fcntl(fdYUV_, F_SETFL, fcntl(fdYUV_, F_GETFL) | O_NONBLOCK | FASYNC );
 }
 
 odomPlaylist_t::~odomPlaylist_t( void )
@@ -391,6 +396,7 @@ int odomPlaylist_t::fdYUV( void )
 {
    if( 0 > fdYUV_ ) {
       fdYUV_ = open( "/dev/yuv", O_WRONLY );
+      fcntl(fdYUV_, F_SETFL, fcntl(fdYUV_, F_GETFL) | O_NONBLOCK | FASYNC );
       yuvInW_ = -1U ; // force ioctl
    }
    return fdYUV_ ;

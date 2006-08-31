@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.14  2006-08-27 19:15:22  ericn
+ * Revision 1.15  2006-08-31 03:45:27  ericn
+ * -use non-blocking I/O on YUV device
+ *
+ * Revision 1.14  2006/08/27 19:15:22  ericn
  * -removed mpegDecode2 test program (mpegQueue does the same thing)
  *
  * Revision 1.13  2006/08/22 15:49:42  ericn
@@ -558,6 +561,7 @@ int main( int argc, char const * const argv[] )
             bool haveHeader = false ;
             unsigned bytesPerPicture = 0 ;
             int const fdYUV = open( "/dev/yuv", O_WRONLY );
+            fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
             char keyvalue = '\0' ;
             
             unsigned long videoBytes = 0 ;
