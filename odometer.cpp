@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.5  2006-08-16 02:31:35  ericn
+ * Revision 1.6  2006-09-01 17:36:33  ericn
+ * -blt video earlier to reduce tearing
+ *
+ * Revision 1.5  2006/08/16 02:31:35  ericn
  * -rewrite based on command lists
  *
  *
@@ -199,6 +202,9 @@ void odometerSet_t::sigVsync(void){
    
    if( ++sigDepth > maxSigDepth )
       maxSigDepth = sigDepth ;
+
+   if( handler_ )
+      handler_( handlerParam_ );
    
    if( !stopping_ 
        && 
@@ -210,10 +216,7 @@ void odometerSet_t::sigVsync(void){
       if( cmdListBytes_ == (unsigned)numWritten )
          ++issueCount_ ;
    }
-   
-   if( handler_ )
-      handler_( handlerParam_ );
-   
+
    --sigDepth ;
 }
 
