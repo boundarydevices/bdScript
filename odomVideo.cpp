@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.4  2006-09-01 20:24:17  ericn
+ * Revision 1.5  2006-09-01 22:54:15  ericn
+ * -change buffer time to ms, decode up to 4 frames per poll
+ *
+ * Revision 1.4  2006/09/01 20:24:17  ericn
  * -keep track of PTS stats
  *
  * Revision 1.3  2006/09/01 01:02:27  ericn
@@ -45,7 +48,7 @@ odomVideo_t::odomVideo_t(
    , stream_( fIn_ )
    , outQueue_( -1,
                 playlist.fdYUV(),
-                1,
+                500,
                 outRect )
    , playlist_( playlist )
    , outRect_( outRect )
@@ -101,21 +104,31 @@ bool odomVideo_t::startPlayback( void )
 
 bool odomVideo_t::playback( void )
 {
-   unsigned char const *frame ;
-   unsigned             frameLen ;
+   unsigned numPictures = 0 ;
+   while( !completed() 
+          && 
+          ( 4 > numPictures ) 
+          && 
+          ( outQueue_.msVideoQueued() < outQueue_.highWater_ms() ) )
+   {
+      unsigned char const *frame ;
+      unsigned             frameLen ;
+      
+      CodecType      type ;
+      CodecID        codecId ;
+      long long      pts ;
+      unsigned char  streamId ;
    
-   CodecType      type ;
-   CodecID        codecId ;
-   long long      pts ;
-   unsigned char  streamId ;
-
-   if( stream_.getFrame( frame, frameLen, pts, streamId, type, codecId ) ){
-      bool isVideo = ( CODEC_TYPE_VIDEO == type );
-      if( isVideo ){
-         outQueue_.feedVideo( frame, frameLen, false, outQueue_.ptsToMs(pts) );
+      if( stream_.getFrame( frame, frameLen, pts, streamId, type, codecId ) ){
+         bool isVideo = ( CODEC_TYPE_VIDEO == type );
+         if( isVideo ){
+            outQueue_.feedVideo( frame, frameLen, false, outQueue_.ptsToMs(pts) );
+            ++numPictures ;
+         }
+         else
+            outQueue_.feedAudio( frame, frameLen, false, outQueue_.ptsToMs(pts) );
       }
    }
-
    return !completed();
 }
 
@@ -143,21 +156,8 @@ void odomVideo_t::doOutput( void ){
 
 void odomVideo_t::dump( void )
 {
-   printf( "%lu ms of video queued\n"
-           "   %u buffers allocated\n"
-           "   %u buffers freed\n"
-              "%u frames queued\n"
-              "%u frames played\n"
-              "%u frames skipped\n"
-              "%u frames dropped\n"
-              "PTS range: %lld..%lld (%lu)\n"
-         ,  outQueue_.msVideoQueued()
-         ,  outQueue_.numAllocated()
-         ,  outQueue_.numFreed()
-         ,  outQueue_.vFramesQueued()
-         ,  outQueue_.vFramesPlayed()
-         ,  outQueue_.vFramesSkipped() 
-         ,  outQueue_.vFramesDropped()
+   outQueue_.dumpStats();
+   printf( "PTS range: %lld..%lld (%lu)\n"
          ,  firstPTS_
          ,  lastPTS_
          ,  (unsigned long)(lastPTS_-firstPTS_)
