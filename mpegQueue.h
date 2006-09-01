@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.5 2006-09-01 00:49:40 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.6 2006-09-01 22:52:16 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.5  2006-09-01 00:49:40  ericn
+ * Revision 1.6  2006-09-01 22:52:16  ericn
+ * -change to finer granularity for buffer sizes (er..time)
+ *
+ * Revision 1.5  2006/09/01 00:49:40  ericn
  * -change names to lowWater_ms() and highWater_ms()
  *
  * Revision 1.4  2006/08/30 02:10:50  ericn
@@ -83,7 +86,7 @@ class mpegQueue_t {
 public:
    mpegQueue_t( int                dspFd,
                 int                yuvFd,
-                unsigned           secondsToBuffer,
+                unsigned           msToBuffer,
                 rectangle_t const &outRect );
    ~mpegQueue_t( void );
    void cleanup( void ); // allows memory-allocation checking before destructor
@@ -129,6 +132,8 @@ public:
    inline unsigned vFramesPlayed( void ) const { return vFramesPlayed_ ; }
    inline unsigned vFramesSkipped( void ) const { return vFramesSkipped_ ; }
    inline unsigned vFramesDropped( void ) const { return vFramesDropped_ ; }
+
+   void dumpStats(void) const ;
 
 private:
    mpegQueue_t( mpegQueue_t const & );

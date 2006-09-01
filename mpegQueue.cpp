@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.7  2006-09-01 00:49:47  ericn
+ * Revision 1.8  2006-09-01 22:52:19  ericn
+ * -change to finer granularity for buffer sizes (er..time)
+ *
+ * Revision 1.7  2006/09/01 00:49:47  ericn
  * -change names to lowWater_ms() and highWater_ms()
  *
  * Revision 1.6  2006/08/30 02:10:53  ericn
@@ -179,14 +182,14 @@ void mpegQueue_t::unlink( entryHeader_t &entry )
 mpegQueue_t::mpegQueue_t
    ( int      dspFd,
      int      yuvFd,
-     unsigned bufferSeconds,
+     unsigned msToBuffer,
      rectangle_t const &outRect )
    : dspFd_( dspFd )
    , yuvFd_( yuvFd )
    , outRect_( outRect )
-   , bufferMs_( bufferSeconds*1000 )
-   , lowWater_(bufferMs_/2)
-   , highWater_(bufferMs_*2)
+   , bufferMs_( msToBuffer )
+   , lowWater_( bufferMs_/2 )
+   , highWater_( bufferMs_+lowWater_ )
    , flags_( 0 )
    , prevOutWidth_( 0 )
    , prevOutHeight_( 0 )
@@ -775,6 +778,29 @@ void mpegQueue_t::playVideo( long long when )
       debugPrint( "idle\n" );
 }
 
+void mpegQueue_t::dumpStats(void) const 
+{
+   printf( "%lu ms of video queued\n"
+           "   low water mark:  %lu\n"
+           "   high water mark: %lu\n"
+           "   %u buffers allocated\n"
+           "   %u buffers freed\n"
+              "%u frames queued\n"
+              "%u frames played\n"
+              "%u frames skipped\n"
+              "%u frames dropped\n"
+         ,  msVideoQueued()
+         ,  lowWater_ms()
+         ,  highWater_ms()
+         ,  numAllocated()
+         ,  numFreed()
+         ,  vFramesQueued()
+         ,  vFramesPlayed()
+         ,  vFramesSkipped() 
+         ,  vFramesDropped()
+         );
+}
+
 
 #ifdef MODULETEST
 
@@ -948,7 +974,7 @@ int main( int argc, char const * const argv[] )
       outRect.width_ = fb.getWidth();
       outRect.height_ = fb.getHeight();
 
-      mpegQueue_t q( dspFd, fdYUV, 1, outRect );
+      mpegQueue_t q( dspFd, fdYUV, 500, outRect );
       inst_ = &q ;
       
       int flags = fcntl( fdSync, F_GETFL, 0 );
@@ -977,7 +1003,6 @@ printf( "----> playing file %s\n", fileName );
 
             while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
             {
-               pts /= 90 ;
                adler = adler32( adler, frame, frameLen );
 //               printf( "%d/%u/%08lX/%08lx\n", type, frameLen, adler32( 0, frame, frameLen ), adler );
                bool isVideo = ( CODEC_TYPE_VIDEO == type );
@@ -1028,15 +1053,7 @@ printf( "----> playing file %s\n", fileName );
       dumpTraces( traces, traceCount );
       delete [] traces ;
 
-      printf( "%u pictures queued\n"
-              "   %u skipped\n"
-              "   %u played\n"
-              "   %u dropped\n"
-            , q.vFramesQueued()
-            , q.vFramesSkipped()
-            , q.vFramesPlayed() 
-            , q.vFramesDropped() );
-
+      q.dumpStats();
       printf( "%u ticks\n"
               "%u parsing\n"
 #ifdef TRACEMPEG2                    
