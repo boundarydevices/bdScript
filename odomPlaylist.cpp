@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.5  2006-08-31 03:45:20  ericn
+ * Revision 1.6  2006-09-01 01:02:27  ericn
+ * -use mpegQueue for odomVideo
+ *
+ * Revision 1.5  2006/08/31 03:45:20  ericn
  * -use non-blocking I/O on YUV device
  *
  * Revision 1.4  2006/08/26 17:13:04  ericn
@@ -215,12 +218,12 @@ void odomPlaylist_t::next( unsigned long syncCount )
 
          case PLAYLIST_MPEG : {
             printf( "-----> starting video %s\n", current_.fileName_ );
-            odomVideo_t *video = new odomVideo_t( *this, 
-                                                  current_.fileName_,
-                                                  current_.x_,
-                                                  current_.y_,
-                                                  current_.w_,
-                                                  current_.h_ );
+            rectangle_t outRect ;
+            outRect.xLeft_  = current_.x_ ;
+            outRect.yTop_   = current_.y_ ;
+            outRect.width_  = current_.w_ ;
+            outRect.height_ = current_.h_ ;
+            odomVideo_t *video = new odomVideo_t( *this, current_.fileName_, outRect );
             if( video->initialized() 
                 &&
                 video->startPlayback() ){

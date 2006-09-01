@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.2 2006-09-01 01:02:27 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-09-01 01:02:27  ericn
+ * -use mpegQueue for odomVideo
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -22,23 +25,18 @@
 
 
 #include "odomPlaylist.h"
-#include "odomVQ.h"
-#include "memFile.h"
-#include "mpDemux.h"
-#include "mpegDecode.h"
+#include "mpegQueue.h"
+#include "mpegStream.h"
 
 class odomVideo_t {
 public:
-   odomVideo_t( odomPlaylist_t &playlist, // used to get YUV handle
-                char const     *fileName,
-                unsigned        outx = 0,
-                unsigned        outy = 0,
-                unsigned        outw = 0,
-                unsigned        outh = 0 );
+   odomVideo_t( odomPlaylist_t    &playlist, // used to get YUV handle
+                char const        *fileName,
+                rectangle_t const &outRect );
    ~odomVideo_t( void );
 
    // returns true if ready to play
-   bool initialized( void ) const { return 0 != vStream_ ; }
+   bool initialized( void ) const { return 0 != fIn_ ; }
 
    // start playback (opens YUV) - returns true if successful
    bool startPlayback( void );
@@ -56,18 +54,11 @@ public:
 
 private:
    odomVideo_t( odomVideo_t const & );
-   memFile_t                       fIn_ ;
+   FILE                           *fIn_ ;
+   mpegStreamFile_t                stream_ ;
+   mpegQueue_t                     outQueue_ ;
    odomPlaylist_t                 &playlist_ ;
-   mpegDecoder_t                   decoder_ ;
-   odometerVideoQueue_t            outQueue_ ;
-   mpegDemux_t::bulkInfo_t const  *bi_ ;
-   mpegDemux_t::streamAndFrames_t *vStream_ ;
-   mpegDemux_t::frame_t const     *next_ ;
-   mpegDemux_t::frame_t const     *end_ ;
-   unsigned                        outX_ ;
-   unsigned                        outY_ ;
-   unsigned                        outW_ ;
-   unsigned                        outH_ ;
+   rectangle_t                     outRect_ ;
    unsigned                        bytesPerPicture_ ;
    long long                       start_ ;
 };
