@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.6  2006-08-30 02:10:53  ericn
+ * Revision 1.7  2006-09-01 00:49:47  ericn
+ * -change names to lowWater_ms() and highWater_ms()
+ *
+ * Revision 1.6  2006/08/30 02:10:53  ericn
  * -add statistics
  *
  * Revision 1.5  2006/08/27 19:14:44  ericn
@@ -130,13 +133,6 @@ queueLock_t::~queueLock_t( void )
       debugPrint( "don't unlock\n" );
 }
 
-bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
-{
-   return ( eh.prev_ == eh.next_ )
-          &&
-          ( eh.prev_ == &eh );
-}
-   
 mpegQueue_t::entryHeader_t *mpegQueue_t::pullHead( entryHeader_t &eh )
 {
    entryHeader_t *e = eh.next_ ;
@@ -189,8 +185,8 @@ mpegQueue_t::mpegQueue_t
    , yuvFd_( yuvFd )
    , outRect_( outRect )
    , bufferMs_( bufferSeconds*1000 )
-   , halfBuffer_(bufferMs_/2)
-   , doubleBuffer_(bufferMs_*2)
+   , lowWater_(bufferMs_/2)
+   , highWater_(bufferMs_*2)
    , flags_( 0 )
    , prevOutWidth_( 0 )
    , prevOutHeight_( 0 )
@@ -210,6 +206,7 @@ mpegQueue_t::mpegQueue_t
    , vFramesQueued_( 0 )
    , vFramesPlayed_( 0 )
    , vFramesSkipped_( 0 )
+   , vFramesDropped_( 0 )
 {
 printf( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
    videoFull_.locked_ = 0 ;
@@ -486,7 +483,7 @@ void mpegQueue_t::feedVideo
          {
             int picType = ( infoptr->current_picture->flags & PIC_MASK_CODING_TYPE );
             if( flags_ & STARTED ){
-                if( msVideoQueued() <= msHalfBuffer() ){
+                if( msVideoQueued() <= lowWater_ms() ){
                    debugPrint( "skipping b-frames w/%lu ms queued\n", msVideoQueued() );
                    flags_ |= NEEDIFRAME ;
                 }
@@ -518,6 +515,7 @@ void mpegQueue_t::feedVideo
             else {
                debugPrint( "skip picture type %d\n", picType );
                mpeg2_skip( decoder_, 1 );
+               ++vFramesDropped_ ;
             }
             
             break;
@@ -987,7 +985,7 @@ printf( "----> playing file %s\n", fileName );
                adler = adler32( adler, frame, frameLen );
 
                if( isVideo ){
-                  while( q.msDoubleBuffer() <= q.msVideoQueued() )
+                  while( q.highWater_ms() <= q.msVideoQueued() )
                      pause();
                   if( 1 != arg ){
                      if( firstVideo && ( 0LL != pts ) )
@@ -1033,9 +1031,11 @@ printf( "----> playing file %s\n", fileName );
       printf( "%u pictures queued\n"
               "   %u skipped\n"
               "   %u played\n"
+              "   %u dropped\n"
             , q.vFramesQueued()
             , q.vFramesSkipped()
-            , q.vFramesPlayed() );
+            , q.vFramesPlayed() 
+            , q.vFramesDropped() );
 
       printf( "%u ticks\n"
               "%u parsing\n"

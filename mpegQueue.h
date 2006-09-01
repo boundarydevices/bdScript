@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.4 2006-08-30 02:10:50 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.5 2006-09-01 00:49:40 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.4  2006-08-30 02:10:50  ericn
+ * Revision 1.5  2006-09-01 00:49:40  ericn
+ * -change names to lowWater_ms() and highWater_ms()
+ *
+ * Revision 1.4  2006/08/30 02:10:50  ericn
  * -add statistics
  *
  * Revision 1.3  2006/08/26 16:07:39  ericn
@@ -111,10 +114,11 @@ public:
    //
    // stats 
    //
+   inline bool isEmpty( void ) const ;
    unsigned long msVideoQueued( void ) const ;
    inline unsigned long msToBuffer( void ) const { return bufferMs_ ; }
-   inline unsigned long msHalfBuffer( void ) const { return halfBuffer_ ; }
-   inline unsigned long msDoubleBuffer( void ) const { return doubleBuffer_ ; }
+   inline unsigned long lowWater_ms( void ) const { return lowWater_ ; }
+   inline unsigned long highWater_ms( void ) const { return highWater_ ; }
 
    inline static long long ptsToMs( long long pts ){ return pts/90 ; }
 
@@ -124,6 +128,7 @@ public:
    inline unsigned vFramesQueued( void ) const { return vFramesQueued_ ; }
    inline unsigned vFramesPlayed( void ) const { return vFramesPlayed_ ; }
    inline unsigned vFramesSkipped( void ) const { return vFramesSkipped_ ; }
+   inline unsigned vFramesDropped( void ) const { return vFramesDropped_ ; }
 
 private:
    mpegQueue_t( mpegQueue_t const & );
@@ -180,8 +185,8 @@ private:
    rectangle_t const outRect_ ;
    
    unsigned long const bufferMs_ ;
-   unsigned long const halfBuffer_ ;
-   unsigned long const doubleBuffer_ ;
+   unsigned long const lowWater_ ;
+   unsigned long const highWater_ ;
 
    unsigned long flags_ ;
 
@@ -215,6 +220,7 @@ private:
    unsigned      vFramesQueued_ ;
    unsigned      vFramesPlayed_ ;
    unsigned      vFramesSkipped_ ;
+   unsigned      vFramesDropped_ ;
 #ifdef MD5OUTPUT
    MD5_CTX       videoMD5_ ;
 #endif
@@ -222,6 +228,17 @@ private:
    friend class queueLock_t ;
 };
 
+
+inline bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
+{
+   return ( eh.prev_ == eh.next_ )
+          &&
+          ( eh.prev_ == &eh );
+}
+   
+inline bool mpegQueue_t::isEmpty( void ) const {
+   return isEmpty( videoFull_.header_ );
+}
 
 #endif
 
