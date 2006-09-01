@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.2 2006-09-01 01:02:27 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.3 2006-09-01 20:24:14 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.2  2006-09-01 01:02:27  ericn
+ * Revision 1.3  2006-09-01 20:24:14  ericn
+ * -keep track of PTS stats
+ *
+ * Revision 1.2  2006/09/01 01:02:27  ericn
  * -use mpegQueue for odomVideo
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -60,6 +63,8 @@ private:
    odomPlaylist_t                 &playlist_ ;
    rectangle_t                     outRect_ ;
    unsigned                        bytesPerPicture_ ;
+   long long                       firstPTS_ ;
+   long long                       lastPTS_ ;
    long long                       start_ ;
 };
 

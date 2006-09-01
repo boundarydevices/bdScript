@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.3  2006-09-01 01:02:27  ericn
+ * Revision 1.4  2006-09-01 20:24:17  ericn
+ * -keep track of PTS stats
+ *
+ * Revision 1.3  2006/09/01 01:02:27  ericn
  * -use mpegQueue for odomVideo
  *
  * Revision 1.2  2006/08/22 15:50:10  ericn
@@ -47,6 +50,8 @@ odomVideo_t::odomVideo_t(
    , playlist_( playlist )
    , outRect_( outRect )
    , bytesPerPicture_( 0 )
+   , firstPTS_( 0LL )
+   , lastPTS_( 0LL )
    , start_( 0LL )
 {
    if( 0 == fIn_ )fprintf( stderr, "%s: %m", fileName );
@@ -76,7 +81,13 @@ bool odomVideo_t::startPlayback( void )
       if( stream_.getFrame( frame, frameLen, pts, streamId, type, codecId ) ){
          bool isVideo = ( CODEC_TYPE_VIDEO == type );
          if( isVideo ){
-            outQueue_.feedVideo( frame, frameLen, firstVideo, outQueue_.ptsToMs(pts) );
+            if( 0LL != pts ){
+               if( 0LL == firstPTS_ )
+                  firstPTS_ = pts ;
+               lastPTS_ = pts ;
+            }
+            long long ms = outQueue_.ptsToMs(pts);
+            outQueue_.feedVideo( frame, frameLen, firstVideo, ms );
             firstVideo = false ;
          }
       }
@@ -84,6 +95,7 @@ bool odomVideo_t::startPlayback( void )
          return false ;
    }
 
+   start_ = tickMs();
    return true ;
 }
 
@@ -115,16 +127,9 @@ bool odomVideo_t::completed( void )
        &&
        outQueue_.isEmpty() ){
       printf( "video completed after %lu ms\n"
-              "%u frames queued\n"
-              "%u frames played\n"
-              "%u frames skipped\n"
-              "%u frames dropped\n"
-              , (unsigned long)( tickMs() - start_ )
-              , outQueue_.vFramesQueued()
-              , outQueue_.vFramesPlayed()
-              , outQueue_.vFramesSkipped() 
-              , outQueue_.vFramesDropped()
-      );
+              , (unsigned long)( tickMs() - start_ ) );
+      dump();
+      
       return true ;
    }
    else
@@ -145,6 +150,7 @@ void odomVideo_t::dump( void )
               "%u frames played\n"
               "%u frames skipped\n"
               "%u frames dropped\n"
+              "PTS range: %lld..%lld (%lu)\n"
          ,  outQueue_.msVideoQueued()
          ,  outQueue_.numAllocated()
          ,  outQueue_.numFreed()
@@ -152,6 +158,9 @@ void odomVideo_t::dump( void )
          ,  outQueue_.vFramesPlayed()
          ,  outQueue_.vFramesSkipped() 
          ,  outQueue_.vFramesDropped()
+         ,  firstPTS_
+         ,  lastPTS_
+         ,  (unsigned long)(lastPTS_-firstPTS_)
          );
 }
 
