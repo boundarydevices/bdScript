@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.7  2006-09-04 15:16:53  ericn
+ * Revision 1.8  2006-09-04 16:43:20  ericn
+ * -add audio signal callback
+ *
+ * Revision 1.7  2006/09/04 15:16:53  ericn
  * -add audio interfaces
  *
  * Revision 1.6  2006/09/01 01:02:27  ericn
@@ -50,8 +53,12 @@
 #include "odomVideo.h"
 #include "odomStream.h"
 #include <linux/soundcard.h>
+#include "rtSignal.h"
+#include <signal.h>
 
 #define PLAYLISTMASK (odomPlaylist_t::MAXENTRIES-1)
+
+static int const dspSignal_ = nextRtSignal();
 
 static void playlist_vsync( void *param ){
    ((odomPlaylist_t *)param)->vsyncHandler();
@@ -470,6 +477,23 @@ void odomPlaylist_t::vsyncHandler( void )
    if( PLAYLIST_MPEG == current_.type_ ){
       odomVideo_t *video = (odomVideo_t *)playing_ ;
       if( video ){
+         video->doAudio();
+      }
+   }
+   else if( PLAYLIST_STREAM == current_.type_ ){
+      odomVideoStream_t *stream = (odomVideoStream_t *)playing_ ;
+      if( stream ){
+         stream->doAudio();
+      }
+   }
+}
+
+
+void odomPlaylist_t::dspHandler( void )
+{
+   if( PLAYLIST_MPEG == current_.type_ ){
+      odomVideo_t *video = (odomVideo_t *)playing_ ;
+      if( video ){
          video->doOutput();
       }
    }
@@ -481,12 +505,43 @@ void odomPlaylist_t::vsyncHandler( void )
    }
 }
 
+static void dspHandler( int signo, siginfo_t *info, void *context )
+{
+   if( lastPlaylistInst_ )
+      lastPlaylistInst_->dspHandler();
+}
 
 int odomPlaylist_t::fdDsp( void )
 {
    if( 0 > fdDsp_ )
       fdDsp_ = open( "/dev/dsp", O_WRONLY );
 
+   if( 0 <= fdDsp_ ){
+      fcntl(fdDsp_, F_SETFL, fcntl(fdDsp_, F_GETFL) | O_NONBLOCK | FASYNC );
+
+      if( 0 != ioctl(fdDsp_, SNDCTL_DSP_SYNC, 0 ) ) 
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
+
+      int const format = AFMT_S16_LE ;
+      if( 0 != ioctl( fdDsp_, SNDCTL_DSP_SETFMT, &format) ) 
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+      
+      int vol = (75<<8)|75 ;
+      if( 0 > ioctl( fdDsp_, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+         perror( "Error setting volume" );
+      
+      struct sigaction sa ;
+      sa.sa_flags = SA_SIGINFO|SA_RESTART ;
+      sa.sa_restorer = 0 ;
+      sigemptyset( &sa.sa_mask );
+
+      fcntl(fdDsp_, F_SETOWN, getpid() );
+      fcntl(fdDsp_, F_SETSIG, dspSignal_ );
+      sa.sa_sigaction = ::dspHandler ;
+      sigaddset( &sa.sa_mask, dspSignal_ );
+      sigaction(dspSignal_, &sa, 0 );
+   }
+   
    return fdDsp_ ;
 }
 

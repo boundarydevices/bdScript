@@ -1,5 +1,5 @@
 #ifndef __ODOMPLAYLIST_H__
-#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.4 2006-09-04 15:16:51 ericn Exp $"
+#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.5 2006-09-04 16:43:17 ericn Exp $"
 
 /*
  * odomPlaylist.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.h,v $
- * Revision 1.4  2006-09-04 15:16:51  ericn
+ * Revision 1.5  2006-09-04 16:43:17  ericn
+ * -add audio signal callback
+ *
+ * Revision 1.4  2006/09/04 15:16:51  ericn
  * -add audio interfaces
  *
  * Revision 1.3  2006/08/26 16:05:16  ericn
@@ -91,6 +94,8 @@ public:
    void closeYUV( void );
 
    void vsyncHandler( void );
+
+   void dspHandler( void );
 
    int fdDsp( void );
    int fdDsp( unsigned speed, unsigned channels );
