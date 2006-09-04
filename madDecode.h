@@ -1,5 +1,5 @@
 #ifndef __MADDECODE_H__
-#define __MADDECODE_H__ "$Id: madDecode.h,v 1.5 2006-05-14 14:34:36 ericn Exp $"
+#define __MADDECODE_H__ "$Id: madDecode.h,v 1.6 2006-09-04 14:33:32 ericn Exp $"
 
 /*
  * madDecode.h
@@ -23,7 +23,10 @@
  * Change History : 
  *
  * $Log: madDecode.h,v $
- * Revision 1.5  2006-05-14 14:34:36  ericn
+ * Revision 1.6  2006-09-04 14:33:32  ericn
+ * -add timing flags, timer string
+ *
+ * Revision 1.5  2006/05/14 14:34:36  ericn
  * -add madDecodeAll() routine
  *
  * Revision 1.4  2003/08/04 03:13:40  ericn
@@ -44,6 +47,8 @@
  */
 
 #include "mad.h"
+
+extern int volatile in_synth_frame ;
 
 class madDecoder_t {
 public:
@@ -74,11 +79,13 @@ public:
    inline unsigned numSamples( void ) const { return haveHeader_ ? numSamples_ : 0 ; }
    inline unsigned sampleRate( void ) const { return haveHeader_ ? sampleRate_ : 0 ; }
    inline unsigned numChannels( void ) const { return haveHeader_ ? numChannels_ : 0 ; }
+   char const *timerString( void );
 
 private:
    struct mad_stream mp3Stream_ ;
    struct mad_frame  mp3Frame_ ;
    struct mad_synth  mp3Synth_ ;
+   mad_timer_t       timer_ ;
    bool              haveHeader_ ;
    unsigned          numChannels_ ;
    unsigned          sampleRate_ ; // HZ
@@ -86,6 +93,7 @@ private:
    unsigned short    assEndLength_ ;
    unsigned          numSamples_ ; // number of samples available
    unsigned          sampleStart_ ; // read up to this sample -1 
+   char              timerBuf_[80];
 };
 
 

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.7  2006-05-14 14:34:55  ericn
+ * Revision 1.8  2006-09-04 14:33:29  ericn
+ * -add timing flags, timer string
+ *
+ * Revision 1.7  2006/05/14 14:34:55  ericn
  * -add madDecodeAll() routine, madDecode2 test program
  *
  * Revision 1.6  2005/08/12 04:19:15  ericn
@@ -40,13 +43,16 @@
 #include "id3tag.h"
 #include <string.h>
 
+int volatile in_synth_frame = 0 ;
+
 inline unsigned short scale( mad_fixed_t sample )
 {
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
 madDecoder_t :: madDecoder_t( void )
-   : haveHeader_( false ),
+   : timer_( mad_timer_zero ),
+     haveHeader_( false ),
      numChannels_( 0 ),
      sampleRate_( 0 ),
      assEndLength_( 0 ),
@@ -98,6 +104,7 @@ bool madDecoder_t :: getData( void )
          haveHeader_ = true ;
          mad_frame_init(&mp3Frame_);
          mad_synth_init(&mp3Synth_);
+         timer_ = mad_timer_zero ;
       }
       else
       {
@@ -151,8 +158,10 @@ bool madDecoder_t :: getData( void )
          {
             numChannels_ = MAD_NCHANNELS(&mp3Frame_.header);
             sampleRate_ = mp3Frame_.header.samplerate ;
+in_synth_frame = 1 ;
             mad_synth_frame( &mp3Synth_, &mp3Frame_ );
-
+in_synth_frame = 0 ;
+            mad_timer_add( &timer_, mp3Frame_.header.duration );
             numSamples_ = mp3Synth_.pcm.length ;
             if( 0 < numSamples_ )
             {
@@ -202,7 +211,7 @@ bool madDecoder_t :: readSamples( unsigned short samples[],
    unsigned short *nextOut = samples ;
 
    if( 1 == numChannels_ )
-   {
+   {     
       if( maxSamples > numSamples_ )
          maxSamples = numSamples_ ;
 
@@ -240,7 +249,11 @@ bool madDecoder_t :: readSamples( unsigned short samples[],
    return 0 != numRead ;
 }
 
-
+char const *madDecoder_t :: timerString( void )
+{
+   mad_timer_string(timer_,timerBuf_,"%lu:%02lu.%03u", MAD_UNITS_MINUTES, MAD_UNITS_MILLISECONDS,0);
+   return timerBuf_ ;
+}
 
 bool madDecodeAll( void const      *mp3Data,             // input
                    unsigned         mp3Length,           // input
@@ -322,8 +335,9 @@ int main( int argc, char const * const argv[] )
             enum { maxSamples = 512 };
             unsigned short samples[maxSamples];
             unsigned numRead ;
-            while( decoder.readSamples( samples, maxSamples, numRead ) )
-               printf( "%u samples\n", numRead );
+            while( decoder.readSamples( samples, maxSamples, numRead ) ){
+               printf( "%s: %u samples\n", decoder.timerString(), numRead );
+            }
             if( !decoder.getData() )
                break;
             else
