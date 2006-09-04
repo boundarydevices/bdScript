@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.5  2006-08-27 19:12:32  ericn
+ * Revision 1.6  2006-09-04 15:17:38  ericn
+ * -add audio
+ *
+ * Revision 1.5  2006/08/27 19:12:32  ericn
  * -remove unsupported dts
  *
  * Revision 1.4  2006/08/26 17:13:22  ericn
@@ -42,7 +45,9 @@ odomVideoStream_t::odomVideoStream_t
    : mpegRxUDP_t( port )
    , playlist_( playlist )
    , outRect_( outRect )
-   , outQueue_( open( "/dev/dsp", O_WRONLY ), playlist.fdYUV(), 1, outRect )
+   , outQueue_( playlist.fdDsp(), 
+                playlist.fdYUV(), 
+                1000, outRect )
    , firstFrame_( true )
 {
 }

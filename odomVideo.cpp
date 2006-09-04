@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.5  2006-09-01 22:54:15  ericn
+ * Revision 1.6  2006-09-04 15:17:19  ericn
+ * -add audio
+ *
+ * Revision 1.5  2006/09/01 22:54:15  ericn
  * -change buffer time to ms, decode up to 4 frames per poll
  *
  * Revision 1.4  2006/09/01 20:24:17  ericn
@@ -33,6 +36,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "tickMs.h"
+#include <linux/soundcard.h>
 
 #define INITTING 1
 #define PULLING  2 
@@ -46,9 +50,9 @@ odomVideo_t::odomVideo_t(
    rectangle_t const &outRect )
    : fIn_( fopen( fileName, "rb" ) )
    , stream_( fIn_ )
-   , outQueue_( -1,
+   , outQueue_( playlist.fdDsp(),
                 playlist.fdYUV(),
-                500,
+                2000,
                 outRect )
    , playlist_( playlist )
    , outRect_( outRect )
@@ -83,28 +87,36 @@ bool odomVideo_t::startPlayback( void )
    
       if( stream_.getFrame( frame, frameLen, pts, streamId, type, codecId ) ){
          bool isVideo = ( CODEC_TYPE_VIDEO == type );
+         long long ms = outQueue_.ptsToMs(pts);
          if( isVideo ){
             if( 0LL != pts ){
                if( 0LL == firstPTS_ )
                   firstPTS_ = pts ;
                lastPTS_ = pts ;
             }
-            long long ms = outQueue_.ptsToMs(pts);
             outQueue_.feedVideo( frame, frameLen, firstVideo, ms );
             firstVideo = false ;
+         }
+         else {
+            outQueue_.feedAudio( frame, frameLen, false, ms );
          }
       }
       else
          return false ;
    }
 
+   outQueue_.startPlayback();
    start_ = tickMs();
+
    return true ;
 }
 
 bool odomVideo_t::playback( void )
 {
    unsigned numPictures = 0 ;
+   
+   outQueue_.playAudio(tickMs());
+
    while( !completed() 
           && 
           ( 4 > numPictures ) 
@@ -129,6 +141,8 @@ bool odomVideo_t::playback( void )
             outQueue_.feedAudio( frame, frameLen, false, outQueue_.ptsToMs(pts) );
       }
    }
+   
+   outQueue_.playAudio(tickMs());
    return !completed();
 }
 
