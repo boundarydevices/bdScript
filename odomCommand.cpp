@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomCommand.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-09-04 15:16:28  ericn
+ * -add volume command
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -620,6 +623,29 @@ static bool clrAlpha(
    return false ;
 }
 
+static bool volume( 
+   odomCmdInterp_t   &interp,
+   char const * const params[],
+   unsigned           numParams,
+   char              *errorMsg,
+   unsigned           errorMsgLen )
+{
+   if( 2 == numParams ){
+      unsigned volume ;
+      if( ( 1 == sscanf( params[1], "%u", &volume ) )
+          &&
+          ( 99 >= volume ) ){
+         interp.playlist().setVolume( volume );
+         return true ;
+      }
+      else
+         snprintf( errorMsg, errorMsgLen, "Invalid volume %s, should be 0..99\n", params[1] );
+   }
+   else
+      snprintf( errorMsg, errorMsgLen, "Usage: volume 0-99\n" );
+
+   return false ;
+}
 
 
 static commandEntry_t commands_[] = {
@@ -659,6 +685,8 @@ static commandEntry_t commands_[] = {
    , handler_: source }
 ,  { name_: "stop"
    , handler_: stop }
+,  { name_: "volume"
+   , handler_: volume }
 };
 
 static unsigned const numCommands_ = sizeof(commands_)/sizeof(commands_[0]);
