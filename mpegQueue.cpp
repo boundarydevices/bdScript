@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.9  2006-09-04 15:16:06  ericn
+ * Revision 1.10  2006-09-04 16:43:42  ericn
+ * -use audio timing
+ *
+ * Revision 1.9  2006/09/04 15:16:06  ericn
  * -add audio support
  *
  * Revision 1.8  2006/09/01 22:52:19  ericn
@@ -205,6 +208,7 @@ mpegQueue_t::mpegQueue_t
    , bufferMs_( msToBuffer )
    , lowWater_( bufferMs_/2 )
    , highWater_( 2*bufferMs_ )
+   , audioBufferBytes_( 0 )
    , flags_( 0 )
    , prevOutWidth_( 0 )
    , prevOutHeight_( 0 )
@@ -265,6 +269,15 @@ debugPrint( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );
    audioEmpty_.header_.prev_ 
       = audioEmpty_.header_.next_ 
       = &audioEmpty_.header_ ;
+
+   audio_buf_info ai ;
+   if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
+      audioBufferBytes_ = ai.bytes ;
+      printf( "%llu ms/buffer @ 2 channels/44100 Hz\n",
+              audioBufferMs( 44100, 2 ) );
+   }
+   else
+      perror( "GETOSPACE" );
 
 #ifdef MD5OUTPUT
    MD5_Init( &videoMD5_ );
@@ -447,6 +460,21 @@ debugPrint( "allocate buffer of size : %u\n", size );
    return ae ;
 }
 
+long long mpegQueue_t::audioBufferMs( unsigned speed, unsigned channels )
+{
+   /*
+    * bytes/second
+    */
+   unsigned bps = speed*channels*sizeof(unsigned short);
+   if( 0 < bps ){
+      return (audioBufferBytes_*1000)/bps ;
+   }
+   else {
+      fprintf( stderr, "Invalid channel count or speed: %u/%u\n", channels, speed );
+      return 0 ;
+   }
+}
+
 void mpegQueue_t::startPlayback( void )
 {
 
@@ -506,7 +534,7 @@ void mpegQueue_t::adjustPTS( long long startPts )
    if( flags_ & STARTED ){
       long long nowPlus = tickMs() + bufferMs_ - startPts ;
 
-      startMs_ = nowPlus ;
+      startMs_ = audioOffs_ = nowPlus ;
       msOut_ = startPts ;
    }
 }
@@ -742,7 +770,10 @@ void mpegQueue_t::playAudio
             if( lockAudioQ.weLocked() ){
                while( !isEmpty( audioFull_.header_ ) ){
                   audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
-                  if( 1 ) { // 0 <= ( when-ae->header_.when_ms_ ) ){
+                  long long timeDiff = when 
+                                     - ae->header_.when_ms_
+                                     - audioBufferMs( ae->sampleRate_, ae->numChannels_ );
+                  if( 0 > timeDiff ){
                      if( ae->sampleRate_ != prevSampleRate_ ){
                         printf( "%u samples/sec\n", ae->sampleRate_ );
                         prevSampleRate_ = ae->sampleRate_ ;
@@ -783,10 +814,11 @@ void mpegQueue_t::playAudio
                      else if( ( -1 != numWritten ) || ( EAGAIN != errno ) )
                         fprintf( stderr, "Short audio write: %d/%d/%d/%u: %m\n", dspFd_, numWritten, errno, ae->length_ );
                      else {
+                        int prevErr = errno ;
                         audio_buf_info ai2 ;
                         if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai2) ){
                            if( 0 < ai2.fragments ){
-                              printf( "EINTR?\n" );
+                              printf( "EINTR? %d/%d/%s\n", numWritten, prevErr, strerror(prevErr) );
                               continue ;
                            }
                         }
@@ -805,7 +837,7 @@ void mpegQueue_t::playAudio
             }
          } // have some space to write
          if( ai.fragments == ai.fragstotal )
-            printf( "audio stall: %u of %u filled\n", bytesWritten, ai.bytes );
+            debugPrint( "audio stall: %u of %u filled\n", bytesWritten, ai.bytes );
 
          if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
             if( 0 != ai.fragments ){

@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.7 2006-09-04 14:34:16 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.8 2006-09-04 16:43:40 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.7  2006-09-04 14:34:16  ericn
+ * Revision 1.8  2006-09-04 16:43:40  ericn
+ * -use audio timing
+ *
+ * Revision 1.7  2006/09/04 14:34:16  ericn
  * -add audio support
  *
  * Revision 1.6  2006/09/01 22:52:16  ericn
@@ -203,6 +206,8 @@ private:
 
    audioEntry_t *getAudioBuf();
 
+   long long audioBufferMs( unsigned speed, unsigned channels );
+
    int const  dspFd_ ;
    int const  yuvFd_ ;
 
@@ -211,6 +216,8 @@ private:
    unsigned long const bufferMs_ ;
    unsigned long const lowWater_ ;
    unsigned long const highWater_ ;
+
+   unsigned long       audioBufferBytes_ ;
 
    unsigned long flags_ ;
 
