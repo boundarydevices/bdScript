@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.6 2006-09-01 22:52:16 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.7 2006-09-04 14:34:16 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.6  2006-09-01 22:52:16  ericn
+ * Revision 1.7  2006-09-04 14:34:16  ericn
+ * -add audio support
+ *
+ * Revision 1.6  2006/09/01 22:52:16  ericn
  * -change to finer granularity for buffer sizes (er..time)
  *
  * Revision 1.5  2006/09/01 00:49:40  ericn
@@ -81,6 +84,7 @@ extern "C" {
 #endif
 
 #include "fbDev.h"
+#include "madDecode.h"
 
 class mpegQueue_t {
 public:
@@ -119,22 +123,35 @@ public:
    //
    inline bool isEmpty( void ) const ;
    unsigned long msVideoQueued( void ) const ;
+   unsigned long msAudioQueued( void ) const ;
    inline unsigned long msToBuffer( void ) const { return bufferMs_ ; }
    inline unsigned long lowWater_ms( void ) const { return lowWater_ ; }
    inline unsigned long highWater_ms( void ) const { return highWater_ ; }
 
    inline static long long ptsToMs( long long pts ){ return pts/90 ; }
 
-   inline unsigned numAllocated( void ) const { return allocCount_ ; }
-   inline unsigned numFreed( void ) const { return freeCount_ ; }
+   inline unsigned numAllocated( void ) const { return vallocCount_ ; }
+   inline unsigned numFreed( void ) const { return vfreeCount_ ; }
 
    inline unsigned vFramesQueued( void ) const { return vFramesQueued_ ; }
    inline unsigned vFramesPlayed( void ) const { return vFramesPlayed_ ; }
    inline unsigned vFramesSkipped( void ) const { return vFramesSkipped_ ; }
    inline unsigned vFramesDropped( void ) const { return vFramesDropped_ ; }
 
+   inline unsigned aFramesQueued( void ) const { return aFramesQueued_ ; }
+   inline unsigned aFramesPlayed( void ) const { return aFramesPlayed_ ; }
+   inline unsigned aFramesSkipped( void ) const { return aFramesSkipped_ ; }
+   inline unsigned aFramesDropped( void ) const { return aFramesDropped_ ; }
+
+   inline long long firstVideoWrite( void ) const { return firstVideoWrite_ ; }
+   inline long long lastVideoWrite( void ) const { return lastVideoWrite_ ; }
+
+   inline long long firstAudioWrite( void ) const { return firstAudioWrite_ ; }
+   inline long long lastAudioWrite( void ) const { return lastAudioWrite_ ; }
+
    void dumpStats(void) const ;
 
+   void startPlayback( void );
 private:
    mpegQueue_t( mpegQueue_t const & );
    enum flags_e {
@@ -175,14 +192,16 @@ private:
    void addDecoderBuf();
    void cleanDecoderBufs();
 
-   void startPlayback( void );
-
    struct audioEntry_t {
       entryHeader_t  header_ ;
-      unsigned       offset_ ;
-      unsigned       length_ ;
-      unsigned char  data_[1];
+      unsigned       offset_ ; // next sample to read (in samples)
+      unsigned       length_ ; // number of samples filled
+      unsigned       sampleRate_ ;
+      unsigned       numChannels_ ;
+      unsigned short data_[1];
    };
+
+   audioEntry_t *getAudioBuf();
 
    int const  dspFd_ ;
    int const  yuvFd_ ;
@@ -209,6 +228,7 @@ private:
    long long     msPerPic_ ;
    long long     msOut_ ;
    long long     startMs_ ;
+   long long     audioOffs_ ;
 
    queueHeader_t videoFull_ ;
    queueHeader_t videoEmpty_ ;
@@ -217,8 +237,11 @@ private:
    queueHeader_t audioFull_ ;
    queueHeader_t audioEmpty_ ;
 
-   unsigned      allocCount_ ;
-   unsigned      freeCount_ ;
+   unsigned      vallocCount_ ;
+   unsigned      vfreeCount_ ;
+
+   unsigned      aAllocCount_ ;
+   unsigned      aFreeCount_ ;
 
    mpeg2dec_t * const decoder_ ;
 
@@ -230,7 +253,28 @@ private:
    MD5_CTX       videoMD5_ ;
 #endif
 
+   madDecoder_t  audioDecoder_ ;
+   audioEntry_t *audioPartial_ ; // contains partial data (if not NULL)
+
+   unsigned      prevSampleRate_ ;
+   unsigned      prevChannels_ ;
+
+   unsigned      aFramesQueued_ ;
+   unsigned      aFramesPlayed_ ;
+   unsigned      aFramesSkipped_ ;
+   unsigned      aFramesDropped_ ;
    friend class queueLock_t ;
+
+   long long     firstVideoMs_ ;
+   long long     lastVideoMs_ ;
+   long long     firstAudioMs_ ;
+   long long     lastAudioMs_ ;
+
+   long long     firstVideoWrite_ ;
+   long long     lastVideoWrite_ ;
+
+   long long     firstAudioWrite_ ;
+   long long     lastAudioWrite_ ;
 };
 
 
