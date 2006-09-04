@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.8  2006-09-01 22:52:19  ericn
+ * Revision 1.9  2006-09-04 15:16:06  ericn
+ * -add audio support
+ *
+ * Revision 1.8  2006/09/01 22:52:19  ericn
  * -change to finer granularity for buffer sizes (er..time)
  *
  * Revision 1.7  2006/09/01 00:49:47  ericn
@@ -56,6 +59,7 @@
 #include <linux/sm501-int.h>
 #include <string.h>
 #include "fbDev.h"
+#include <sys/soundcard.h>
 
 // #define USE_MMAP
 
@@ -66,6 +70,8 @@
 #ifdef MD5OUTPUT
 #include <openssl/md5.h>
 #endif
+
+#define TRACEMAD
 
 extern "C" {
 #ifdef TRACEMPEG2
@@ -78,14 +84,23 @@ extern int volatile in_mpeg2_dct_add ;
 extern int volatile in_mpeg2_dct_init ;
 extern int volatile in_mpeg2_me ;
 #endif
+#ifdef TRACEMAD
+extern int volatile in_mad_synth_full ;
+extern int volatile in_mad_synth_half ;
+extern int volatile in_mad_synth_dct ;
+#endif
+
 int volatile in_mpeg2_parse = 0 ;
 int volatile in_write = 0 ;
+int volatile in_mp3_feed = 0 ;
+int volatile in_mp3_synth = 0 ;
+int volatile in_mp3_pull = 0 ;
+int volatile in_file_read = 0 ;
 };
-
 
 #define fieldsize( __st, __f ) sizeof( ((__st const *)0)->__f )
 
-#define AUDIOFRAMESIZE 4096
+#define AUDIOSAMPLESPERFRAME 4096
 
 class queueLock_t {
 public:
@@ -189,7 +204,7 @@ mpegQueue_t::mpegQueue_t
    , outRect_( outRect )
    , bufferMs_( msToBuffer )
    , lowWater_( bufferMs_/2 )
-   , highWater_( bufferMs_+lowWater_ )
+   , highWater_( 2*bufferMs_ )
    , flags_( 0 )
    , prevOutWidth_( 0 )
    , prevOutHeight_( 0 )
@@ -203,15 +218,33 @@ mpegQueue_t::mpegQueue_t
    , msPerPic_( 0 )
    , msOut_( 0LL )
    , startMs_( 0LL )
-   , allocCount_( 0 )
-   , freeCount_( 0 )
+   , audioOffs_( 0LL )
+   , vallocCount_( 0 )
+   , vfreeCount_( 0 )
+   , aAllocCount_( 0 )
+   , aFreeCount_( 0 )
    , decoder_( mpeg2_init() )
    , vFramesQueued_( 0 )
    , vFramesPlayed_( 0 )
    , vFramesSkipped_( 0 )
    , vFramesDropped_( 0 )
+   , audioPartial_( 0 )
+   , prevSampleRate_( 0 )
+   , prevChannels_( 0 )
+   , aFramesQueued_( 0 )
+   , aFramesPlayed_( 0 )
+   , aFramesSkipped_( 0 )
+   , aFramesDropped_( 0 )
+   , firstVideoMs_( 0 )
+   , lastVideoMs_( 0 )
+   , firstAudioMs_( 0 )
+   , lastAudioMs_( 0 )
+   , firstVideoWrite_( 0 )
+   , lastVideoWrite_( 0 )
+   , firstAudioWrite_( 0 )
+   , lastAudioWrite_( 0 )
 {
-printf( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
+debugPrint( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
    videoFull_.locked_ = 0 ;
    videoFull_.header_.prev_ 
       = videoFull_.header_.next_ 
@@ -286,8 +319,59 @@ void mpegQueue_t::feedAudio
    ( unsigned char const *data, 
      unsigned             length,
      bool                 discontinuity,
-     long long            pts ) // transport PTS
+     long long            when_ms ) // transport PTS
 {
+#if 1
+in_mp3_feed = 1 ;
+   audioDecoder_.feed( data, length );
+in_mp3_feed = 0 ;
+
+in_mp3_synth = 1 ;
+   while( audioDecoder_.getData() ){
+in_mp3_synth = 0 ;
+debugPrint( "%s\n", audioDecoder_.timerString() );
+      do {
+         if( 0 == audioPartial_ ){
+            audioPartial_ = getAudioBuf();
+            assert( 0 != audioPartial_ );
+            audioPartial_->header_.when_ms_ = when_ms ;
+         }
+         unsigned numFree = AUDIOSAMPLESPERFRAME-audioPartial_->length_ ;
+         unsigned numRead ;
+         unsigned short *next = audioPartial_->data_ + audioPartial_->length_ ;
+
+         in_mp3_pull = 1 ;
+         if( audioDecoder_.readSamples( next, numFree, numRead ) ){
+            in_mp3_pull = 0 ;
+            audioPartial_->length_ += numRead ;
+            if( AUDIOSAMPLESPERFRAME == audioPartial_->length_ ){
+               audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
+               audioPartial_->numChannels_ = audioDecoder_.numChannels();
+   
+               if( 0LL == firstAudioMs_ )
+                  firstAudioMs_ = audioPartial_->header_.when_ms_ ;
+               lastAudioMs_ = audioPartial_->header_.when_ms_ ;
+               audioPartial_->header_.when_ms_ += audioOffs_ ;
+
+               queueLock_t lockAudioQ( &audioFull_.locked_ );
+               assert( lockAudioQ.weLocked() ); // only reader side should fail
+   
+               pushTail( audioFull_.header_, &audioPartial_->header_ );
+               audioPartial_ = 0 ;
+               ++aFramesQueued_ ;
+            }
+         }
+         else {
+            in_mp3_pull = 0 ;
+            break ;
+         }
+      } while( 1 );
+in_mp3_synth = 1 ;
+   } // while more output synthesized
+in_mp3_synth = 0 ;
+if( flags_ & AUDIOIDLE )
+   playAudio(tickMs());
+#endif
 }
 
 
@@ -303,7 +387,7 @@ mpegQueue_t::videoEntry_t *mpegQueue_t::getPictureBuf(void)
 debugPrint( "recycle buffer: %p\n", ve );
          ve->width_ = inWidth_ ;
          ve->height_ = inHeight_ ;
-         ++allocCount_ ;
+         ++vallocCount_ ;
          return ve ;
       }
       else {
@@ -315,7 +399,7 @@ debugPrint( "recycle buffer: %p\n", ve );
                   -fieldsize(videoEntry_t,data_)
                   +inBufferLength_ ;
 debugPrint( "allocate buffer of size : %u\n", size );
-   ++allocCount_ ;
+   ++vallocCount_ ;
 
    unsigned char * const data = new unsigned char [ size ];
    videoEntry_t *const ve = (videoEntry_t *)data ;
@@ -327,32 +411,93 @@ debugPrint( "allocate buffer of size : %u\n", size );
    return ve ;
 }
 
+mpegQueue_t::audioEntry_t *mpegQueue_t::getAudioBuf( void )
+{
+   {
+      queueLock_t lockEmptyQ( &audioEmpty_.locked_ );
+      assert( lockEmptyQ.weLocked() ); // only reader side should fail
+   
+      entryHeader_t *next ;
+      if( 0 != ( next = pullHead( audioEmpty_.header_ ) ) ){
+         audioEntry_t *const ae = (audioEntry_t *)next ;
+         ae->offset_ =
+         ae->length_ = 
+         ae->sampleRate_ =
+         ae->numChannels_ = 0 ;
+         ++aAllocCount_ ;
+         return ae ;
+debugPrint( "recycle buffer: %p\n", ae );
+      }
+   }
+
+   unsigned size = sizeof(audioEntry_t)
+                  -fieldsize(audioEntry_t,data_)
+                  +(AUDIOSAMPLESPERFRAME*fieldsize(audioEntry_t,data_[0]));
+debugPrint( "allocate buffer of size : %u\n", size );
+   ++aAllocCount_ ;
+
+   unsigned char * const data = new unsigned char [ size ];
+   audioEntry_t *const ae = (audioEntry_t *)data ;
+   ae->offset_ =
+   ae->length_ = 
+   ae->sampleRate_ =
+   ae->numChannels_ = 0 ;
+   ae->header_.next_ = ae->header_.prev_ = &ae->header_ ;
+
+   return ae ;
+}
+
 void mpegQueue_t::startPlayback( void )
 {
+
    if( 0 == ( flags_ & STARTED ) ){
       flags_ |= STARTED ;
-   
-      long long const now = tickMs();
+      
+      long long now = tickMs();
 
       queueLock_t lockVideoQ( &videoFull_.locked_ );
       assert( lockVideoQ.weLocked() );
 
-      entryHeader_t *entry = videoFull_.header_.next_ ;
-      startMs_ = now - entry->when_ms_ ;
-
-      while( entry != &videoFull_.header_ ){
-         entry->when_ms_ += startMs_ ;
-         entry = entry->next_ ;
-      }
-
       queueLock_t lockAudioQ( &audioFull_.locked_ );
       assert( lockAudioQ.weLocked() );
 
-      entry = audioFull_.header_.next_ ;
-      while( entry != &audioFull_.header_ ){
+      entryHeader_t *firstVideo = videoFull_.header_.next_ ;
+      entryHeader_t *firstAudio = audioFull_.header_.next_ ;
+
+#if 1
+      if( firstAudio->when_ms_ < firstVideo->when_ms_ ){
+         startMs_ = now - firstAudio->when_ms_ ;
+printf( "use audio timestamp: %llu\n", firstAudio->when_ms_ );
+printf( "video timestamp: %llu\n", firstVideo->when_ms_ );
+      }
+      else {
+         startMs_ = now - firstVideo->when_ms_ ;
+printf( "use video timestamp: %llu\n", firstVideo->when_ms_ );
+printf( "audio timestamp: %llu\n", firstAudio->when_ms_ );
+      }
+#endif
+
+      long long first = firstVideo->when_ms_ ;
+      long long last = first ;
+      entryHeader_t *entry = firstVideo ;
+      while( entry != &videoFull_.header_ ){
+         last = entry->when_ms_ ;
          entry->when_ms_ += startMs_ ;
          entry = entry->next_ ;
       }
+      debugPrint( "\nvideo ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
+
+      first = firstAudio->when_ms_ ;
+      last = first ;
+      audioOffs_ = startMs_ ;
+      entry = audioFull_.header_.next_ ;
+      while( entry != &audioFull_.header_ ){
+         last = entry->when_ms_ ;
+         entry->when_ms_ += audioOffs_ ;
+         entry = entry->next_ ;
+      }
+      debugPrint( "audio ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
+      playAudio(now);
    }
 }
 
@@ -371,7 +516,18 @@ void mpegQueue_t::queuePicture(videoEntry_t *ve)
    queueLock_t lockVideoQ( &videoFull_.locked_ );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
 
+   if( 0LL == firstVideoMs_ )
+      firstVideoMs_ = ve->header_.when_ms_ ;
+   lastVideoMs_ = ve->header_.when_ms_ ;
+
    ve->header_.when_ms_ += startMs_ ;
+
+   long int diff = (long)(ve->header_.when_ms_ - videoFull_.header_.next_->when_ms_ );
+   if( 0 > diff )
+      printf( "ms inversion: %lld/%lld (%ld)\n",
+              ve->header_.when_ms_,
+              videoFull_.header_.next_->when_ms_,
+              diff );
 
    pushTail( videoFull_.header_, &ve->header_ );
    ++vFramesQueued_ ;
@@ -399,10 +555,14 @@ void mpegQueue_t::cleanDecoderBufs()
 
    entryHeader_t *e ;
    while( 0 != ( e = pullHead( decoderBufs_.header_ ) ) ){
-      ++freeCount_ ;
+      ++vfreeCount_ ;
       pushTail( videoEmpty_.header_, e );
    }
 }
+
+static char const cPicTypes[] = {
+   "xIPBD"
+};
 
 void mpegQueue_t::feedVideo
    ( unsigned char const *data, 
@@ -410,11 +570,6 @@ void mpegQueue_t::feedVideo
      bool                 discontinuity,
      long long            offset_ms ) // 
 {
-   if( ( 0LL != offset_ms )
-       &&
-       ( 0LL == msOut_ ) )
-      msOut_ = offset_ms ;
-
    if( discontinuity ){
       flags_ |= NEEDIFRAME ;
       mpeg2_reset( decoder_, 1 );
@@ -498,26 +653,22 @@ void mpegQueue_t::feedVideo
                 ||
                 ( PIC_FLAG_CODING_TYPE_P == picType ) )
             {
-               debugPrint( "picture type %d\n", picType );
+debugPrint( "%c", cPicTypes[picType] );
                mpeg2_skip( decoder_, 0 );
-               debugPrint( "add decoder buf\n" );
                addDecoderBuf();
 
-               debugPrint( "flags %lx\n", flags_ );
+               if( 0 != (flags_ & NEEDIFRAME) ){
 
-               if( ( PIC_FLAG_CODING_TYPE_I == picType )
-                   &&
-                   ( 0 != (flags_ & NEEDIFRAME) ) ){
-
-                  if( msVideoQueued() >= msToBuffer() ){
+                  if( msVideoQueued() >= lowWater_ms() ){
                      flags_ &= ~NEEDIFRAME ;
                      debugPrint( "play b-frames...\n" );
                   }
                }
             }
             else {
-               debugPrint( "skip picture type %d\n", picType );
+               debugPrint( "skip picture type %c\n", cPicTypes[picType] );
                mpeg2_skip( decoder_, 1 );
+               msOut_ += msPerPic_ ;
                ++vFramesDropped_ ;
             }
             
@@ -553,9 +704,13 @@ assert( ve->length_ == inBufferLength_ );
             }
             break;
          } // SLICE
+         case STATE_GOP:
+debugPrint( "\n%8lld - G", offset_ms );
+            if( 0 != offset_ms )
+               msOut_ = offset_ms ;
+            break ;
          case STATE_BUFFER :
          case STATE_SEQUENCE_REPEATED:
-         case STATE_GOP:
             break ;
          case STATE_INVALID:
             mpeg2_reset(decoder_,1);
@@ -573,41 +728,97 @@ assert( ve->length_ == inBufferLength_ );
           }
       }
    } while( ( -1 != mpState ) && ( STATE_BUFFER != mpState ) );
-
 }
 
 void mpegQueue_t::playAudio
    ( long long when ) // in ms a.la. tickMs()
 {
    if( flags_ & STARTED ){
-      queueLock_t lockAudioQ( &audioFull_.locked_ );
-      if( lockAudioQ.weLocked() ){
-         while( !isEmpty( audioFull_.header_ ) ){
-            audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
-            if( 0 <= ( when-ae->header_.when_ms_ ) ){
-               int numWritten = write( dspFd_, ae->data_+ae->offset_, ae->length_ );
-               if( 0 < numWritten ){
-                  ae->length_ -= numWritten ;
-                  if( 0 == ae->length_ ){
-                     entryHeader_t *const e = pullHead( audioFull_.header_ );
-                     assert( e );
-                     assert( e == (entryHeader_t *)ae );
-                     pushTail( audioEmpty_.header_, e );
-                     continue ;
-                  } // finished this packet of audio
-                  else
-                     ae->offset_ += numWritten ;
+      audio_buf_info ai ;
+      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
+         unsigned bytesWritten = 0 ;
+         if( 0 < ai.fragments ){
+            queueLock_t lockAudioQ( &audioFull_.locked_ );
+            if( lockAudioQ.weLocked() ){
+               while( !isEmpty( audioFull_.header_ ) ){
+                  audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
+                  if( 1 ) { // 0 <= ( when-ae->header_.when_ms_ ) ){
+                     if( ae->sampleRate_ != prevSampleRate_ ){
+                        printf( "%u samples/sec\n", ae->sampleRate_ );
+                        prevSampleRate_ = ae->sampleRate_ ;
+                        if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &prevSampleRate_ ) )
+                           fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", prevSampleRate_ );
+                     }
+                     else if ( 0 == prevSampleRate_ ){
+                        printf( "No sample rate(yet)\n" );
+                     }
+                     if( ae->numChannels_ != prevChannels_ ){
+                        printf( "%u channels\n", ae->numChannels_ );
+                        prevChannels_ = ae->numChannels_ ;
+                        if( 0 != ioctl( dspFd_, SNDCTL_DSP_CHANNELS, &prevChannels_ ) )
+                           fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+                     }
+                     else if ( 0 == prevChannels_ ){
+                        printf( "No channel count(yet)\n" );
+                     }
+                     unsigned bytes = ( ae->length_ - ae->offset_ ) * sizeof(ae->data_[0]);
+                     int numWritten = write( dspFd_, ae->data_+ae->offset_, bytes );
+                     if( 0 < numWritten ){
+                        bytesWritten += numWritten ;
+      if( 0 == firstAudioWrite_ )
+         firstAudioWrite_ = tickMs();
+      lastAudioWrite_ = tickMs();
+                        ae->offset_ += numWritten/sizeof(ae->data_[0]);
+                        if( ae->offset_ == ae->length_ ){
+                           entryHeader_t *const e = pullHead( audioFull_.header_ );
+                           assert( e );
+                           assert( e == (entryHeader_t *)ae );
+                           pushTail( audioEmpty_.header_, e );
+                           ++aFreeCount_ ; 
+                           continue ;
+                        } // finished this packet of audio
+                        else
+                           ae->offset_ += numWritten ;
+                     }
+                     else if( ( -1 != numWritten ) || ( EAGAIN != errno ) )
+                        fprintf( stderr, "Short audio write: %d/%d/%d/%u: %m\n", dspFd_, numWritten, errno, ae->length_ );
+                     else {
+                        audio_buf_info ai2 ;
+                        if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai2) ){
+                           if( 0 < ai2.fragments ){
+                              printf( "EINTR?\n" );
+                              continue ;
+                           }
+                        }
+                        else
+                           perror( "GETOSPACE2" );
+                     }
+                  } // time to play
+      
+                  // continue from the middle
+                  break ;
                }
-               else
-                  fprintf( stderr, "Short audio write: %d/%d/%u: %m\n", numWritten, errno, ae->length_ );
-            } // time to play
+            }
+            else {
+               printf( "~audioLock\n" );
+               flags_ |= AUDIOIDLE ;
+            }
+         } // have some space to write
+         if( ai.fragments == ai.fragstotal )
+            printf( "audio stall: %u of %u filled\n", bytesWritten, ai.bytes );
 
-            // continue from the middle
-            break ;
+         if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
+            if( 0 != ai.fragments ){
+               flags_ |= AUDIOIDLE ;
+            }
+            else
+               flags_ &= ~AUDIOIDLE ;
          }
+         else
+            perror( "GETOSPACE2" );
       }
       else
-         flags_ |= AUDIOIDLE ;
+         perror( "GETOSPACE" );
    } // if we've started playback
 }
 
@@ -615,6 +826,16 @@ unsigned long mpegQueue_t::msVideoQueued( void ) const
 {
    entryHeader_t const * const head = videoFull_.header_.next_ ;
    entryHeader_t const * const tail = videoFull_.header_.prev_ ;
+   unsigned long queueTime = (tail->when_ms_ - head->when_ms_);
+
+   debugPrint( "%lu: %p/%p: %lld..%lld\n", queueTime, head, tail, head->when_ms_, tail->when_ms_ );
+   return (unsigned long)( queueTime );
+}
+
+unsigned long mpegQueue_t::msAudioQueued( void ) const 
+{
+   entryHeader_t const * const head = audioFull_.header_.next_ ;
+   entryHeader_t const * const tail = audioFull_.header_.prev_ ;
    unsigned long queueTime = (tail->when_ms_ - head->when_ms_);
 
    debugPrint( "%lu: %p/%p: %lld..%lld\n", queueTime, head, tail, head->when_ms_, tail->when_ms_ );
@@ -651,7 +872,7 @@ void mpegQueue_t::playVideo( long long when )
    MD5_Update(&videoMD5_, ve->data_, ve->length_ );
 #endif
 
-                  ++freeCount_ ;
+                  ++vfreeCount_ ;
                   pushTail( videoEmpty_.header_, e );
                   ++vFramesSkipped_ ;
                   continue ;
@@ -742,19 +963,24 @@ void mpegQueue_t::playVideo( long long when )
                   entryHeader_t *const e = pullHead( videoFull_.header_ );
                   assert( e );
                   assert( e == (entryHeader_t *)ve );
-                  ++freeCount_ ;
+                  ++vfreeCount_ ;
                   pushTail( videoEmpty_.header_, e );
                   continue ;
 #else
 
+                  if( 0LL == firstVideoWrite_ )
+                     firstVideoWrite_ = when ;
+                  lastVideoWrite_ = when ;
+
                   in_write = 1 ;
+
                   int numWritten = write( yuvFd_, ve->data_, ve->length_ );
                   in_write = 0 ;
                   if( ve->length_ == (unsigned)numWritten ){
                      entryHeader_t *const e = pullHead( videoFull_.header_ );
                      assert( e );
                      assert( e == (entryHeader_t *)ve );
-                     ++freeCount_ ;
+                     ++vfreeCount_ ;
                      pushTail( videoEmpty_.header_, e );
                      continue ;
                   }
@@ -773,6 +999,10 @@ void mpegQueue_t::playVideo( long long when )
       else {
          debugPrint( "not locked\n" );
       }
+
+      if( flags_ & AUDIOIDLE ){
+         playAudio(tickMs());
+      }
    } // if we've started playback
    else
       debugPrint( "idle\n" );
@@ -785,10 +1015,18 @@ void mpegQueue_t::dumpStats(void) const
            "   high water mark: %lu\n"
            "   %u buffers allocated\n"
            "   %u buffers freed\n"
-              "%u frames queued\n"
-              "%u frames played\n"
-              "%u frames skipped\n"
-              "%u frames dropped\n"
+           "   %u video frames queued\n"
+           "   %u video frames played\n"
+           "   %u video frames skipped\n"
+           "   %u video frames dropped\n"
+           "   %u audio frames queued\n"
+           "   %u audio frames played\n"
+           "   %u audio frames skipped\n"
+           "   %u audio frames dropped\n"
+           "   video ms range: %lld..%lld (%lu ms)\n"
+           "   video writes: %lld..%lld (%lu ms)\n"
+           "   audio ms range: %lld..%lld (%lu ms)\n"
+           "   audio writes: %lld..%lld (%lu ms)\n"
          ,  msVideoQueued()
          ,  lowWater_ms()
          ,  highWater_ms()
@@ -798,6 +1036,22 @@ void mpegQueue_t::dumpStats(void) const
          ,  vFramesPlayed()
          ,  vFramesSkipped() 
          ,  vFramesDropped()
+         ,  aFramesQueued()
+         ,  aFramesPlayed()
+         ,  aFramesSkipped() 
+         ,  aFramesDropped()
+         ,  firstVideoMs_
+         ,  lastVideoMs_
+         ,  (unsigned long)( lastVideoMs_ - firstVideoMs_ )
+         ,  firstVideoWrite_
+         ,  lastVideoWrite_
+         ,  (unsigned long)( lastVideoWrite_ - firstVideoWrite_ )
+         ,  firstAudioMs_
+         ,  lastAudioMs_
+         ,  (unsigned long)( lastAudioMs_ - firstAudioMs_ )
+         ,  firstAudioWrite_
+         ,  lastAudioWrite_
+         ,  (unsigned long)( lastAudioWrite_ - firstAudioWrite_ )
          );
 }
 
@@ -827,7 +1081,6 @@ static char const * const frameTypes_[] = {
 #include <sys/ioctl.h>
 #include <linux/sm501-int.h>
 #include <fcntl.h>
-#include <sys/soundcard.h>
 #include <sys/ioctl.h>
 #include "trace.h"
 #include "rtSignal.h"
@@ -837,6 +1090,8 @@ static char const * const frameTypes_[] = {
 
 typedef struct stats_t {
    unsigned ticks_ ;
+   unsigned idle_ ;
+   unsigned inFileRead_ ;
    unsigned inParse_ ;
 #ifdef TRACEMPEG2
    unsigned inSlice_ ;
@@ -849,6 +1104,15 @@ typedef struct stats_t {
    unsigned inMe_ ; // motion estimation
 #endif
    unsigned inWrite_ ;
+   unsigned inAudioFeed_ ;
+   unsigned inAudioSynth_ ;
+   unsigned inAudioSynthFrame_ ;
+   unsigned inAudioPull_ ;
+#ifdef TRACEMAD
+   unsigned inSynthFull_ ;
+   unsigned inSynthHalf_ ;
+   unsigned inSynthDCT_ ;
+#endif
 };
 
 
@@ -857,28 +1121,85 @@ static void traceCallback( void *param )
 {
    stats_t *stats = (stats_t *)param ;
    stats->ticks_++ ;
-   if( in_mpeg2_parse )
+   bool isIdle = true ;
+   if( in_file_read ){
+      stats->inFileRead_++ ;
+      isIdle = false ;
+   }
+   if( in_mpeg2_parse ){
       stats->inParse_++ ;
-   if( in_write )
+      isIdle = false ;
+   }
+   if( in_write ){
       stats->inWrite_++ ;
+      isIdle = false ;
+   }
+   if( in_mp3_feed ){
+      stats->inAudioFeed_++ ;
+      isIdle = false ;
+   }
+   if( in_mp3_synth ){
+      stats->inAudioSynth_++ ;
+      isIdle = false ;
+   }
+   if( in_synth_frame ){
+      stats->inAudioSynthFrame_++ ;
+      isIdle = false ;
+   }
+   if( in_mp3_pull ){
+      stats->inAudioPull_++ ;
+      isIdle = false ;
+   }
 #ifdef TRACEMPEG2
-   if( in_mpeg2_slice )
+   if( in_mpeg2_slice ){
       stats->inSlice_++ ;
-   if( in_mpeg2_convert )
+      isIdle = false ;
+   }
+   if( in_mpeg2_convert ){
       stats->inConvert_++ ;
-   if( in_mpeg2_dct_row )
+      isIdle = false ;
+   }
+   if( in_mpeg2_dct_row ){
       stats->idctRow_++ ;
-   if( in_mpeg2_dct_col )
+      isIdle = false ;
+   }
+   if( in_mpeg2_dct_col ){
       stats->idctCol_++ ;
-   if( in_mpeg2_dct_copy )
+      isIdle = false ;
+   }
+   if( in_mpeg2_dct_copy ){
       stats->idctCopy_++ ;
-   if( in_mpeg2_dct_add )
+      isIdle = false ;
+   }
+   if( in_mpeg2_dct_add ){
       stats->idctAdd_++ ;
-   if( in_mpeg2_dct_init )
+      isIdle = false ;
+   }
+   if( in_mpeg2_dct_init ){
       stats->idctInit_++ ;
-   if( in_mpeg2_me )
+      isIdle = false ;
+   }
+   if( in_mpeg2_me ){
       stats->inMe_++ ;
+      isIdle = false ;
+   }
 #endif
+#ifdef TRACEMAD
+   if( in_mad_synth_full ){
+      stats->inSynthFull_++ ;
+      isIdle = false ;
+   }
+   if( in_mad_synth_half ){
+      stats->inSynthHalf_++ ;
+      isIdle = false ;
+   }
+   if( in_mad_synth_dct ){
+      stats->inSynthDCT_++ ;
+      isIdle = false ;
+   }
+#endif
+   if( isIdle )
+      stats->idle_++ ;
 }
 
 static mpegQueue_t *inst_ = 0 ;
@@ -888,6 +1209,14 @@ static void vsyncHandler( int signo, siginfo_t *info, void *context )
    if( inst_ ){
       long long now = tickMs();
       inst_->playVideo(now);
+   }
+}
+
+static void audioHandler( int signo, siginfo_t *info, void *context )
+{
+   if( inst_ ){
+      long long now = tickMs();
+      inst_->playAudio(now);
    }
 }
 
@@ -911,6 +1240,17 @@ int main( int argc, char const * const argv[] )
       int const channels = 2 ;
       if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+
+      int speed = 44100 ;
+      if( 0 != ioctl( dspFd, SNDCTL_DSP_SPEED, &speed ) )
+         fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+
+      int flags = fcntl(dspFd, F_GETFL);
+      fcntl(dspFd, F_SETFL, flags | O_NONBLOCK | FASYNC );
+
+      int vol = (75<<8)|75 ;
+      if( 0 > ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+         perror( "Error setting volume" );
 
       unsigned xPos = 0 ;
       unsigned yPos = 0 ;
@@ -958,9 +1298,9 @@ int main( int argc, char const * const argv[] )
       }
       fcntl(fdSync, F_SETOWN, pid_);
       fcntl(fdSync, F_SETSIG, vsyncSignal );
-      
+
       struct sigaction sa ;
-   
+
       sa.sa_flags = SA_SIGINFO|SA_RESTART ;
       sa.sa_restorer = 0 ;
       sigemptyset( &sa.sa_mask );
@@ -968,16 +1308,25 @@ int main( int argc, char const * const argv[] )
       sigaddset( &sa.sa_mask, vsyncSignal );
       sigaction(vsyncSignal, &sa, 0 );
       
+      int const audioSignal = nextRtSignal();
+      fcntl(dspFd, F_SETOWN, pid_ );
+      fcntl(dspFd, F_SETSIG, audioSignal );
+
+      sigemptyset( &sa.sa_mask );
+      sa.sa_sigaction = audioHandler ;
+      sigaddset( &sa.sa_mask, audioSignal );
+      sigaction(audioSignal, &sa, 0 );
+
       fbDevice_t &fb = getFB();
       rectangle_t outRect ;
       outRect.xLeft_ = outRect.yTop_ = 0 ;
       outRect.width_ = fb.getWidth();
       outRect.height_ = fb.getHeight();
 
-      mpegQueue_t q( dspFd, fdYUV, 500, outRect );
+      mpegQueue_t q( dspFd, fdYUV, 2000, outRect );
       inst_ = &q ;
       
-      int flags = fcntl( fdSync, F_GETFL, 0 );
+      flags = fcntl( fdSync, F_GETFL, 0 );
       fcntl( fdSync, F_SETFL, flags | O_NONBLOCK | FASYNC );
 
       for( int arg = 1 ; arg < argc ; arg++ ){
@@ -1001,8 +1350,10 @@ printf( "----> playing file %s\n", fileName );
             long long pts ;
             unsigned char streamId ;
 
+in_file_read = 1 ;
             while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
             {
+in_file_read = 0 ;
                adler = adler32( adler, frame, frameLen );
 //               printf( "%d/%u/%08lX/%08lx\n", type, frameLen, adler32( 0, frame, frameLen ), adler );
                bool isVideo = ( CODEC_TYPE_VIDEO == type );
@@ -1010,22 +1361,42 @@ printf( "----> playing file %s\n", fileName );
                adler = adler32( adler, frame, frameLen );
 
                if( isVideo ){
-                  while( q.highWater_ms() <= q.msVideoQueued() )
+                  while( q.highWater_ms() <= q.msVideoQueued() ){
                      pause();
+                  }
                   if( 1 != arg ){
                      if( firstVideo && ( 0LL != pts ) )
                         q.adjustPTS( q.ptsToMs(pts) );
                   }
-                  q.feedVideo( frame, frameLen, firstVideo, q.ptsToMs(pts) );
+                  q.feedVideo( frame, frameLen, false, q.ptsToMs(pts) );
                   if( firstVideo && (0LL != pts) )
                      firstVideo = false ;
                } else {
                   q.feedAudio( frame, frameLen, false, q.ptsToMs(pts) );
                }
             }
+in_file_read = 0 ;
 
-            while( 0 < q.msVideoQueued() )
+            while( ( 0 < q.msVideoQueued() ) || ( 0 < q.msAudioQueued() ) ){
                pause();
+            }
+
+            // wait for audio empty
+            do {
+               audio_buf_info ai ;
+               if( 0 == ioctl( dspFd, SNDCTL_DSP_GETOSPACE, &ai) ){
+                  if( ai.fragments == ai.fragstotal ){
+                     long long emptyTime = tickMs();
+                     printf( "empty at %lld (%lu ms after first write)\n", 
+                             emptyTime, (unsigned long)( emptyTime-q.firstAudioWrite() ) );
+                     break ;
+                  }
+               }
+               else {
+                  perror( "GETOSPACE" );
+                  break ;
+               }
+            } while( 1 );
 
             long long endMs = tickMs();
             printf( "%lu ms elapsed\n"
@@ -1054,21 +1425,45 @@ printf( "----> playing file %s\n", fileName );
       delete [] traces ;
 
       q.dumpStats();
-      printf( "%u ticks\n"
-              "%u parsing\n"
-#ifdef TRACEMPEG2                    
-              "%u slicing\n"
-              "%u converting\n"
-              "      %u idct row\n"
-              "      %u idct col\n"
-              "      %u idct copy\n"
-              "      %u idct add\n"
-              "      %u idct init\n"
-              "%u motion estimation\n"
+      printf( "%4u ticks\n"
+              "%4u idle (%u.%02u%%)\n"
+              "%4u reading file\n"
+              "%4u parsing\n"
+              "%4u feeding audio\n"
+              "%4u audio synth\n"
+              "%4u synth frame\n"
+              "%4u pulling audio\n"
+#ifdef TRACEMAD
+              "%4u mad synth full\n"
+              "%4u mad synth half\n"
+              "%4u mad synth DCT\n"
 #endif
-              "%u writing\n",
+#ifdef TRACEMPEG2                    
+              "%4u slicing\n"
+              "%4u converting\n"
+              "      %4u idct row\n"
+              "      %4u idct col\n"
+              "      %4u idct copy\n"
+              "      %4u idct add\n"
+              "      %4u idct init\n"
+              "%4u motion estimation\n"
+#endif
+              "%4u writing\n",
               stats.ticks_,
+              stats.idle_,
+              ((stats.idle_*100)/stats.ticks_),
+              ((stats.idle_*10000)/stats.ticks_)%100,
+              stats.inFileRead_,
               stats.inParse_,
+              stats.inAudioFeed_,
+              stats.inAudioSynth_,
+              stats.inAudioSynthFrame_,
+              stats.inAudioPull_,
+#ifdef TRACEMAD
+              stats.inSynthFull_,
+              stats.inSynthHalf_,
+              stats.inSynthDCT_,
+#endif
 #ifdef TRACEMPEG2                    
               stats.inSlice_,
               stats.inConvert_,
