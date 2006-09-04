@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.6  2006-09-04 15:17:38  ericn
+ * Revision 1.7  2006-09-04 16:42:39  ericn
+ * -add audio playback call
+ *
+ * Revision 1.6  2006/09/04 15:17:38  ericn
  * -add audio
  *
  * Revision 1.5  2006/08/27 19:12:32  ericn
@@ -91,6 +94,7 @@ void odomVideoStream_t::onRx(
    else {
       outQueue_.feedAudio( fData, length, discont, pts );
    }
+   outQueue_.playAudio(tickMs());
 }
 
 void odomVideoStream_t::onEOF( 
@@ -101,12 +105,19 @@ void odomVideoStream_t::onEOF(
 {
    printf( "eof(%s): %lu bytes (%lu video, %lu audio)\n", fileName, totalBytes, videoBytes, audioBytes );
    printf( "ms: %ld... %llu->%llu\n", (unsigned long)(lastMs_-startMs_), startMs_, lastMs_ );
+   outQueue_.dumpStats();
 }
 
 void odomVideoStream_t::doOutput( void )
 {
    long long const now = tickMs();
    outQueue_.playVideo( now );
+}
+
+void odomVideoStream_t::doAudio( void )
+{
+   long long const now = tickMs();
+   outQueue_.playAudio( now );
 }
 
 void odomVideoStream_t::dump( void )

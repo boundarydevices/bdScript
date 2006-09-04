@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.6  2006-09-04 15:17:19  ericn
+ * Revision 1.7  2006-09-04 16:42:22  ericn
+ * -add audio playback call
+ *
+ * Revision 1.6  2006/09/04 15:17:19  ericn
  * -add audio
  *
  * Revision 1.5  2006/09/01 22:54:15  ericn
@@ -166,6 +169,11 @@ bool odomVideo_t::completed( void )
 void odomVideo_t::doOutput( void ){
    long long const now = tickMs();
    outQueue_.playVideo( now );
+}
+
+void odomVideo_t::doAudio( void ){
+   long long const now = tickMs();
+   outQueue_.playAudio( now );
 }
 
 void odomVideo_t::dump( void )

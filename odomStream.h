@@ -1,5 +1,5 @@
 #ifndef __ODOMSTREAM_H__
-#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.3 2006-08-27 19:12:15 ericn Exp $"
+#define __ODOMSTREAM_H__ "$Id: odomStream.h,v 1.4 2006-09-04 16:42:31 ericn Exp $"
 
 /*
  * odomStream.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomStream.h,v $
- * Revision 1.3  2006-08-27 19:12:15  ericn
+ * Revision 1.4  2006-09-04 16:42:31  ericn
+ * -add audio playback call
+ *
+ * Revision 1.3  2006/08/27 19:12:15  ericn
  * -remove unsupported dts
  *
  * Revision 1.2  2006/08/26 16:06:15  ericn
@@ -52,6 +55,9 @@ public:
 
    // called to pump frame(s) to frame buffer from vsync
    void doOutput( void );
+   
+   // called from audio avail signal to fill audio buffer
+   void doAudio( void );
 
    void dump( void );
 

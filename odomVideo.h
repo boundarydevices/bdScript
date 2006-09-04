@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.3 2006-09-01 20:24:14 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.4 2006-09-04 16:42:14 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.3  2006-09-01 20:24:14  ericn
+ * Revision 1.4  2006-09-04 16:42:14  ericn
+ * -add audio playback call
+ *
+ * Revision 1.3  2006/09/01 20:24:14  ericn
  * -keep track of PTS stats
  *
  * Revision 1.2  2006/09/01 01:02:27  ericn
@@ -52,6 +55,9 @@ public:
 
    // called to pump frame(s) to frame buffer from vsync
    void doOutput( void );
+
+   // called from audio avail signal to fill audio buffer
+   void doAudio( void );
 
    void dump( void );
 
