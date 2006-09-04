@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.5  2006-05-09 03:36:41  ericn
+ * Revision 1.6  2006-09-04 14:32:12  ericn
+ * -show fragments, fix compile warnings, set volume
+ *
+ * Revision 1.5  2006/05/09 03:36:41  ericn
  * -remove curlCache_t reference
  *
  * Revision 1.4  2002/11/30 00:30:55  ericn
@@ -104,8 +107,6 @@ signed short scale(mad_fixed_t sample)
  * is to output (or play) the decoded PCM audio.
  */
 static unsigned short *outBuffer  = 0 ;
-static unsigned short numSamples_ = 0 ;
-static unsigned short numBuffers_ = 0 ;
 static unsigned short fragSize    = 0 ;
 static unsigned short spaceLeft   = 0 ;
 
@@ -121,7 +122,7 @@ enum mad_flow output(void *data,
  
    if( ( pcm->channels != requestedChannels_ )
        ||
-       ( pcm->samplerate != sampleRate_ ) )
+       ( pcm->samplerate != (unsigned)sampleRate_ ) )
    {
       int dummy = 0 ;
       if( 0 != ioctl( dspFd_, SNDCTL_DSP_SYNC, &dummy ) )
@@ -142,7 +143,7 @@ enum mad_flow output(void *data,
          }
       }
    
-      if( pcm->samplerate != sampleRate_ )
+      if( pcm->samplerate != (unsigned)sampleRate_ )
       {
          sampleRate_ = pcm->samplerate ;
          if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &sampleRate_ ) )
@@ -280,6 +281,10 @@ int main( int argc, char *argv[] )
    
                if( 0 != speed )
                {
+                  int vol = (75<<8)|75 ;
+                  if( 0 > ioctl( dspFd_, SOUND_MIXER_WRITE_VOLUME, &vol)) 
+                     perror( "Error setting volume" );
+
                   char *cURL = argv[1];
 		  memFile_t f( cURL );
                   if( f.worked() )
@@ -288,6 +293,15 @@ int main( int argc, char *argv[] )
                      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &info ) )
                      {   
                         fragSize = info.fragsize ;
+printf( "%d fragments\n"
+        "%d total\n"
+        "%d bytes/frag\n"
+        "%d total bytes\n"
+      , info.fragments
+      , info.fragstotal
+      , info.fragsize
+      , info.bytes
+      );
                      }
                      else
                      {
