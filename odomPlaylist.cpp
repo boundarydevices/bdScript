@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.6  2006-09-01 01:02:27  ericn
+ * Revision 1.7  2006-09-04 15:16:53  ericn
+ * -add audio interfaces
+ *
+ * Revision 1.6  2006/09/01 01:02:27  ericn
  * -use mpegQueue for odomVideo
  *
  * Revision 1.5  2006/08/31 03:45:20  ericn
@@ -46,6 +49,7 @@
 #include <linux/sm501-int.h>
 #include "odomVideo.h"
 #include "odomStream.h"
+#include <linux/soundcard.h>
 
 #define PLAYLISTMASK (odomPlaylist_t::MAXENTRIES-1)
 
@@ -66,14 +70,15 @@ odomPlaylist_t::odomPlaylist_t( void )
    , yuvOutY_(-1U)
    , yuvOutW_(-1U)
    , yuvOutH_(-1U)
+   , fdDsp_(-1)
+   , channels_(0)
+   , speed_(0)
 {
    current_.type_ = PLAYLIST_NONE ;
    current_.repeat_ = false ;
    odometerSet_t::get().setHandler( playlist_vsync, this );
 
    lastPlaylistInst_ = this ;
-   
-   fcntl(fdYUV_, F_SETFL, fcntl(fdYUV_, F_GETFL) | O_NONBLOCK | FASYNC );
 }
 
 odomPlaylist_t::~odomPlaylist_t( void )
@@ -476,3 +481,50 @@ void odomPlaylist_t::vsyncHandler( void )
    }
 }
 
+
+int odomPlaylist_t::fdDsp( void )
+{
+   if( 0 > fdDsp_ )
+      fdDsp_ = open( "/dev/dsp", O_WRONLY );
+
+   return fdDsp_ ;
+}
+
+int odomPlaylist_t::fdDsp( unsigned speed, unsigned channels )
+{
+   fdDsp();
+   if( 0 <= fdDsp_ ){
+      if( speed != speed_ ){
+         if( 0 == ioctl( fdDsp_, SNDCTL_DSP_SPEED, &speed ) ){
+            speed_ = speed ;
+         }
+         else
+            fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+      }
+      if( channels != channels_ ){
+         if( 0 == ioctl( fdDsp_, SNDCTL_DSP_CHANNELS, &channels ) ){
+            channels_ = channels ;
+         }
+         else
+            fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%u:%m\n", channels );
+      }
+   }
+   return fdDsp_ ;
+}
+
+void odomPlaylist_t::closeDsp( void )
+{
+   if( 0 <= fdDsp_ ){
+      close( fdDsp_ );
+      fdDsp_ = -1 ; 
+   }
+}
+
+void odomPlaylist_t::setVolume( unsigned volume )
+{
+   volume &= 0xFF ;
+   volume = ( volume << 8 ) | volume ;
+   fdDsp();
+   if( 0 != ioctl( fdDsp_, SOUND_MIXER_WRITE_VOLUME, &volume ) )
+      fprintf( stderr, ":ioctl(SOUND_MIXER_WRITE_VOLUME):%04x:%m\n", volume );
+}

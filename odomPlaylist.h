@@ -1,5 +1,5 @@
 #ifndef __ODOMPLAYLIST_H__
-#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.3 2006-08-26 16:05:16 ericn Exp $"
+#define __ODOMPLAYLIST_H__ "$Id: odomPlaylist.h,v 1.4 2006-09-04 15:16:51 ericn Exp $"
 
 /*
  * odomPlaylist.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.h,v $
- * Revision 1.3  2006-08-26 16:05:16  ericn
+ * Revision 1.4  2006-09-04 15:16:51  ericn
+ * -add audio interfaces
+ *
+ * Revision 1.3  2006/08/26 16:05:16  ericn
  * -allow access to YUV without geometry
  *
  * Revision 1.2  2006/08/20 18:16:54  ericn
@@ -89,6 +92,12 @@ public:
 
    void vsyncHandler( void );
 
+   int fdDsp( void );
+   int fdDsp( unsigned speed, unsigned channels );
+   void closeDsp( void );
+
+   void setVolume( unsigned volume );
+
    void dump( void );
 private:
    void next( unsigned long syncCount );
@@ -105,6 +114,9 @@ private:
    unsigned          yuvOutY_ ;
    unsigned          yuvOutW_ ;
    unsigned          yuvOutH_ ;
+   int               fdDsp_ ;
+   unsigned          channels_ ;
+   unsigned          speed_ ;
 };
 
 
