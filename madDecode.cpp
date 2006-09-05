@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.8  2006-09-04 14:33:29  ericn
+ * Revision 1.9  2006-09-05 02:16:32  ericn
+ * -don't spin on errors
+ *
+ * Revision 1.8  2006/09/04 14:33:29  ericn
  * -add timing flags, timer string
  *
  * Revision 1.7  2006/05/14 14:34:55  ericn
@@ -122,6 +125,7 @@ bool madDecoder_t :: getData( void )
             }
             printf("error decoding header: %s\n", 
                    mad_stream_errorstr (&mp3Stream_));
+            return false ;
          }
          else if( MAD_ERROR_BUFLEN == mp3Stream_.error )
          {
@@ -172,7 +176,7 @@ in_synth_frame = 0 ;
          else
          {
             if( MAD_RECOVERABLE( mp3Stream_.error ) )
-               ;
+               printf( "try to recover\n" );
             else 
             {
                if( MAD_ERROR_BUFLEN != mp3Stream_.error )
