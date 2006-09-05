@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.10  2006-09-04 16:43:42  ericn
+ * Revision 1.11  2006-09-05 02:29:14  ericn
+ * -added queue dumping utilities for debug, lock identification
+ *
+ * Revision 1.10  2006/09/04 16:43:42  ericn
  * -use audio timing
  *
  * Revision 1.9  2006/09/04 15:16:06  ericn
@@ -107,24 +110,29 @@ int volatile in_file_read = 0 ;
 
 class queueLock_t {
 public:
-   queueLock_t( unsigned volatile *lock );
+   queueLock_t( unsigned volatile *lock, unsigned id = 1 );
    ~queueLock_t( void );
 
    bool weLocked( void ) const { return 0 == prevVal_ ; }
    bool wasLocked( void ) const { return 0 != prevVal_ ; }
+   unsigned whoLocked( void ) const { return prevVal_ ; }
 
 private:
    queueLock_t( queueLock_t const & );
    unsigned volatile *lock_ ;
+   unsigned           id_ ;
    unsigned           prevVal_ ;
 };
 
-queueLock_t::queueLock_t( unsigned volatile *lock )
+queueLock_t::queueLock_t( 
+   unsigned volatile *lock,
+   unsigned id )
    : lock_( lock )
+   , id_( id )
 {
    debugPrint( "locking: %p/%d...", this, *lock );
    unsigned old ;
-   unsigned newval = 1 ;
+   unsigned newval = id_ ;
    __asm__ __volatile__ (
       "swp %0, %1, [%2]"
       : "=&r" (old)
@@ -147,7 +155,13 @@ queueLock_t::~queueLock_t( void )
    	 : "=&r" (ret)
    	 : "r" (newval), "r" (lock)
    	 : "memory", "cc");
-      assert( 1 == ret );
+      if( 0 == ret ){
+         printf( "failed unlock attempt for queue lock %p\n"
+                 "id %u\n"
+                 "prevVal %u\n"
+                 "locked by %u\n", lock_, id_, prevVal_, ret );
+         exit(1);
+      }
       debugPrint( "%d\n", *lock );
    }
    else
@@ -312,6 +326,11 @@ mpegQueue_t::~mpegQueue_t( void )
 #endif
 }
    
+bool mpegQueue_t::started( void ) const 
+{ 
+   return 0 != flags_ & STARTED ; 
+}
+
 void mpegQueue_t::lockAndClean( queueHeader_t &qh )
 {
    queueLock_t lockVideoQ( &qh.locked_ );
@@ -366,7 +385,7 @@ debugPrint( "%s\n", audioDecoder_.timerString() );
                lastAudioMs_ = audioPartial_->header_.when_ms_ ;
                audioPartial_->header_.when_ms_ += audioOffs_ ;
 
-               queueLock_t lockAudioQ( &audioFull_.locked_ );
+               queueLock_t lockAudioQ( &audioFull_.locked_, 1 );
                assert( lockAudioQ.weLocked() ); // only reader side should fail
    
                pushTail( audioFull_.header_, &audioPartial_->header_ );
@@ -390,7 +409,7 @@ if( flags_ & AUDIOIDLE )
 
 mpegQueue_t::videoEntry_t *mpegQueue_t::getPictureBuf(void)
 {
-   queueLock_t lockVideoQ( &videoEmpty_.locked_ );
+   queueLock_t lockVideoQ( &videoEmpty_.locked_, 1 );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
 
    entryHeader_t *next ;
@@ -407,6 +426,7 @@ debugPrint( "recycle buffer: %p\n", ve );
          freeEntry( next );
       }
    }
+
 
    unsigned size = sizeof(videoEntry_t)
                   -fieldsize(videoEntry_t,data_)
@@ -427,7 +447,7 @@ debugPrint( "allocate buffer of size : %u\n", size );
 mpegQueue_t::audioEntry_t *mpegQueue_t::getAudioBuf( void )
 {
    {
-      queueLock_t lockEmptyQ( &audioEmpty_.locked_ );
+      queueLock_t lockEmptyQ( &audioEmpty_.locked_, 1 );
       assert( lockEmptyQ.weLocked() ); // only reader side should fail
    
       entryHeader_t *next ;
@@ -483,10 +503,10 @@ void mpegQueue_t::startPlayback( void )
       
       long long now = tickMs();
 
-      queueLock_t lockVideoQ( &videoFull_.locked_ );
+      queueLock_t lockVideoQ( &videoFull_.locked_, 1 );
       assert( lockVideoQ.weLocked() );
 
-      queueLock_t lockAudioQ( &audioFull_.locked_ );
+      queueLock_t lockAudioQ( &audioFull_.locked_, 2 );
       assert( lockAudioQ.weLocked() );
 
       entryHeader_t *firstVideo = videoFull_.header_.next_ ;
@@ -525,8 +545,10 @@ printf( "audio timestamp: %llu\n", firstAudio->when_ms_ );
          entry = entry->next_ ;
       }
       debugPrint( "audio ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
+      
       playAudio(now);
    }
+   
 }
 
 void mpegQueue_t::adjustPTS( long long startPts )
@@ -541,7 +563,7 @@ void mpegQueue_t::adjustPTS( long long startPts )
 
 void mpegQueue_t::queuePicture(videoEntry_t *ve)
 {
-   queueLock_t lockVideoQ( &videoFull_.locked_ );
+   queueLock_t lockVideoQ( &videoFull_.locked_, 2 );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
 
    if( 0LL == firstVideoMs_ )
@@ -578,7 +600,7 @@ void mpegQueue_t::addDecoderBuf()
 
 void mpegQueue_t::cleanDecoderBufs()
 {
-   queueLock_t lockEmptyQ( &videoEmpty_.locked_ );
+   queueLock_t lockEmptyQ( &videoEmpty_.locked_, 3 );
    assert( lockEmptyQ.weLocked() );
 
    entryHeader_t *e ;
@@ -766,7 +788,7 @@ void mpegQueue_t::playAudio
       if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
          unsigned bytesWritten = 0 ;
          if( 0 < ai.fragments ){
-            queueLock_t lockAudioQ( &audioFull_.locked_ );
+            queueLock_t lockAudioQ( &audioFull_.locked_, 3 );
             if( lockAudioQ.weLocked() ){
                while( !isEmpty( audioFull_.header_ ) ){
                   audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
@@ -832,7 +854,7 @@ void mpegQueue_t::playAudio
                }
             }
             else {
-               printf( "~audioLock\n" );
+               printf( "~audioLock (%u)\n", lockAudioQ.whoLocked() );
                flags_ |= AUDIOIDLE ;
             }
          } // have some space to write
@@ -881,8 +903,8 @@ extern "C" {
 void mpegQueue_t::playVideo( long long when )
 {
    if( flags_ & STARTED ){
-      queueLock_t lockVideoQ( &videoFull_.locked_ );
-      queueLock_t lockEmptyQ( &videoEmpty_.locked_ );
+      queueLock_t lockVideoQ( &videoFull_.locked_, 3 );
+      queueLock_t lockEmptyQ( &videoEmpty_.locked_, 4 );
       if( lockVideoQ.weLocked() && lockEmptyQ.weLocked() ){
          while( !isEmpty( videoFull_.header_ ) ){
             videoEntry_t *const ve = (videoEntry_t *)videoFull_.header_.next_ ;
@@ -1029,7 +1051,10 @@ void mpegQueue_t::playVideo( long long when )
          }
       }
       else {
-         debugPrint( "not locked\n" );
+         printf( "vLock: %d/%d, %u/%u\n",  
+                 lockVideoQ.weLocked(), lockEmptyQ.weLocked(),
+                 lockVideoQ.whoLocked(), lockEmptyQ.whoLocked()
+                 );
       }
 
       if( flags_ & AUDIOIDLE ){
@@ -1038,6 +1063,29 @@ void mpegQueue_t::playVideo( long long when )
    } // if we've started playback
    else
       debugPrint( "idle\n" );
+}
+
+// checks for end of either of two queues
+void mpegQueue_t::dumpQueue( entryHeader_t const &eh,
+                             entryHeader_t const &eh2 )
+{
+   entryHeader_t const *prev = 0 ;
+   entryHeader_t const *next = eh.next_ ;
+   while( ( next != &eh ) && ( next != &eh2 ) && ( next != prev ) ){
+      printf( "   %p@%lld\n", next, next->when_ms_ );
+
+      // if( next == prev ) then the node has been detached
+      prev = next ;
+      next = next->next_ ;
+   }
+}
+
+void mpegQueue_t::dumpVideoQueue(void) const {
+   printf( "---> video queue\n" ); dumpQueue( videoFull_.header_, videoEmpty_.header_ );
+}
+
+void mpegQueue_t::dumpAudioQueue(void) const {
+   printf( "---> audio queue\n" ); dumpQueue( audioFull_.header_, audioEmpty_.header_ );
 }
 
 void mpegQueue_t::dumpStats(void) const 
@@ -1408,6 +1456,17 @@ in_file_read = 0 ;
                }
             }
 in_file_read = 0 ;
+
+            if( ( q.msVideoQueued() > 2*q.highWater_ms() )
+                &&
+                ( q.msAudioQueued() > 2*q.highWater_ms() ) ){
+               printf( "invalid queue lengths:\n"
+                       "%lu ms video, %lu ms audio\n",
+                       q.msVideoQueued(), q.msAudioQueued() );
+            }
+
+            if( !q.started() )
+               q.startPlayback();
 
             while( ( 0 < q.msVideoQueued() ) || ( 0 < q.msAudioQueued() ) ){
                pause();
