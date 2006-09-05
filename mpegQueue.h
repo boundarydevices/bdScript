@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.8 2006-09-04 16:43:40 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.9 2006-09-05 02:29:03 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.8  2006-09-04 16:43:40  ericn
+ * Revision 1.9  2006-09-05 02:29:03  ericn
+ * -added queue dumping utilities for debug
+ *
+ * Revision 1.8  2006/09/04 16:43:40  ericn
  * -use audio timing
  *
  * Revision 1.7  2006/09/04 14:34:16  ericn
@@ -121,6 +124,8 @@ public:
    void playAudio( long long whenMs );
    void playVideo( long long whenMs );
 
+   bool started( void ) const ;
+
    //
    // stats 
    //
@@ -153,8 +158,11 @@ public:
    inline long long lastAudioWrite( void ) const { return lastAudioWrite_ ; }
 
    void dumpStats(void) const ;
+   void dumpVideoQueue(void) const ;
+   void dumpAudioQueue(void) const ;
 
    void startPlayback( void );
+
 private:
    mpegQueue_t( mpegQueue_t const & );
    enum flags_e {
@@ -174,6 +182,8 @@ private:
    inline static void pushTail( entryHeader_t &head, entryHeader_t *entry );
    inline static void unlink( entryHeader_t &entry );
    inline static void freeEntry( entryHeader_t *e );
+   static void dumpQueue( entryHeader_t const &eh1,
+                          entryHeader_t const &eh2 );
 
    struct queueHeader_t {
       entryHeader_t  header_ ;
@@ -250,7 +260,7 @@ private:
    unsigned      aAllocCount_ ;
    unsigned      aFreeCount_ ;
 
-   mpeg2dec_t * const decoder_ ;
+   mpeg2dec_t   *decoder_ ;
 
    unsigned      vFramesQueued_ ;
    unsigned      vFramesPlayed_ ;
@@ -293,7 +303,8 @@ inline bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
 }
    
 inline bool mpegQueue_t::isEmpty( void ) const {
-   return isEmpty( videoFull_.header_ );
+   return isEmpty( videoFull_.header_ )
+       && isEmpty( audioFull_.header_ );
 }
 
 #endif
