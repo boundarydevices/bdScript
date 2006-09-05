@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.8  2006-09-04 16:43:20  ericn
+ * Revision 1.9  2006-09-05 02:17:50  ericn
+ * -fix doOutput()/doAudio() bug
+ *
+ * Revision 1.8  2006/09/04 16:43:20  ericn
  * -add audio signal callback
  *
  * Revision 1.7  2006/09/04 15:16:53  ericn
@@ -471,25 +474,7 @@ void odomPlaylist_t::closeYUV( void )
    }
 }
 
-
 void odomPlaylist_t::vsyncHandler( void )
-{
-   if( PLAYLIST_MPEG == current_.type_ ){
-      odomVideo_t *video = (odomVideo_t *)playing_ ;
-      if( video ){
-         video->doAudio();
-      }
-   }
-   else if( PLAYLIST_STREAM == current_.type_ ){
-      odomVideoStream_t *stream = (odomVideoStream_t *)playing_ ;
-      if( stream ){
-         stream->doAudio();
-      }
-   }
-}
-
-
-void odomPlaylist_t::dspHandler( void )
 {
    if( PLAYLIST_MPEG == current_.type_ ){
       odomVideo_t *video = (odomVideo_t *)playing_ ;
@@ -501,6 +486,23 @@ void odomPlaylist_t::dspHandler( void )
       odomVideoStream_t *stream = (odomVideoStream_t *)playing_ ;
       if( stream ){
          stream->doOutput();
+      }
+   }
+}
+
+
+void odomPlaylist_t::dspHandler( void )
+{
+   if( PLAYLIST_MPEG == current_.type_ ){
+      odomVideo_t *video = (odomVideo_t *)playing_ ;
+      if( video ){
+         video->doAudio();
+      }
+   }
+   else if( PLAYLIST_STREAM == current_.type_ ){
+      odomVideoStream_t *stream = (odomVideoStream_t *)playing_ ;
+      if( stream ){
+         stream->doAudio();
       }
    }
 }
