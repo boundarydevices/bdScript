@@ -1,5 +1,5 @@
 #ifndef __ODOMCOMMAND_H__
-#define __ODOMCOMMAND_H__ "$Id: odomCommand.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMCOMMAND_H__ "$Id: odomCommand.h,v 1.2 2006-09-05 02:17:17 ericn Exp $"
 
 /*
  * odomCommand.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: odomCommand.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-09-05 02:17:17  ericn
+ * -repeat-last-command feature
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -40,6 +43,7 @@ public:
 private:
    odomCmdInterp_t( odomCmdInterp_t const & ); // no copies
 
+   char prevCmd_[512]; // temp space
    char inBuf_[512]; // temp space
    char errorMsg_[512];
    bool exit_ ;

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomCommand.cpp,v $
- * Revision 1.2  2006-09-04 15:16:28  ericn
+ * Revision 1.3  2006-09-05 02:17:19  ericn
+ * -repeat-last-command feature
+ *
+ * Revision 1.2  2006/09/04 15:16:28  ericn
  * -add volume command
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -695,6 +698,7 @@ odomCmdInterp_t::odomCmdInterp_t( odomPlaylist_t &playlist )
    : exit_( false )
    , playlist_( playlist )
 {
+   prevCmd_[0] = inBuf_[0] = '\0' ;
    errorMsg_[0] = '\0' ;
 }
    
@@ -734,15 +738,25 @@ bool odomCmdInterp_t::dispatch( char const *cmdline )
       char const *cmd = parts[0];
       for( unsigned i = 0 ; i < numCommands_ ; i++ )
       {
-         if( 0 == strcasecmp( cmd, commands_[i].name_ ) )
-            return commands_[i].handler_( *this, parts, numParts, errorMsg_, sizeof(errorMsg_) );
+         if( 0 == strcasecmp( cmd, commands_[i].name_ ) ){
+            bool worked = commands_[i].handler_( *this, parts, numParts, errorMsg_, sizeof(errorMsg_) );
+            if( worked ){
+               strncpy( prevCmd_, cmdline, sizeof( prevCmd_ )-1 );
+               prevCmd_[sizeof( prevCmd_ )-1] = '\0' ;
+            }
+            return worked ;
+         }
       }
 
+      // command not found
       if( ( 0 == strcasecmp( cmd, "die" ) )
           ||
           ( 0 == strcasecmp( cmd, "exit" ) ) ){
          exit_ = true ;
          return true ;
+      }
+      else if( 0 == strcmp( cmd, "/" ) ){
+         return dispatch( prevCmd_ );
       }
       else {
          snprintf( errorMsg_, sizeof(errorMsg_), "command %s not implemented\n", cmd );
