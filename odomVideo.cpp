@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.7  2006-09-04 16:42:22  ericn
+ * Revision 1.8  2006-09-05 02:20:45  ericn
+ * -don't spin on eof
+ *
+ * Revision 1.7  2006/09/04 16:42:22  ericn
  * -add audio playback call
  *
  * Revision 1.6  2006/09/04 15:17:19  ericn
@@ -143,6 +146,8 @@ bool odomVideo_t::playback( void )
          else
             outQueue_.feedAudio( frame, frameLen, false, outQueue_.ptsToMs(pts) );
       }
+      else
+         break ;
    }
    
    outQueue_.playAudio(tickMs());
