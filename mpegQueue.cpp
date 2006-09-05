@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.11  2006-09-05 02:29:14  ericn
+ * Revision 1.12  2006-09-05 03:53:37  ericn
+ * -limit scope of queue locks during startup
+ *
+ * Revision 1.11  2006/09/05 02:29:14  ericn
  * -added queue dumping utilities for debug, lock identification
  *
  * Revision 1.10  2006/09/04 16:43:42  ericn
@@ -497,55 +500,54 @@ long long mpegQueue_t::audioBufferMs( unsigned speed, unsigned channels )
 
 void mpegQueue_t::startPlayback( void )
 {
-
    if( 0 == ( flags_ & STARTED ) ){
       flags_ |= STARTED ;
       
       long long now = tickMs();
 
-      queueLock_t lockVideoQ( &videoFull_.locked_, 1 );
-      assert( lockVideoQ.weLocked() );
+      { // limit scope of lock
+         queueLock_t lockVideoQ( &videoFull_.locked_, 1 );
+         assert( lockVideoQ.weLocked() );
 
-      queueLock_t lockAudioQ( &audioFull_.locked_, 2 );
-      assert( lockAudioQ.weLocked() );
+         queueLock_t lockAudioQ( &audioFull_.locked_, 2 );
+         assert( lockAudioQ.weLocked() );
+   
+         entryHeader_t *firstVideo = videoFull_.header_.next_ ;
+         entryHeader_t *firstAudio = audioFull_.header_.next_ ;
+   
+         //
+         // use latter of two timestamps (to avoid zero case)
+         //
+         if( firstAudio->when_ms_ < firstVideo->when_ms_ ){
+            startMs_ = now - firstVideo->when_ms_ ;
+         }
+         else {
+            startMs_ = now - firstAudio->when_ms_ ;
+         }
 
-      entryHeader_t *firstVideo = videoFull_.header_.next_ ;
-      entryHeader_t *firstAudio = audioFull_.header_.next_ ;
+         long long first = firstVideo->when_ms_ ;
+         long long last = first ;
+         entryHeader_t *entry = firstVideo ;
+         while( entry != &videoFull_.header_ ){
+            last = entry->when_ms_ ;
+            entry->when_ms_ += startMs_ ;
+            entry = entry->next_ ;
+         }
+         debugPrint( "\nvideo ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
+   
+         first = firstAudio->when_ms_ ;
+         last = first ;
+         audioOffs_ = startMs_ ;
+         entry = audioFull_.header_.next_ ;
+         while( entry != &audioFull_.header_ ){
+            last = entry->when_ms_ ;
+            entry->when_ms_ += audioOffs_ ;
+            entry = entry->next_ ;
+         }
+         debugPrint( "audio ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
 
-#if 1
-      if( firstAudio->when_ms_ < firstVideo->when_ms_ ){
-         startMs_ = now - firstAudio->when_ms_ ;
-printf( "use audio timestamp: %llu\n", firstAudio->when_ms_ );
-printf( "video timestamp: %llu\n", firstVideo->when_ms_ );
-      }
-      else {
-         startMs_ = now - firstVideo->when_ms_ ;
-printf( "use video timestamp: %llu\n", firstVideo->when_ms_ );
-printf( "audio timestamp: %llu\n", firstAudio->when_ms_ );
-      }
-#endif
+      } // scope of queue lock(s)
 
-      long long first = firstVideo->when_ms_ ;
-      long long last = first ;
-      entryHeader_t *entry = firstVideo ;
-      while( entry != &videoFull_.header_ ){
-         last = entry->when_ms_ ;
-         entry->when_ms_ += startMs_ ;
-         entry = entry->next_ ;
-      }
-      debugPrint( "\nvideo ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
-
-      first = firstAudio->when_ms_ ;
-      last = first ;
-      audioOffs_ = startMs_ ;
-      entry = audioFull_.header_.next_ ;
-      while( entry != &audioFull_.header_ ){
-         last = entry->when_ms_ ;
-         entry->when_ms_ += audioOffs_ ;
-         entry = entry->next_ ;
-      }
-      debugPrint( "audio ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
-      
       playAudio(now);
    }
    
