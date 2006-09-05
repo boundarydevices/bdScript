@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.7  2006-09-04 16:42:39  ericn
+ * Revision 1.8  2006-09-05 15:02:04  ericn
+ * -use mpegQueue dumpStats()
+ *
+ * Revision 1.7  2006/09/04 16:42:39  ericn
  * -add audio playback call
  *
  * Revision 1.6  2006/09/04 15:17:38  ericn
@@ -122,13 +125,9 @@ void odomVideoStream_t::doAudio( void )
 
 void odomVideoStream_t::dump( void )
 {
-   printf( "%lu ms of video queued\n"
-           "   %u buffers allocated\n"
-           "   %u buffers freed\n"
-         ,  outQueue_.msVideoQueued()
-         ,  outQueue_.numAllocated()
-         ,  outQueue_.numFreed()
+   printf( "----------------------\n"
          );
+   outQueue_.dumpStats();
 }
 
 
