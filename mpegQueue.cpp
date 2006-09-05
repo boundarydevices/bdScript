@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.12  2006-09-05 03:53:37  ericn
+ * Revision 1.13  2006-09-05 03:56:07  ericn
+ * -allow B frames before starting, after GOP
+ *
+ * Revision 1.12  2006/09/05 03:53:37  ericn
  * -limit scope of queue locks during startup
  *
  * Revision 1.11  2006/09/05 02:29:14  ericn
@@ -710,8 +713,9 @@ debugPrint( "%c", cPicTypes[picType] );
                addDecoderBuf();
 
                if( 0 != (flags_ & NEEDIFRAME) ){
-
-                  if( msVideoQueued() >= lowWater_ms() ){
+                  if( ( 0 == (flags_ & STARTED) ) 
+                      ||
+                      ( msVideoQueued() >= lowWater_ms() ) ){
                      flags_ &= ~NEEDIFRAME ;
                      debugPrint( "play b-frames...\n" );
                   }
@@ -760,6 +764,7 @@ assert( ve->length_ == inBufferLength_ );
 debugPrint( "\n%8lld - G", offset_ms );
             if( 0 != offset_ms )
                msOut_ = offset_ms ;
+            flags_ &= ~NEEDIFRAME ;
             break ;
          case STATE_BUFFER :
          case STATE_SEQUENCE_REPEATED:
