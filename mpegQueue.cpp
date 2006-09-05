@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.13  2006-09-05 03:56:07  ericn
+ * Revision 1.14  2006-09-05 03:59:54  ericn
+ * -fix time calculation in playAudio()
+ *
+ * Revision 1.13  2006/09/05 03:56:07  ericn
  * -allow B frames before starting, after GOP
  *
  * Revision 1.12  2006/09/05 03:53:37  ericn
@@ -780,7 +783,9 @@ debugPrint( "\n%8lld - G", offset_ms );
 
       if( 0 == (flags_ & STARTED) )
       {
-          if( msVideoQueued() >= bufferMs_ ){
+          if( ( msVideoQueued() >= bufferMs_ )
+              ||
+              ( msAudioQueued() >= bufferMs_ ) ){
              startPlayback();
           }
       }
@@ -799,8 +804,8 @@ void mpegQueue_t::playAudio
             if( lockAudioQ.weLocked() ){
                while( !isEmpty( audioFull_.header_ ) ){
                   audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
-                  long long timeDiff = when 
-                                     - ae->header_.when_ms_
+                  long long timeDiff = ae->header_.when_ms_
+                                     - when 
                                      - audioBufferMs( ae->sampleRate_, ae->numChannels_ );
                   if( 0 > timeDiff ){
                      if( ae->sampleRate_ != prevSampleRate_ ){
