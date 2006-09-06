@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.9 2006-09-05 02:29:03 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.10 2006-09-06 15:09:12 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.9  2006-09-05 02:29:03  ericn
+ * Revision 1.10  2006-09-06 15:09:12  ericn
+ * -add utility routines for use in streaming
+ *
+ * Revision 1.9  2006/09/05 02:29:03  ericn
  * -added queue dumping utilities for debug
  *
  * Revision 1.8  2006/09/04 16:43:40  ericn
@@ -113,6 +116,7 @@ public:
            bool                 discontinuity,
            long long            offset_ms ); // adjusted to real-time after buffer is full
    // used by streaming when a 'new' file starts
+   void flushAudio( void );
    void adjustPTS( long long startPts );
 
 
@@ -130,8 +134,23 @@ public:
    // stats 
    //
    inline bool isEmpty( void ) const ;
+
+   //
+   // These routines return the total queue duration without
+   // reference to the clock (for use while buffering)
+   //
+   // Because of this, they can be used before playback starts
+   // and the timestamps are converted to wall time.
+   //
    unsigned long msVideoQueued( void ) const ;
    unsigned long msAudioQueued( void ) const ;
+
+   //
+   // These routines return the queue duration from now until end-of-playback
+   //
+   unsigned long videoTailFromNow(void) const ;
+   unsigned long audioTailFromNow(void) const ;
+
    inline unsigned long msToBuffer( void ) const { return bufferMs_ ; }
    inline unsigned long lowWater_ms( void ) const { return lowWater_ ; }
    inline unsigned long highWater_ms( void ) const { return highWater_ ; }
@@ -216,6 +235,9 @@ private:
 
    audioEntry_t *getAudioBuf();
 
+   //
+   // how much time does the audio queue take at a given playback rate?
+   //
    long long audioBufferMs( unsigned speed, unsigned channels );
 
    int const  dspFd_ ;

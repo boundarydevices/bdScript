@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.14  2006-09-05 03:59:54  ericn
+ * Revision 1.15  2006-09-06 15:09:58  ericn
+ * -add utility routines for use in streaming
+ *
+ * Revision 1.14  2006/09/05 03:59:54  ericn
  * -fix time calculation in playAudio()
  *
  * Revision 1.13  2006/09/05 03:56:07  ericn
@@ -356,6 +359,33 @@ void mpegQueue_t::cleanQueue( queueHeader_t &qh )
    }
 }
 
+void mpegQueue_t::flushAudio(void)
+{
+   if( 0 != audioPartial_ ){
+      if( audioPartial_->length_ ){
+         audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
+         audioPartial_->numChannels_ = audioDecoder_.numChannels();
+         audioPartial_->offset_ = 0 ;
+   
+         if( 0LL == firstAudioMs_ )
+            firstAudioMs_ = audioPartial_->header_.when_ms_ ;
+         lastAudioMs_ = audioPartial_->header_.when_ms_ ;
+         audioPartial_->header_.when_ms_ += audioOffs_ ;
+         queueLock_t lockAudioQ( &audioFull_.locked_, 1 );
+         assert( lockAudioQ.weLocked() ); // only reader side should fail
+   
+         pushTail( audioFull_.header_, &audioPartial_->header_ );
+      }
+      else {
+         queueLock_t lockAudioQ( &audioEmpty_.locked_, 1 );
+         assert( lockAudioQ.weLocked() ); // only reader side should fail
+
+         pushTail( audioEmpty_.header_, &audioPartial_->header_ );
+      }
+      audioPartial_ = 0 ;
+   }
+}
+
 void mpegQueue_t::feedAudio
    ( unsigned char const *data, 
      unsigned             length,
@@ -388,7 +418,8 @@ debugPrint( "%s\n", audioDecoder_.timerString() );
             if( AUDIOSAMPLESPERFRAME == audioPartial_->length_ ){
                audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
                audioPartial_->numChannels_ = audioDecoder_.numChannels();
-   
+               audioPartial_->offset_ = 0 ;
+
                if( 0LL == firstAudioMs_ )
                   firstAudioMs_ = audioPartial_->header_.when_ms_ ;
                lastAudioMs_ = audioPartial_->header_.when_ms_ ;
@@ -400,6 +431,11 @@ debugPrint( "%s\n", audioDecoder_.timerString() );
                pushTail( audioFull_.header_, &audioPartial_->header_ );
                audioPartial_ = 0 ;
                ++aFramesQueued_ ;
+               if( highWater_ms()*4 <= audioTailFromNow() ){
+                  fprintf( stderr, "------> too much audio queued\n" );
+                  dumpStats();
+                  exit(1);
+               }
             }
          }
          else {
@@ -412,6 +448,7 @@ in_mp3_synth = 1 ;
 in_mp3_synth = 0 ;
 if( flags_ & AUDIOIDLE )
    playAudio(tickMs());
+
 #endif
 }
 
@@ -589,6 +626,8 @@ void mpegQueue_t::queuePicture(videoEntry_t *ve)
 
    pushTail( videoFull_.header_, &ve->header_ );
    ++vFramesQueued_ ;
+
+   assert( highWater_ms()*2 > videoTailFromNow() );
 }
 
 void mpegQueue_t::addDecoderBuf()
@@ -826,6 +865,10 @@ void mpegQueue_t::playAudio
                      else if ( 0 == prevChannels_ ){
                         printf( "No channel count(yet)\n" );
                      }
+
+
+                     assert( ae->length_ > ae->offset_ ); // or why are we here?
+
                      unsigned bytes = ( ae->length_ - ae->offset_ ) * sizeof(ae->data_[0]);
                      int numWritten = write( dspFd_, ae->data_+ae->offset_, bytes );
                      if( 0 < numWritten ){
@@ -834,7 +877,9 @@ void mpegQueue_t::playAudio
          firstAudioWrite_ = tickMs();
       lastAudioWrite_ = tickMs();
                         ae->offset_ += numWritten/sizeof(ae->data_[0]);
-                        if( ae->offset_ == ae->length_ ){
+
+                        assert( ae->offset_ <= ae->length_ );
+                        if( ae->offset_ >= ae->length_ ){
                            entryHeader_t *const e = pullHead( audioFull_.header_ );
                            assert( e );
                            assert( e == (entryHeader_t *)ae );
@@ -842,11 +887,19 @@ void mpegQueue_t::playAudio
                            ++aFreeCount_ ; 
                            continue ;
                         } // finished this packet of audio
-                        else
-                           ae->offset_ += numWritten ;
                      }
-                     else if( ( -1 != numWritten ) || ( EAGAIN != errno ) )
-                        fprintf( stderr, "Short audio write: %d/%d/%d/%u: %m\n", dspFd_, numWritten, errno, ae->length_ );
+                     else if( ( -1 != numWritten ) || ( EAGAIN != errno ) ){
+                        fprintf( stderr, "Short audio write: %d/%d/%d/%u/%u/%u: %m\n", dspFd_, numWritten, errno, bytes, ae->offset_, ae->length_ );
+                        unsigned value ;
+                        if( 0 == ioctl( dspFd_, SOUND_PCM_READ_RATE, &value ) )
+                           fprintf( stderr, "speed %u\n", value );
+                        else
+                           perror( "PCM_READ_RATE" );
+                        if( 0 == ioctl( dspFd_, SOUND_PCM_READ_CHANNELS, &value ) )
+                           fprintf( stderr, "%u channels\n", value );
+                        else
+                           perror( "PCM_READ_CHANNELS" );
+                     }
                      else {
                         int prevErr = errno ;
                         audio_buf_info ai2 ;
@@ -906,6 +959,40 @@ unsigned long mpegQueue_t::msAudioQueued( void ) const
 
    debugPrint( "%lu: %p/%p: %lld..%lld\n", queueTime, head, tail, head->when_ms_, tail->when_ms_ );
    return (unsigned long)( queueTime );
+}
+
+unsigned long mpegQueue_t::videoTailFromNow(void) const 
+{
+   unsigned long queueTime = 0 ;
+   if( 0 == (flags_ & STARTED) ){
+      entryHeader_t const * const tail = videoFull_.header_.prev_ ;
+      if( tail != &videoFull_.header_ ){
+         long delta = (tail->when_ms_ - tickMs());
+         if( 0 < delta )
+            queueTime = delta ;
+      }
+   } // clocks have been converted
+   else
+      queueTime = msVideoQueued();
+   
+   return queueTime ;
+}
+
+unsigned long mpegQueue_t::audioTailFromNow(void) const 
+{
+   unsigned long queueTime = 0 ;
+   if( 0 == (flags_ & STARTED) ){
+      entryHeader_t const * const tail = audioFull_.header_.prev_ ;
+      if( tail != &audioFull_.header_ ){
+         long delta = (tail->when_ms_ - tickMs());
+         if( 0 < delta )
+            queueTime = delta ;
+      }
+   } // clocks have been converted
+   else
+      queueTime = msAudioQueued();
+   
+   return queueTime ;
 }
 
 extern "C" {
@@ -1102,7 +1189,10 @@ void mpegQueue_t::dumpAudioQueue(void) const {
 
 void mpegQueue_t::dumpStats(void) const 
 {
-   printf( "%lu ms of video queued\n"
+   printf( "start offsets:\n"
+           "   %lld video\n"
+           "   %lld audio\n"
+           "%lu ms of video queued (%lu from now)\n"
            "   low water mark:  %lu\n"
            "   high water mark: %lu\n"
            "   %u buffers allocated\n"
@@ -1111,6 +1201,7 @@ void mpegQueue_t::dumpStats(void) const
            "   %u video frames played\n"
            "   %u video frames skipped\n"
            "   %u video frames dropped\n"
+           "%lu ms of audio queued (%lu from now)\n"
            "   %u audio frames queued\n"
            "   %u audio frames played\n"
            "   %u audio frames skipped\n"
@@ -1119,7 +1210,9 @@ void mpegQueue_t::dumpStats(void) const
            "   video writes: %lld..%lld (%lu ms)\n"
            "   audio ms range: %lld..%lld (%lu ms)\n"
            "   audio writes: %lld..%lld (%lu ms)\n"
-         ,  msVideoQueued()
+         ,  startMs_
+         ,  audioOffs_
+         ,  msVideoQueued(), videoTailFromNow()
          ,  lowWater_ms()
          ,  highWater_ms()
          ,  numAllocated()
@@ -1128,6 +1221,7 @@ void mpegQueue_t::dumpStats(void) const
          ,  vFramesPlayed()
          ,  vFramesSkipped() 
          ,  vFramesDropped()
+         ,  msAudioQueued(), audioTailFromNow()
          ,  aFramesQueued()
          ,  aFramesPlayed()
          ,  aFramesSkipped() 
