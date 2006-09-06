@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.8  2006-09-05 15:02:04  ericn
+ * Revision 1.9  2006-09-06 15:09:26  ericn
+ * -flush audio on eof
+ *
+ * Revision 1.8  2006/09/05 15:02:04  ericn
  * -use mpegQueue dumpStats()
  *
  * Revision 1.7  2006/09/04 16:42:39  ericn
@@ -106,6 +109,7 @@ void odomVideoStream_t::onEOF(
    unsigned long videoBytes,
    unsigned long audioBytes )
 {
+   outQueue_.flushAudio();
    printf( "eof(%s): %lu bytes (%lu video, %lu audio)\n", fileName, totalBytes, videoBytes, audioBytes );
    printf( "ms: %ld... %llu->%llu\n", (unsigned long)(lastMs_-startMs_), startMs_, lastMs_ );
    outQueue_.dumpStats();
