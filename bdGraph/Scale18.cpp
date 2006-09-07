@@ -18,11 +18,11 @@ static void ConvertRgb24Line(unsigned char* fbMem, unsigned char const *video,in
 {
     do {
     	unsigned int val = (video[0]>>2) | ((video[1]&0xfc)<<(6-2)) | ((video[2]&0xfc)<<(6+6-2));
-    if(0) {
+    if(1) {
 		fbMem[0] = (unsigned char)val;
 		fbMem[1] = (unsigned char)(val>>8);
 		fbMem[2] = (unsigned char)(val>>16);
-    } else
+    } else {
 		fbMem[0] = (unsigned char)~val;
 		fbMem[1] = (unsigned char)~(val>>8);
 		fbMem[2] = (unsigned char)~(val>>16);
