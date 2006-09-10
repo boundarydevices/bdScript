@@ -90,6 +90,7 @@ OBJS = \
        jsUDP.o \
        jsURL.o \
        jsUse.o \
+       logTraces.o \
        md5.o \
        memFile.o \
        mpegStream.o \
@@ -647,6 +648,9 @@ md5: md5.cpp $(LIB)
 
 backtrace: backtrace.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -rdynamic -o backtrace -DSTANDALONE=1 -Xlinker -Map -Xlinker backtrace.map backtrace.cpp $(LIBS) -lcrypto -lCurlCache
+
+logTraces: logTraces.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -rdynamic -o logTraces -DMODULETEST=1 -Xlinker -Map -Xlinker logTraces.map logTraces.cpp $(LIBS) -lcrypto -lCurlCache -lstdc++
 
 avSendTo: avSendTo.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lcrypto -lz -lm -lpthread -lsupc++
