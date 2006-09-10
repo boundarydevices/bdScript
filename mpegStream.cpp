@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegStream.cpp,v $
- * Revision 1.5  2006-08-27 19:13:22  ericn
+ * Revision 1.6  2006-09-10 01:16:06  ericn
+ * -trace events
+ *
+ * Revision 1.5  2006/08/27 19:13:22  ericn
  * -add mpegFileStream_t class, deprecate mpegStream_t
  *
  * Revision 1.4  2006/08/24 23:59:15  ericn
@@ -32,6 +35,10 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#define LOGTRACES
+#include "logTraces.h"
+
+static traceSource_t traceStreamRead( "fread" );
 
 mpegStreamFile_t::mpegStreamFile_t( FILE *fIn )
    : fIn_( fIn )
@@ -64,7 +71,10 @@ bool mpegStreamFile_t::getFrame
             if( numUsed > numLeft_ ){
                unsigned const numNeeded = numUsed-numLeft_ ;
 assert( offset_+numNeeded <= sizeof(inBuf_) );
+
+               TRACEINCR( traceStreamRead );
                int numRead = fread( inBuf_+offset_+numLeft_, 1, numNeeded, fIn_ );
+               TRACEDECR( traceStreamRead );
                if( (unsigned)numRead != numNeeded ){
                   perror( "mpegStreamRead2" );
                   return false ;
@@ -95,7 +105,9 @@ assert( ( frameData >= inBuf_ ) && ( (frameData+frameLen) < (inBuf_+sizeof(inBuf
       
       assert( offset_ < sizeof(inBuf_)/2 );
       // read more data
+      TRACEINCR( traceStreamRead );
       int numRead = fread( inBuf_+offset_, 1, sizeof(inBuf_)/2, fIn_ );
+      TRACEDECR( traceStreamRead );
       if( 0 < numRead ){
          numLeft_ += numRead ;
       }

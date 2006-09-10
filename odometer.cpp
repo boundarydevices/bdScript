@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.6  2006-09-01 17:36:33  ericn
+ * Revision 1.7  2006-09-10 01:15:19  ericn
+ * -trace events
+ *
+ * Revision 1.6  2006/09/01 17:36:33  ericn
  * -blt video earlier to reduce tearing
  *
  * Revision 1.5  2006/08/16 02:31:35  ericn
@@ -26,6 +29,11 @@
 #include "fbDev.h"
 #include <fcntl.h>
 #include "rtSignal.h"
+#define LOGTRACES
+#include "logTraces.h"
+
+static traceSource_t traceVsync( "vsync" );
+static traceSource_t traceCmdList( "cmdList" );
 
 odometer_t::odometer_t
    ( odomGraphics_t const &graphics,
@@ -169,8 +177,28 @@ unsigned maxSigDepth = 0 ;
 unsigned sigDepth = 0 ;
 
 void odometerSet_t::sigio(void){
-   fprintf( stderr, "sigio (overflow)\n" );
-   exit(1);
+   fprintf( stderr, "sigio (overflow). pending signals follow:\n" );
+   sigset_t sigs ;
+   sigfillset( &sigs );
+   siginfo_t info ;
+   struct timespec ts ;
+   ts.tv_sec = 0 ;
+   ts.tv_nsec = 0 ;
+   int signum ;
+   while( 0 <= ( signum = sigtimedwait( &sigs, &info, &ts ) ) ){
+      printf( "   signal %d/%d, errno %d, fd %d\n",
+              info.si_signo, signum,
+              info.si_errno,
+              info.si_fd );
+   }
+
+   sigpending( &sigs );
+   for( signum = minRtSignal(); signum <= maxRtSignal(); signum++ ){
+      if( 0 == sigismember( &sigs, signum ) )
+         printf( "~" );
+      printf( "%d\n", signum );
+   }
+//   exit(1);
 }
 
 void odometerSet_t::sigCmdList(void){
@@ -212,6 +240,7 @@ void odometerSet_t::sigVsync(void){
        &&
        ( issueCount_ == completionCount_ ) )
    {
+      TRACEINCR( traceCmdList );
       int numWritten = write( fdCmd_, cmdList_, cmdListBytes_ );
       if( cmdListBytes_ == (unsigned)numWritten )
          ++issueCount_ ;
@@ -224,16 +253,22 @@ static void cmdListHandler( int signo, siginfo_t *info, void *context )
 {
    if( inst_ )
       inst_->sigCmdList();
+   TRACEDECR( traceCmdList );
 }
 
 static void sigioHandler( int signo, siginfo_t *info, void *context )
 {
+   printf( "sigio handler:\n"
+           "    signum %d/%d\n"
+           "    fd %d\n",
+           info->si_signo, signo, info->si_fd );
    if( inst_ )
       inst_->sigio();
 }
 
 static void vsyncHandler( int signo, siginfo_t *info, void *context )
 {
+   TRACE_T( traceVsync, trace );
    if( inst_ )
       inst_->sigVsync();
 }

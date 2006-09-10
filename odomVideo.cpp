@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.8  2006-09-05 02:20:45  ericn
+ * Revision 1.9  2006-09-10 01:15:43  ericn
+ * -trace events
+ *
+ * Revision 1.8  2006/09/05 02:20:45  ericn
  * -don't spin on eof
  *
  * Revision 1.7  2006/09/04 16:42:22  ericn
@@ -43,6 +46,10 @@
 #include <unistd.h>
 #include "tickMs.h"
 #include <linux/soundcard.h>
+#define LOGTRACES
+#include "logTraces.h"
+
+static traceSource_t traceVideo( "odomVideo" );
 
 #define INITTING 1
 #define PULLING  2 
@@ -68,12 +75,14 @@ odomVideo_t::odomVideo_t(
    , start_( 0LL )
 {
    if( 0 == fIn_ )fprintf( stderr, "%s: %m", fileName );
+   TRACEINCR(traceVideo);
 }
 
 odomVideo_t::~odomVideo_t( void )
 {
    if( fIn_ )
       fclose( fIn_ );
+   TRACEDECR(traceVideo);
 }
 
 bool odomVideo_t::startPlayback( void )

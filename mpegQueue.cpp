@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.15  2006-09-06 15:09:58  ericn
+ * Revision 1.16  2006-09-10 01:16:51  ericn
+ * -trace events
+ *
+ * Revision 1.15  2006/09/06 15:09:58  ericn
  * -add utility routines for use in streaming
  *
  * Revision 1.14  2006/09/05 03:59:54  ericn
@@ -78,6 +81,12 @@
 #include <string.h>
 #include "fbDev.h"
 #include <sys/soundcard.h>
+#define LOGTRACES
+#include "logTraces.h"
+
+static traceSource_t traceAudioDecode( "audioDecode" );
+static traceSource_t traceVideoDecode( "videoDecode" );
+static traceSource_t traceSkipB( "skipBFrames" );
 
 // #define USE_MMAP
 
@@ -392,6 +401,7 @@ void mpegQueue_t::feedAudio
      bool                 discontinuity,
      long long            when_ms ) // transport PTS
 {
+   TRACE_T( traceAudioDecode, traceAudio );
 #if 1
 in_mp3_feed = 1 ;
    audioDecoder_.feed( data, length );
@@ -593,7 +603,6 @@ void mpegQueue_t::startPlayback( void )
 
       playAudio(now);
    }
-   
 }
 
 void mpegQueue_t::adjustPTS( long long startPts )
@@ -667,8 +676,13 @@ void mpegQueue_t::feedVideo
      bool                 discontinuity,
      long long            offset_ms ) // 
 {
+   TRACE_T( traceVideoDecode, traceVideo );
+   
    if( discontinuity ){
-      flags_ |= NEEDIFRAME ;
+      if( 0 == (flags_ & NEEDIFRAME)){
+         flags_ |= NEEDIFRAME ;
+         TRACEINCR(traceSkipB);
+      }
       mpeg2_reset( decoder_, 1 );
       cleanDecoderBufs();
    }
@@ -738,10 +752,12 @@ void mpegQueue_t::feedVideo
          {
             int picType = ( infoptr->current_picture->flags & PIC_MASK_CODING_TYPE );
             if( flags_ & STARTED ){
-                if( msVideoQueued() <= lowWater_ms() ){
-                   debugPrint( "skipping b-frames w/%lu ms queued\n", msVideoQueued() );
-                   flags_ |= NEEDIFRAME ;
-                }
+               if( msVideoQueued() <= lowWater_ms() ){
+                  debugPrint( "skipping b-frames w/%lu ms queued\n", msVideoQueued() );
+                  if( 0 == (flags_ & NEEDIFRAME))
+                     TRACEINCR(traceSkipB);
+                  flags_ |= NEEDIFRAME ;
+               }
             }
 
             if( ( 0 == ( flags_ & NEEDIFRAME ) )
@@ -759,6 +775,7 @@ debugPrint( "%c", cPicTypes[picType] );
                       ||
                       ( msVideoQueued() >= lowWater_ms() ) ){
                      flags_ &= ~NEEDIFRAME ;
+                     TRACEDECR(traceSkipB);
                      debugPrint( "play b-frames...\n" );
                   }
                }
@@ -806,7 +823,11 @@ assert( ve->length_ == inBufferLength_ );
 debugPrint( "\n%8lld - G", offset_ms );
             if( 0 != offset_ms )
                msOut_ = offset_ms ;
-            flags_ &= ~NEEDIFRAME ;
+            if( 0 != (flags_ & NEEDIFRAME)){
+               TRACEDECR(traceSkipB);
+               flags_ &= ~NEEDIFRAME ;
+            }
+
             break ;
          case STATE_BUFFER :
          case STATE_SEQUENCE_REPEATED:
@@ -919,7 +940,7 @@ void mpegQueue_t::playAudio
                }
             }
             else {
-               printf( "~audioLock (%u)\n", lockAudioQ.whoLocked() );
+               debugPrint( "~audioLock (%u)\n", lockAudioQ.whoLocked() );
                flags_ |= AUDIOIDLE ;
             }
          } // have some space to write
@@ -1150,14 +1171,10 @@ void mpegQueue_t::playVideo( long long when )
          }
       }
       else {
-         printf( "vLock: %d/%d, %u/%u\n",  
-                 lockVideoQ.weLocked(), lockEmptyQ.weLocked(),
-                 lockVideoQ.whoLocked(), lockEmptyQ.whoLocked()
+         debugPrint( "vLock: %d/%d, %u/%u\n",  
+                     lockVideoQ.weLocked(), lockEmptyQ.weLocked(),
+                     lockVideoQ.whoLocked(), lockEmptyQ.whoLocked()
                  );
-      }
-
-      if( flags_ & AUDIOIDLE ){
-         playAudio(tickMs());
       }
    } // if we've started playback
    else

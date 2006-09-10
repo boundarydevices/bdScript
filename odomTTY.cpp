@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomTTY.cpp,v $
- * Revision 1.2  2006-08-28 18:23:54  ericn
+ * Revision 1.3  2006-09-10 01:15:52  ericn
+ * -trace events
+ *
+ * Revision 1.2  2006/08/28 18:23:54  ericn
  * -add touch handler
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -54,6 +57,7 @@ void odomTTY_t::onCtrlC( void )
 #include "hexDump.h"
 #include <signal.h>
 #include "odomTouch.h"
+#include "logTraces.h"
 
 static struct sigaction sa;
 static struct sigaction oldint;
@@ -89,6 +93,8 @@ static void crashHandler(int sig)
 
 int main( int argc, char const * const argv[] )
 {
+   logTraces_t::get( true ); // enable
+   
    sa.sa_handler = crashHandler;
    sigemptyset(&sa.sa_mask);
    sa.sa_flags = 0;

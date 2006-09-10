@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegRxUDP.cpp,v $
- * Revision 1.2  2006-08-27 18:14:24  ericn
+ * Revision 1.3  2006-09-10 01:16:22  ericn
+ * -trace events
+ *
+ * Revision 1.2  2006/08/27 18:14:24  ericn
  * -remove unsupported dts
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -31,6 +34,11 @@
 #include <time.h>
 #include <fcntl.h>
 #include <errno.h>
+#define LOGTRACES
+#include "logTraces.h"
+
+static traceSource_t traceDiscont( "rxDiscont" );
+static traceSource_t traceRecv( "rxUDP" );
 
 mpegRxUDP_t::mpegRxUDP_t( unsigned short portNum )
    : sFd_( socket( AF_INET, SOCK_DGRAM, 0 ) )
@@ -107,11 +115,16 @@ void mpegRxUDP_t::poll( void )
    sockaddr_in fromAddr ;
    socklen_t   fromSize = sizeof( fromAddr );
    do {
-      int numRead = recvfrom( sFd_,
-                              (char *)&inPacket, sizeof(inPacket), 
-                              MSG_DONTWAIT,
-                              (struct sockaddr *)&fromAddr, 
-                              &fromSize );
+      int numRead ;
+      {
+         TRACE_T( traceRecv, trace );
+         numRead = recvfrom( sFd_,
+                             (char *)&inPacket, sizeof(inPacket), 
+                             MSG_DONTWAIT,
+                             (struct sockaddr *)&fromAddr, 
+                             &fromSize );
+      } // limit scope of trace
+
       if( 0 < numRead ){
 //         printf( "rx: %u.%u ", inPacket.identifier_, inPacket.sequence_ );
          switch( (unsigned)inPacket.type_ ){
@@ -145,6 +158,8 @@ void mpegRxUDP_t::poll( void )
                int delta = inPacket.sequence_ - prevSeq_ ;
                if( 0 < delta ){
                   bool const discontinuity = (1 != delta);
+                  if( discontinuity )
+                     TRACEINCR( traceDiscont );
 
                   mpegFrame_t &frame = inPacket.d.frame_ ;
                   totalBytes_ += frame.frameLen_ ;
@@ -157,8 +172,10 @@ void mpegRxUDP_t::poll( void )
                         discontinuity, 
                         frame.data_, frame.frameLen_,
                         frame.pts_ );
-                  if( discontinuity )
+                  if( discontinuity ){
+                     TRACEDECR( traceDiscont );
                      printf( "discontinuity: %u/%u\n", prevSeq_, inPacket.sequence_ );
+                  }
                   prevSeq_ = inPacket.sequence_ ;
                } // not an obsolete packet
                else
