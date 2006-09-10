@@ -1,5 +1,5 @@
 #ifndef __RTSIGNAL_H__
-#define __RTSIGNAL_H__ "$Id: rtSignal.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __RTSIGNAL_H__ "$Id: rtSignal.h,v 1.2 2006-09-10 01:14:36 ericn Exp $"
 
 /*
  * rtSignal.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: rtSignal.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-09-10 01:14:36  ericn
+ * -return active signal range
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -23,6 +26,9 @@
  */
 
 extern int nextRtSignal( void );
+
+extern int minRtSignal( void );
+extern int maxRtSignal( void );
 
 #endif
 
