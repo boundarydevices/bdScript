@@ -37,3 +37,4 @@ mpegStream
 mpegRxUDP
 touchSignal
 sm501reg
+logTraces
