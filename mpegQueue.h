@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.10 2006-09-06 15:09:12 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.11 2006-09-12 13:40:30 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.10  2006-09-06 15:09:12  ericn
+ * Revision 1.11  2006-09-12 13:40:30  ericn
+ * -add resetAudio method
+ *
+ * Revision 1.10  2006/09/06 15:09:12  ericn
  * -add utility routines for use in streaming
  *
  * Revision 1.9  2006/09/05 02:29:03  ericn
@@ -117,6 +120,7 @@ public:
            long long            offset_ms ); // adjusted to real-time after buffer is full
    // used by streaming when a 'new' file starts
    void flushAudio( void );
+   void resetAudio( void );
    void adjustPTS( long long startPts );
 
 

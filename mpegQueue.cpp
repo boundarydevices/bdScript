@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.16  2006-09-10 01:16:51  ericn
+ * Revision 1.17  2006-09-12 13:40:37  ericn
+ * -add resetAudio method
+ *
+ * Revision 1.16  2006/09/10 01:16:51  ericn
  * -trace events
  *
  * Revision 1.15  2006/09/06 15:09:58  ericn
@@ -375,14 +378,14 @@ void mpegQueue_t::flushAudio(void)
          audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
          audioPartial_->numChannels_ = audioDecoder_.numChannels();
          audioPartial_->offset_ = 0 ;
-   
+
          if( 0LL == firstAudioMs_ )
             firstAudioMs_ = audioPartial_->header_.when_ms_ ;
          lastAudioMs_ = audioPartial_->header_.when_ms_ ;
          audioPartial_->header_.when_ms_ += audioOffs_ ;
          queueLock_t lockAudioQ( &audioFull_.locked_, 1 );
          assert( lockAudioQ.weLocked() ); // only reader side should fail
-   
+
          pushTail( audioFull_.header_, &audioPartial_->header_ );
       }
       else {
@@ -392,6 +395,13 @@ void mpegQueue_t::flushAudio(void)
          pushTail( audioEmpty_.header_, &audioPartial_->header_ );
       }
       audioPartial_ = 0 ;
+   }
+}
+
+void mpegQueue_t::resetAudio(void)
+{
+   if( 0 != ioctl( dspFd_, SNDCTL_DSP_RESET, 0) ){
+      perror( "SNDCTL_DSP_RESET" );
    }
 }
 
