@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomStream.cpp,v $
- * Revision 1.9  2006-09-06 15:09:26  ericn
+ * Revision 1.10  2006-09-12 13:39:39  ericn
+ * -bump queue length, reset audio on new file
+ *
+ * Revision 1.9  2006/09/06 15:09:26  ericn
  * -flush audio on eof
  *
  * Revision 1.8  2006/09/05 15:02:04  ericn
@@ -56,7 +59,7 @@ odomVideoStream_t::odomVideoStream_t
    , outRect_( outRect )
    , outQueue_( playlist.fdDsp(), 
                 playlist.fdYUV(), 
-                1000, outRect )
+                2000, outRect )
    , firstFrame_( true )
 {
 }
@@ -70,6 +73,7 @@ void odomVideoStream_t::onNewFile(
    unsigned    fileNameLen )
 {
    printf( "new file %s\n", fileName );
+   outQueue_.resetAudio();
    firstFrame_ = true ;
 }
 
