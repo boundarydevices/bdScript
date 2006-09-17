@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.4 2006-09-04 16:42:14 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.5 2006-09-17 15:53:54 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.4  2006-09-04 16:42:14  ericn
+ * Revision 1.5  2006-09-17 15:53:54  ericn
+ * -use pipeline for mpeg file reads
+ *
+ * Revision 1.4  2006/09/04 16:42:14  ericn
  * -add audio playback call
  *
  * Revision 1.3  2006/09/01 20:24:14  ericn
@@ -63,6 +66,7 @@ public:
 
 private:
    odomVideo_t( odomVideo_t const & );
+   char                            cmdLine_[512];
    FILE                           *fIn_ ;
    mpegStreamFile_t                stream_ ;
    mpegQueue_t                     outQueue_ ;

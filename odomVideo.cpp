@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.9  2006-09-10 01:15:43  ericn
+ * Revision 1.10  2006-09-17 15:54:02  ericn
+ * -use pipeline for mpeg file reads
+ *
+ * Revision 1.9  2006/09/10 01:15:43  ericn
  * -trace events
  *
  * Revision 1.8  2006/09/05 02:20:45  ericn
@@ -45,8 +48,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "tickMs.h"
+#include <sys/stat.h>
 #include <linux/soundcard.h>
-#define LOGTRACES
+// #define LOGTRACES
 #include "logTraces.h"
 
 static traceSource_t traceVideo( "odomVideo" );
@@ -57,12 +61,18 @@ static traceSource_t traceVideo( "odomVideo" );
 
 unsigned long volatile flags_ = 0 ;
 
+static FILE *procFile( char *cmdLine, unsigned cmdSize, char const *fileName )
+{
+   snprintf( cmdLine, cmdSize, "cat %s", fileName );
+   return popen( cmdLine, "r" );
+}
+
 odomVideo_t::odomVideo_t( 
    odomPlaylist_t    &playlist,
    char const        *fileName,
    rectangle_t const &outRect )
-   : fIn_( fopen( fileName, "rb" ) )
-   , stream_( fIn_ )
+   : fIn_( procFile(cmdLine_,sizeof(cmdLine_), fileName ) )
+   , stream_( fileno(fIn_) )
    , outQueue_( playlist.fdDsp(),
                 playlist.fdYUV(),
                 2000,
@@ -81,7 +91,7 @@ odomVideo_t::odomVideo_t(
 odomVideo_t::~odomVideo_t( void )
 {
    if( fIn_ )
-      fclose( fIn_ );
+      pclose( fIn_ );
    TRACEDECR(traceVideo);
 }
 
@@ -167,13 +177,13 @@ bool odomVideo_t::completed( void )
 {
    if( ( ( 0 == fIn_ )
          || 
-         feof( fIn_ ) )
+         stream_.eof() )
        &&
        outQueue_.isEmpty() ){
       printf( "video completed after %lu ms\n"
               , (unsigned long)( tickMs() - start_ ) );
       dump();
-      
+
       return true ;
    }
    else
