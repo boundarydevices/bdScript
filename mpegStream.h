@@ -1,5 +1,5 @@
 #ifndef __MPEGSTREAM_H__
-#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.4 2006-08-27 19:13:19 ericn Exp $"
+#define __MPEGSTREAM_H__ "$Id: mpegStream.h,v 1.5 2006-09-17 15:54:29 ericn Exp $"
 
 /*
  * mpegStream.h
@@ -10,7 +10,10 @@
  * Change History : 
  *
  * $Log: mpegStream.h,v $
- * Revision 1.4  2006-08-27 19:13:19  ericn
+ * Revision 1.5  2006-09-17 15:54:29  ericn
+ * -use unbuffered I/O for stream
+ *
+ * Revision 1.4  2006/08/27 19:13:19  ericn
  * -add mpegFileStream_t class, deprecate mpegStream_t
  *
  * Revision 1.3  2006/08/24 23:59:11  ericn
@@ -40,7 +43,7 @@
 //
 class mpegStreamFile_t {
 public:
-   mpegStreamFile_t( FILE *fIn );
+   mpegStreamFile_t( int fdIn );
    ~mpegStreamFile_t( void );
 
    bool getFrame( unsigned char const       *&frameData,      // output: pointer to frame data
@@ -54,12 +57,15 @@ public:
    // for debug purposes. position in file 
    unsigned offsetInFile(void) const { return fileOffs_ ; }
 
+   inline bool eof( void ) const { return eof_ ; }
+
 private:
-   FILE   *const fIn_ ;
+   int const     fdIn_ ;
    unsigned char inBuf_[8192];
    unsigned      offset_ ;
    unsigned      numLeft_ ;
    unsigned      fileOffs_ ;
+   bool          eof_ ;
 };
 
 

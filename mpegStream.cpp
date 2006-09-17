@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegStream.cpp,v $
- * Revision 1.6  2006-09-10 01:16:06  ericn
+ * Revision 1.7  2006-09-17 15:54:32  ericn
+ * -use unbuffered I/O for stream
+ *
+ * Revision 1.6  2006/09/10 01:16:06  ericn
  * -trace events
  *
  * Revision 1.5  2006/08/27 19:13:22  ericn
@@ -35,16 +38,20 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
-#define LOGTRACES
+#include <unistd.h>
+#include <errno.h>
+
+//#define LOGTRACES
 #include "logTraces.h"
 
 static traceSource_t traceStreamRead( "fread" );
 
-mpegStreamFile_t::mpegStreamFile_t( FILE *fIn )
-   : fIn_( fIn )
+mpegStreamFile_t::mpegStreamFile_t( int fdIn )
+   : fdIn_( fdIn )
    , offset_( 0 )
    , numLeft_( 0 )
    , fileOffs_( 0 )
+   , eof_( false )
 {
 }
 
@@ -73,7 +80,7 @@ bool mpegStreamFile_t::getFrame
 assert( offset_+numNeeded <= sizeof(inBuf_) );
 
                TRACEINCR( traceStreamRead );
-               int numRead = fread( inBuf_+offset_+numLeft_, 1, numNeeded, fIn_ );
+               int numRead = read( fdIn_, inBuf_+offset_+numLeft_, numNeeded );
                TRACEDECR( traceStreamRead );
                if( (unsigned)numRead != numNeeded ){
                   perror( "mpegStreamRead2" );
@@ -102,18 +109,22 @@ assert( ( frameData >= inBuf_ ) && ( (frameData+frameLen) < (inBuf_+sizeof(inBuf
          fileOffs_ += offset_ ;
          offset_ = 0 ;
       }
-      
+
       assert( offset_ < sizeof(inBuf_)/2 );
       // read more data
       TRACEINCR( traceStreamRead );
-      int numRead = fread( inBuf_+offset_, 1, sizeof(inBuf_)/2, fIn_ );
+      int numRead = read( fdIn_, inBuf_+offset_, sizeof(inBuf_)/2 );
       TRACEDECR( traceStreamRead );
       if( 0 < numRead ){
          numLeft_ += numRead ;
       }
       else {
-         if( !feof(fIn_) )
-            perror( "mpegStreamRead2" );
+         if( ( -1 == numRead ) && (EINTR == errno) ){
+            printf( "EINTR\n" );
+            continue ;
+         }
+         else if( 0 == numRead )
+            eof_ = true ;
          return false ;
       }
    } while( 1 );
@@ -168,7 +179,7 @@ int main( int argc, char const * const argv[] )
          long long      pts ;
          unsigned char  streamId ;
 
-         mpegStreamFile_t stream( fIn );
+         mpegStreamFile_t stream( fileno(fIn) );
 
          while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
          {

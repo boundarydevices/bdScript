@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.17  2006-09-12 13:40:37  ericn
+ * Revision 1.18  2006-09-17 15:54:48  ericn
+ * -use unbuffered I/O for stream
+ *
+ * Revision 1.17  2006/09/12 13:40:37  ericn
  * -add resetAudio method
  *
  * Revision 1.16  2006/09/10 01:16:51  ericn
@@ -84,7 +87,7 @@
 #include <string.h>
 #include "fbDev.h"
 #include <sys/soundcard.h>
-#define LOGTRACES
+// #define LOGTRACES
 #include "logTraces.h"
 
 static traceSource_t traceAudioDecode( "audioDecode" );
@@ -1555,7 +1558,7 @@ printf( "----> playing file %s\n", fileName );
             unsigned long adler = 0 ;
             bool firstVideo = true ;
    
-            mpegStreamFile_t stream( fIn );
+            mpegStreamFile_t stream( fileno(fIn) );
             unsigned char const *frame ;
             unsigned             frameLen ;
             CodecType type ;

@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegSendUDP.cpp,v $
- * Revision 1.4  2006-08-27 19:13:49  ericn
+ * Revision 1.5  2006-09-17 15:55:05  ericn
+ * -use unbuffered I/O for stream
+ *
+ * Revision 1.4  2006/08/27 19:13:49  ericn
  * -use mpegFileStream_t
  *
  * Revision 1.3  2006/08/26 16:07:00  ericn
@@ -106,7 +109,7 @@ int main( int argc, char const * const argv[] )
                      outPacket.type_ = MPEGUDP_DATA ;
                      outPacket.sequence_++ ;
                      
-                     mpegStreamFile_t stream( fIn );
+                     mpegStreamFile_t stream( fileno(fIn) );
                      unsigned long        videoBytes = 0 ;
                      unsigned long        videoPackets = 0 ;
 
