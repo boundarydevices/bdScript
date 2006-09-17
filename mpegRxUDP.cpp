@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegRxUDP.cpp,v $
- * Revision 1.3  2006-09-10 01:16:22  ericn
+ * Revision 1.4  2006-09-17 15:55:23  ericn
+ * -no log by default
+ *
+ * Revision 1.3  2006/09/10 01:16:22  ericn
  * -trace events
  *
  * Revision 1.2  2006/08/27 18:14:24  ericn
@@ -34,7 +37,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <errno.h>
-#define LOGTRACES
+//#define LOGTRACES
 #include "logTraces.h"
 
 static traceSource_t traceDiscont( "rxDiscont" );

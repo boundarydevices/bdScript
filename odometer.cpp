@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.7  2006-09-10 01:15:19  ericn
+ * Revision 1.8  2006-09-17 15:55:23  ericn
+ * -no log by default
+ *
+ * Revision 1.7  2006/09/10 01:15:19  ericn
  * -trace events
  *
  * Revision 1.6  2006/09/01 17:36:33  ericn
@@ -29,7 +32,7 @@
 #include "fbDev.h"
 #include <fcntl.h>
 #include "rtSignal.h"
-#define LOGTRACES
+//#define LOGTRACES
 #include "logTraces.h"
 
 static traceSource_t traceVsync( "vsync" );

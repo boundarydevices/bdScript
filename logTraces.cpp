@@ -7,14 +7,17 @@
  * Change History : 
  *
  * $Log: logTraces.cpp,v $
- * Revision 1.1  2006-09-10 01:18:13  ericn
+ * Revision 1.2  2006-09-17 15:55:23  ericn
+ * -no log by default
+ *
+ * Revision 1.1  2006/09/10 01:18:13  ericn
  * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2006
  */
 
-#define LOGTRACES
+// #define LOGTRACES
 
 #include "logTraces.h"
 #include "dictionary.h"
