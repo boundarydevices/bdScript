@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsStarUSB.cpp,v $
- * Revision 1.11  2006-08-16 02:35:09  ericn
+ * Revision 1.12  2006-09-22 01:45:18  ericn
+ * -retry claim, release on close
+ *
+ * Revision 1.11  2006/08/16 02:35:09  ericn
  * -use *rE1 for no cut command
  *
  * Revision 1.10  2006/08/07 18:21:26  tkisky
@@ -141,7 +144,19 @@ starPoll_t :: starPoll_t( void )
       if( 0 != udev_ )
       {
          int const intNum = dev->config[0].interface[0].altsetting[0].bInterfaceNumber ;
-         usb_claim_interface( udev_, intNum );
+         int iterations = 0 ;
+         do { 
+            int result = usb_claim_interface( udev_, intNum );
+            if( 0 != result ){
+               debugPrint( "Error claiming usb interface!\n" );
+               sleep( 1 );
+            }
+            else {
+               debugPrint( "claimed usb interface\n" );
+               break ;
+            }
+         } while( ++iterations < 10 );
+
          set( 100 );
          debugPrint( "printer interface %d claimed\r\n", intNum );
       } else {
@@ -173,6 +188,7 @@ void starPoll_t :: print( JSContext *cx, void const *data, unsigned len )
       else if( 0 > numWritten )
       {
          JS_ReportError( cx, "Error writing to printer" );
+         usb_release_interface( udev_, 0 );
          usb_close( udev_ );
          udev_ = 0 ;
       }
@@ -187,6 +203,7 @@ void starPoll_t :: print( JSContext *cx, void const *data, unsigned len )
          else
          {
             JS_ReportError( cx, "Error resetting printer" );
+            usb_release_interface( udev_, 0 );
             usb_close( udev_ );
             udev_ = 0 ;
          }
@@ -325,6 +342,12 @@ static JSBool jsFlush( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 
 static JSBool jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   starPoll_t *const star = (starPoll_t *)JS_GetInstancePrivate( cx, obj, &jsStarUSBClass_, NULL );
+   if( ( 0 != star ) && ( 0 != star->udev_ ) ){
+      JS_SetPrivate( cx, obj, 0 );
+      delete star ;
+   }
+
    *rval = JSVAL_FALSE ;
    return JS_TRUE ;
 }
