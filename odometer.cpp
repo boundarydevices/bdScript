@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.8  2006-09-17 15:55:23  ericn
+ * Revision 1.9  2006-09-23 15:30:01  ericn
+ * -Use multiSignal module
+ *
+ * Revision 1.8  2006/09/17 15:55:23  ericn
  * -no log by default
  *
  * Revision 1.7  2006/09/10 01:15:19  ericn
@@ -34,6 +37,7 @@
 #include "rtSignal.h"
 //#define LOGTRACES
 #include "logTraces.h"
+#include "multiSignal.h"
 
 static traceSource_t traceVsync( "vsync" );
 static traceSource_t traceCmdList( "cmdList" );
@@ -252,28 +256,20 @@ void odometerSet_t::sigVsync(void){
    --sigDepth ;
 }
 
-static void cmdListHandler( int signo, siginfo_t *info, void *context )
+static void cmdListHandler( int signo, void *param )
 {
-   if( inst_ )
-      inst_->sigCmdList();
+   odometerSet_t *odoms = (odometerSet_t *)param ;
+   if( odoms )
+      odoms->sigCmdList();
    TRACEDECR( traceCmdList );
 }
 
-static void sigioHandler( int signo, siginfo_t *info, void *context )
-{
-   printf( "sigio handler:\n"
-           "    signum %d/%d\n"
-           "    fd %d\n",
-           info->si_signo, signo, info->si_fd );
-   if( inst_ )
-      inst_->sigio();
-}
-
-static void vsyncHandler( int signo, siginfo_t *info, void *context )
+static void vsyncHandler( int signo, void *param )
 {
    TRACE_T( traceVsync, trace );
-   if( inst_ )
-      inst_->sigVsync();
+   odometerSet_t *odoms = (odometerSet_t *)param ;
+   if( odoms )
+      odoms->sigVsync();
 }
 
 void odometerSet_t::stop( void )
@@ -320,32 +316,25 @@ odometerSet_t::odometerSet_t( void )
 {
    if( isOpen() )
    {
+      printf( "signals: cmdList(%d), vsync(%d)\n", cmdListSignal_, vsyncSignal_ );
       getFB().syncCount( prevSync_ );
 
       stop();
    
-      struct sigaction sa ;
-      sa.sa_flags = SA_SIGINFO|SA_RESTART ;
-      sa.sa_restorer = 0 ;
-      sigemptyset( &sa.sa_mask );
-   
       fcntl(fdCmd_, F_SETOWN, pid_ );
       fcntl(fdCmd_, F_SETSIG, cmdListSignal_ );
-      sa.sa_sigaction = cmdListHandler ;
-      sigaddset( &sa.sa_mask, cmdListSignal_ );
-      sigaddset( &sa.sa_mask, vsyncSignal_ );
-      sigaction(cmdListSignal_, &sa, 0 );
+      
+      sigset_t blockThese ;
+      sigaddset( &blockThese, cmdListSignal_ );
+      sigaddset( &blockThese, vsyncSignal_ );
+
+      setSignalHandler( cmdListSignal_, blockThese, cmdListHandler, this );
    
       fcntl(fdSync_, F_SETOWN, pid_);
       fcntl(fdSync_, F_SETSIG, vsyncSignal_ );
-      sa.sa_sigaction = vsyncHandler ;
-      sigaddset( &sa.sa_mask, cmdListSignal_ );
-      sigaddset( &sa.sa_mask, vsyncSignal_ );
-      sigaction(vsyncSignal_, &sa, 0 );
-   
-      sa.sa_sigaction = sigioHandler ;
-      sigaction(SIGIO, &sa, 0 );
-   
+      
+      setSignalHandler( vsyncSignal_, blockThese, vsyncHandler, this );
+
       int flags = fcntl( fdCmd_, F_GETFL, 0 );
       fcntl( fdCmd_, F_SETFL, flags | O_NONBLOCK | FASYNC );
       flags = fcntl( fdSync_, F_GETFL, 0 );
