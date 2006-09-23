@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.44  2006-08-31 15:51:13  ericn
+ * Revision 1.45  2006-09-23 22:17:16  ericn
+ * -add interject() method
+ *
+ * Revision 1.44  2006/08/31 15:51:13  ericn
  * -remove unused code
  *
  * Revision 1.43  2006/08/16 21:10:52  ericn
@@ -1520,6 +1523,24 @@ bool audioQueue_t :: queueMPEG
    return queue_.push( item );
 }
    
+bool audioQueue_t :: interject
+   ( waveHeader_t const  &data )
+{
+   int dspFd = openWriteFd();
+   int const param = (int)&data ;
+   printf( "interject: %u channels, %u Hz, %u samples\n",
+           data.numChannels_,
+           data.sampleRate_,
+           data.numSamples_ );
+   if( 0 == ioctl( dspFd, SNDCTL_DSP_INTERJECT, param))
+      printf( "interjected\n" );
+   else 
+      perror( "SNDCTL_DSP_INTERJECT" );
+   closeWriteFd();
+
+   return true ;
+}
+
 bool audioQueue_t :: queuePlayback
    ( JSObject            *obj,
      waveHeader_t const  &data,

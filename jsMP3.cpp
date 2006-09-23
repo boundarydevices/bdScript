@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.25  2006-05-14 14:45:13  ericn
+ * Revision 1.26  2006-09-23 22:17:16  ericn
+ * -add interject() method
+ *
+ * Revision 1.25  2006/05/14 14:45:13  ericn
  * -allow predecoded MP3, add timing routines
  *
  * Revision 1.24  2005/11/06 00:49:34  ericn
@@ -164,8 +167,47 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsMP3Interject( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   jsval                dataVal ;
+   JSString            *dataStr ;
+   unsigned char const *data ;
+   if( JS_GetProperty( cx, obj, "decoded", &dataVal ) 
+       &&
+       JSVAL_IS_STRING( dataVal ) 
+       &&
+       ( 0 != ( dataStr = JSVAL_TO_STRING( dataVal ) ) ) 
+       &&
+       ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
+   {
+      audioQueue_t::waveHeader_t *waveHdr = (audioQueue_t::waveHeader_t *)data ;
+      unsigned decodedBytes = waveHdr->numSamples_*sizeof(waveHdr->samples_[0]);
+      unsigned waveSize = decodedBytes+sizeof(audioQueue_t::waveHeader_t)-sizeof(waveHdr->samples_);
+      if( waveSize == JS_GetStringLength(dataStr) ){
+         if( getAudioQueue().interject( *waveHdr ) )
+         {
+            JS_ReportError( cx, "played sound effect" );
+         }
+         else
+         {
+            JS_ReportError( cx, "Error queueing MP3 for playback" );
+         }
+      }
+      else
+         JS_ReportError( cx, "Invalid data size: expecting %u, got %u\n",
+                         waveSize, JS_GetStringLength(dataStr) );
+   }
+   else
+      JS_ReportError( cx, "Invalid MP3 data (must be pre-decoded)" );
+
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec mp3Methods_[] = {
     {"play",         jsMP3Play,           0 },
+    {"interject",    jsMP3Interject,      0 },
     {0}
 };
 
@@ -230,9 +272,9 @@ static void mp3OnComplete( jsCurlRequest_t &req, void const *data, unsigned long
                            sampleRate, numChannels ) )
          {
             audioQueue_t::waveHeader_t *waveHdr ;
-            
+
             unsigned waveSize = decodedBytes+sizeof(audioQueue_t::waveHeader_t)-sizeof(waveHdr->samples_);
-            
+
             void *waveData = JS_malloc( req.cx_, waveSize );
             waveHdr = (audioQueue_t::waveHeader_t *)waveData ;
             waveHdr->numChannels_ = numChannels ;
