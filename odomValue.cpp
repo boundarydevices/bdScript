@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomValue.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-09-23 15:27:06  ericn
+ * -cleanup debug stuff
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -23,14 +26,6 @@
 
 static unsigned const maxDigits_ = 8 ;
 
-
-static void doSleep( unsigned seconds )
-{
-   long long const start = tickMs();
-   while( seconds > (tickMs()-start)/1000 ){
-      sleep(1);
-   }
-}
 
 odomValue_t::odomValue_t
    ( fbCommandList_t      &cmdList,
@@ -177,12 +172,9 @@ void odomValue_t::set( unsigned pennies )
 
    for( ; d < maxDigits_ ; d++ )
    {
-//printf( "hide digit %u\n", d ); doSleep(2);
       odomDigit_t *dig = digits_[maxDigits_-1-d];
       dig->hide();
    }
-   
-//printf( "drawing dollar\n" ); doSleep(5);
    
    dollarRect_.xLeft_ = digits_[maxDigits_-sigDigits_]->getX() - graphics_.dollarSign_.width();
    if( graphicsLayer == mode_ ) {
@@ -196,9 +188,6 @@ void odomValue_t::set( unsigned pennies )
                        graphics_.dollarSign_.width(),
                        graphics_.dollarSign_.height() );
    } // alpha layer
-
-//printf( "done setting value\n" ); doSleep(5);
-
 }
 
 // advance by specified number of pixels
