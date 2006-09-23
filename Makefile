@@ -496,6 +496,11 @@ rtsCTS: rtsCTS.cpp
 	arm-linux-nm rtsCTS >rtsCTS.map
 	$(STRIP) rtsCTS
 
+setBaud: setBaud.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o setBaud setBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm setBaud >setBaud.map
+	$(STRIP) setBaud
+
 sm501flip: sm501flip.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501flip sm501flip.cpp -lstdc++ 
 	arm-linux-nm sm501flip >sm501flip.map
