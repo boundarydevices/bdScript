@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.16 2006-05-14 14:42:48 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.17 2006-09-23 22:16:55 ericn Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.16  2006-05-14 14:42:48  ericn
+ * Revision 1.17  2006-09-23 22:16:55  ericn
+ * -match effect_t in include/linux/soundcard.h for raw data
+ *
+ * Revision 1.16  2006/05/14 14:42:48  ericn
  * -expose fd routines, timestamp variables
  *
  * Revision 1.15  2005/11/06 20:26:23  ericn
@@ -115,10 +118,12 @@ public:
    //
    // wave file data is prepended with this
    //
+   // --- structure must match effect_t in pxa-audio.c
+   //
    struct waveHeader_t {
-      unsigned char  numChannels_ ;
-      unsigned short sampleRate_ ;
-      unsigned long  numSamples_ ;
+      unsigned       numChannels_ ;
+      unsigned       numSamples_ ;
+      unsigned       sampleRate_ ;
       unsigned short samples_[1];
    };
 
@@ -159,6 +164,11 @@ public:
                        waveHeader_t const  &data,
                        jsval                onComplete = JSVAL_VOID,
                        jsval                onCancel = JSVAL_VOID );
+
+   //
+   // Interject a sound-effect
+   //
+   bool interject( waveHeader_t const &data );
 
    //
    // queue a record buffer
