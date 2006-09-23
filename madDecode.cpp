@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.9  2006-09-05 02:16:32  ericn
+ * Revision 1.10  2006-09-23 19:33:22  ericn
+ * -add output to standalone prog
+ *
+ * Revision 1.9  2006/09/05 02:16:32  ericn
  * -don't spin on errors
  *
  * Revision 1.8  2006/09/04 14:33:29  ericn
@@ -328,11 +331,12 @@ bool madDecodeAll( void const      *mp3Data,             // input
 
 int main( int argc, char const * const argv[] )
 {
-   if( 2 == argc )
+   if( 2 <= argc )
    {
       memFile_t fIn( argv[1] );
       if( fIn.worked() )
       {
+         FILE *fOut = ( 2 < argc ) ? fopen( argv[2], "wb" ) : 0 ;
          madDecoder_t decoder ;
          decoder.feed( fIn.getData(), fIn.getLength() );
          do {
@@ -341,18 +345,25 @@ int main( int argc, char const * const argv[] )
             unsigned numRead ;
             while( decoder.readSamples( samples, maxSamples, numRead ) ){
                printf( "%s: %u samples\n", decoder.timerString(), numRead );
+               if( fOut )
+                  fwrite( samples, 2, numRead, fOut );
             }
             if( !decoder.getData() )
                break;
             else
                printf( "more data\n" );
          } while( 1 );
+
+         if( fOut ){
+            fclose( fOut );
+            printf( "wrote file <%s>\n", argv[2] );
+         }
       }
       else
          perror( argv[1] );
    }
    else
-      fprintf( stderr, "Usage : madDecode fileName\n" );
+      fprintf( stderr, "Usage : madDecode fileName [outFile]\n" );
 
    return 0 ;
 }
@@ -469,7 +480,6 @@ void handler(int sig)
 
    exit( 1 );
 }
-
 
 
 int main( int argc, char const * const argv[] )
