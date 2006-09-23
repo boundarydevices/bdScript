@@ -94,6 +94,7 @@ OBJS = \
        md5.o \
        memFile.o \
        mpegStream.o \
+       multiSignal.o \
        openFds.o \
        palette.o \
        parsedFlash.o \
@@ -465,6 +466,10 @@ sm501alpha: sm501alpha.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o sm501alpha sm501alpha.cpp $(LIBS) -lCurlCache -lstdc++ 
 	arm-linux-nm sm501alpha >sm501alpha.map
 	$(STRIP) sm501alpha
+
+multiSignal: multiSignal.cpp $(LIB) 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o multiSignal multiSignal.cpp $(LIBS) -lCurlCache -lpthread -lstdc++ 
+	arm-linux-nm multiSignal >multiSignal.map
 
 videoSet: videoSet.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o videoSet videoSet.cpp $(LIBS) -lCurlCache -lstdc++ 
