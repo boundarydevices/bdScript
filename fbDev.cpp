@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.32  2006-08-16 14:49:25  ericn
+ * Revision 1.33  2006-09-24 16:20:27  ericn
+ * -add render with transparent color
+ *
+ * Revision 1.32  2006/08/16 14:49:25  ericn
  * -no double-buffering
  *
  * Revision 1.31  2006/06/14 13:51:20  ericn
@@ -893,6 +896,42 @@ debugPrint( "!!!!!!!!!!!! ignoring transparency !!!!!!!!!!!\n" );
    }
    else
       render( xPos, yPos, w, h, pixels );
+}
+
+void fbDevice_t :: render( 
+   unsigned short xPos, unsigned short yPos,
+   unsigned short w, unsigned short h,
+   unsigned short const *pixels,
+   unsigned short transparentColor,
+   unsigned short bgColor )
+{
+   int const left = xPos ;
+   for( unsigned y = 0 ; y < h ; y++, yPos++ )
+   {
+      if( yPos < getHeight() )
+      {
+         // 16-bit color
+         unsigned short *pix = getRow( yPos ) + left ;
+         xPos = left ;
+         for( unsigned x = 0 ; x < w ; x++, xPos++ )
+         {
+            if( xPos < getWidth() )
+            {
+               unsigned short const foreColor = pixels[y*w+x];
+               if( foreColor != transparentColor ){
+                  *pix = foreColor ;                     
+               }
+               else
+                  *pix = bgColor ;
+               pix++ ;
+            }
+            else
+               break; // only going further off the screen
+         }
+      }
+      else
+         break; // only going further off the screen
+   }
 }
 
 void fbDevice_t :: render

@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.23 2006-08-16 14:49:22 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.24 2006-09-24 16:20:24 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.23  2006-08-16 14:49:22  ericn
+ * Revision 1.24  2006-09-24 16:20:24  ericn
+ * -add render with transparent color
+ *
+ * Revision 1.23  2006/08/16 14:49:22  ericn
  * -no double-buffering
  *
  * Revision 1.22  2006/06/14 13:51:17  ericn
@@ -178,6 +181,11 @@ public:
                 unsigned short w, unsigned short h,
                 unsigned short const *pixels,
                 unsigned char const  *alpha );
+   void render( unsigned short x, unsigned short y,
+                unsigned short w, unsigned short h,
+                unsigned short const *pixels,
+                unsigned short transparentColor,
+                unsigned short bgColor );
    static void render( unsigned short x, unsigned short y,
                        unsigned short w, unsigned short h,
                        unsigned short const *pixels,
