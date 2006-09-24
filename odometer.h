@@ -1,5 +1,5 @@
 #ifndef __ODOMETER_H__
-#define __ODOMETER_H__ "$Id: odometer.h,v 1.3 2006-08-20 18:16:31 ericn Exp $"
+#define __ODOMETER_H__ "$Id: odometer.h,v 1.4 2006-09-24 16:26:13 ericn Exp $"
 
 /*
  * odometer.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: odometer.h,v $
- * Revision 1.3  2006-08-20 18:16:31  ericn
+ * Revision 1.4  2006-09-24 16:26:13  ericn
+ * -remove vsync propagation (use multiSignal instead)
+ *
+ * Revision 1.3  2006/08/20 18:16:31  ericn
  * -fix typo
  *
  * Revision 1.2  2006/08/16 02:31:56  ericn
@@ -93,9 +96,8 @@ public:
    void sigCmdList(void);
    void sigVsync(void);
 
-   typedef void (*vsyncHandler_t)( void * );
-
-   void setHandler( vsyncHandler_t, void *opaque );
+   inline int getVSyncSignal( void ) const { return vsyncSignal_ ; }
+   inline int getCmdListSignal( void ) const { return cmdListSignal_ ; }
 
    void dump( void );
 
@@ -113,8 +115,6 @@ private:
    unsigned long volatile  completionCount_ ;
    unsigned long           prevSync_ ;
    bool                    isRunning_ ;
-   vsyncHandler_t          handler_ ; 
-   void                    *handlerParam_ ;
 };
 
 

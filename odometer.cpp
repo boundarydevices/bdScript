@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.9  2006-09-23 15:30:01  ericn
+ * Revision 1.10  2006-09-24 16:26:15  ericn
+ * -remove vsync propagation (use multiSignal instead)
+ *
+ * Revision 1.9  2006/09/23 15:30:01  ericn
  * -Use multiSignal module
  *
  * Revision 1.8  2006/09/17 15:55:23  ericn
@@ -238,9 +241,6 @@ void odometerSet_t::sigVsync(void){
    if( ++sigDepth > maxSigDepth )
       maxSigDepth = sigDepth ;
 
-   if( handler_ )
-      handler_( handlerParam_ );
-   
    if( !stopping_ 
        && 
        ( 0 < cmdListBytes_ ) 
@@ -311,8 +311,6 @@ odometerSet_t::odometerSet_t( void )
    , issueCount_( 0 )
    , completionCount_( 0 )
    , isRunning_(false)
-   , handler_( 0 )
-   , handlerParam_( 0 )
 {
    if( isOpen() )
    {
@@ -340,12 +338,6 @@ odometerSet_t::odometerSet_t( void )
       flags = fcntl( fdSync_, F_GETFL, 0 );
       fcntl( fdSync_, F_SETFL, flags | O_NONBLOCK | FASYNC );
    }
-}
-
-void odometerSet_t::setHandler( vsyncHandler_t handler, void *opaque )
-{
-   handlerParam_ = opaque ;
-   handler_ = handler ;
 }
 
 void odometerSet_t::dump( void )
