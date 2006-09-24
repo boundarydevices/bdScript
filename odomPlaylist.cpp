@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.9  2006-09-05 02:17:50  ericn
+ * Revision 1.10  2006-09-24 16:26:34  ericn
+ * -remove vsync propagation from odometerSet_t (use multiSignal instead)
+ *
+ * Revision 1.9  2006/09/05 02:17:50  ericn
  * -fix doOutput()/doAudio() bug
  *
  * Revision 1.8  2006/09/04 16:43:20  ericn
@@ -58,16 +61,20 @@
 #include <linux/soundcard.h>
 #include "rtSignal.h"
 #include <signal.h>
+#include "multiSignal.h"
 
 #define PLAYLISTMASK (odomPlaylist_t::MAXENTRIES-1)
 
 static int const dspSignal_ = nextRtSignal();
 
-static void playlist_vsync( void *param ){
-   ((odomPlaylist_t *)param)->vsyncHandler();
-}
-
 odomPlaylist_t *lastPlaylistInst_ = 0 ;
+
+static void playlistVSync( int signo, void *param )
+{
+   odomPlaylist_t *playlist = (odomPlaylist_t *)param ;
+   if( playlist )
+      playlist->vsyncHandler();
+}
 
 odomPlaylist_t::odomPlaylist_t( void )
    : playing_( 0 )
@@ -86,7 +93,14 @@ odomPlaylist_t::odomPlaylist_t( void )
 {
    current_.type_ = PLAYLIST_NONE ;
    current_.repeat_ = false ;
-   odometerSet_t::get().setHandler( playlist_vsync, this );
+
+   sigset_t mask ;
+   sigemptyset( &mask );
+   sigaddset( &mask, odometerSet_t::get().getVSyncSignal() );
+   sigaddset( &mask, odometerSet_t::get().getCmdListSignal() );
+
+   setSignalHandler( odometerSet_t::get().getVSyncSignal(),
+                     mask, playlistVSync, this );
 
    lastPlaylistInst_ = this ;
 }
