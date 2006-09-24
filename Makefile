@@ -780,6 +780,18 @@ imgFile: $(IMGFILEOBJS) Makefile
       $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
 	$(STRIP) $@
 
+anigifMain.o: imgGIF.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+IMGFILEOBJS = anigifMain.o image.o memFile.o fbDev.o imgJPEG.o imgPNG.o
+aniGIF: $(IMGFILEOBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker aniGIF.map \
+      $(IMGFILEOBJS) \
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
 imgTransparentMain.o: imgTransparent.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DMODULETEST=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
