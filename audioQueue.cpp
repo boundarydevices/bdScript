@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.45  2006-09-23 22:17:16  ericn
+ * Revision 1.46  2006-09-25 16:11:27  ericn
+ * -get rid of compiler warnings
+ *
+ * Revision 1.45  2006/09/23 22:17:16  ericn
  * -add interject() method
  *
  * Revision 1.44  2006/08/31 15:51:13  ericn
@@ -968,7 +971,7 @@ wrote += numWritten ;
                spaceLeft = OUTBUFSIZE ;
                nextOut = outBuffer ;
 
-               if( header.sampleRate_ != lastSampleRate )
+               if( header.sampleRate_ != (unsigned)lastSampleRate )
                {
                   lastSampleRate = header.sampleRate_ ;
                   if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
@@ -1061,7 +1064,7 @@ wrote += numWritten ;
             {
                audioQueue_t :: waveHeader_t *header = ( audioQueue_t :: waveHeader_t * )item->data_ ;
                _recording = true ;
-               if( header->sampleRate_ != lastRecordRate )
+               if( header->sampleRate_ != (unsigned)lastRecordRate )
                {
                   lastRecordRate = header->sampleRate_ ;
                   if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
