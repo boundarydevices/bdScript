@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.12  2006-09-25 18:50:34  ericn
+ * Revision 1.13  2006-09-25 19:19:50  ericn
+ * -remove debug msg
+ *
+ * Revision 1.12  2006/09/25 18:50:34  ericn
  * -add serial (MicroTouch EX II) touch support
  *
  * Revision 1.11  2006/05/14 14:32:42  ericn
@@ -379,7 +382,7 @@ debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
                wasDown = true ;
             }
             else
-               printf( "Not enough samples\n" );
+               debugPrint( "Not enough samples\n" );
          }
          else {
             onRelease( event.stamp );
