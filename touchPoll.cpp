@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.11  2006-05-14 14:32:42  ericn
+ * Revision 1.12  2006-09-25 18:50:34  ericn
+ * -add serial (MicroTouch EX II) touch support
+ *
+ * Revision 1.11  2006/05/14 14:32:42  ericn
  * -use first timestamp, not last
  *
  * Revision 1.10  2005/11/23 13:08:20  ericn
@@ -51,12 +54,16 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-
+#include <string.h>
+#include <ctype.h>
+#include "setSerial.h"
+#include "pollTimer.h"
 
 // #define DEBUGPRINT
 #include "debugPrint.h"
 #include "rollingMedian.h"
 #include "rollingMean.h"
+#include "tickMs.h"
 
 #define MEDIANRANGE 5
 static rollingMedian_t medianX_( MEDIANRANGE );
@@ -84,18 +91,104 @@ static char const *getTouchDev( char const *devName )
    return devName ;
 }
 
+static bool isSerial( char const *devName ){
+   return 0 != strstr( devName, "ttyS" );
+}
+
+static int openTouchDev( char const *devName ){
+   int fd = -1 ;
+   if( !isSerial(devName) ){
+      fd = open(devName, O_RDONLY);
+   }
+   else {
+      printf( "Serial touch screen\n" );
+      char const *end = strchr( devName, ',' );
+      if( 0 == end )
+         end = devName + strlen(devName);
+      unsigned nameLen = end-devName ;
+      printf( "nameLen: %u, end %p\n", nameLen, end );
+      char deviceName[512];
+      if( nameLen < sizeof(deviceName) ){
+         memcpy( deviceName, devName, nameLen );
+         deviceName[nameLen] = '\0' ;
+         unsigned baud = 9600 ;
+         unsigned databits = 8 ;
+         char parity = 'N' ;
+         unsigned stop = 1 ;
+         if( '\0' != *end ){
+            end++ ;
+            baud = 0 ; 
+            while( isdigit(*end) ){
+               baud *= 10 ;
+               baud += ( *end-'0' );
+               end++ ;
+            }
+
+            if( ',' == *end ){
+               end++ ;
+               databits = *end-'0' ;
+               end++ ;
+               if( ',' == *end ){
+                  end++ ;
+                  parity = *end++ ;
+                  if( ',' == *end ){
+                     stop = end[1] - '0';
+                  }
+               }
+            }
+         }
+         fd = open( deviceName, O_RDWR );
+         if( 0 < fd ){
+            printf( "settings: %s,%u,%u,%c,%u\n", deviceName, baud, databits, parity, stop );
+            setBaud( fd, baud );
+            setRaw( fd );
+            setDataBits( fd, databits );
+            setStopBits( fd, stop );
+            setParity( fd, parity );
+         }
+         else
+            perror( deviceName );
+      }
+      else
+         fprintf( stderr, "Invalid touch device name\n" );
+   }
+
+   return fd ;
+}
+
+class touchPollTimer_t : public pollTimer_t {
+public:
+   touchPollTimer_t( touchPoll_t &bcp )
+      : touch_( bcp ){}
+
+   virtual void fire( void ){ touch_.timeout(); }
+
+private:
+   touchPoll_t &touch_ ;
+};
+
 touchPoll_t :: touchPoll_t
    ( pollHandlerSet_t &set,
      char const       *devName )
-   : pollHandler_t( open( getTouchDev(devName), O_RDONLY ), set )
+   : pollHandler_t( openTouchDev( getTouchDev(devName) ), set )
+   , timer_( 0 )
+   , isSerial_( isSerial(getTouchDev(devName)) )
+   , state_( findStart )
+   , iVal_( 0 )
+   , jVal_( 0 )
+   , nextTrace_( 0 )
+   , lastRead_( 0 )
+   , lastChar_( 0 )
 {
-debugPrint( "touchPoll constructed, dev = %s, fd == %d\n", devName, getFd() );   
+debugPrint( "touchPoll constructed, dev = %s, fd == %d\n", getTouchDev(devName), getFd() );   
    if( isOpen() )
    {
       fcntl( fd_, F_SETFD, FD_CLOEXEC );
       fcntl( fd_, F_SETFL, O_NONBLOCK );
       setMask( POLLIN );
       set.add( *this );
+      if( isSerial_ )
+         timer_ = new touchPollTimer_t( *this );
    }
 }
 
@@ -110,6 +203,10 @@ touchPoll_t :: ~touchPoll_t( void )
          ; // purge queue
       close();
    }
+
+   if( timer_ ){
+      delete timer_ ;
+   }
 }
 
 void touchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
@@ -122,91 +219,233 @@ void touchPoll_t :: onRelease( timeval const &tv )
    printf( "touch screen release\n" );
 }
 
+static char const * const stateNames_[] = {
+   "findStart",
+   "byte0",
+   "byte1",
+   "byte2",
+   "byte3"
+};
+
 static bool wasDown = false ;
 
 void touchPoll_t :: onDataAvail( void )
 {
-   ts_event nextEvent ;
-   ts_event event ;
-   unsigned count = 0 ;
-   int numRead ;
-
-   timeval firstTime ;
+   debugPrint( "onDataAvail() %s\n", isSerial_ ? "serial" : "ucb1x00" );
+   if( !isSerial_ ){
+      ts_event nextEvent ;
+      ts_event event ;
+      unsigned count = 0 ;
+      int numRead ;
    
-   while( sizeof( nextEvent ) == ( numRead = read( fd_, &nextEvent, sizeof( nextEvent ) ) ) )
-   {
-      if( 0 == count )
-         firstTime = nextEvent.stamp ;
+      timeval firstTime ;
 
-      medianX_.feed( nextEvent.x );
-      medianY_.feed( nextEvent.y );
-
+      while( sizeof( nextEvent ) == ( numRead = read( fd_, &nextEvent, sizeof( nextEvent ) ) ) )
+      {
+         if( 0 == count )
+            firstTime = nextEvent.stamp ;
+   
+         medianX_.feed( nextEvent.x );
+         medianY_.feed( nextEvent.y );
+   
 debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
 #ifdef XDEBUGPRINT
       printf( "medianX: " ); medianX_.dump();
       printf( "medianY: " ); medianY_.dump();
 #endif
-
-      unsigned short sampleX ;
-      if( medianX_.read( sampleX ) )
-         meanX_.feed( sampleX );
-      unsigned short sampleY ;
-      if( medianY_.read( sampleY ) )
-         meanY_.feed( sampleY );
-      event = nextEvent ;
-      count++ ;
-   }
    
-   if( 0 < count )
-   {
-      if( 0 < event.pressure )
+         unsigned short sampleX ;
+         if( medianX_.read( sampleX ) )
+            meanX_.feed( sampleX );
+         unsigned short sampleY ;
+         if( medianY_.read( sampleY ) )
+            meanY_.feed( sampleY );
+         event = nextEvent ;
+         count++ ;
+      }
+      
+      if( 0 < count )
       {
-         unsigned short x, y ;
-//         x = event.x ; y = event.y ; if( 1 )
-//         if( medianX_.read( x ) && medianY_.read( y ) )
-         if( meanX_.read( x ) && meanY_.read( y ) )
+         if( 0 < event.pressure )
          {
-debugPrint( "out: %u/%u\n", x, y );
-            onTouch( x, y, event.pressure, firstTime );
-            if( !wasDown )
+            unsigned short x, y ;
+   //         x = event.x ; y = event.y ; if( 1 )
+   //         if( medianX_.read( x ) && medianY_.read( y ) )
+            if( meanX_.read( x ) && meanY_.read( y ) )
             {
-debugPrint( "first touch at %u:%u\n", x, y );
-               wasDown = true ;
+   debugPrint( "out: %u/%u\n", x, y );
+               onTouch( x, y, event.pressure, firstTime );
+               if( !wasDown )
+               {
+   debugPrint( "first touch at %u:%u\n", x, y );
+                  wasDown = true ;
+               }
+            }
+            else
+            {
+   debugPrint( "not enough values\n" );
             }
          }
          else
          {
-debugPrint( "not enough values\n" );
+            if( wasDown )
+            {
+               onRelease( firstTime );
+               wasDown = false ;
+            }
+            else
+            {
+   debugPrint( "missed touch\n" );
+            }
+            medianX_.reset(); medianY_.reset();
+            meanX_.reset(); meanY_.reset();
          }
-      }
-      else
-      {
-         if( wasDown )
-         {
-            onRelease( firstTime );
-            wasDown = false ;
-         }
-         else
-         {
-debugPrint( "missed touch\n" );
-         }
-         medianX_.reset(); medianY_.reset();
-         meanX_.reset(); meanY_.reset();
       }
    }
+   else {
+      if( timer_ )
+         timer_->clear();
+
+      ts_event event ;
+      char     inBuf[512];
+      int      numRead ;
+      unsigned count = 0 ;
+
+      unsigned short *values[] = {
+         &iVal_,
+         &jVal_
+      };
+
+      while( 0 < ( numRead = read( fd_, &inBuf, sizeof( inBuf ) ) ) ){
+         debugPrint( "read %u bytes\n", numRead );
+         lastRead_ = nextTrace_ ;
+         for( int i = 0 ; i < numRead ; i++ ){
+            char const c = inBuf[i];
+
+            debugPrint( "char[%u] %02x, state %s\n", i, c, stateNames_[state_] );
+
+            lastChar_ = c ;
+            unsigned t = nextTrace_ & (sizeof(inTrace_)-1);
+            nextTrace_++ ;
+            inTrace_[t] = c ;
+
+            switch( state_ ){
+               case findStart: {
+                  if( c & 0x80 ){
+                     state_++ ;
+                     iVal_ = jVal_ = 0 ;
+                     press_ = ( 0 != ( c & 0x40 ) );
+                     debugPrint( "%s\r\n", press_ ? "press" : "release" );
+                  }
+                  else
+                     debugPrint( "Non-leading <%02x>\n", c );
+                  break ;
+               }
+
+               default: {
+                  if( 0 != ( c & 0x80 ) ){
+                     state_ = findStart ;
+                     --i ;
+                  }
+                  else {
+                     unsigned offs = state_-byte0 ;
+                     unsigned short &val = *values[offs>>1];
+                     if( 0 == ( offs & 1 ) )
+                        val = c & 0x7f ;
+                     else
+                        val += (c<<7);
+                     state_++ ;
+                     if( byte3 < state_ ){
+                        state_ = findStart ;
+                        event.x = iVal_ ;
+                        event.y = jVal_ ;
+                        event.pressure = press_ ;
+                        medianX_.feed( event.x );
+                        medianY_.feed( event.y );
+                     }
+                     count++ ;
+                  }
+               }
+            }
+         }
+      } // while more input data
+      
+      if( count ){
+         debugPrint( "%s %04x:%04x\r\n", event.pressure ? "press" : "release", iVal_, jVal_ );
+         gettimeofday( &event.stamp, 0 );
+         if( event.pressure ){
+            if( medianX_.read( event.x ) && medianY_.read( event.y ) ){
+               onTouch( event.x, event.y, 1, event.stamp );
+               wasDown = true ;
+            }
+            else
+               printf( "Not enough samples\n" );
+         }
+         else {
+            onRelease( event.stamp );
+            medianX_.reset(); medianY_.reset();
+            wasDown = false ;
+         }
+      }
+      if( wasDown && ( 0 != timer_ ) )
+         timer_->set( 100 );
+   }
+}
+
+void touchPoll_t :: timeout( void )
+{
+   printf( "touch timeout\n" );
+   if( wasDown ){
+      struct timeval stamp ;
+      gettimeofday( &stamp, 0 );
+      onRelease( stamp );
+      medianX_.reset(); medianY_.reset();
+      wasDown = false ;
+   }
+}
+
+void touchPoll_t :: dump( void )
+{
+   unsigned t = 0 ;
+   unsigned count = sizeof( inTrace_ );
+   if( nextTrace_ >= sizeof(inTrace_) ){
+      t = nextTrace_ & (sizeof(inTrace_)-1);
+   }
+   else
+      count = nextTrace_ ;
+
+   printf( "--> %u chars traced, %u read\n", count, nextTrace_ );
+   printf( "    last read %u, char <%02x>\n", lastRead_, lastChar_ );
+   printf( "    state %s, press %u\n", stateNames_[state_], press_ );
+   printf( "    iVal %04x\n", iVal_ );
+   printf( "    jVal %04x\n", jVal_ );
+   unsigned pos = 0 ;
+   while( count-- ){
+      printf( "%02x ", inTrace_[t] );
+      if( 16 == ++pos ){
+         pos = 0 ;
+         printf( "\n" );
+      }
+      t = ( t + 1 ) & (sizeof(inTrace_)-1);
+   }
+   printf( "\n" );
 }
 
 #ifdef STANDALONE
 
 #include <unistd.h>
+#include "pollTimer.h"
 
 int main( void )
 {
    pollHandlerSet_t handlers ;
+
+   getTimerPoll(handlers);
+
    touchPoll_t      touchPoll( handlers );
    if( touchPoll.isOpen() )
    {
-      debugPrint( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
+      printf( "opened touchPoll: fd %d, mask %x\n", touchPoll.getFd(), touchPoll.getMask() );
 
       int iterations = 0 ;
       while( 1 )

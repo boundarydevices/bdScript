@@ -1,5 +1,5 @@
 #ifndef __TOUCHPOLL_H__
-#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.6 2006-08-07 16:47:23 tkisky Exp $"
+#define __TOUCHPOLL_H__ "$Id: touchPoll.h,v 1.7 2006-09-25 18:50:30 ericn Exp $"
 
 /*
  * touchPoll.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: touchPoll.h,v $
- * Revision 1.6  2006-08-07 16:47:23  tkisky
+ * Revision 1.7  2006-09-25 18:50:30  ericn
+ * -add serial (MicroTouch EX II) touch support
+ *
+ * Revision 1.6  2006/08/07 16:47:23  tkisky
  * -...
  *
  * Revision 1.5  2005/11/17 03:47:53  ericn
@@ -41,6 +44,8 @@ typedef unsigned long kernel_ulong_t;
 #include <linux/types.h>
 #include <linux/input.h>
 
+class touchPollTimer_t ;
+
 class touchPoll_t : public pollHandler_t {
 public:
    touchPoll_t( pollHandlerSet_t &set,
@@ -53,7 +58,32 @@ public:
    virtual void onRelease( timeval const &tv );
 
    virtual void onDataAvail( void );
+
+   void timeout( void );
+
+   void dump( void );
+
 protected:
+   touchPollTimer_t *timer_ ;
+
+   enum {
+      findStart,
+      byte0,
+      byte1,
+      byte2,
+      byte3
+   } state_t ;
+   
+   bool           isSerial_ ;
+   unsigned       state_ ;
+   bool           press_ ;
+   unsigned short iVal_ ;
+   unsigned short jVal_ ;
+
+   char           inTrace_[256];
+   unsigned       nextTrace_ ;
+   unsigned       lastRead_ ;
+   char           lastChar_ ;
 };
 
 #endif
