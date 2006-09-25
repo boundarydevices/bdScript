@@ -43,7 +43,12 @@ static void toggleRTS( int fdSerial )
       perror( "TIOCMGET" );
 }
 
-static void setRaw( int fd, int baud, struct termios &oldState )
+static void setRaw( int fd, 
+                    int baud, 
+                    int databits, 
+                    char parity, 
+                    unsigned stopBits,
+                    struct termios &oldState )
 {
    tcgetattr(fd,&oldState);
 
@@ -64,7 +69,27 @@ static void setRaw( int fd, int baud, struct termios &oldState )
    newState.c_cc[VTIME] = 0; // 1/10th's of a second, see http://www.opengroup.org/onlinepubs/007908799/xbd/termios.html
 
    newState.c_cflag &= ~(PARENB|CSTOPB|CSIZE|CRTSCTS);              // Mask character size to 8 bits, no parity, Disable hardware flow control
+
+   if( 'E' == parity )
+   {
+      newState.c_cflag |= PARENB ;
+      newState.c_cflag &= ~PARODD ;
+   }
+   else if( 'O' == parity )
+   {
+      newState.c_cflag |= PARENB | PARODD ;
+   }
+   else {
+   } // no parity... already set
+
    newState.c_cflag |= (CLOCAL | CREAD |CS8);                       // Select 8 data bits
+   if( 7 == databits ){
+      newState.c_cflag &= ~CS8 ;
+   }
+
+   if( 1 != stopBits )
+      newState.c_cflag |= CSTOPB ;
+
    newState.c_lflag &= ~(ICANON | ECHO );                           // set raw mode for input
    newState.c_iflag &= ~(IXON | IXOFF | IXANY|INLCR|ICRNL|IUCLC);   //no software flow control
    newState.c_oflag &= ~OPOST;                      //raw output
@@ -121,10 +146,19 @@ int main( int argc, char const * const argv[] )
          fcntl( fdSerial, F_SETFL, O_NONBLOCK );
 
 	 int baud = strtoul( argv[2], 0, 0 );
+         int databits = ( ( 3 < argc ) && ( 7 == strtoul( argv[3], 0, 0 ) ) )
+                        ? 7
+                        : 8 ;
+         char parity = ( 4 < argc )
+                       ? toupper( *argv[4] )
+                       : 'N' ;
+         unsigned stopBits = ( ( 5 < argc ) && ( '2' == *argv[5] ) )
+                           ? 2 
+                           : 1 ;
 
          printf( "device %s opened\n", deviceName );
          struct termios oldSerialState;
-         setRaw( fdSerial, baud, oldSerialState);
+         setRaw( fdSerial, baud, databits, parity, stopBits, oldSerialState);
 
          struct termios oldStdinState;
          
