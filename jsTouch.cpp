@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.25  2006-05-14 14:35:38  ericn
+ * Revision 1.26  2006-09-25 18:48:16  ericn
+ * -add dump() method
+ *
+ * Revision 1.25  2006/05/14 14:35:38  ericn
  * -add touchTime(), releaseTime() methods to measure latency
  *
  * Revision 1.24  2005/11/06 00:49:43  ericn
@@ -417,6 +420,21 @@ jsReleaseTime( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    return JS_TRUE ;
 }
 
+static JSBool
+jsDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   if( touchPoll_ ){
+      touchPoll_->dump();
+      *rval = JSVAL_TRUE ;
+   }
+   else {
+      *rval = JSVAL_FALSE ;
+      JS_ReportError( cx, "No touch screen object\n" );
+   }
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec touchMethods_[] = {
     {"getX",         jsGetTouchX,           0 },
     {"getY",         jsGetTouchY,           0 },
@@ -425,6 +443,7 @@ static JSFunctionSpec touchMethods_[] = {
     {"setCooked",    jsSetCooked,           0 },
     {"touchTime",    jsTouchTime,           0 },
     {"releaseTime",  jsReleaseTime,         0 },
+    {"dump",         jsDump,                0 },
     {0}
 };
 
