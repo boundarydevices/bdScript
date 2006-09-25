@@ -111,6 +111,7 @@ OBJS = \
        screenImage.o \
        semClasses.o \
        serialPoll.o \
+       setSerial.o \
        sniffWLAN.o \
        tcpPoll.o \
        trace.o \
@@ -500,6 +501,16 @@ setBaud: setBaud.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o setBaud setBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
 	arm-linux-nm setBaud >setBaud.map
 	$(STRIP) setBaud
+
+serialCounts: serialCounts.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o serialCounts serialCounts.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm serialCounts >serialCounts.map
+	$(STRIP) serialCounts
+
+serialTouch: serialTouch.cpp
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o serialTouch serialTouch.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm serialTouch >serialTouch.map
+	$(STRIP) serialTouch
 
 sm501flip: sm501flip.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501flip sm501flip.cpp -lstdc++ 
