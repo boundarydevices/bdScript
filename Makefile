@@ -175,7 +175,8 @@ SM501OBJS = fbCmdBlt.o \
             fbImage.o \
             fbMem.o \
             img4444.o \
-            sm501alpha.o
+            sm501alpha.o \
+            vsync.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))
@@ -257,7 +258,6 @@ ODOMOBJS = \
        odomTTY.o \
        odomValue.o \
        odomVideo.o \
-       odomVQ.o \
        odometer.o
 
 ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
@@ -344,16 +344,6 @@ odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomTTY odomTTYMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odomTTY | sort >odomTTY.map
-	cp $@ $@.prestrip
-	$(STRIP) $@
-
-odomVQMain.o: odomVQ.cpp odomVQ.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-odomVQ: odomVQMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
-	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomVQ odomVQMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle odomVQ | sort >odomVQ.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -762,7 +752,7 @@ hexDump: hexDump.cpp Makefile $(LIB)
 	$(STRIP) $@
 
 vsync: vsync.cpp Makefile $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -D__STANDALONE__ -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -DMODULETEST -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 rollingMedian: rollingMedian.cpp Makefile $(LIB)
