@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.26  2006-09-25 18:48:16  ericn
+ * Revision 1.27  2006-09-30 18:31:01  ericn
+ * -add getPin(), setPin() methods
+ *
+ * Revision 1.26  2006/09/25 18:48:16  ericn
  * -add dump() method
  *
  * Revision 1.25  2006/05/14 14:35:38  ericn
@@ -110,7 +113,9 @@
 #include "touchPoll.h"
 #include "debugPrint.h"
 #include "flashVar.h"
+#include "ucb1x00_pins.h"
 #include <math.h>
+#include "linux/ucb1x00-adc.h"
 
 class jsTouchPoll_t : public touchPoll_t {
 public:
@@ -435,6 +440,71 @@ jsDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsGetPin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   if( ( 1 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] ) )
+   {
+      unsigned pinNum = JSVAL_TO_INT(argv[0]);
+      if( ( pinNum >= NUMADCPINS ) &&
+          ( pinNum < NUMGPIOPINS ) ){
+         bool value ;
+         if( ucb1x00_get_pin( touchPoll_->getFd(), pinNum, value ) ){
+            if( value )
+               *rval = JSVAL_TRUE ;
+         }
+         else
+            JS_ReportError( cx, "Error reading pin %u\n", pinNum );
+      }
+      else
+         JS_ReportError( cx, "Invalid pin (range [%u..%u])\n", NUMADCPINS, NUMGPIOPINS-1 );
+   }
+   else
+      JS_ReportError( cx, "Usage: touchScreen.getPin( pinNum[%u..%u])\n", NUMADCPINS, NUMGPIOPINS-1 );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetPin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+
+   if( ( 2 == argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      unsigned pinNum = JSVAL_TO_INT(argv[0]);
+      if( ( pinNum >= NUMADCPINS ) &&
+          ( pinNum < NUMGPIOPINS ) ){
+         unsigned value = JSVAL_TO_INT(argv[1]);
+         if( (0 == value) || (1 == value) ){
+            if( ucb1x00_set_pin( touchPoll_->getFd(), pinNum, (1==value) ) ){
+               *rval = JSVAL_TRUE ;
+            }
+            else
+               JS_ReportError( cx, "Error reading pin %u\n", pinNum );
+         }
+         else
+            JS_ReportError( cx, "Invalid value: should be zero or one\n" );
+      }
+      else
+         JS_ReportError( cx, "Invalid pin (range [%u..%u])\n", NUMADCPINS, NUMGPIOPINS-1 );
+   }
+   else
+      JS_ReportError( cx, "Usage: touchScreen.setPin( pinNum[%u..%u], 0|1)\n", NUMADCPINS, NUMGPIOPINS-1 );
+
+
+   return JS_TRUE ;
+}
+
+
 static JSFunctionSpec touchMethods_[] = {
     {"getX",         jsGetTouchX,           0 },
     {"getY",         jsGetTouchY,           0 },
@@ -443,6 +513,8 @@ static JSFunctionSpec touchMethods_[] = {
     {"setCooked",    jsSetCooked,           0 },
     {"touchTime",    jsTouchTime,           0 },
     {"releaseTime",  jsReleaseTime,         0 },
+    {"getPin",       jsGetPin,              0 },
+    {"setPin",       jsSetPin,              0 },
     {"dump",         jsDump,                0 },
     {0}
 };
