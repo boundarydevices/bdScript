@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: serialPoll.cpp,v $
- * Revision 1.4  2005-11-06 00:49:51  ericn
+ * Revision 1.5  2006-09-30 01:08:31  ericn
+ * -make debug messages debugPrint()
+ *
+ * Revision 1.4  2005/11/06 00:49:51  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.3  2005/08/22 13:12:36  ericn
@@ -31,6 +34,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include "baudRate.h"
+#include "debugPrint.h"
 
 class serialPollTimer_t : public pollTimer_t {
 public:
@@ -165,7 +169,7 @@ bool serialPoll_t :: read( std::string &s )
 // general pollHandler input routine
 void serialPoll_t :: onDataAvail( void )
 {
-   fprintf( stderr, "data avail\n" );
+   debugPrint( "data avail\n" );
    unsigned const spaceAvail = sizeof( inData_ )-inLength_-1 ;
    int numRead = ::read( fd_, inData_+inLength_, spaceAvail );
    if( 0 <= numRead )
