@@ -116,6 +116,7 @@ OBJS = \
        tcpPoll.o \
        trace.o \
        ttyPoll.o \
+       ucb1x00_pins.o \
        udpPoll.o \
        ultoa.o \
        ultodd.o \
@@ -413,6 +414,14 @@ odomValueMain.o: odomValue.cpp odomValue.h
 odomValue: odomValueMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue odomValueMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
 	arm-linux-nm --demangle odomValue | sort >odomValue.map
+
+ucb1x00_pinsMain.o: ucb1x00_pins.cpp ucb1x00_pins.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+ucb1x00_pins: ucb1x00_pinsMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ucb1x00_pins ucb1x00_pinsMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
+	arm-linux-nm --demangle ucb1x00_pins | sort >ucb1x00_pins.map
+
 
 sm501mem: sm501mem.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o sm501mem sm501mem.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
