@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.88  2006-08-16 21:11:10  ericn
+ * Revision 1.89  2006-10-05 14:40:51  ericn
+ * -add detach flag to cmd line
+ *
+ * Revision 1.88  2006/08/16 21:11:10  ericn
  * -allow GPIO support
  *
  * Revision 1.87  2006/05/14 14:42:19  ericn
@@ -349,6 +352,7 @@
 #include "jsSerial.h"
 #include "jsFlashVar.h"
 #include "jsMD5.h"
+#include <fcntl.h>
 
 #include "touchPoll.h"
 
@@ -586,7 +590,7 @@ static namedConstant_t constants_[] = {
  * a context, and a global object, then initializes the JS run time,
  * and creates a context. */
 
-int prMain(int argc, char **argv)
+int prMain(int argc, char **argv, bool )
 {
    // initialize the JS run time, and return result in rt
    JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
@@ -929,11 +933,39 @@ int main( int argc, char *argv[] )
             fprintf( stderr, "Error resolving exe:%m\n" );
          }
       } // limit scope of temporaries
-   
+
+      char **nativeArgs = new char *[argc+1];
+      memset( nativeArgs, 0, (argc+1)*sizeof(nativeArgs[0]) );
+      bool detach = false ;
+      int numArgs = 0 ;
+
+      { // limit scope
+         for( int arg = 0 ; arg < argc ; arg++ ){
+            if( 0 == strcasecmp( "-d", argv[arg] ) ){
+               detach = true ;
+            }
+            else
+               nativeArgs[numArgs++] = argv[arg];
+         }
+      }
+
+      if( detach ){
+         printf( "detach from console\n" );
+         for( int i = 0 ; i < 3 ; i++ )
+            close( i );
+         int fdNull = open( "/dev/null", O_RDWR );
+         if( 0 <= fdNull ){
+            for( int i = 0 ; i < 3 ; i++ )
+               dup(fdNull);
+         }
+         else
+            perror( "/dev/null" );
+      }
+
       do
       {
          // int result = 
-         prMain( argc, argv );
+         prMain( numArgs, nativeArgs, detach );
          if( gotoCalled_ )
          {
             argv[1] = (char *)gotoURL_.c_str();
@@ -951,7 +983,9 @@ int main( int argc, char *argv[] )
       } while( 1 );
    }
    else
-      fprintf( stderr, "Usage : jsExec url\n" );
+      fprintf( stderr, 
+               "Usage : jsExec [-d] url\n" 
+               "-d      detach from stdin/stdout/stderr\n" );
    
    return 0 ;
 }
