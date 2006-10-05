@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ucb1x00_pins.cpp,v $
- * Revision 1.1  2006-09-30 18:32:00  ericn
+ * Revision 1.2  2006-10-05 14:42:04  ericn
+ * -don't read before write on SET_PIN
+ *
+ * Revision 1.1  2006/09/30 18:32:00  ericn
  * -Initial import
  *
  *
@@ -27,19 +30,12 @@ bool ucb1x00_set_pin( int      fdUCB,     // from touch-screen device, normally 
                       unsigned pinNum,
                       bool     setHigh )
 {
-   bool oldValue ;
-   if( ucb1x00_get_pin( fdUCB, pinNum, oldValue ) ){
-      if( oldValue != setHigh ){
-         unsigned long ioparam = pinMask( pinNum, (unsigned)setHigh );
-         if( 0 == ioctl( fdUCB, SET_PIN, ioparam ) ){
-            return true ;
-         }
-         else
-            perror( "?? SET_PIN" );
-      }
-      else
-         return true ;
+   unsigned long ioparam = pinMask( pinNum, (unsigned)setHigh );
+   if( 0 == ioctl( fdUCB, SET_PIN, ioparam ) ){
+      return true ;
    }
+   else
+      perror( "?? SET_PIN" );
    return false ;
 }
                       
