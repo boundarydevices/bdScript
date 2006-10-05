@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsTimer.cpp,v $
- * Revision 1.10  2003-12-27 18:38:51  ericn
+ * Revision 1.11  2006-10-05 14:42:53  ericn
+ * -add dumpTimers method
+ *
+ * Revision 1.10  2003/12/27 18:38:51  ericn
  * -got rid of secondary threads
  *
  * Revision 1.9  2003/06/22 23:03:42  ericn
@@ -49,6 +52,7 @@
 #include <string>
 #include "codeQueue.h"
 #include "pollTimer.h"
+#include "tickMs.h"
 #include <set>
 
 struct timerObject_t : public pollTimer_t {
@@ -67,6 +71,7 @@ public:
    unsigned long milliseconds_ ;
    jsval         sourceCode_ ;
    bool const    once_ ;
+   unsigned      fireCount_ ;
 
 private:
    timerObject_t( timerObject_t const & ); // no copies
@@ -86,6 +91,7 @@ timerObject_t :: timerObject_t( JSContext    *cx,
    , milliseconds_( ms )
    , sourceCode_( source )
    , once_( once )
+   , fireCount_( 0 )
 {
    JS_AddRoot( cx_, &sourceCode_ );
    set( milliseconds_ );
@@ -103,8 +109,9 @@ timerObject_t :: ~timerObject_t( void )
 void timerObject_t::fire( void )
 {
 //   printf( "timerObject_t::fire()\n" );
+   ++fireCount_ ;
    executeCode( scope_, sourceCode_, "timer" );
-   
+
    if( once_ )
       delete this ;
    else
@@ -216,11 +223,32 @@ jsCancelTimer( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
    return JS_TRUE ;
 }
 
+static JSBool
+jsDumpTimers( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   long long now = tickMs();
+   printf( "current time is %llu\n", now );
+   timerSet_t::const_iterator it = timers_.begin();
+   for( ; it != timers_.end(); it++ ){
+      timerObject_t *t = (*it);
+      printf( "timer %p/%lu/%s/fired %u times/expires %llu/%ld\n", 
+              t, 
+              t->milliseconds_, 
+              t->once_ ? "oneShot" : "interval",
+              t->fireCount_,
+              t->expires(),
+              (long)(t->expires()-now) );
+   }
+
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
 
 static JSFunctionSpec _functions[] = {
     {"timer",           jsTimer,          1 },
     {"oneShot",         jsOneShot,        1 },
     {"cancelTimer",     jsCancelTimer,    1 },
+    {"dumpTimers",      jsDumpTimers,     1 },
     {0}
 };
 
