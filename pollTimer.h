@@ -1,5 +1,5 @@
 #ifndef __POLLTIMER_H__
-#define __POLLTIMER_H__ "$Id: pollTimer.h,v 1.1 2003-12-27 18:38:06 ericn Exp $"
+#define __POLLTIMER_H__ "$Id: pollTimer.h,v 1.2 2006-10-05 14:42:25 ericn Exp $"
 
 /*
  * pollTimer.h
@@ -22,7 +22,10 @@
  * Change History : 
  *
  * $Log: pollTimer.h,v $
- * Revision 1.1  2003-12-27 18:38:06  ericn
+ * Revision 1.2  2006-10-05 14:42:25  ericn
+ * -expose expiration
+ *
+ * Revision 1.1  2003/12/27 18:38:06  ericn
  * -Initial import
  *
  *
@@ -55,6 +58,8 @@ public:
    // If you want another call, fire() should call set() again.
    // 
    virtual void fire( void );
+
+   inline long long expires( void ) const { return expiration_ ; }
 
 protected:
    long long    expiration_ ;
