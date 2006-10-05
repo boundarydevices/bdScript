@@ -176,8 +176,7 @@ SM501OBJS = fbCmdBlt.o \
             fbImage.o \
             fbMem.o \
             img4444.o \
-            sm501alpha.o \
-            vsync.o
+            sm501alpha.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))
@@ -761,7 +760,7 @@ hexDump: hexDump.cpp Makefile $(LIB)
 	$(STRIP) $@
 
 vsync: vsync.cpp Makefile $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -DMODULETEST -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -D__STANDALONE__ -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 rollingMedian: rollingMedian.cpp Makefile $(LIB)
