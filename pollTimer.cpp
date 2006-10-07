@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
- * Revision 1.2  2004-09-09 21:02:36  tkisky
+ * Revision 1.3  2006-10-07 16:13:43  ericn
+ * -added include
+ *
+ * Revision 1.2  2004/09/09 21:02:36  tkisky
  * -error msg /dev/timer not found
  *
  * Revision 1.1  2003/12/27 18:38:08  ericn
@@ -27,6 +30,7 @@
 #include <linux/gen-timer.h>
 #include <sys/ioctl.h>
 #include <poll.h>
+#include "tickMs.h"
 
 static timerPollHandler_t *timer_ = 0 ;
 
