@@ -1,5 +1,5 @@
 #ifndef __MULTISIGNAL_H__
-#define __MULTISIGNAL_H__ "$Id: multiSignal.h,v 1.1 2006-09-23 15:28:12 ericn Exp $"
+#define __MULTISIGNAL_H__ "$Id: multiSignal.h,v 1.2 2006-10-10 20:42:53 ericn Exp $"
 
 /*
  * multiSignal.h
@@ -21,7 +21,10 @@
  * Change History : 
  *
  * $Log: multiSignal.h,v $
- * Revision 1.1  2006-09-23 15:28:12  ericn
+ * Revision 1.2  2006-10-10 20:42:53  ericn
+ * -add setSignalMask() routine
+ *
+ * Revision 1.1  2006/09/23 15:28:12  ericn
  * -Initial import
  *
  *
@@ -35,7 +38,7 @@ typedef void (*signalHandler_t)( int signo, void *param);
 
 void setSignalHandler
    ( int              signo, 
-     sigset_t        &mask,    // mask these signals. Reset on e
+     sigset_t        &mask,    // mask these signals. Reset on each call
      signalHandler_t  handler,
      void            *handlerContext );
 
@@ -44,6 +47,7 @@ void clearSignalHandler
      signalHandler_t handler,
      void           *handlerContext );
 
+void setSignalMask( int signo, sigset_t &mask );    // mask these signals.
 
 #endif
 
