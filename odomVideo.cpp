@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomVideo.cpp,v $
- * Revision 1.10  2006-09-17 15:54:02  ericn
+ * Revision 1.11  2006-10-10 20:50:16  ericn
+ * -use fds, not playlist
+ *
+ * Revision 1.10  2006/09/17 15:54:02  ericn
  * -use pipeline for mpeg file reads
  *
  * Revision 1.9  2006/09/10 01:15:43  ericn
@@ -68,16 +71,16 @@ static FILE *procFile( char *cmdLine, unsigned cmdSize, char const *fileName )
 }
 
 odomVideo_t::odomVideo_t( 
-   odomPlaylist_t    &playlist,
+   int                fdDsp,
+   int                fdYUV,
    char const        *fileName,
    rectangle_t const &outRect )
    : fIn_( procFile(cmdLine_,sizeof(cmdLine_), fileName ) )
    , stream_( fileno(fIn_) )
-   , outQueue_( playlist.fdDsp(),
-                playlist.fdYUV(),
+   , outQueue_( fdDsp,
+                fdYUV,
                 2000,
                 outRect )
-   , playlist_( playlist )
    , outRect_( outRect )
    , bytesPerPicture_( 0 )
    , firstPTS_( 0LL )

@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.5 2006-09-17 15:53:54 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.6 2006-10-10 20:50:13 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.5  2006-09-17 15:53:54  ericn
+ * Revision 1.6  2006-10-10 20:50:13  ericn
+ * -use fds, not playlist
+ *
+ * Revision 1.5  2006/09/17 15:53:54  ericn
  * -use pipeline for mpeg file reads
  *
  * Revision 1.4  2006/09/04 16:42:14  ericn
@@ -33,13 +36,13 @@
  */
 
 
-#include "odomPlaylist.h"
 #include "mpegQueue.h"
 #include "mpegStream.h"
 
 class odomVideo_t {
 public:
-   odomVideo_t( odomPlaylist_t    &playlist, // used to get YUV handle
+   odomVideo_t( int                fdDsp,
+                int                fdYUV,
                 char const        *fileName,
                 rectangle_t const &outRect );
    ~odomVideo_t( void );
@@ -70,7 +73,6 @@ private:
    FILE                           *fIn_ ;
    mpegStreamFile_t                stream_ ;
    mpegQueue_t                     outQueue_ ;
-   odomPlaylist_t                 &playlist_ ;
    rectangle_t                     outRect_ ;
    unsigned                        bytesPerPicture_ ;
    long long                       firstPTS_ ;
