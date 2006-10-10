@@ -61,7 +61,7 @@ static void setRaw( int fd,
 
    cfsetispeed(&newState, baudConst);
    cfsetospeed(&newState, baudConst);
-   
+
    //
    // Note that this doesn't appear to work!
    // Reads always seem to be terminated at 16 chars!
@@ -197,7 +197,6 @@ int main( int argc, char const * const argv[] )
          }
 
          tcsetattr( fdSerial, TCSANOW, &oldSerialState );
-         tcsetattr( fileno(stdin), TCSANOW, &oldStdinState );
          
          close( fdSerial );
       }
