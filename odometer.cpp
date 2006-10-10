@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.10  2006-09-24 16:26:15  ericn
+ * Revision 1.11  2006-10-10 20:51:10  ericn
+ * -remove deprecated test program
+ *
+ * Revision 1.10  2006/09/24 16:26:15  ericn
  * -remove vsync propagation (use multiSignal instead)
  *
  * Revision 1.9  2006/09/23 15:30:01  ericn
@@ -349,68 +352,3 @@ void odometerSet_t::dump( void )
       printf( "%s\n", (*it).first.c_str() );
    }
 }
-
-#ifdef MODULETEST
-
-int main( int argc, char const * const argv[] )
-{
-   printf( "Hello, %s\n", argv[0] );
-   odometerSet_t &odometers = odometerSet_t::get();
-   odomGraphics_t const graphics( "/mmc/odometer" );
-   if( !graphics.worked() ){
-      fprintf( stderr, "Error loading graphics\n" );
-      return -1 ;
-   }
-
-   fbDevice_t &fb = getFB();
-   
-   unsigned const digitHeight = graphics.decimalPoint_.height();
-   unsigned numOdoms = fb.getHeight()/digitHeight ;
-   printf( "%u values will fit on the screen: digitHeight == %u\n", numOdoms, digitHeight );
-
-   unsigned maxV = ( 1 < argc ) ? strtoul(argv[1], 0, 0) : 1 ;
-   unsigned const initVal  = ( 2 < argc ) ? strtoul(argv[2], 0, 0 ) : 0 ;
-
-   unsigned y = 0 ;
-   for( unsigned i = 0 ; i < numOdoms ; i++ ){
-      char name[2];
-      sprintf( name, "%c", 'a' + i );
-      odometers.add( name, new odometer_t( graphics, initVal, 0, y, maxV ) );
-      odometers.setValue( name, initVal );
-      unsigned target = initVal*(i+1);
-      odometers.setTarget( name, target );
-      y += digitHeight ;
-   }
-
-   odometers.run();
-
-   char inBuf[256];
-   printf( "hit <Enter> to continue\n" );
-   fgets( inBuf,sizeof(inBuf),stdin);
-
-   odometers.stop();
-
-   for( unsigned i = 0 ; i < numOdoms ; i++ ){
-      char name[2];
-      sprintf( name, "%c", 'a' + i );
-      
-      odometer_t *const odom = odometers.get(name);
-
-      unsigned pennies = odom->value().value();
-      unsigned dollars = pennies / 100 ;
-      pennies %= 100 ;
-   
-      printf( "value[%u] == %u.%02u, ", i, dollars, pennies );
-      
-      pennies = odom->target();
-      dollars = pennies / 100 ;
-      pennies %= 100 ;
-
-      printf( "target == %u.%02u\n", dollars, pennies );
-   }
-   printf( "%lu blts\n", odometers.bltCount() );
-   
-   return 0 ;
-}
-
-#endif
