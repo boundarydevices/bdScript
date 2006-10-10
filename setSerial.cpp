@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: setSerial.cpp,v $
- * Revision 1.1  2006-09-27 01:41:46  ericn
+ * Revision 1.2  2006-10-10 20:55:12  ericn
+ * -use cfmakeraw
+ *
+ * Revision 1.1  2006/09/27 01:41:46  ericn
  * -Initial import
  *
  *
@@ -128,7 +131,7 @@ int setRaw( int fd ) // no echo or character processing
    if( 0 == rval ){
       struct termios newState = oldState;
    
-      newState.c_lflag &= ~(ICANON | ECHO );                           // set raw mode for input
+      cfmakeraw( &newState );
 
       rval = tcsetattr( fd, TCSANOW, &newState );
       if( 0 != rval )
