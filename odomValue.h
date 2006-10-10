@@ -1,5 +1,5 @@
 #ifndef __ODOMVALUE_H__
-#define __ODOMVALUE_H__ "$Id: odomValue.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMVALUE_H__ "$Id: odomValue.h,v 1.2 2006-10-10 20:49:23 ericn Exp $"
 
 /*
  * odomValue.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: odomValue.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-10 20:49:23  ericn
+ * -bump maxDigits to 10
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -34,7 +37,7 @@ public:
    ~odomValue_t( void );
 
    enum {
-      maxDigits_ = 8
+      maxDigits_ = 10
    };
 
    // initialize to a particular value 
