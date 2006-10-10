@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: multiSignal.cpp,v $
- * Revision 1.1  2006-09-23 15:28:14  ericn
+ * Revision 1.2  2006-10-10 20:48:38  ericn
+ * -fix mask logic, add setSignalMask()
+ *
+ * Revision 1.1  2006/09/23 15:28:14  ericn
  * -Initial import
  *
  *
@@ -51,13 +54,13 @@ blockSignal_t::blockSignal_t( int signo )
 
 blockSignal_t::~blockSignal_t( void )
 {
-   if( wasMasked_ ){
+   if( !wasMasked_ ){
       sigset_t unblock ;
       sigemptyset( &unblock );
       sigaddset( &unblock, sig_ );
 
       pthread_sigmask( SIG_UNBLOCK, &unblock, 0 );
-   } // or why bother
+   } // only undo our own operation
 }
 
 
@@ -211,6 +214,13 @@ void clearSignalHandler
    if( 0 == i ){
       signal( signo, SIG_IGN );
    } // block signal
+}
+
+void setSignalMask( int signo, sigset_t &mask )     // mask these signals.
+{
+   sigset_t oldSet ;
+   int rc = pthread_sigmask( SIG_SETMASK, &mask, &oldSet );
+   assert( 0 == rc );
 }
 
 #ifdef MODULETEST
