@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.10  2006-09-24 16:26:34  ericn
+ * Revision 1.11  2006-10-10 20:50:51  ericn
+ * -use fds, not playlist in odomVideo constructor
+ *
+ * Revision 1.10  2006/09/24 16:26:34  ericn
  * -remove vsync propagation from odometerSet_t (use multiSignal instead)
  *
  * Revision 1.9  2006/09/05 02:17:50  ericn
@@ -252,7 +255,7 @@ void odomPlaylist_t::next( unsigned long syncCount )
             outRect.yTop_   = current_.y_ ;
             outRect.width_  = current_.w_ ;
             outRect.height_ = current_.h_ ;
-            odomVideo_t *video = new odomVideo_t( *this, current_.fileName_, outRect );
+            odomVideo_t *video = new odomVideo_t( fdDsp(), fdYUV(), current_.fileName_, outRect );
             if( video->initialized() 
                 &&
                 video->startPlayback() ){
