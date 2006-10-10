@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: logTraces.cpp,v $
- * Revision 1.2  2006-09-17 15:55:23  ericn
+ * Revision 1.3  2006-10-10 20:40:44  ericn
+ * -make dictionary dynamic
+ *
+ * Revision 1.2  2006/09/17 15:55:23  ericn
  * -no log by default
  *
  * Revision 1.1  2006/09/10 01:18:13  ericn
@@ -18,6 +21,9 @@
  */
 
 // #define LOGTRACES
+
+#define DEBUGPRINT
+#include "debugPrint.h"
 
 #include "logTraces.h"
 #include "dictionary.h"
@@ -35,6 +41,8 @@
 #include <signal.h>
 #include <sys/mman.h>
 
+typedef dictionary_t<std::string> stringDictionary_t ;
+static stringDictionary_t *srcDict_ ;
 static logTraces_t *instance_ = 0 ;
 static int connectSig_ = -1 ;
 
@@ -42,6 +50,8 @@ logTraces_t &logTraces_t::get( void )
 {
    if( 0 == instance_ ){
       instance_ = new logTraces_t ;
+      assert( 0 == srcDict_ );
+      srcDict_ = new stringDictionary_t ;
    }
    return *instance_ ;
 }
@@ -54,18 +64,14 @@ logTraces_t &logTraces_t::get( bool enable )
    assert( !instance_->enabled() );
    if( enable ){
       connectSig_ = nextRtSignal();
-      printf( "connect signal == %d\n", connectSig_ );
       instance_->enable();
    }
    return *instance_ ;
 }
 
-typedef dictionary_t<std::string> stringDictionary_t ;
-static stringDictionary_t srcDict_ ;
-
 unsigned logTraces_t::newSource( char const *sourceName )
 {
-   return srcDict_ += sourceName ;
+   return (*srcDict_) += sourceName ;
 }
 
 void logTraces_t::log( unsigned source, unsigned value )
@@ -81,7 +87,6 @@ void logTraces_t::log( unsigned source, unsigned value )
 
 static void connectHandler( int signo, siginfo_t *info, void *context )
 {
-   printf( "connect handler\n" ); fflush(stdout);
    sleep(3);
    if( instance_ && !instance_->connected() ){
       instance_->connect();
@@ -195,8 +200,8 @@ void logTraces_t::connect(void){
 
    connectFd_ = accept( listenFd_, (struct sockaddr *)&clientAddr, &sockAddrSize );
    if( connected() ){
-      for( unsigned i = 0 ; i < srcDict_.size(); i++ ){
-         std::string const &srcName = srcDict_[i];
+      for( unsigned i = 0 ; i < srcDict_->size(); i++ ){
+         std::string const &srcName = (*srcDict_)[i];
          write( connectFd_, srcName.c_str(), srcName.size() );
          write( connectFd_, "\n", 1 );
       }
@@ -209,7 +214,6 @@ void logTraces_t::connect(void){
 }
 
 void logTraces_t::disconnect(void){
-   printf( "disconnect\n" );
    if( 0 <= connectFd_ ){
       close( connectFd_ );
       connectFd_ = -1 ;
