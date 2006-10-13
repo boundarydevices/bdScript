@@ -1,17 +1,20 @@
 #ifndef __FBCMDFINISH_H__
-#define __FBCMDFINISH_H__ "$Id: fbCmdFinish.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __FBCMDFINISH_H__ "$Id: fbCmdFinish.h,v 1.2 2006-10-13 21:09:38 ericn Exp $"
 
 /*
  * fbCmdFinish.h
  *
  * This header file declares the fbFinish_t command
- * list class, which represents the
- *
+ * list class, which represents the end of a set of 
+ * commands.
  *
  * Change History : 
  *
  * $Log: fbCmdFinish.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-13 21:09:38  ericn
+ * -finish comment
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
