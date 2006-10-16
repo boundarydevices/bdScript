@@ -36,6 +36,7 @@ MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
 OBJS = \
        baudRate.o \
        bitmap.o \
+       blockSig.o \
        box.o \
        ccActiveURL.o \
        ccDiskCache.o \
@@ -47,6 +48,7 @@ OBJS = \
        dirByATime.o \
        dither.o \
        dnsPoll.o \
+       dspOutSignal.o \
        dumpCPP.o \
        fbDev.o \
        ftObjs.o \
@@ -64,6 +66,7 @@ OBJS = \
        jsBCWidths.o \
        jsBitmap.o \
        jsCurl.o \
+       jsData.o \
        jsDir.o \
        jsEnviron.o \
        jsExit.o \
@@ -111,6 +114,7 @@ OBJS = \
        screenImage.o \
        semClasses.o \
        serialPoll.o \
+       serialSignal.o \
        setSerial.o \
        sniffWLAN.o \
        tcpPoll.o \
@@ -169,14 +173,22 @@ endif
 ifeq (y,$(KERNEL_FB_SM501))
 OBJS += fbMem.o yuyv.o
 SM501LIB = $(INSTALL_ROOT)/lib/libSM501.a
-SM501OBJS = fbCmdBlt.o \
+SM501OBJS = asyncScreenObj.o \
+            fbcCircular.o \
+            fbcHideable.o \
+            fbcMoveHide.o \
+            fbCmdBlt.o \
+            fbCmdClear.o \
             fbCmdFinish.o \
             fbCmdList.o \
+            fbCmdListSignal.o \
             fbCmdWait.o \
             fbImage.o \
             fbMem.o \
             img4444.o \
-            sm501alpha.o
+            sm501alpha.o \
+            vsyncSignal.o \
+            yuvSignal.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))
@@ -257,6 +269,7 @@ ODOMOBJS = \
        odomTouch.o \
        odomTTY.o \
        odomValue.o \
+       odomValue2.o \
        odomVideo.o \
        odometer.o
 
@@ -269,7 +282,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
@@ -279,6 +292,7 @@ $(LIBBDGRAPH):
 
 $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
+	$(RANLIB) $(LIB)
 
 $(SM501LIB): Makefile $(SM501OBJS)
 	$(AR) r $(SM501LIB) $(SM501OBJS)
@@ -317,13 +331,10 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
-odometerMain.o: odometer.cpp odometer.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-odometer: odometerMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+jsData: jsData.cpp $(LIB) Makefile
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odometer odometerMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle odometer | sort >odometer.map
+	$(CC) $(HARDWARE_TYPE) -DMODULETEST=1 -D_REENTRANT=1 -DXP_UNIX=1 $(IFLAGS) -O2 -o jsData jsData.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle jsData | sort >jsData.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -414,6 +425,13 @@ odomValue: odomValueMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue odomValueMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
 	arm-linux-nm --demangle odomValue | sort >odomValue.map
 
+odomValue2Main.o: odomValue2.cpp odomValue2.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomValue2: odomValue2Main.o $(LIB) $(ODOMLIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue2 odomValue2Main.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
+	arm-linux-nm --demangle odomValue2 | sort >odomValue2.map
+
 ucb1x00_pinsMain.o: ucb1x00_pins.cpp ucb1x00_pins.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
@@ -440,6 +458,29 @@ fbCmdListMain.o: fbCmdList.cpp fbCmdList.h
 fbCmdList: fbCmdListMain.o $(LIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbCmdList fbCmdListMain.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lSM501 -lpng -ljpeg -lungif -lfreetype -lm -lz
 
+fbcHideableMain.o: fbcHideable.cpp fbcHideable.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbcHideable: fbcHideableMain.o $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbcHideable fbcHideableMain.o $(LIBS) -lCurlCache -lSM501 -lCurlCache -lstdc++ -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
+
+fbcMoveHideMain.o: fbcMoveHide.cpp fbcMoveHide.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbcMoveHide: fbcMoveHideMain.o $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbcMoveHide fbcMoveHideMain.o $(LIBS) -lCurlCache -lSM501 -lCurlCache -lstdc++ -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
+
+fbcCircularMain.o: fbcCircular.cpp fbcCircular.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbcCircular: fbcCircularMain.o $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbcCircular fbcCircularMain.o $(LIBS) -lCurlCache -lSM501 -lCurlCache -lstdc++ -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
+
+fbCmdClearMain.o: fbCmdClear.cpp fbCmdClear.h 
+	$(CC) -fno-rtti -Wall -DMODULETEST=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+fbCmdClear: fbCmdClearMain.o $(LIB) $(SM501LIB)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o fbCmdClear fbCmdClearMain.o $(LIBS) -lSM501 -lOdometer -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
 
 sm501reg: sm501reg.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501reg sm501reg.cpp -lstdc++ 
@@ -490,17 +531,25 @@ flashPlay: flashPlay.cpp $(LIB)
 	arm-linux-nm flashPlay >flashPlay.map
 	$(STRIP) flashPlay
 
-rtsCTS: rtsCTS.cpp
+rtsCTS: rtsCTS.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o rtsCTS rtsCTS.cpp $(LIBS) -lCurlCache -lstdc++ 
 	arm-linux-nm rtsCTS >rtsCTS.map
 	$(STRIP) rtsCTS
 
-setBaud: setBaud.cpp
+setBaud: setBaud.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o setBaud setBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
 	arm-linux-nm setBaud >setBaud.map
 	$(STRIP) setBaud
 
-serialCounts: serialCounts.cpp
+serialSignal: serialSignal.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DMODULETEST -O2 -o serialSignal serialSignal.cpp $(LIBS) -lCurlCache -lsupc++ -lpthread
+	$(STRIP) serialSignal
+
+ttySignal: ttySignal.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DMODULETEST -O2 -o ttySignal ttySignal.cpp $(LIBS) -lCurlCache -lsupc++ -lpthread
+	$(STRIP) ttySignal
+
+serialCounts: serialCounts.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o serialCounts serialCounts.cpp $(LIBS) -lCurlCache -lstdc++ 
 	arm-linux-nm serialCounts >serialCounts.map
 	$(STRIP) serialCounts
@@ -792,8 +841,8 @@ imgFile: $(IMGFILEOBJS) Makefile
 anigifMain.o: imgGIF.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-IMGFILEOBJS = anigifMain.o image.o memFile.o fbDev.o imgJPEG.o imgPNG.o
-aniGIF: $(IMGFILEOBJS) Makefile 
+ANIGIFOBJS = anigifMain.o image.o memFile.o fbDev.o imgJPEG.o imgPNG.o
+aniGIF: $(ANIGIFOBJS) Makefile 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
       -Xlinker aniGIF.map \
@@ -819,15 +868,69 @@ mpegSendUDP: mpegSendUDP.cpp mpegUDP.h mpegPS.cpp mpegPS.h mpegStream.cpp mpegSt
 #	$(STRIP) $@
 #
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
+all: $(LIB) $(SM501LIB) $(ODOMLIB) curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
 
 .PHONY: install-libs install-headers
 
-shared-headers = ddtoul.h dirByATime.h hexDump.h  \
-   imgGIF.h imgJPEG.h imgPNG.h \
-   macros.h madHeaders.h memFile.h \
-   mtQueue.h relativeURL.h semClasses.h \
-   ultoa.h ultodd.h urlFile.h
+shared-headers = \
+   baudRate.h \
+   bitmap.h \
+   blockSig.h \
+   config.h \
+   ddtoul.h \
+   debugPrint.h \
+   dirByATime.h \
+   dspOutSignal.h \
+   fbCmdListSignal.h \
+   fbDev.h \
+   hexDump.h  \
+   image.h \
+   imgGIF.h \
+   imgJPEG.h \
+   imgPNG.h \
+   jsData.h \
+   macros.h \
+   madDecode.h \
+   madHeaders.h \
+   memFile.h \
+   mpegPS.h \
+   mpegQueue.h \
+   mpegStream.h \
+   mtQueue.h \
+   multiSignal.h \
+   relativeURL.h \
+   rtSignal.h \
+   semClasses.h \
+   serialSignal.h \
+   setSerial.h \
+   tickMs.h \
+   ultoa.h \
+   ultodd.h \
+   urlFile.h \
+   vsyncSignal.h \
+   yuvSignal.h
+
+ifeq (y,$(KERNEL_FB_SM501))
+shared-headers += \
+   asyncScreenObj.h \
+   fbImage.h \
+   fbcCircular.h \
+   fbcHideable.h \
+   fbcMoveHide.h \
+   fbCmdBlt.h \
+   fbCmdClear.h \
+   fbCmdFinish.h \
+   fbCmdList.h \
+   fbCmdWait.h \
+   fbMem.h \
+   odomDigit.h \
+   odomGraphics.h \
+   odomMode.h \
+   odomValue.h \
+   odomValue2.h \
+   odomVideo.h \
+   sm501alpha.h
+endif
 
 install-headers:
 	cp -f -v $(shared-headers) $(INSTALL_ROOT)/include
@@ -841,8 +944,12 @@ install-bin: all
 install: install-bin install-headers
 
 clean:
-	rm -f *.o *.a *.map *.lst *.sym bc curlGet dirTest urlTest \
-         jsExec testJS ftRender madHeaders backtrace \
-         cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
-         mpeg2mp3 pixmanTest mpegQueue odomTTY mpegDecode \
-         $(LIB)
+	rm -f *.o *.a *.map *.lst *.sym *.prestrip bc curlGet dirTest \
+	   urlTest jsExec testJS ftRender madHeaders backtrace \
+      cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
+      mpeg2mp3 pixmanTest mpegQueue odomTTY mpegDecode \
+	   pxaregs flashVar ftDump jsData setBaud serialSignal \
+	   serialCounts fbCmdClear sm501reg sm501dump imgFile \
+      serialTouch odomValue fbcCircular fbcHideable odomValue2 \
+      sm501alpha fbcMoveHide \
+      $(LIB) $(ODOMLIB) $(SM501LIB)
