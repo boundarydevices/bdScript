@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.33  2006-09-24 16:20:27  ericn
+ * Revision 1.34  2006-10-16 22:35:53  ericn
+ * -use high bit to drive low bits in getRed(), getGreen, getBlue()
+ *
+ * Revision 1.33  2006/09/24 16:20:27  ericn
  * -add render with transparent color
  *
  * Revision 1.32  2006/08/16 14:49:25  ericn
@@ -220,7 +223,10 @@ unsigned char fbDevice_t :: getRed( unsigned short screenRGB )
          out |= mask ;
    return out << 3 ;
 #else
-   return (screenRGB & (0x1f<<11)) >> (11-3);
+   unsigned char r = (screenRGB & (0x1f<<11)) >> (11-3);
+   if( r & 0x80 )
+      r |= 7 ;       // more red if high red
+   return r ;
 #endif
 }
 
@@ -235,7 +241,10 @@ unsigned char fbDevice_t :: getGreen( unsigned short screenRGB )
          out |= mask ;
    return out << 2 ;
 #else
-   return (screenRGB & (0x3f<<5)) >> (5-2);
+   unsigned char g = (screenRGB & (0x3f<<5)) >> (5-2);
+   if( g & 0x80 )
+      g |= 3 ;       // more green if high green
+   return g ;
 #endif
 }
 
@@ -250,7 +259,10 @@ unsigned char fbDevice_t :: getBlue( unsigned short screenRGB )
          out |= mask ;
    return out << 3 ;
 #else
-   return (screenRGB & 0x1f) << 3;
+   unsigned char b = (screenRGB & 0x1f) << 3 ;
+   if( b & 0x80 )
+      b |= 7 ;       // more blue if high blue
+   return b ;
 #endif
 }
 
