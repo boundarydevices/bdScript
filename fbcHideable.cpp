@@ -1,41 +1,32 @@
 /*
- * Module fbcMoveHide.cpp
+ * Module fbcHideable.cpp
  *
- * This module defines the methods of the fbcMoveHide_t
- * class as declared in fbcMoveHide.h
+ * This module defines the methods of the fbcHideable_t
+ * class as declared in fbcHideable.h
  *
+ * Implementation consists of six commands:
  *
+ *    jump              (to clear or end)
+ *    wait for drawing engine
+ *    blt
+ *    jump              (skip clear)
+ *    wait for drawing engine
+ *    clear
+ * 
  * Change History : 
  *
- * $Log: fbcMoveHide.cpp,v $
- * Revision 1.1  2006-10-16 22:45:39  ericn
+ * $Log: fbcHideable.cpp,v $
+ * Revision 1.1  2006-10-16 22:45:37  ericn
  * -Initial import
  *
  *
  * Copyright Boundary Devices, Inc. 2006
  */
 
-#include "fbcMoveHide.h"
-
 #include "fbcHideable.h"
 #include <linux/sm501-int.h>
 
-fbcMoveHide_t::state_t const fbcMoveHide_t::unknownState_ = {
-   state_: unknown_e,
-   xPos_: 0
-};
-
-fbcMoveHide_t::state_t const fbcMoveHide_t::visibleState_ = {
-   state_: visible_e,
-   xPos_: 0
-};
-
-fbcMoveHide_t::state_t const fbcMoveHide_t::hiddenState_ = {
-   state_: hidden_e,
-   xPos_: 0
-};
-
-fbcMoveHide_t::fbcMoveHide_t
+fbcHideable_t::fbcHideable_t
    ( fbCommandList_t &cmdList,
      unsigned long    destRamOffs,
      unsigned         destx,
@@ -50,9 +41,9 @@ fbcMoveHide_t::fbcMoveHide_t
      bool             initVisible,
      unsigned short   backgroundColor )
    : asyncScreenObject_t( cmdList )
-   , onScreenState_( unknownState_ )
-   , commandState_( unknownState_ )
-   , offScreenState_( initVisible ? visibleState_ : hiddenState_ )
+   , onScreenState_( unknown_e )
+   , commandState_( unknown_e )
+   , offScreenState_( initVisible ? visible_e : hidden_e )
    , jump1_( new fbJump_t( 0 ) )
    , wait1_( new fbWait_t( WAITFORDRAWINGENGINE, DRAWINGENGINEIDLE ) )
    , blt_( new fbBlt_t( destRamOffs, destx, desty, destw, desth,
@@ -65,7 +56,6 @@ fbcMoveHide_t::fbcMoveHide_t
    , numClear_( 0 )
    , numSkip_( 0 )
 {
-   offScreenState_.xPos_ = destx ;
    cmdList.push( jump1_ );
    cmdList.push( wait1_ );
    cmdList.push( blt_ );
@@ -89,11 +79,11 @@ fbcMoveHide_t::fbcMoveHide_t
    updateCommandList();
 }
 
-fbcMoveHide_t::~fbcMoveHide_t( void )
+fbcHideable_t::~fbcHideable_t( void )
 {
 }
 
-void fbcMoveHide_t::executed()
+void fbcHideable_t::executed()
 {
    onScreenState_ = commandState_ ;
    switch( action_ ){
@@ -103,63 +93,45 @@ void fbcMoveHide_t::executed()
    }
 }
 
-void fbcMoveHide_t::updateCommandList()
+void fbcHideable_t::updateCommandList()
 {
    if( !valueBeingSet() ){
-      int prevState = commandState_.state_ ;
-      bool changed = false ;
       if( commandState_ != offScreenState_ )
       {
-         assert( unknown_e != offScreenState_.state_ );
-//         printf( "moveHide: state %d->%d\n", commandState_.state_, offScreenState_.state_ );
+         assert( unknown_e != offScreenState_ );
          commandState_ = offScreenState_ ;
-         changed = true ;
       }
-
+      
       if( onScreenState_== commandState_ ){
-//         if( changed )
-//            printf( "!!! skipped state %d to %d\n", prevState, offScreenState_.state_ );
          jump1_->setLength( skipSize_ );
          action_ = skip ;
       }
-      else if( visible_e == commandState_.state_ ){
-//         if( changed )
-//            printf( "   now visible from %d\n", prevState );
-         blt_->setDestX( commandState_.xPos_ );
+      else if( visible_e == commandState_ ){
          jump1_->setLength( 0 );
          action_ = blt ;
       }
       else {
-//         if( changed )
-//            printf( "   now hidden from %d\n", prevState );
-         clr_->setDestX( commandState_.xPos_ );
          jump1_->setLength( clearSize_ );
          action_ = clear ;
       }
    }
 }
 
-void fbcMoveHide_t::show( void )
+void fbcHideable_t::show( void )
 {
    setValueStart();
-   offScreenState_.state_ = visible_e ;
+   offScreenState_ = visible_e ;
    setValueEnd();
 }
 
-void fbcMoveHide_t::hide( void )
+void fbcHideable_t::hide( void )
 {
    setValueStart();
-   offScreenState_.state_ = hidden_e ;
+   offScreenState_ = hidden_e ;
    setValueEnd();
 }
 
-void fbcMoveHide_t::setX( unsigned x ){
-   setValueStart();
-   offScreenState_.xPos_ = x ;
-   setValueEnd();
-}
-
-void fbcMoveHide_t::dump( void ){
+void fbcHideable_t::dump( void ){
    printf( "%5u blts\n"
            "%5u clears\n"
            "%5u skips\n",
@@ -186,7 +158,7 @@ void fbcMoveHide_t::dump( void ){
 static fbPtr_t           *cmdListMem_ = 0 ;
 static fbCmdListSignal_t *cmdListDev_ = 0 ;
 static unsigned imgCount = 0 ;
-static fbcMoveHide_t **objs = 0 ;
+static fbcHideable_t **objs = 0 ;
 
 static void videoOutput( int signo, void *param )
 {
@@ -234,7 +206,7 @@ int main( int argc, char const * const argv[] )
 
       imgCount = argc-1 ;
       fbImage_t ** const images = new fbImage_t *[imgCount];
-      objs = new fbcMoveHide_t *[imgCount];
+      objs = new fbcHideable_t *[imgCount];
       unsigned   * const offsets = new unsigned [imgCount];
 
       unsigned x = 0 ;
@@ -255,7 +227,7 @@ int main( int argc, char const * const argv[] )
          unsigned const i = arg-1 ;
          images[i] = newImg ;
          offsets[i] = cmdList.size();
-         objs[i] = new fbcMoveHide_t( cmdList, fbRAM, x, 0, fb.getWidth(), fb.getHeight(), *newImg,
+         objs[i] = new fbcHideable_t( cmdList, fbRAM, x, 0, fb.getWidth(), fb.getHeight(), *newImg,
                                       0, 0, newImg->width(), newImg->height(),
                                       visible, 0x001f );
          visible = !visible ;
@@ -296,7 +268,6 @@ int main( int argc, char const * const argv[] )
                for( unsigned i = 0 ; i < imgCount; i++ ){
                   if( visible ){
                      objs[i]->show();
-                     objs[i]->setX( objs[i]->getX() + 2*images[0]->width() );
                   }
                   else
                      objs[i]->hide();

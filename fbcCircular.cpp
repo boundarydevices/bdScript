@@ -26,13 +26,7 @@
  * Change History : 
  *
  * $Log: fbcCircular.cpp,v $
- * Revision 1.3  2002-12-15 05:42:18  ericn
- * -added swapSource(), setDestX() methods
- *
- * Revision 1.2  2006/12/01 22:49:50  tkisky
- * -include assert
- *
- * Revision 1.1  2006/10/16 22:45:35  ericn
+ * Revision 1.1  2006-10-16 22:45:35  ericn
  * -Initial import
  *
  *
@@ -43,7 +37,6 @@
 #include "fbcCircular.h"
 
 #include <linux/sm501-int.h>
-#include <assert.h>
 
 static fbcCircular_t::state_t const unknownState_ = { 
       displayState_: fbcCircular_t::unknown_e
@@ -224,28 +217,6 @@ void fbcCircular_t::updateCommandList()
    assert( 0 == flags );
 }
 
-void fbcCircular_t::setDestX( unsigned destX )
-{
-   setValueStart();
-   int diff = destX-destx_ ;
-   destx_ += diff ;
-   clr_->setDestX( clr_->getDestX() + diff );
-   blt1_->setDestX( blt1_->getDestX() + diff );
-   blt2_->setDestX( blt2_->getDestX() + diff );
-   onScreenState_.displayState_ = unknown_e ;
-   setValueEnd();
-}
-
-void fbcCircular_t::swapSource( fbImage_t const &src )
-{
-   setValueStart();
-   srcImg_ = src ;
-   blt1_->swapSource( src, commandState_.offset_ );
-   blt2_->swapSource( src, 0 );
-   onScreenState_.displayState_ = unknown_e ;
-   setValueEnd();
-}
-
 unsigned fbcCircular_t::setOffset( unsigned pixels )
 {
    unsigned leftover ;
@@ -298,8 +269,6 @@ void fbcCircular_t::dump( void ){
 #include <signal.h>
 #include "tickMs.h"
 #include "multiSignal.h"
-#include "rawKbd.h"
-#include <ctype.h>
 
 static fbPtr_t           *cmdListMem_ = 0 ;
 static fbCmdListSignal_t *cmdListDev_ = 0 ;
@@ -410,11 +379,9 @@ int main( int argc, char const * const argv[] )
          printf( "executed\n" );
          long long const startTick = tickMs();
          long long prevTick = startTick ;
-         rawKbd_t kbd ;
-         bool doExit = false ;
-         while( !doExit && ( 50000 > (prevTick-startTick) ) ){
+         while( 50000 > (prevTick-startTick) ){
             pause();
-            if( 1000 < ( tickMs()-prevTick ) ){
+            if( false ){ // 1000 < ( tickMs()-prevTick ) ){
                for( unsigned i = 0 ; i < imgCount; i++ ){
                   if( visible )
                      objs[i]->show();
@@ -428,35 +395,6 @@ int main( int argc, char const * const argv[] )
             }
             for( unsigned i = 0 ; i < imgCount; i++ ){
                objs[i]->setOffset(3*vsyncCount);
-            }
-            char c ;
-            if( kbd.read( c ) ){
-               switch( tolower( c ) ){
-                  case '+' : {
-                     printf( "+++\n" );
-                     for( unsigned i = 0 ; i < imgCount ; i++ ){
-                        unsigned x = objs[i]->getDestX();
-                        objs[i]->setDestX(x+10);
-                     }
-                     break ;
-                  }
-                  case '-' : {
-                     printf( "---\n" );
-                     for( unsigned i = 0 ; i < imgCount ; i++ ){
-                        unsigned x = objs[i]->getDestX();
-                        if( 10 <= x )
-                           x -= 10 ;
-                        else
-                           x = 0 ;
-                        objs[i]->setDestX(x);
-                     }
-                     break ;
-                  }
-                  case '\x03' :
-                  case '\x1b' :
-                     doExit = true ;
-                     break ;
-               }
             }
          }
          for( unsigned i = 0 ; i < imgCount ; i++ ){
