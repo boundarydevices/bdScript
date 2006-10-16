@@ -1,5 +1,5 @@
 #ifndef __MULTISIGNAL_H__
-#define __MULTISIGNAL_H__ "$Id: multiSignal.h,v 1.2 2006-10-10 20:42:53 ericn Exp $"
+#define __MULTISIGNAL_H__ "$Id: multiSignal.h,v 1.3 2006-10-16 22:27:30 ericn Exp $"
 
 /*
  * multiSignal.h
@@ -21,7 +21,10 @@
  * Change History : 
  *
  * $Log: multiSignal.h,v $
- * Revision 1.2  2006-10-10 20:42:53  ericn
+ * Revision 1.3  2006-10-16 22:27:30  ericn
+ * -removed setSignalMask() routine, added dumpSignalHandlers()
+ *
+ * Revision 1.2  2006/10/10 20:42:53  ericn
  * -add setSignalMask() routine
  *
  * Revision 1.1  2006/09/23 15:28:12  ericn
@@ -47,7 +50,7 @@ void clearSignalHandler
      signalHandler_t handler,
      void           *handlerContext );
 
-void setSignalMask( int signo, sigset_t &mask );    // mask these signals.
+void dumpSignalHandlers( int signo );
 
 #endif
 
