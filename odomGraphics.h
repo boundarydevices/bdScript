@@ -1,5 +1,5 @@
 #ifndef __ODOMGRAPHICS_H__
-#define __ODOMGRAPHICS_H__ "$Id: odomGraphics.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __ODOMGRAPHICS_H__ "$Id: odomGraphics.h,v 1.2 2006-10-16 22:26:19 ericn Exp $"
 
 /*
  * odomGraphics.h
@@ -25,7 +25,10 @@
  * Change History : 
  *
  * $Log: odomGraphics.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:26:19  ericn
+ * -added validate() method
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -52,6 +55,8 @@ struct odomGraphics_t {
    fbPtr_t               dollarAlpha_ ;
    fbPtr_t               decimalAlpha_ ;
    fbPtr_t               commaAlpha_ ;
+
+   bool validate() const ;
 
 private:
    bool  worked_ ;

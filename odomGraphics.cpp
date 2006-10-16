@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomGraphics.cpp,v $
- * Revision 1.2  2006-08-16 21:22:14  ericn
+ * Revision 1.3  2006-10-16 22:26:25  ericn
+ * -added validate() method
+ *
+ * Revision 1.2  2006/08/16 21:22:14  ericn
  * -rename header
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -164,6 +167,39 @@ odomGraphics_t::odomGraphics_t(
 odomGraphics_t::~odomGraphics_t(void)
 {
 }
+
+bool odomGraphics_t::validate() const
+{
+   bool valid = true ;
+   if( !digitStrip_.validate() ){
+      printf( "Invalid digitStrip\n" );
+   }
+   if( !dollarSign_.validate() ){
+      printf( "Invalid dollarSign\n" );
+   }
+   if( !decimalPoint_.validate() ){
+      printf( "Invalid decimalPoint\n" );
+   }
+   if( !comma_.validate() ){
+      printf( "Invalid comma\n" );
+   }
+
+   if( !digitAlpha_.validate() ){
+      printf( "Invalid digitAlpha\n" );
+   }
+   if( !dollarAlpha_.validate() ){
+      printf( "Invalid dollarAlpha\n" );
+   }
+   if( !decimalAlpha_.validate() ){
+      printf( "Invalid decimalAlpha\n" );
+   }
+   if( !commaAlpha_.validate() ){
+      printf( "Invalid commaAlpha\n" );
+   }
+
+   return valid ;
+}
+
 
 #include <map>
 #include <string>
