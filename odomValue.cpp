@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomValue.cpp,v $
- * Revision 1.2  2006-09-23 15:27:06  ericn
+ * Revision 1.3  2006-10-16 22:24:56  ericn
+ * -no background for alpha meters, check width & height of screen
+ *
+ * Revision 1.2  2006/09/23 15:27:06  ericn
  * -cleanup debug stuff
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -36,23 +39,44 @@ odomValue_t::odomValue_t
    : graphics_(graphics)
    , alpha_( sm501alpha_t::get( alphaMode(mode) ) )
    , mode_( mode )
+   , fbRam_( mode == graphicsLayer ? 0 : alpha_.fbRamOffset() )
    , commaPos_(0)
-   , background_( x, y, 
-                  maxDigits_*graphics.digitStrip_.width()
-                  + graphics.comma_.width()
-                  + graphics.decimalPoint_.width()
-                  + graphics.dollarSign_.width(),
-                  graphics.dollarSign_.height() )
+   , r_( makeRect( x, y, 
+                   maxDigits_*graphics.digitStrip_.width()
+                    + graphics.comma_.width()
+                    + graphics.decimalPoint_.width()
+                    + graphics.dollarSign_.width(),
+                   graphics.dollarSign_.height() ) )
+   , background_( ( graphicsLayer == mode )
+                ? fbImage_t( x, y, r_.width_, r_.height_ )
+                : fbImage_t() )
+   , dollarBlt_( 0 )
+   , commaBlt_( 0 )
+   , decimalBlt_( 0 )
    , sigDigits_( 0 )
    , pennies_( 0 )
 {
-   r_.xLeft_  = x ;
-   r_.yTop_   = y ;
-   r_.width_  = background_.width();
-   r_.height_ = background_.height();
-
+   fbDevice_t &fb = getFB();
+   if( ( r_.xLeft_ + r_.width_ ) > fb.getWidth() ){
+      printf( "odometer too wide: %u+%u, max %u pixels\n",
+              r_.xLeft_, r_.width_, fb.getWidth() );
+      exit(1);
+   }
+   if( ( r_.yTop_ + r_.height_ ) > fb.getHeight() ){
+      printf( "odometer too tall: %u+%u, max %u pixels\n",
+              r_.yTop_, r_.height_, fb.getHeight() );
+      exit(1);
+   }
    unsigned const commaIdx = maxDigits_-2-3 ;
    unsigned const decimalIdx = maxDigits_-2 ;
+
+   dollarBlt_ = new fbBlt_t( fbRam_, x, y, 
+                             fb.getWidth(), fb.getHeight(),
+                             graphics.dollarSign_, 0, 0,
+                             graphics.dollarSign_.width(), 
+                             graphics.dollarSign_.height() );
+   dollarBlt_->skip();
+   cmdList.push( dollarBlt_ );
 
    x += graphics.dollarSign_.width();
    unsigned d ;
@@ -67,7 +91,14 @@ odomValue_t::odomValue_t
 
    commaRect_ = makeRect(x, r_.yTop_, graphics_.comma_.width(), graphics_.comma_.height());
    commaPos_ = x ;
-   
+   commaBlt_ = new fbBlt_t( fbRam_, commaPos_, y, 
+                            fb.getWidth(), fb.getHeight(),
+                            graphics.comma_, 0, 0,
+                            graphics.comma_.width(), 
+                            graphics.comma_.height() );
+   cmdList.push( commaBlt_ );
+   commaBlt_->skip();
+
    x += graphics.comma_.width();
    for( ; d < decimalIdx ; d++ )
    {
@@ -78,7 +109,14 @@ odomValue_t::odomValue_t
       x += graphics.digitStrip_.width();
    }
 
-   fbDevice_t &fb = getFB();
+
+   decimalBlt_ = new fbBlt_t( fbRam_, x, y, 
+                              fb.getWidth(), fb.getHeight(),
+                              graphics.decimalPoint_, 0, 0,
+                              graphics.decimalPoint_.width(), 
+                              graphics.decimalPoint_.height() );
+   cmdList.push( decimalBlt_ );
+   decimalBlt_->skip();
 
    decimalRect_ = makeRect( x, r_.yTop_, graphics.decimalPoint_.width(), graphics.decimalPoint_.height() );
    if( graphicsLayer == mode_ ){
@@ -108,9 +146,13 @@ odomValue_t::odomValue_t
 
 odomValue_t::~odomValue_t( void )
 {
-   fbDevice_t &fb = getFB();
-   fbBlt( fb.getRamOffs(), r_.xLeft_, r_.yTop_, fb.getWidth(), fb.getHeight(),
-          background_, 0, 0, background_.width(), background_.height() );
+   if( graphicsLayer == mode_ ){
+      fbDevice_t &fb = getFB();
+      fbBlt( fb.getRamOffs(), r_.xLeft_, r_.yTop_, fb.getWidth(), fb.getHeight(),
+             background_, 0, 0, background_.width(), background_.height() );
+   }
+   else
+      alpha_.clear( r_ );
 }
 
 void odomValue_t::drawDigit( unsigned idx )
