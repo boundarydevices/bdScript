@@ -1,5 +1,5 @@
 #ifndef __MPEGQUEUE_H__
-#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.11 2006-09-12 13:40:30 ericn Exp $"
+#define __MPEGQUEUE_H__ "$Id: mpegQueue.h,v 1.12 2006-10-16 22:29:48 ericn Exp $"
 
 /*
  * mpegQueue.h
@@ -42,7 +42,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.h,v $
- * Revision 1.11  2006-09-12 13:40:30  ericn
+ * Revision 1.12  2006-10-16 22:29:48  ericn
+ * -added aBytesQueued_ member, method
+ *
+ * Revision 1.11  2006/09/12 13:40:30  ericn
  * -add resetAudio method
  *
  * Revision 1.10  2006/09/06 15:09:12  ericn
@@ -137,7 +140,7 @@ public:
    //
    // stats 
    //
-   inline bool isEmpty( void ) const ;
+   bool isEmpty( void ) const ;
 
    //
    // These routines return the total queue duration without
@@ -170,6 +173,7 @@ public:
    inline unsigned vFramesDropped( void ) const { return vFramesDropped_ ; }
 
    inline unsigned aFramesQueued( void ) const { return aFramesQueued_ ; }
+   inline unsigned aBytesQueued( void ) const { return aBytesQueued_ ; }
    inline unsigned aFramesPlayed( void ) const { return aFramesPlayed_ ; }
    inline unsigned aFramesSkipped( void ) const { return aFramesSkipped_ ; }
    inline unsigned aFramesDropped( void ) const { return aFramesDropped_ ; }
@@ -303,6 +307,7 @@ private:
    unsigned      prevChannels_ ;
 
    unsigned      aFramesQueued_ ;
+   unsigned      aBytesQueued_ ;
    unsigned      aFramesPlayed_ ;
    unsigned      aFramesSkipped_ ;
    unsigned      aFramesDropped_ ;
@@ -328,10 +333,5 @@ inline bool mpegQueue_t::isEmpty( entryHeader_t const &eh )
           ( eh.prev_ == &eh );
 }
    
-inline bool mpegQueue_t::isEmpty( void ) const {
-   return isEmpty( videoFull_.header_ )
-       && isEmpty( audioFull_.header_ );
-}
-
 #endif
 
