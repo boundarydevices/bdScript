@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:37:17  ericn
+ * -add membbers getDestX(), setDestX(), getWidth()
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -144,6 +147,23 @@ void fbBlt_t::perform( void )
       skip_ = false ;
    }
 }
+
+unsigned fbBlt_t::getDestX( void ) const 
+{
+   return cmdMem_[BLTREG(SMIDRAW_2D_Destination)] >> 16 ;
+}
+
+void fbBlt_t::setDestX( unsigned destx )
+{
+   cmdMem_[BLTREG(SMIDRAW_2D_Destination)] &= 0x0000FFFF ;
+   cmdMem_[BLTREG(SMIDRAW_2D_Destination)] |= (destx << 16 );
+}
+
+unsigned fbBlt_t::getWidth( void ) const 
+{
+   return cmdMem_[BLTREG(SMIDRAW_2D_Dimension)] >> 16 ;
+}
+
 
 int fbBlt( unsigned long    destRamOffs,
            unsigned         destx,
