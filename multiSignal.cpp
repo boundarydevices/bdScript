@@ -9,7 +9,11 @@
  * Change History : 
  *
  * $Log: multiSignal.cpp,v $
- * Revision 1.2  2006-10-10 20:48:38  ericn
+ * Revision 1.3  2006-10-16 22:29:01  ericn
+ * removed setSignalMask() routine, added dumpSignalHandlers()
+ * moved blockSignal_t into blockSignal.h/.cpp
+ *
+ * Revision 1.2  2006/10/10 20:48:38  ericn
  * -fix mask logic, add setSignalMask()
  *
  * Revision 1.1  2006/09/23 15:28:14  ericn
@@ -24,45 +28,11 @@
 #include <assert.h>
 #include <stdio.h>
 #include "rtSignal.h"
+#include <string.h>
+#include "blockSig.h"
 
-// --------------------------------------------------------------
-// class to block a signal (while manipulating the handler list)
-//
-class blockSignal_t {
-public:
-   blockSignal_t( int signo );
-   ~blockSignal_t( void );
-
-   int  sig_ ;
-   bool wasMasked_ ;
-};
-
-blockSignal_t::blockSignal_t( int signo )
-   : sig_( signo )
-   , wasMasked_( 0 )
-{
-   sigset_t blockThese ;
-   sigset_t oldSet ;
-   sigemptyset( &blockThese );
-   sigaddset( &blockThese, signo );
-
-   int rc = pthread_sigmask( SIG_BLOCK, &blockThese, &oldSet );
-   assert( 0 == rc );
-
-   wasMasked_ = sigismember( &oldSet, signo );
-}
-
-blockSignal_t::~blockSignal_t( void )
-{
-   if( !wasMasked_ ){
-      sigset_t unblock ;
-      sigemptyset( &unblock );
-      sigaddset( &unblock, sig_ );
-
-      pthread_sigmask( SIG_UNBLOCK, &unblock, 0 );
-   } // only undo our own operation
-}
-
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 #define MAXMULTIPLEXED_SIGNALS   16
 #define MAXHANDLERS_PER_SIGNAL   16
@@ -80,6 +50,7 @@ static void rootHandler( int signo, siginfo_t *info, void *context )
    assert( SIGRTMIN <= signo );
    assert( SIGRTMIN + MAXMULTIPLEXED_SIGNALS > signo );
 
+   debugPrint( "rootHandler for signal %d\n", signo );
    unsigned const sigoffs = signo-SIGRTMIN;
    signalData_t const *handlers = handlers_[sigoffs];
    while( handlers->handler_ ){
@@ -112,6 +83,7 @@ void setSignalHandler
      signalHandler_t  handler,
      void            *handlerContext )
 {
+   debugPrint( "set handler %p+%p for signal %d\n", handler, handlerContext, signo );
    if( SIGRTMIN > signo ){
       fprintf( stderr, "Invalid signal %d/%d\n", signo, SIGRTMIN );
    }
@@ -122,7 +94,9 @@ void setSignalHandler
    unsigned const sigoffs = signo-SIGRTMIN ;
 
    if( 0 == handlers_[sigoffs] ){
-      handlers_[sigoffs] = new signalData_t [MAXHANDLERS_PER_SIGNAL];
+      signalData_t *const handlers = new signalData_t [MAXHANDLERS_PER_SIGNAL];
+      memset( handlers, 0, MAXHANDLERS_PER_SIGNAL*sizeof( *handlers ) );
+      handlers_[sigoffs] = handlers ;
    }
 
    blockSignal_t block( signo );
@@ -216,11 +190,41 @@ void clearSignalHandler
    } // block signal
 }
 
-void setSignalMask( int signo, sigset_t &mask )     // mask these signals.
+void dumpSignalHandlers( int signo )
 {
-   sigset_t oldSet ;
-   int rc = pthread_sigmask( SIG_SETMASK, &mask, &oldSet );
+   if( SIGRTMIN > signo ){
+      fprintf( stderr, "%s: Invalid signal %d/%d\n", __PRETTY_FUNCTION__, signo, SIGRTMIN );
+      return ;
+   }
+   assert( SIGRTMIN <= signo );
+   assert( SIGRTMIN + MAXMULTIPLEXED_SIGNALS > signo );
+   unsigned const sigoffs = signo-SIGRTMIN ;
+
+   if( 0 == handlers_[sigoffs] ){
+      printf( "%s: No handlers\n", __PRETTY_FUNCTION__ );
+      return ;
+   }
+
+   signalData_t *handlers = handlers_[sigoffs];
+   printf( "signal handlers for signal %d/%p\n", signo, handlers );
+   unsigned i ;
+   for( i = 0 ; i < MAXHANDLERS_PER_SIGNAL ; i++ ){
+      signalData_t &data = handlers[i];
+      if( 0 != data.handler_ ){
+         printf( "   handler %p, param %p\n", data.handler_, data.handlerParam_ );
+      }
+      else
+         break ;
+   } // look for our spot
+
+   printf( "--- masked signals: \n" );
+   sigset_t blocked ;
+   int rc = pthread_sigmask( 0, 0, &blocked );
    assert( 0 == rc );
+   for( int sig = minRtSignal() ; sig <= maxRtSignal(); sig++ ){
+      if( sigismember( &blocked, sig ) )
+         printf( "   %u\n", sig );
+   }
 }
 
 #ifdef MODULETEST
