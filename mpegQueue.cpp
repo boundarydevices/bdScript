@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.18  2006-09-17 15:54:48  ericn
+ * Revision 1.19  2006-10-16 22:33:30  ericn
+ * -added aBytesQueued_ member, method, fixed header timestamps
+ *
+ * Revision 1.18  2006/09/17 15:54:48  ericn
  * -use unbuffered I/O for stream
  *
  * Revision 1.17  2006/09/12 13:40:37  ericn
@@ -277,6 +280,7 @@ mpegQueue_t::mpegQueue_t
    , prevSampleRate_( 0 )
    , prevChannels_( 0 )
    , aFramesQueued_( 0 )
+   , aBytesQueued_( 0 )
    , aFramesPlayed_( 0 )
    , aFramesSkipped_( 0 )
    , aFramesDropped_( 0 )
@@ -291,22 +295,27 @@ mpegQueue_t::mpegQueue_t
 {
 debugPrint( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
    videoFull_.locked_ = 0 ;
+   videoFull_.header_.when_ms_ = 0 ;
    videoFull_.header_.prev_ 
       = videoFull_.header_.next_ 
       = &videoFull_.header_ ;
    videoEmpty_.locked_ = 0 ;
+   videoEmpty_.header_.when_ms_ = 0 ;
    videoEmpty_.header_.prev_ 
       = videoEmpty_.header_.next_ 
       = &videoEmpty_.header_ ;
    decoderBufs_.locked_ = 0 ;
+   decoderBufs_.header_.when_ms_ = 0 ;
    decoderBufs_.header_.prev_ 
       = decoderBufs_.header_.next_ 
       = &decoderBufs_.header_ ;
    audioFull_.locked_ = 0 ;
+   audioFull_.header_.when_ms_ = 0 ;
    audioFull_.header_.prev_ 
       = audioFull_.header_.next_ 
       = &audioFull_.header_ ;
    audioEmpty_.locked_ = 0 ;
+   audioEmpty_.header_.when_ms_ = 0 ;
    audioEmpty_.header_.prev_ 
       = audioEmpty_.header_.next_ 
       = &audioEmpty_.header_ ;
@@ -314,8 +323,8 @@ debugPrint( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );
    audio_buf_info ai ;
    if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
       audioBufferBytes_ = ai.bytes ;
-      printf( "%llu ms/buffer @ 2 channels/44100 Hz\n",
-              audioBufferMs( 44100, 2 ) );
+      debugPrint( "%llu ms/buffer @ 2 channels/44100 Hz\n",
+                  audioBufferMs( 44100, 2 ) );
    }
    else
       perror( "GETOSPACE" );
@@ -443,20 +452,27 @@ debugPrint( "%s\n", audioDecoder_.timerString() );
                audioPartial_->numChannels_ = audioDecoder_.numChannels();
                audioPartial_->offset_ = 0 ;
 
-               if( 0LL == firstAudioMs_ )
+               if( 0LL == firstAudioMs_ ){
                   firstAudioMs_ = audioPartial_->header_.when_ms_ ;
+debugPrint( "first audio frame: %lld\n", firstAudioMs_ );
+               }
                lastAudioMs_ = audioPartial_->header_.when_ms_ ;
                audioPartial_->header_.when_ms_ += audioOffs_ ;
+debugPrint( "audio %lld\n", audioPartial_->header_.when_ms_ );
 
                queueLock_t lockAudioQ( &audioFull_.locked_, 1 );
                assert( lockAudioQ.weLocked() ); // only reader side should fail
-   
+
                pushTail( audioFull_.header_, &audioPartial_->header_ );
                audioPartial_ = 0 ;
                ++aFramesQueued_ ;
+               aBytesQueued_ += 2*AUDIOSAMPLESPERFRAME ;
+
                if( highWater_ms()*4 <= audioTailFromNow() ){
-                  fprintf( stderr, "------> too much audio queued\n" );
+                  printf( "------> too much audio queued: %lu/%lu\n", highWater_ms(), audioTailFromNow() );
+                  printf( "flags = 0x%lx\n", flags_ );
                   dumpStats();
+                  dumpAudioQueue();
                   exit(1);
                }
             }
@@ -591,6 +607,8 @@ void mpegQueue_t::startPlayback( void )
             startMs_ = now - firstAudio->when_ms_ ;
          }
 
+printf( "startMs_ %lld\n", startMs_ );
+
          long long first = firstVideo->when_ms_ ;
          long long last = first ;
          entryHeader_t *entry = firstVideo ;
@@ -633,8 +651,10 @@ void mpegQueue_t::queuePicture(videoEntry_t *ve)
    queueLock_t lockVideoQ( &videoFull_.locked_, 2 );
    assert( lockVideoQ.weLocked() ); // only reader side should fail
 
-   if( 0LL == firstVideoMs_ )
+   if( 0LL == firstVideoMs_ ){
       firstVideoMs_ = ve->header_.when_ms_ ;
+printf( "first video frame at %lld\n", firstVideoMs_ );
+   }
    lastVideoMs_ = ve->header_.when_ms_ ;
 
    ve->header_.when_ms_ += startMs_ ;
@@ -900,20 +920,20 @@ void mpegQueue_t::playAudio
                         printf( "No channel count(yet)\n" );
                      }
 
-
                      assert( ae->length_ > ae->offset_ ); // or why are we here?
 
                      unsigned bytes = ( ae->length_ - ae->offset_ ) * sizeof(ae->data_[0]);
                      int numWritten = write( dspFd_, ae->data_+ae->offset_, bytes );
                      if( 0 < numWritten ){
                         bytesWritten += numWritten ;
-      if( 0 == firstAudioWrite_ )
-         firstAudioWrite_ = tickMs();
-      lastAudioWrite_ = tickMs();
+                        if( 0 == firstAudioWrite_ )
+                           firstAudioWrite_ = tickMs();
+                        lastAudioWrite_ = tickMs();
                         ae->offset_ += numWritten/sizeof(ae->data_[0]);
 
                         assert( ae->offset_ <= ae->length_ );
                         if( ae->offset_ >= ae->length_ ){
+                           ++aFramesPlayed_ ;
                            entryHeader_t *const e = pullHead( audioFull_.header_ );
                            assert( e );
                            assert( e == (entryHeader_t *)ae );
@@ -947,6 +967,11 @@ void mpegQueue_t::playAudio
                            perror( "GETOSPACE2" );
                      }
                   } // time to play
+                  else
+                     debugPrint( "Not time yet: %lld/%lld, %lld\n", 
+                                 when, 
+                                 ae->header_.when_ms_,
+                                 audioBufferMs( ae->sampleRate_, ae->numChannels_ ) );
       
                   // continue from the middle
                   break ;
@@ -973,6 +998,8 @@ void mpegQueue_t::playAudio
       else
          perror( "GETOSPACE" );
    } // if we've started playback
+   else
+      printf( "audio not started\n" );
 }
 
 unsigned long mpegQueue_t::msVideoQueued( void ) const 
@@ -1154,7 +1181,6 @@ void mpegQueue_t::playVideo( long long when )
                   pushTail( videoEmpty_.header_, e );
                   continue ;
 #else
-
                   if( 0LL == firstVideoWrite_ )
                      firstVideoWrite_ = when ;
                   lastVideoWrite_ = when ;
@@ -1172,7 +1198,7 @@ void mpegQueue_t::playVideo( long long when )
                      continue ;
                   }
                   else
-                     fprintf( stderr, "Short video write: %d/%d/%u: %m\n", numWritten, errno, ve->length_ );
+                     fprintf( stderr, "Short video write: %d/%d/%d/%u: %m\n", yuvFd_, numWritten, errno, ve->length_ );
 #endif
                } // no peek ahead
             } // time to play
@@ -1193,6 +1219,22 @@ void mpegQueue_t::playVideo( long long when )
    else
       debugPrint( "idle\n" );
 }
+
+bool mpegQueue_t::isEmpty( void ) const {
+   if( isEmpty( videoFull_.header_ )
+       && 
+       isEmpty( audioFull_.header_ ) ){
+      audio_buf_info ai ;
+      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
+         return( ai.fragments == ai.fragstotal );
+      }
+      else
+         perror( "GETOSPACE" );
+   }
+
+   return false ;
+}
+
 
 // checks for end of either of two queues
 void mpegQueue_t::dumpQueue( entryHeader_t const &eh,
@@ -1232,7 +1274,7 @@ void mpegQueue_t::dumpStats(void) const
            "   %u video frames skipped\n"
            "   %u video frames dropped\n"
            "%lu ms of audio queued (%lu from now)\n"
-           "   %u audio frames queued\n"
+           "   %u audio frames queued (%u bytes)\n"
            "   %u audio frames played\n"
            "   %u audio frames skipped\n"
            "   %u audio frames dropped\n"
@@ -1252,7 +1294,7 @@ void mpegQueue_t::dumpStats(void) const
          ,  vFramesSkipped() 
          ,  vFramesDropped()
          ,  msAudioQueued(), audioTailFromNow()
-         ,  aFramesQueued()
+         ,  aFramesQueued(), aBytesQueued()
          ,  aFramesPlayed()
          ,  aFramesSkipped() 
          ,  aFramesDropped()
