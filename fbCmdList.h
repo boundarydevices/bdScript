@@ -1,5 +1,5 @@
 #ifndef __FBCMDLIST_H__
-#define __FBCMDLIST_H__ "$Id: fbCmdList.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __FBCMDLIST_H__ "$Id: fbCmdList.h,v 1.2 2006-10-16 22:36:34 ericn Exp $"
 
 /*
  * fbCmdList.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: fbCmdList.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:36:34  ericn
+ * -make fbJump_t a full-fledged fbCommand_t
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -61,11 +64,18 @@ private:
 };
 
 
-class fbJump_t {
+class fbJump_t : public fbCommand_t {
 public:
    fbJump_t( unsigned numBytes );
 
-   unsigned long cmdData_[2];
+   virtual void const *data( void ) const ;
+   virtual void retarget( void *data );
+
+   // used to implement conditional jumps
+   void setLength( unsigned bytes );
+
+   unsigned long  cmdData_[2];
+   unsigned long *cmdPtr_ ;
 };
 
 

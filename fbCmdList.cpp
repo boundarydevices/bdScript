@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdList.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:36:37  ericn
+ * -make fbJump_t a full-fledged fbCommand_t
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -76,9 +79,26 @@ void fbCommandList_t::copy( void *where )
 }
 
 fbJump_t::fbJump_t( unsigned numBytes )
+   : fbCommand_t( sizeof( cmdData_ ) )
+   , cmdPtr_( cmdData_ )
 {
    cmdData_[0] = 0xC0000000 | (numBytes & 0x0FFFFFF8);
    cmdData_[1] = 1 ;
+}
+
+void const *fbJump_t::data( void ) const 
+{
+   return cmdPtr_ ;
+}
+
+void fbJump_t::retarget( void *data )
+{
+   cmdPtr_ = (unsigned long *)data ;
+}
+
+void fbJump_t::setLength( unsigned bytes )
+{
+   cmdPtr_[0] = 0xC0000000 | (bytes & 0x0FFFFFF8);
 }
 
 void fbCommandList_t::dump()
@@ -143,7 +163,7 @@ int main( int argc, char const * const argv[] )
 
          cmdList.push( new fbWait_t( WAITFORDRAWINGENGINE, DRAWINGENGINEIDLE ) );
 
-         fbImage_t *const newImg = new fbImage_t( image );
+         fbImage_t *const newImg = new fbImage_t( image, fbImage_t::rgb565 );
 //         memset( newImg->pixels(), 0x80, newImg->stride()*newImg->height()*2 );
          
          printf( "%u x %u pixels, stride %u\n", image.width_, image.height_, newImg->stride() );
