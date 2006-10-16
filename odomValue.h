@@ -1,5 +1,5 @@
 #ifndef __ODOMVALUE_H__
-#define __ODOMVALUE_H__ "$Id: odomValue.h,v 1.2 2006-10-10 20:49:23 ericn Exp $"
+#define __ODOMVALUE_H__ "$Id: odomValue.h,v 1.3 2006-10-16 22:25:31 ericn Exp $"
 
 /*
  * odomValue.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: odomValue.h,v $
- * Revision 1.2  2006-10-10 20:49:23  ericn
+ * Revision 1.3  2006-10-16 22:25:31  ericn
+ * -use blts for dollar, comma, decimal
+ *
+ * Revision 1.2  2006/10/10 20:49:23  ericn
  * -bump maxDigits to 10
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -26,6 +29,7 @@
 #include "odomGraphics.h"
 #include "fbDev.h"
 #include "odomMode.h"
+#include "fbCmdBlt.h"
 
 class odomValue_t {
 public:
@@ -60,13 +64,17 @@ private:
    odomGraphics_t const &graphics_ ;
    sm501alpha_t         &alpha_ ;
    odometerMode_e  const mode_ ;
+   unsigned        const fbRam_ ; // either alpha or graphics plane offset
    unsigned              commaPos_ ;
    rectangle_t           r_ ;
-   fbImage_t const       background_ ;
+   fbImage_t      const  background_ ;
    rectangle_t           decimalRect_ ;
    rectangle_t           commaRect_ ;
    rectangle_t           dollarRect_ ;
    odomDigit_t          *digits_[maxDigits_];
+   fbBlt_t              *dollarBlt_ ;
+   fbBlt_t              *commaBlt_ ;
+   fbBlt_t              *decimalBlt_ ;
    unsigned              sigDigits_ ;
    unsigned              pennies_ ;
 };
