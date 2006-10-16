@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbMem.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:34:48  ericn
+ * -added validate() method
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -25,6 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include "dlList.h"
+
+// #define DEBUGPRINT
 #include "debugPrint.h"
 
 static fbMemory_t *instance_ = 0 ;
@@ -118,6 +124,43 @@ debugPrint( "last instance %p\n", this );
    }
 }
 
+
+typedef struct {
+   struct list_head node_ ;
+   unsigned long    size_ ;
+   unsigned long    pad_ ; // to 16-bytes
+} allocHeader_t ;
+
+
+bool fbPtrImpl_t :: validate( void ) const 
+{
+   if( 0 < count_ ){
+      allocHeader_t *alloc = ((allocHeader_t *)ptr_)-1 ;
+      if( alloc->size_ >= size_ ){
+         if( alloc->node_.next != alloc->node_.prev ){
+            if( ( 0 != alloc->node_.next )
+                &&
+                ( 0 != alloc->node_.prev ) ){
+               return true ;
+            }
+            else
+               printf( "null pointer in node %p/%p/%p\n", alloc, alloc->node_.next, alloc->node_.prev );
+         }
+         else {
+            printf( "pointer linked to itself: %p/%p/%p\n", alloc, alloc->node_.next, alloc->node_.prev );
+         }
+      }
+      else {
+         printf( "Invalid sizes: %lu/%u\n", alloc->size_, size_ );
+      }
+   }
+   else {
+      printf( "validate on unreferenced ptr\n" );
+   }
+
+   return false ;
+}
+
 fbPtr_t :: fbPtr_t( void )
    : inst_( 0 )
 {
@@ -167,6 +210,16 @@ unsigned fbPtr_t :: size( void ) const
 {
    return inst_ ? inst_->size_ : 0 ;
 }
+
+bool fbPtr_t :: validate( void ) const {
+   if( inst_ )
+      return inst_->validate();
+   else {
+      printf( "Valid, but NULL pointer\n" );
+      return true ;
+   }
+}
+
 
 #ifdef MODULETEST
 #include <vector>

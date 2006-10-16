@@ -1,5 +1,5 @@
 #ifndef __FBMEM_H__
-#define __FBMEM_H__ "$Id: fbMem.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __FBMEM_H__ "$Id: fbMem.h,v 1.2 2006-10-16 22:34:21 ericn Exp $"
 
 /*
  * fbMem.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: fbMem.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-16 22:34:21  ericn
+ * -added validate() method
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -59,6 +62,7 @@ class fbPtrImpl_t {
 
    void addRef( void ){ ++count_ ; }
    void releaseRef( void );
+   bool validate( void ) const ;
 
    unsigned count_ ;
    unsigned offs_ ;
@@ -80,6 +84,8 @@ public:
    void *getPtr(void) const { return inst_ ? inst_->ptr_ : 0 ; }
    unsigned getOffs(void) const { return inst_ ? inst_->offs_ : 0 ; }
    unsigned size( void ) const ;
+
+   bool validate( void ) const ;
 
 private:
    fbPtrImpl_t *inst_ ;

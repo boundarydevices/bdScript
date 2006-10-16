@@ -1,5 +1,5 @@
 #ifndef __FBIMAGE_H__
-#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.2 2006-08-16 02:38:00 ericn Exp $"
+#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.3 2006-10-16 22:35:17 ericn Exp $"
 
 /*
  * fbImage.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: fbImage.h,v $
- * Revision 1.2  2006-08-16 02:38:00  ericn
+ * Revision 1.3  2006-10-16 22:35:17  ericn
+ * -added validate() method
+ *
+ * Revision 1.2  2006/08/16 02:38:00  ericn
  * -update to use fbPtr_t, allow 4444 support
  *
  * Revision 1.1  2006/06/14 13:55:22  ericn
@@ -49,6 +52,8 @@ public:
    unsigned ramOffset( void ) const { return ptr_.getOffs(); }
    void    *pixels( void ) const { return ptr_.getPtr(); }
    unsigned memSize( void ) const { return ptr_.size(); }
+   
+   inline bool validate( void ) const { return ptr_.validate(); }
 
 private:
    mode_t   mode_ ;
