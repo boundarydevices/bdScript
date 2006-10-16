@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomDigit.cpp,v $
- * Revision 1.2  2006-08-16 02:32:31  ericn
+ * Revision 1.3  2006-10-16 22:26:54  ericn
+ * -no background for alpha-layer odometers
+ *
+ * Revision 1.2  2006/08/16 02:32:31  ericn
  * -support alpha mode
  *
  * Revision 1.1  2006/08/06 13:19:34  ericn
@@ -39,7 +42,9 @@ odomDigit_t::odomDigit_t(
    , mode_( mode )
    , pos9_( 9*r_.height_ )
    , pixelOffs_( 0 )
-   , background_( x, y, r_.width_, r_.height_ )
+   , background_( ( graphicsLayer == mode )
+                  ? fbImage_t( x, y, r_.width_, r_.height_ )
+                  : fbImage_t() )
    , hidden_( false )
 {
    fbDevice_t &fb = getFB();
