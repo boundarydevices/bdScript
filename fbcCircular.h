@@ -1,5 +1,5 @@
 #ifndef __FBCCIRCULAR_H__
-#define __FBCCIRCULAR_H__ "$Id: fbcCircular.h,v 1.1 2006-10-16 22:45:36 ericn Exp $"
+#define __FBCCIRCULAR_H__ "$Id: fbcCircular.h,v 1.2 2006-10-19 03:09:52 ericn Exp $"
 
 /*
  * fbcCircular.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: fbcCircular.h,v $
- * Revision 1.1  2006-10-16 22:45:36  ericn
+ * Revision 1.2  2006-10-19 03:09:52  ericn
+ * -two hidden objects are equal
+ *
+ * Revision 1.1  2006/10/16 22:45:36  ericn
  * -Initial import
  *
  *
@@ -121,12 +124,20 @@ private:
 
 bool fbcCircular_t::state_t::operator==( state_t const &rhs ) const 
 {
-   return 0 == memcmp( this, &rhs, sizeof(*this) );
+   int diff = displayState_ - rhs.displayState_ ;
+   if( ( 0 == diff ) && ( hidden_e != displayState_ ) ){
+      diff = offset_ - rhs.offset_ ;
+   }
+   return 0 == diff ;
 }
 
 bool fbcCircular_t::state_t::operator!=( state_t const &rhs ) const 
 {
-   return 0 != memcmp( this, &rhs, sizeof(*this) );
+   int diff = displayState_ - rhs.displayState_ ;
+   if( ( 0 == diff ) && ( hidden_e != displayState_ ) ){
+      diff = offset_ - rhs.offset_ ;
+   }
+   return 0 != diff ;
 }
 
 #endif

@@ -1,5 +1,5 @@
 #ifndef __FBCMOVEHIDE_H__
-#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.1 2006-10-16 22:45:40 ericn Exp $"
+#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.2 2006-10-19 03:10:09 ericn Exp $"
 
 /*
  * fbcMoveHide.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.h,v $
- * Revision 1.1  2006-10-16 22:45:40  ericn
+ * Revision 1.2  2006-10-19 03:10:09  ericn
+ * -two hidden objects are equal
+ *
+ * Revision 1.1  2006/10/16 22:45:40  ericn
  * -Initial import
  *
  *
@@ -113,7 +116,7 @@ unsigned fbcMoveHide_t::getWidth( void ) const {
 
 bool fbcMoveHide_t::state_t::operator==(state_t const &rhs ) const {
    int diff = state_ - rhs.state_ ;
-   if( 0 == diff ){
+   if( ( 0 == diff ) && ( hidden_e != state_ ) ){
       diff = xPos_ - rhs.xPos_ ;
    }
 
@@ -122,7 +125,7 @@ bool fbcMoveHide_t::state_t::operator==(state_t const &rhs ) const {
 
 bool fbcMoveHide_t::state_t::operator!=(state_t const &rhs ) const {
    int diff = state_ - rhs.state_ ;
-   if( 0 == diff ){
+   if( ( 0 == diff ) && ( hidden_e != state_ ) ){
       diff = xPos_ - rhs.xPos_ ;
    }
 
