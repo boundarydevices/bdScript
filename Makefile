@@ -951,5 +951,5 @@ clean:
 	   pxaregs flashVar ftDump jsData setBaud serialSignal \
 	   serialCounts fbCmdClear sm501reg sm501dump imgFile \
       serialTouch odomValue fbcCircular fbcHideable odomValue2 \
-      sm501alpha fbcMoveHide \
+      sm501alpha fbcMoveHide ttySignal \
       $(LIB) $(ODOMLIB) $(SM501LIB)
