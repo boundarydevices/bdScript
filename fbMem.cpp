@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbMem.cpp,v $
- * Revision 1.2  2006-10-16 22:34:48  ericn
+ * Revision 1.3  2006-10-19 00:32:57  ericn
+ * -debugMsg(), not printf()
+ *
+ * Revision 1.2  2006/10/16 22:34:48  ericn
  * -added validate() method
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -215,7 +218,7 @@ bool fbPtr_t :: validate( void ) const {
    if( inst_ )
       return inst_->validate();
    else {
-      printf( "Valid, but NULL pointer\n" );
+      debugPrint( "Valid, but NULL pointer\n" );
       return true ;
    }
 }
@@ -228,7 +231,6 @@ bool fbPtr_t :: validate( void ) const {
 
 int main( void )
 {
-   printf( "Hello, fbMem\n" );
    long long start, end ;
 
    {
