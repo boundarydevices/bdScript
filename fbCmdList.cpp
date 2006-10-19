@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdList.cpp,v $
- * Revision 1.2  2006-10-16 22:36:37  ericn
+ * Revision 1.3  2006-10-19 00:34:55  ericn
+ * -added fbJump_t::getLength(), debug msg
+ *
+ * Revision 1.2  2006/10/16 22:36:37  ericn
  * -make fbJump_t a full-fledged fbCommand_t
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -26,6 +29,9 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
+// #define DEBUGPRINT
+#include "debugPrint.h"
+
 static bool initialized_ = false ;
 static void initialize()
 {
@@ -34,7 +40,9 @@ static void initialize()
    rv.value_ = 1 ; // condition bit for skip commands
 
    int res = ioctl( getFB().getFd(), SM501_WRITEREG, &rv );
-   if( res )
+   if( 0 == res )
+      debugPrint( "set condition code register!\n" );
+   else
       perror( "SM501_WRITEREG" );
    initialized_ = true ;
 }
@@ -99,6 +107,11 @@ void fbJump_t::retarget( void *data )
 void fbJump_t::setLength( unsigned bytes )
 {
    cmdPtr_[0] = 0xC0000000 | (bytes & 0x0FFFFFF8);
+}
+
+unsigned fbJump_t::getLength( void ) const 
+{
+   return cmdPtr_[0] & 0x0FFFFFF8 ;
 }
 
 void fbCommandList_t::dump()
