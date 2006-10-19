@@ -1,5 +1,5 @@
 #ifndef __FBCMDWAIT_H__
-#define __FBCMDWAIT_H__ "$Id: fbCmdWait.h,v 1.1 2006-08-16 17:31:05 ericn Exp $"
+#define __FBCMDWAIT_H__ "$Id: fbCmdWait.h,v 1.2 2006-10-19 00:32:14 ericn Exp $"
 
 /*
  * fbCmdWait.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbCmdWait.h,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2006-10-19 00:32:14  ericn
+ * -retarget
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -34,9 +37,11 @@ public:
    virtual ~fbWait_t( void );
 
    virtual void const *data( void ) const ;
+   virtual void retarget( void *data );
 
 private:
    unsigned long data_[2];
+   unsigned long *cmdPtr_ ;
 };
 
 
