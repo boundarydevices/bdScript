@@ -1,5 +1,5 @@
 #ifndef __ODOMVALUE2_H__
-#define __ODOMVALUE2_H__ "$Id: odomValue2.h,v 1.1 2006-10-16 22:45:45 ericn Exp $"
+#define __ODOMVALUE2_H__ "$Id: odomValue2.h,v 1.2 2006-10-19 00:36:25 ericn Exp $"
 
 /*
  * odomValue2.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: odomValue2.h,v $
- * Revision 1.1  2006-10-16 22:45:45  ericn
+ * Revision 1.2  2006-10-19 00:36:25  ericn
+ * -move dollar sign to the end, add convenience methods
+ *
+ * Revision 1.1  2006/10/16 22:45:45  ericn
  * -Initial import
  *
  *
@@ -49,17 +52,24 @@ public:
 
    void dump( void );
 
+   inline unsigned digitHeight( void ) const { return digitHeight_ ; }
+
 protected:
+   void hideEm(void);
+   void showEm( unsigned msd );
+
    odomGraphics_t const &graphics_ ;
    sm501alpha_t         &alpha_ ;
    unsigned        const fbRam_ ; // either alpha or graphics plane offset
    unsigned        const digitHeight_ ;
 
-   fbcMoveHide_t        *dollarSign_ ;
    fbcHideable_t        *comma1_ ;
    fbcHideable_t        *comma2_ ;
    fbcHideable_t        *decimalPoint_ ;
    fbcCircular_t        *digits_[maxDigits_];
+
+   // dollar sign goes last so it's on the top
+   fbcMoveHide_t        *dollarSign_ ;
    unsigned char         digitValues_[maxDigits_];
    bool                  wantHidden_ ; // off-screen value
    bool                  cmdHidden_ ; // command value
