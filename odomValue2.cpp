@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odomValue2.cpp,v $
- * Revision 1.1  2006-10-16 22:45:44  ericn
+ * Revision 1.2  2006-10-19 15:28:09  ericn
+ * -dollar sign at end of list, convenience functions, optional color background
+ *
+ * Revision 1.1  2006/10/16 22:45:44  ericn
  * -Initial import
  *
  *
@@ -16,6 +19,9 @@
 
 
 #include "odomValue2.h"
+
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 //
 // with 10 digits, we have the following punctuation:
@@ -27,6 +33,26 @@ unsigned const comma1Pos = 2 ;
 unsigned const comma2Pos = 5 ;
 unsigned const decimalPos = 8 ;
 
+// #define COLORBACKGROUND
+
+#ifdef COLORBACKGROUND
+   static unsigned short DIGITBACK( unsigned dig ){
+      dig += 4 ; // make range 4..13
+      return (unsigned short)( (dig<<12) | (dig<<8) | (dig<<4) | dig );
+   }
+   #define COMMA1BACK   0xF0F0
+   #define COMMA2BACK   0xFF00
+   #define DECIMALBACK  0xF444
+   #define DOLLARBACK   0xF00F
+#else
+   #define DIGITBACK(__dig)   0
+   
+   #define COMMA1BACK   0
+   #define COMMA2BACK   0
+   #define DECIMALBACK  0
+   #define DOLLARBACK   0
+#endif
+
 odomValue2_t::odomValue2_t
    ( fbCommandList_t      &cmdList,
      odomGraphics_t const &graphics,
@@ -36,19 +62,6 @@ odomValue2_t::odomValue2_t
    , alpha_( sm501alpha_t::get(sm501alpha_t::rgba4444) )
    , fbRam_( alpha_.fbRamOffset() )
    , digitHeight_( graphics.decimalPoint_.height() )
-   , dollarSign_( 
-        new fbcMoveHide_t( cmdList,
-                           fbRam_,
-                           x,
-                           y,
-                           getFB().getWidth(),
-                           getFB().getHeight(),
-                           graphics.dollarSign_,
-                           0, 0, 
-                           graphics.dollarSign_.width(),
-                           graphics.dollarSign_.height(),
-                           false, 0 ) 
-   )
    , comma1_( 
         new fbcHideable_t( cmdList,
                            fbRam_,
@@ -62,7 +75,7 @@ odomValue2_t::odomValue2_t
                            0, 0, 
                            graphics.comma_.width(),
                            graphics.comma_.height(),
-                           false, 0 ) 
+                           false, COMMA1BACK ) 
    )
    , comma2_( 
         new fbcHideable_t( cmdList,
@@ -78,7 +91,7 @@ odomValue2_t::odomValue2_t
                            0, 0, 
                            graphics.comma_.width(),
                            graphics.comma_.height(),
-                           false, 0 ) 
+                           false, COMMA2BACK ) 
    )
    , decimalPoint_(
         new fbcHideable_t( cmdList,
@@ -94,8 +107,9 @@ odomValue2_t::odomValue2_t
                            0, 0, 
                            graphics.decimalPoint_.width(),
                            graphics.decimalPoint_.height(),
-                           false, 0 ) 
+                           false, DECIMALBACK ) 
    )
+   , dollarSign_( 0 )
    , wantHidden_( true )   // app should call show()
    , cmdHidden_( true )    // commands start out hidden
    , isHidden_( false )    // force redraw
@@ -106,6 +120,7 @@ odomValue2_t::odomValue2_t
    unsigned const screenWidth = getFB().getWidth();
    unsigned const screenHeight = getFB().getHeight();
 
+   unsigned const startX = x ;
    x += graphics.dollarSign_.width();
    unsigned dig ;
    for( dig = 0 ; dig < maxDigits_ ; dig++ ){
@@ -117,9 +132,22 @@ odomValue2_t::odomValue2_t
                                         x, y, screenWidth, screenHeight,
                                         graphics.digitStrip_,
                                         digitHeight_,
-                                        0, false, 0 );
+                                        0, false, DIGITBACK(dig) );
       x += graphics.digitStrip_.width();
    }
+
+   // allocate dollar sign last so it doesn't get cleared by digit clear
+   dollarSign_ = new fbcMoveHide_t( cmdList,
+                                    fbRam_,
+                                    startX,
+                                    y,
+                                    getFB().getWidth(),
+                                    getFB().getHeight(),
+                                    graphics.dollarSign_,
+                                    0, 0, 
+                                    graphics.dollarSign_.width(),
+                                    graphics.dollarSign_.height(),
+                                    false, DOLLARBACK );
 }
 
 
@@ -159,63 +187,80 @@ void odomValue2_t::set
 void odomValue2_t::executed()
 {
    isHidden_ = cmdHidden_ ;
-   dollarSign_->executed();
    comma1_->executed();
    comma2_->executed();
    decimalPoint_->executed();
    for( unsigned i = 0 ; i < maxDigits_ ; i++ )
       digits_[i]->executed();
+   dollarSign_->executed();
 }
 
+void odomValue2_t::hideEm( void )
+{
+debugPrint( "hide value\n" );
+
+   dollarSign_->hide();
+   comma1_->hide();
+   comma2_->hide();
+   decimalPoint_->hide();
+   for( unsigned i = 0 ; i < maxDigits_ ; i++ )
+      digits_[i]->hide();
+}
+
+void odomValue2_t::showEm( unsigned msd )
+{
+debugPrint( "show value\n" );
+
+   dollarSign_->show();
+   if( msd < comma1Pos )
+      comma1_->show();
+   if( msd < comma2Pos )
+      comma2_->show();
+   decimalPoint_->show();
+   unsigned i ;
+   for( i = 0 ; i < msd ; i++ ){
+      digits_[i]->hide();
+   }
+   for( ; i < maxDigits_ ; i++ ){
+      digits_[i]->show();
+   }
+}
 
 void odomValue2_t::updateCommandList()
 {
    if( !updating_ ){
       unsigned msd = maxDigits_-sigDigits_ ;
+      bool changed = false ;
       if( sigDigits_ != prevSig_ ){
+         changed = true ;
+debugPrint( "%u significant digits, msd = %u, want %d, cmd %d\n", sigDigits_, msd, wantHidden_, cmdHidden_ );
          prevSig_ = sigDigits_ ;
-         printf( "%u significant digits, msd = %u, want %d, cmd %d\n", sigDigits_, msd, wantHidden_, cmdHidden_ );
          dollarSign_->setX( digits_[msd]->getDestX() - dollarSign_->getWidth() );
       }
 
       if( wantHidden_ != cmdHidden_ ){
-printf( "hidden %d->%d\n", cmdHidden_, wantHidden_ );
+debugPrint( "hidden %d->%d\n", cmdHidden_, wantHidden_ );
          cmdHidden_ = wantHidden_ ;
+         changed = true ;
+      }
+
+      if( changed ){
          if( wantHidden_ ){
-printf( "hide value\n" );
-            dollarSign_->hide();
-            comma1_->hide();
-            comma2_->hide();
-            decimalPoint_->hide();
-            for( unsigned i = 0 ; i < maxDigits_ ; i++ )
-               digits_[i]->hide();
+            hideEm();
          }
          else {
-printf( "show value\n" );
-            dollarSign_->show();
-            if( msd < comma1Pos )
-               comma1_->show();
-            if( msd < comma2Pos )
-               comma2_->show();
-            decimalPoint_->show();
-            unsigned i ;
-            for( i = 0 ; i < msd ; i++ ){
-               digits_[i]->hide();
-            }
-            for( ; i < maxDigits_ ; i++ ){
-               digits_[i]->show();
-            }
+            showEm( msd );
          }
       }
-      dollarSign_->updateCommandList();
       comma1_->updateCommandList();
       comma2_->updateCommandList();
       decimalPoint_->updateCommandList();
       for( unsigned i = 0 ; i < maxDigits_ ; i++ )
          digits_[i]->updateCommandList();
+      dollarSign_->updateCommandList();
    }
    else
-      printf( "updating...\n" );
+      debugPrint( "updating...\n" );
 }
 
 void odomValue2_t::show()
@@ -234,11 +279,14 @@ void odomValue2_t::hide()
 
 void odomValue2_t::dump( void )
 {
-   printf( "..dollarSign:\n" ); dollarSign_->dump();
-   printf( "..comma1:\n" ); comma1_->dump();
-   printf( "..comma2:\n" ); comma2_->dump();
+   printf( "dollarSign:\n" ); dollarSign_->dump();
+   printf( "comma1:\n" ); comma1_->dump();
+   printf( "comma2:\n" ); comma2_->dump();
+
+   printf( "decimal:\n" ); decimalPoint_->dump();
+
    for( unsigned i = 0 ; i < maxDigits_ ; i++ ){
-      printf( "...digit[%u]\n", i );
+      printf( "digit[%u]\n", i );
       digits_[i]->dump();
    }
 }
