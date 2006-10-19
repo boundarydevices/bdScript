@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdClear.cpp,v $
- * Revision 1.1  2006-10-16 22:45:31  ericn
+ * Revision 1.2  2006-10-19 00:35:32  ericn
+ * -debugPrint, not printf
+ *
+ * Revision 1.1  2006/10/16 22:45:31  ericn
  * -Initial import
  *
  *
@@ -23,6 +26,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include "fbDev.h"
+#include "debugPrint.h"
 
 static unsigned long const clrCommand_[] = {
     0x30100000    // -- load register immediate 0x100000 - 2d source
@@ -111,7 +115,7 @@ void fbCmdClear_t::setDestX( unsigned xPos )
 {
    unsigned prevX = getDestX();
    if( prevX != xPos ){
-      printf( "move clear to xPos: %u\n", xPos );
+      debugPrint( "move clear to xPos: %u\n", xPos );
       cmdMem_[CLRREG(SMIDRAW_2D_Destination)] &= 0x0000FFFF ;
       cmdMem_[CLRREG(SMIDRAW_2D_Destination)] |= (xPos << 16 );
       unsigned short right = cmdMem_[CLRREG(SMIDRAW_2D_Clip_BR)] & 0xFFFF ;
