@@ -2,6 +2,9 @@
 #define NP_CNT 1
 #endif
 
+#include <stdio.h>
+#include <string.h>
+
 #define NPD_CNT (NP_CNT+NP_CNT)
 
 #define DO_AVERAGE
