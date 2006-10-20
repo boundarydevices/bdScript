@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.19  2006-10-16 22:33:30  ericn
+ * Revision 1.20  2006-10-20 01:05:37  ericn
+ * -don't TRACEMAD by default
+ *
+ * Revision 1.19  2006/10/16 22:33:30  ericn
  * -added aBytesQueued_ member, method, fixed header timestamps
  *
  * Revision 1.18  2006/09/17 15:54:48  ericn
@@ -107,7 +110,7 @@ static traceSource_t traceSkipB( "skipBFrames" );
 #include <openssl/md5.h>
 #endif
 
-#define TRACEMAD
+// #define TRACEMAD
 
 extern "C" {
 #ifdef TRACEMPEG2
