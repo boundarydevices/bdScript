@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.cpp,v $
- * Revision 1.1  2006-10-16 22:45:39  ericn
+ * Revision 1.2  2006-10-25 23:27:24  ericn
+ * -two-step move
+ *
+ * Revision 1.1  2006/10/16 22:45:39  ericn
  * -Initial import
  *
  *
@@ -112,7 +115,15 @@ void fbcMoveHide_t::updateCommandList()
       {
          assert( unknown_e != offScreenState_.state_ );
 //         printf( "moveHide: state %d->%d\n", commandState_.state_, offScreenState_.state_ );
-         commandState_ = offScreenState_ ;
+         if( ( onScreenState_.xPos_ != offScreenState_.xPos_ )
+             &&
+             ( onScreenState_.state_ == visible_e ) ){
+            commandState_.state_ = hidden_e ;
+            commandState_.xPos_  = onScreenState_.xPos_ ;
+         } // need to clear old value
+         else {
+            commandState_ = offScreenState_ ;
+         }
          changed = true ;
       }
 

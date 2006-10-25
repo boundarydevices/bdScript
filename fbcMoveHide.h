@@ -1,5 +1,5 @@
 #ifndef __FBCMOVEHIDE_H__
-#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.2 2006-10-19 03:10:09 ericn Exp $"
+#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.3 2006-10-25 23:27:41 ericn Exp $"
 
 /*
  * fbcMoveHide.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.h,v $
- * Revision 1.2  2006-10-19 03:10:09  ericn
+ * Revision 1.3  2006-10-25 23:27:41  ericn
+ * -two-step move
+ *
+ * Revision 1.2  2006/10/19 03:10:09  ericn
  * -two hidden objects are equal
  *
  * Revision 1.1  2006/10/16 22:45:40  ericn
@@ -55,6 +58,15 @@ public:
    void hide( void );
 
    inline unsigned getX( void ) const ;   
+   
+   // When changing X-positions, the fbcMoveHide class
+   // normally performs a two-step process:
+   //       clear old rectangle, then
+   //       blt to new rectangle
+   // If the application knows that the old position 
+   // will be overwritten, this routine can force the
+   // clear to be skipped.
+   inline void skipHide( void );
    void setX( unsigned x );
    inline unsigned getWidth( void ) const ;
 
@@ -62,6 +74,7 @@ public:
 
 private:
    fbcMoveHide_t( fbcMoveHide_t const & ); // no copies
+
    enum state_e {
       unknown_e   = 0,
       visible_e   = 1,
@@ -130,6 +143,11 @@ bool fbcMoveHide_t::state_t::operator!=(state_t const &rhs ) const {
    }
 
    return ( 0 != diff );
+}
+
+void fbcMoveHide_t::skipHide( void )
+{
+   onScreenState_.state_ = hidden_e ; // so clear won't occur
 }
 
 #endif
