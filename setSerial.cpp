@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: setSerial.cpp,v $
- * Revision 1.2  2006-10-10 20:55:12  ericn
+ * Revision 1.3  2006-10-25 23:26:13  ericn
+ * -actuall set the baud rate
+ *
+ * Revision 1.2  2006/10/10 20:55:12  ericn
  * -use cfmakeraw
  *
  * Revision 1.1  2006/09/27 01:41:46  ericn
@@ -33,11 +36,15 @@ int setBaud( int fd, unsigned baud )
    
       unsigned baudConst ;
       baudRateToConst( baud, baudConst );
-   
       rval = cfsetispeed(&newState, baudConst);
       if( 0 == rval ){
          rval = cfsetospeed(&newState, baudConst);
-         if( 0 != rval )
+         if( 0 == rval ){
+            rval = tcsetattr( fd, TCSANOW, &newState );
+            if( 0 != rval )
+               perror( "tcsetattr" );
+         }
+         else
             perror( "cfsetospeed" );
       }
       else
