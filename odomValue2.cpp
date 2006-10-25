@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odomValue2.cpp,v $
- * Revision 1.2  2006-10-19 15:28:09  ericn
+ * Revision 1.3  2006-10-25 23:26:46  ericn
+ * -handle dollar values going down
+ *
+ * Revision 1.2  2006/10/19 15:28:09  ericn
  * -dollar sign at end of list, convenience functions, optional color background
  *
  * Revision 1.1  2006/10/16 22:45:44  ericn
@@ -214,8 +217,12 @@ debugPrint( "show value\n" );
    dollarSign_->show();
    if( msd < comma1Pos )
       comma1_->show();
+   else
+      comma1_->hide();
    if( msd < comma2Pos )
       comma2_->show();
+   else
+      comma2_->hide();
    decimalPoint_->show();
    unsigned i ;
    for( i = 0 ; i < msd ; i++ ){
@@ -234,8 +241,10 @@ void odomValue2_t::updateCommandList()
       if( sigDigits_ != prevSig_ ){
          changed = true ;
 debugPrint( "%u significant digits, msd = %u, want %d, cmd %d\n", sigDigits_, msd, wantHidden_, cmdHidden_ );
-         prevSig_ = sigDigits_ ;
          dollarSign_->setX( digits_[msd]->getDestX() - dollarSign_->getWidth() );
+         if( sigDigits_ > prevSig_ )
+            dollarSign_->skipHide();
+         prevSig_ = sigDigits_ ;
       }
 
       if( wantHidden_ != cmdHidden_ ){
