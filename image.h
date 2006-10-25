@@ -1,5 +1,5 @@
 #ifndef __IMAGE_H__
-#define __IMAGE_H__ "$Id: image.h,v 1.3 2006-05-14 14:43:44 ericn Exp $"
+#define __IMAGE_H__ "$Id: image.h,v 1.4 2006-10-25 23:28:04 ericn Exp $"
 
 /*
  * image.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: image.h,v $
- * Revision 1.3  2006-05-14 14:43:44  ericn
+ * Revision 1.4  2006-10-25 23:28:04  ericn
+ * -add typeName() utility routine
+ *
+ * Revision 1.3  2006/05/14 14:43:44  ericn
  * -allow image_t construction
  *
  * Revision 1.2  2005/01/01 16:11:49  ericn
@@ -67,6 +70,7 @@ public:
    unsigned short height_ ;
    void const    *alpha_ ;
 
+   static char const *typeName( type_e );
 private:
    image_t( image_t const & ); // no copies
 };
