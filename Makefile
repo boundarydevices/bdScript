@@ -34,6 +34,7 @@ MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
 #MPEG2LIBS = -lmpeg2 -lmpeg2convert
 
 OBJS = \
+       ascii85.o \
        baudRate.o \
        bitmap.o \
        blockSig.o \
@@ -56,6 +57,8 @@ OBJS = \
        hexDump.o \
        httpPoll.o \
        image.o \
+       imageInfo.o \
+       imageToPS.o \
        imgFile.o \
        imgGIF.o \
        imgJPEG.o \
@@ -92,6 +95,7 @@ OBJS = \
        jsTimer.o \
        jsUDP.o \
        jsURL.o \
+       jsUsblp.o \
        jsUse.o \
        logTraces.o \
        md5.o \
@@ -103,6 +107,7 @@ OBJS = \
        parsedFlash.o \
        parsedURL.o \
        ping.o \
+       pngToPS.o \
        pollHandler.o \
        pollTimer.o \
        popen.o \
@@ -125,6 +130,7 @@ OBJS = \
        ultoa.o \
        ultodd.o \
        urlFile.o \
+       usblpPoll.o \
        flashVar.o \
        jsFlashVar.o \
 
@@ -804,6 +810,23 @@ mpegRxUDP: mpegRxUDPMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYRE
 	arm-linux-nm --demangle mpegRxUDP | sort >mpegRxUDP.map
 	$(STRIP) $@
 
+usbPostscriptMain.o: usbPostscript.cpp
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST -c $(IFLAGS) -O2 -o usbPostscriptMain.o usbPostscript.cpp
+
+usbPostscript: usbPostscriptMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbPostscript usbPostscriptMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle usbPostscript | sort >usbPostscript.map
+	$(STRIP) $@
+
+usblpPollMain.o: usblpPoll.cpp
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST_USBLP -c $(IFLAGS) -O2 -o usblpPollMain.o usblpPoll.cpp
+
+usblpPoll: usblpPollMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usblpPoll usblpPollMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle usblpPoll | sort >usblpPoll.map
+	$(STRIP) $@
+
+
 hexDump: hexDump.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o hexDump -D__STANDALONE__ -Xlinker -Map -Xlinker hexDump.map hexDump.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
@@ -952,4 +975,5 @@ clean:
 	   serialCounts fbCmdClear sm501reg sm501dump imgFile \
       serialTouch odomValue fbcCircular fbcHideable odomValue2 \
       sm501alpha fbcMoveHide ttySignal \
+      pngToPS usbPostscript usblpPoll imageInfo ascii85 imageToPS \
       $(LIB) $(ODOMLIB) $(SM501LIB)
