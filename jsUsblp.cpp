@@ -9,16 +9,7 @@
  * Change History : 
  *
  * $Log: jsUsblp.cpp,v $
- * Revision 1.5  2006-02-13 21:10:42  ericn
- * -add isOpen() method
- *
- * Revision 1.4  2007/01/03 22:06:04  ericn
- * -added statistics and logging routines
- *
- * Revision 1.3  2006/12/13 21:25:01  ericn
- * -add jsBitmapToSwecoin method
- *
- * Revision 1.1  2006/10/29 21:59:10  ericn
+ * Revision 1.1  2006-10-29 21:59:10  ericn
  * -Initial import
  *
  *
@@ -32,25 +23,7 @@
 #include "codeQueue.h"
 #include "imageInfo.h"
 #include "imageToPS.h"
-#include "bitmap.h"
-#include "jsBitmap.h"
 #include <errno.h>
-#include <alloca.h>
-#include <sys/ioctl.h>
-
-#define IOCNR_CLRADLER		        12
-#define IOCNR_GETADLER		        13
-#define IOCNR_CLRCOUNT		        14
-#define IOCNR_GETCOUNT		        15
-#define IOCNR_CLRADLERIN		16
-#define IOCNR_GETADLERIN		17
-#define CLRADLER  _IOC( _IOC_NONE, 'P', IOCNR_CLRADLER, 0)
-#define GETADLER  _IOR( 'P', IOCNR_GETADLER, unsigned long)
-#define CLRADLERIN  _IOC( _IOC_NONE, 'P', IOCNR_CLRADLERIN, 0)
-#define GETADLERIN  _IOR( 'P', IOCNR_GETADLERIN, unsigned long)
-
-#define CLRCOUNT  _IOC( _IOC_NONE, 'P', IOCNR_CLRCOUNT, 0)
-#define GETCOUNT  _IOR( 'P', IOCNR_GETCOUNT, unsigned long)
 
 class jsUsblpPoll_t : public usblpPoll_t {
 public:
@@ -60,6 +33,7 @@ public:
    virtual void onDataIn( void );
 
    JSObject *obj_ ;
+   FILE     *fLog_ ;
 };
 
 jsUsblpPoll_t::jsUsblpPoll_t( JSObject *devObj )
@@ -68,6 +42,7 @@ jsUsblpPoll_t::jsUsblpPoll_t( JSObject *devObj )
                   2<<20,      // 2 MB
                   4096 )
    , obj_( devObj )
+   , fLog_( 0 )
 {
    JS_AddRoot( execContext_, &obj_ );
 }
@@ -75,6 +50,8 @@ jsUsblpPoll_t::jsUsblpPoll_t( JSObject *devObj )
 jsUsblpPoll_t::~jsUsblpPoll_t( void )
 {
    JS_RemoveRoot( execContext_, &obj_ );
+   if( fLog_ )
+      fclose( fLog_ );
 }
 
 void jsUsblpPoll_t::onDataIn( void )
@@ -113,26 +90,24 @@ JSClass jsUsblpClass_ = {
 //
 static JSBool jsUsblp( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = JSVAL_FALSE ;
    if( 0 != (cx->fp->flags & JSFRAME_CONSTRUCTING) )
    {
       JSObject *devObj = JS_NewObject( cx, &jsUsblpClass_, lpProto, obj );
    
       if( devObj )
       {
-         jsUsblpPoll_t *realDev = new jsUsblpPoll_t(devObj);
-         if( realDev && realDev->isOpen() ){
-            *rval = OBJECT_TO_JSVAL(devObj); // root
-            JS_SetPrivate( cx, devObj, realDev );
-         }
-         else
-            JS_ReportError( cx, "No usblp device found\n" );
+         *rval = OBJECT_TO_JSVAL(devObj); // root
+
+         JS_SetPrivate( cx, devObj, new jsUsblpPoll_t(devObj) );
       }
       else
+      {
          JS_ReportError( cx, "allocating usblp\n" );
+         *rval = JSVAL_FALSE ;
+      }
    }
    else
-      JS_ReportError( cx, "Usage : mylp = new usblp();\n" );
+      JS_ReportError( cx, "Usage : mylp = new usblp();" );
 
    return JS_TRUE;
 }
@@ -164,6 +139,9 @@ jsWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             int numWritten = dev->write( outData, segLength );
             if( 0 < numWritten ){
                totalLength += numWritten ;
+               if( dev->fLog_ ){
+                  fwrite( outData, 1, numWritten, dev->fLog_ );
+               }
             }
             else if( 0 > numWritten ){
                JS_ReportError( cx, "usblp: short write %d of %u\n", numWritten, segLength );
@@ -206,19 +184,6 @@ jsRead( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static JSBool
-jsIsOpen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      if( dev->isOpen() )
-         *rval = JSVAL_TRUE ;
-   }
-   return JS_TRUE ;
-}
-
 static bool imagePsOutput( char const *outData,
                            unsigned    outLength,
                            void       *opaque )
@@ -228,6 +193,9 @@ static bool imagePsOutput( char const *outData,
    while( 0 < outLength ){
       int numWritten = dev->write( outData, outLength );
       if( 0 < numWritten ){
+         if( dev->fLog_ ){
+            fwrite( outData, 1, numWritten, dev->fLog_ );
+         }
          outData += numWritten ;
          outLength -= numWritten ;
       }
@@ -314,74 +282,6 @@ jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
-static JSBool
-jsBitmapToSwecoin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      JSObject *objBmp ;
-      if( ( 1 == argc )
-          &&
-          JSVAL_IS_OBJECT( argv[0] )
-          &&
-          ( 0 != ( objBmp = JSVAL_TO_OBJECT(argv[0]) ) )
-          &&
-          JS_InstanceOf( cx, objBmp, &jsBitmapClass_, NULL ) )
-      {
-         jsval widthVal, heightVal, dataVal ;
-         if( JS_GetProperty( cx, objBmp, "width", &widthVal )
-             &&
-             JS_GetProperty( cx, objBmp, "height", &heightVal )
-             &&
-             JS_GetProperty( cx, objBmp, "pixBuf", &dataVal )
-             &&
-             JSVAL_IS_STRING( dataVal ) )
-         {
-            bitmap_t bmp( (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
-                          JSVAL_TO_INT( widthVal ),
-                          JSVAL_TO_INT( heightVal ) );
-            unsigned char const *nextRow = bmp.getMem();
-            unsigned char bpl = bmp.bytesPerRow();
-            char const pixelBytes = (bmp.getWidth()+7)/8 ;
-            char const pixelsPlusHeader = pixelBytes+3 ;
-            unsigned const imageSize = bmp.getHeight()*pixelsPlusHeader+1 ;
-            char *const imgBuf = (char *)malloc( imageSize );
-            char *nextOut = imgBuf ;
-
-            for( unsigned i = 0 ; i < bmp.getHeight(); i++, nextRow += bpl, nextOut += pixelsPlusHeader ){
-               nextOut[0] = '\x1b' ;
-               nextOut[1] = 's' ;
-               nextOut[2] = pixelBytes ;
-               memcpy( nextOut+3, nextRow, pixelBytes );
-            } // write each row of output
-            
-            unsigned bytesLeft = imageSize ;
-            nextOut = imgBuf ;
-            while( 0 < bytesLeft ){
-               int numWritten = dev->write( nextOut, bytesLeft );
-               if( 0 < numWritten ){
-                  nextOut += numWritten ;
-                  bytesLeft -= numWritten ;
-               }
-               else {
-                  JS_ReportError( cx, "short write: %d of %d\n", numWritten, bytesLeft );
-                  break ;
-               }
-            }
-            *rval = JSVAL_TRUE ;
-         }
-         else
-            JS_ReportError( cx, "Invalid bitmap" );
-      }
-      else
-         JS_ReportError( cx, "Usage: usblp.bitmapToSwecoin(bitmap)\n" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
 
 static JSBool
 jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -442,182 +342,12 @@ jsStopLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static JSBool
-jsGetAdler( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      unsigned long adler ;
-      int ioctlRet = ioctl( dev->getFd(), GETADLER, &adler );
-      if( 0 == ioctlRet )
-         *rval = INT_TO_JSVAL(adler);
-      else
-         perror( "GETADLER" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsClearAdler( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      int ioctlRet = ioctl( dev->getFd(), CLRADLER, 0 );
-      if( 0 == ioctlRet )
-         *rval = JSVAL_ZERO ;
-      else
-         perror( "CLRADLER" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsGetAdlerIn( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      unsigned long adler ;
-      int ioctlRet = ioctl( dev->getFd(), GETADLERIN, &adler );
-      if( 0 == ioctlRet )
-         *rval = INT_TO_JSVAL(adler);
-      else
-         perror( "GETADLERIN" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsClearAdlerIn( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      int ioctlRet = ioctl( dev->getFd(), CLRADLERIN, 0 );
-      if( 0 == ioctlRet )
-         *rval = JSVAL_ZERO ;
-      else
-         perror( "CLRADLERIN" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsGetCount( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      unsigned long adler ;
-      int ioctlRet = ioctl( dev->getFd(), GETCOUNT, &adler );
-      if( 0 == ioctlRet )
-         *rval = INT_TO_JSVAL(adler);
-      else
-         perror( "GETCOUNT" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsClearCount( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      int ioctlRet = ioctl( dev->getFd(), CLRCOUNT, 0 );
-      if( 0 == ioctlRet )
-         *rval = JSVAL_ZERO ;
-      else
-         perror( "CLRCOUNT" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsRxAvail( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      int numAvail ;
-      int const ioctlResult = ioctl( dev->getFd(), FIONREAD, &numAvail );
-      if( 0 == ioctlResult )
-      {
-         *rval = INT_TO_JSVAL(numAvail);
-      }
-      else
-         perror( "jsUsbLp:FIONREAD" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
-static JSBool
-jsOutStats( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_FALSE ;
-   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
-   if( dev )
-   {
-      printf( "lp device output stats:\n"
-              "%u bytes of output buffer\n"
-              "add at %u\n"
-              "take from %u\n",
-              dev->outBufferLength_, 
-              dev->outAdd_,
-              dev->outTake_ );
-      int numAvail ;
-      int const ioctlResult = ioctl( dev->getFd(), FIONREAD, &numAvail );
-      if( 0 == ioctlResult )
-      {
-         *rval = INT_TO_JSVAL(numAvail);
-      }
-      else
-         perror( "jsUsbLp:FIONREAD" );
-   }
-   else
-      JS_ReportError( cx, "Invalid usblp object\n" );
-   return JS_TRUE ;
-}
-
 static JSFunctionSpec usblp_methods[] = {
-   { "write",           jsWrite,           0,0,0 },
-   { "read",            jsRead,            0,0,0 },
-   { "isOpen",          jsIsOpen,          0,0,0 },
-   { "imageToPS",       jsImageToPS,       0,0,0 },
-   { "getAdler",        jsGetAdler,        0,0,0 },
-   { "clearAdler",      jsClearAdler,      0,0,0 },
-   { "getAdlerIn",      jsGetAdlerIn,      0,0,0 },
-   { "clearAdlerIn",    jsClearAdlerIn,    0,0,0 },
-   { "getCount",        jsGetCount,        0,0,0 },
-   { "clearCount",      jsClearCount,      0,0,0 },
-   { "bitmapToSwecoin", jsBitmapToSwecoin, 0,0,0 },
-   { "rxAvail",         jsRxAvail,         0,0,0 },
-   { "startLog",        jsStartLog,        0,0,0 },
-   { "stopLog",         jsStopLog,         0,0,0 },
-   { "outStats",        jsOutStats,        0,0,0 },
+   { "write",           jsWrite,     0,0,0 },
+   { "read",            jsRead,      0,0,0 },
+   { "imageToPS",       jsImageToPS, 0,0,0 },
+   { "startLog",        jsStartLog,  0,0,0 },
+   { "stopLog",         jsStopLog,   0,0,0 },
    { 0 }
 };
 
