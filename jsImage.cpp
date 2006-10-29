@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.34  2006-03-28 04:16:50  ericn
+ * Revision 1.35  2006-10-29 21:56:26  ericn
+ * -add imageInfo() function
+ *
+ * Revision 1.34  2006/03/28 04:16:50  ericn
  * -conditional compile on Cairo
  *
  * Revision 1.33  2005/12/11 16:02:30  ericn
@@ -130,6 +133,7 @@
 #include "bdGraph/Scale16.h"
 #include "dither.h"
 #include "jsBitmap.h"
+#include "imageInfo.h"
 
 #if CONFIG_JSCAIRO == 1
 #include "jsCairo.h"
@@ -922,6 +926,44 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 
 }
 
+static JSBool
+jsImageInfo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   JSString *str ;
+   if( ( 1 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] )
+       &&
+       ( 0 != ( str = JS_ValueToString(cx, argv[0]) ) ) )
+   {
+      imageInfo_t info ;
+      if( getImageInfo( JS_GetStringBytes( str ), 
+                        JS_GetStringLength( str ), 
+                        info ) )
+      {
+         JSObject *infoObj = JS_NewObject( cx, &global_class, NULL, NULL);
+         if( infoObj ){
+            *rval = OBJECT_TO_JSVAL( infoObj ); // root
+            JS_DefineProperty( cx, infoObj, "width", INT_TO_JSVAL(info.width_), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+            JS_DefineProperty( cx, infoObj, "height", INT_TO_JSVAL(info.height_), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+         }
+      }
+      else
+         JS_ReportError( cx, "Invalid or unsupported image\n" );
+   }
+   else
+      JS_ReportError( cx, "Usage: imageInfo( imgDataString )\n" );
+
+   return JS_TRUE ;
+}
+
+static JSFunctionSpec functions_[] = {
+    {"imageInfo",    jsImageInfo,        0},
+    {0}
+};
+
+
 bool initJSImage( JSContext *cx, JSObject *glob )
 {
    JSObject *rval = JS_InitClass( cx, glob, NULL, &jsImageClass_,
@@ -931,10 +973,11 @@ bool initJSImage( JSContext *cx, JSObject *glob )
                                   0, 0 );
    if( rval )
    {
-      return true ;
+      if( JS_DefineFunctions( cx, glob, functions_ ) )
+      {
+         return true ;
+      }
    }
-   else
-      return false ;
-
+   return false ;
 }
 
