@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.89  2006-10-05 14:40:51  ericn
+ * Revision 1.90  2006-10-29 21:57:12  ericn
+ * -add jsUsblp initialization
+ *
+ * Revision 1.89  2006/10/05 14:40:51  ericn
  * -add detach flag to cmd line
  *
  * Revision 1.88  2006/08/16 21:11:10  ericn
@@ -353,6 +356,7 @@
 #include "jsFlashVar.h"
 #include "jsMD5.h"
 #include <fcntl.h>
+#include "jsUsblp.h"
 
 #include "touchPoll.h"
 
@@ -706,6 +710,8 @@ int prMain(int argc, char **argv, bool )
 #if CONFIG_JSSTARUSB == 1
                   initJSStarUSB( cx, glob );
 #endif
+
+                  initJSUsbLp( cx, glob );
 
                   getCurlCache();
 
