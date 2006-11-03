@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgToPNG.cpp,v $
- * Revision 1.2  2006-08-16 02:30:06  ericn
+ * Revision 1.3  2006-11-03 19:22:09  ericn
+ * -write end before flush
+ *
+ * Revision 1.2  2006/08/16 02:30:06  ericn
  * -use alpha if present
  *
  * Revision 1.1  2006/05/07 15:41:17  ericn
@@ -178,6 +181,8 @@ bool imageToPNG( image_t const &img,
 
 				delete [] outRow ;
 
+				png_write_end(png_ptr, info_ptr);
+
 				chunk_t *ch = get_png_chunk(png_ptr);
 				if( ch ){
 					void *outData ;
@@ -185,9 +190,6 @@ bool imageToPNG( image_t const &img,
 					pngData = outData ;
 					flush_png_data(png_ptr);
 				}
-				
-				png_write_end(png_ptr, info_ptr);
-
 			}
 
 			png_destroy_info_struct(png_ptr, &info_ptr);
