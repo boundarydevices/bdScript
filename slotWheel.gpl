@@ -1,0 +1,132 @@
+#
+# slotWheel.gpl
+#
+# Plot four-segment slot wheel motion (time and position):
+#
+#        Segment 1: constant velocity retract (simulates tightening spring)
+#        Segment 2: (acceleration) simulates constant acceleration from release
+#                   of the virtual spring
+#        Segment 3: (deceleration) constant-velocity deceleration simulating
+#                   friction or gravity
+#        Segment 4: (bounce) simulated spring latching wheel into fixed position
+#
+# The math behind this is fairly simple (shown with 't' relative to segment)
+# as shown in the K-12 website at 
+#        http://www.glenbrook.k12.il.us/gbssci/Phys/Class/1DKin/U1L6c.html
+#
+#        Segment 1:        position = startPos + backSlope*t
+#                          velocity = backSlope
+#
+#        Segment 2:        position = pos0 + v0*t + 1/2*fAccel*(t**2)
+#                          velocity = v0 + fAccel*t
+#
+#                          pos0 is equal to the position at the end of segment 1:
+#                             backSlope*maxBack
+#
+#                          v0 is equal to the velocity at the end of segment 1: 
+#                             backSlope
+#
+#        Segment 3:        position = pos0 + v0*t + 1/2*fDecel*(t**2)
+#                          velocity = v0 + fDecel*t
+#
+#                          v0 is equal to the velocity at the end of Segment 2:
+#                             backSlope+(fAccel*maxAccel)
+#
+#        Segment 4:        This segment is a bit different, since it is driven
+#                          by a decreasing sine wave (cos actually) starting at
+#                          the end of Segment 4. There are three key parameters
+#                          used to control the shape of the segment:
+#
+#                             bounceMag   - controls the magnitude of the sine wave
+#                             bounceSpeed - controls the speed of the bounce
+#                             bounceDist  - time until bouncing stops
+#
+#                          In actuall application use, the bounceMag parameter is
+#                          rigged to give the desired outcome and bounceDist is
+#                          tweaked to give a good-looking bounce.
+#
+# Since segment four needs to start when the velocity in segment 3 is zero, 
+# a pre-calculation is needed to find 't'.
+#
+#     0 = decelV(t)
+#       = accelV(maxBack+maxAccel) + (fDecel*(t-maxAccel-maxBack))
+#       = backV(maxBack) + fAccel*maxAccel + (fDecel*(t-maxAccel-maxBack))
+#
+#     -(fDecel*(t-maxAccel-maxBack)) = backSlope + fAccel*maxAccel
+#
+#     t = backSlope + fAccel*maxAccel - fDecel*maxAccel - fDecel*maxBack
+#         --------------------------------------------------------------
+#                                  -fDecel
+#
+#     t = backSlope + fAccel*maxAccel + maxAccel + maxBack
+#         ---------   ---------------   
+#          -fDecel        -fDecel
+#
+
+
+#
+# constants first (for tweaking)
+#
+startPos  = 5 ;
+maxBack   = 10 ;
+backSlope = -10 ;
+
+maxAccel  = 10 ;
+fAccel    = 8 ;
+
+maxDecel  = 10 ;
+fDecel    = -9.8
+
+bounceMag  = 30 ;
+bounceDist = 6 ;
+bounceSpeed = 4 ;
+
+#
+# back pull position and velocity
+#
+backPos(t) = startPos + backSlope*t
+backV(t)   = backSlope ;
+
+#
+# acceleration position and velocity
+#
+accelPos(t) = backPos(maxBack) \
+            + backV(maxBack)*(t-maxBack) \
+            +(0.5*fAccel*((t-maxBack)**2))
+accelV(t) = backV(maxBack) \
+          + (fAccel*(t-maxBack))
+
+#
+# deceleration position and velocity
+#
+decelPos(t) = accelPos(maxBack+maxAccel) \
+           + (t-maxAccel-maxBack)*accelV(maxAccel+maxBack) \
+           + (0.5*fDecel*((t-maxAccel-maxBack)**2))
+decelV(t)   = accelV(maxBack+maxAccel) \
+            + (fDecel*(t-maxAccel-maxBack))
+
+#
+# deceleration end time
+#
+tDecelEnd = ((backSlope/(0-fDecel)) + ((fAccel*maxAccel)/(0-fDecel)) + maxAccel + maxBack)
+
+#
+# bounce end time and position
+#
+tBounceEnd = (tDecelEnd + bounceDist)
+decelEndPos = decelPos(tDecelEnd)
+bouncePos(t) = ( tBounceEnd > t ) \
+               ? decelEndPos - bounceMag + bounceMag*(cos((t-tDecelEnd)*bounceSpeed))*((tBounceEnd-t)/bounceDist) \
+               : bouncePos(tBounceEnd-0.0001);
+
+motion(t) = ( t < maxBack ) \
+            ? backPos(t) \
+            : ( (t < (maxBack+maxAccel)) \
+                ? accelPos(t)  \
+                : ( ( t < tDecelEnd ) \
+                    ? decelPos(t) \
+                    : bouncePos(t) ) )
+
+plot [0:tBounceEnd] motion(x)
+# plot [tDecelEnd:tBounceEnd] bounceMag*(cos((x-tDecelEnd)*bounceSpeed))*((tBounceEnd-x)/bounceDist)
+
