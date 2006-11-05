@@ -67,18 +67,17 @@
 #
 # constants first (for tweaking)
 #
-startPos  = 5 ;
-maxBack   = 10 ;
+startPos  = 0 ;
+maxBack   = 60 ;
 backSlope = -10 ;
 
-maxAccel  = 10 ;
-fAccel    = 8 ;
+maxAccel  = 90 ;
+fAccel    = 4 ;
 
-maxDecel  = 10 ;
-fDecel    = -9.8
+fDecel    = -3.8
 
 bounceMag  = 30 ;
-bounceDist = 6 ;
+bounceDist = 30 ;
 bounceSpeed = 4 ;
 
 #
@@ -115,8 +114,10 @@ tDecelEnd = ((backSlope/(0-fDecel)) + ((fAccel*maxAccel)/(0-fDecel)) + maxAccel 
 #
 tBounceEnd = (tDecelEnd + bounceDist)
 decelEndPos = decelPos(tDecelEnd)
+
+# ternary expression to avoid divide by zero
 bouncePos(t) = ( tBounceEnd > t ) \
-               ? decelEndPos - bounceMag + bounceMag*(cos((t-tDecelEnd)*bounceSpeed))*((tBounceEnd-t)/bounceDist) \
+               ? decelEndPos - bounceMag + bounceMag*(cos((t-tDecelEnd)*bounceSpeed/((tBounceEnd-t)/bounceDist)))*((tBounceEnd-t)/bounceDist) \
                : bouncePos(tBounceEnd-0.0001);
 
 motion(t) = ( t < maxBack ) \
