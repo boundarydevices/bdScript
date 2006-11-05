@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: jsData.cpp,v $
- * Revision 1.1  2006-10-16 22:45:41  ericn
+ * Revision 1.2  2006-11-05 18:19:21  ericn
+ * -allow nested jsData_t's
+ *
+ * Revision 1.1  2006/10/16 22:45:41  ericn
  * -Initial import
  *
  *
@@ -64,6 +67,7 @@ jsData_t::jsData_t( char const *scriptlet,
                     unsigned length,
                     char const *fileName )
    : fileName_( fileName ? fileName : "<input>" )
+   , ownIt_( true )
    , rt_( JS_NewRuntime(4L * 1024L * 1024L) )
    , cx_( rt_ ? JS_NewContext(rt_, 8192): 0 )
    , obj_( cx_ ? JS_NewObject(cx_, &data_class, NULL, NULL): 0 )
@@ -85,13 +89,28 @@ jsData_t::jsData_t( char const *scriptlet,
    }
 }
 
+jsData_t::jsData_t( 
+   JSRuntime  *rt,
+   JSContext  *cx,
+   JSObject   *rootObj,
+   char const *fileName )
+   : fileName_( fileName ? fileName : "<input>" )
+   , ownIt_( false )
+   , rt_( rt )
+   , cx_( cx )
+   , obj_( rootObj )
+{
+}
+
 jsData_t::~jsData_t( void )
 {
-   if( cx_ ){
-      JS_DestroyContext(cx_);
-   }
-   if( rt_ ){
-      JS_DestroyRuntime(rt_);
+   if( ownIt_ ){
+      if( cx_ ){
+         JS_DestroyContext(cx_);
+      }
+      if( rt_ ){
+         JS_DestroyRuntime(rt_);
+      }
    }
 }
 
@@ -99,7 +118,7 @@ bool jsData_t::evaluate(
    char const *scriptlet, 
    unsigned    length,
    jsval      &rval,
-   JSObject   *obj )
+   JSObject   *obj ) const 
 {
    bool worked ;
    if( 0 == obj )
@@ -117,7 +136,7 @@ bool jsData_t::getInt(
    char const *name, 
    int        &value,
    JSObject   *obj 
-)
+)  const 
 {
    jsval rv ;
    if( evaluate( name, strlen( name ), rv, obj ) 
@@ -131,11 +150,28 @@ bool jsData_t::getInt(
    return false ;
 }
 
+bool jsData_t::getDouble( 
+   char const *name, 
+   double     &value,
+   JSObject   *obj 
+) const 
+{
+   jsval rv ;
+   if( evaluate( name, strlen( name ), rv, obj ) 
+       &&
+       JS_ValueToNumber( cx_, rv, &value ) )
+   {
+      return true ;
+   }
+
+   return false ;
+}
+
 bool jsData_t::getBool( 
    char const *name, 
    bool &value,
    JSObject *obj 
-)
+) const 
 {
    jsval rv ;
    if( evaluate( name, strlen( name ), rv, obj ) 
@@ -154,7 +190,9 @@ bool jsData_t::getString(
    char *value, 
    unsigned maxLen, 
    unsigned &length,
-   JSObject *obj ){
+   JSObject *obj 
+) const 
+{
    jsval rv ;
    JSString *s ;
    if( evaluate( name, strlen( name ), rv, obj ) 

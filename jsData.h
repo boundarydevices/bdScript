@@ -1,5 +1,5 @@
 #ifndef __JSDATA_H__
-#define __JSDATA_H__ "$Id: jsData.h,v 1.1 2006-10-16 22:45:42 ericn Exp $"
+#define __JSDATA_H__ "$Id: jsData.h,v 1.2 2006-11-05 18:19:18 ericn Exp $"
 
 /*
  * jsData.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: jsData.h,v $
- * Revision 1.1  2006-10-16 22:45:42  ericn
+ * Revision 1.2  2006-11-05 18:19:18  ericn
+ * -allow nested jsData_t's
+ *
+ * Revision 1.1  2006/10/16 22:45:42  ericn
  * -Initial import
  *
  *
@@ -33,6 +36,10 @@ public:
    jsData_t( char const *scriptlet,
              unsigned    length,
              char const *fileName = 0 );
+   jsData_t( JSRuntime  *rt,
+             JSContext  *cx,
+             JSObject   *rootObj,
+             char const *fileName = 0 );
    ~jsData_t( void );
 
    inline bool initialized( void ) const { return 0 != obj_ ; }
@@ -40,7 +47,7 @@ public:
    bool evaluate( char const *scriptlet, 
                   unsigned    length, 
                   jsval      &rval,
-                  JSObject   *obj = 0 );  // zero means global scope
+                  JSObject   *obj = 0 ) const ;  // zero means global scope
 
    inline JSContext *cx( void ) const { return cx_ ; }
 
@@ -48,12 +55,17 @@ public:
 
    void setErrorMsg( char const *msg, char const *fileName, unsigned line );
 
-   bool getInt( char const *name, int &value, JSObject *obj=0 );
-   bool getBool( char const *name, bool &value, JSObject *obj=0 );
-   bool getString( char const *name, char *value, unsigned maxLen, unsigned &length, JSObject *obj=0 );
+   bool getInt( char const *name, int &value, JSObject *obj=0 ) const ;
+   bool getDouble( char const *name, double &value, JSObject *obj=0 ) const ;
+   bool getBool( char const *name, bool &value, JSObject *obj=0 ) const ;
+   bool getString( char const *name, char *value, unsigned maxLen, unsigned &length, JSObject *obj=0 ) const ;
+
+   operator JSRuntime *(void) const { return rt_ ; }
+   operator JSContext *(void) const { return cx_ ; }
 
 private:
    char const * const fileName_ ;
+   bool         const ownIt_ ;
    JSRuntime         *rt_ ;
    JSContext         *cx_ ; 
    JSObject          *obj_ ;
