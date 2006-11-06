@@ -1,5 +1,5 @@
 #ifndef __DICTIONARY_H__
-#define __DICTIONARY_H__ "$Id: dictionary.h,v 1.1 2006-06-14 13:54:05 ericn Exp $"
+#define __DICTIONARY_H__ "$Id: dictionary.h,v 1.2 2006-11-06 10:34:22 ericn Exp $"
 
 /*
  * dictionary.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: dictionary.h,v $
- * Revision 1.1  2006-06-14 13:54:05  ericn
+ * Revision 1.2  2006-11-06 10:34:22  ericn
+ * -add find(), isPresent() methods
+ *
+ * Revision 1.1  2006/06/14 13:54:05  ericn
  * -Initial import
  *
  *
@@ -33,12 +36,16 @@ public:
    
    // access an item by index
    T const &operator[]( unsigned idx ) const ;
-   
+
+   bool isPresent(T const &v) const ;
+   bool find(T const &v, unsigned &index ) const ;
+
    unsigned size(void) const { return items_.size(); }
 
    typedef T value_t ;
-   typedef std::map<T,unsigned>          vtoi_t ;
-   typedef typename vtoi_t::iterator     iterator ;
+   typedef std::map<T,unsigned>             vtoi_t ;
+   typedef typename vtoi_t::iterator        iterator ;
+   typedef typename vtoi_t::const_iterator  const_iterator ;
 
 private:
    dictionary_t( dictionary_t const & ); // no copies
@@ -69,6 +76,27 @@ T const &dictionary_t<T>::operator[]( unsigned idx ) const
 {
    return items_[idx];
 }
+
+template<typename T>
+bool dictionary_t<T>::isPresent(T const &v) const 
+{
+   const_iterator iter = byValue_.find(v);
+   return !(iter == byValue_.end());
+}
+
+template<typename T>
+bool dictionary_t<T>::find( T const &v, unsigned &index ) const
+{
+   const_iterator iter = byValue_.find(v);
+   if( iter != byValue_.end() )
+   {
+      index = (*iter).second ;
+      return true ;
+   }
+   else
+      return false ;
+}
+   
 
 #endif
 
