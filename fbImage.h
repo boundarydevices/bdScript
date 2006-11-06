@@ -1,5 +1,5 @@
 #ifndef __FBIMAGE_H__
-#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.3 2006-10-16 22:35:17 ericn Exp $"
+#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.4 2006-11-06 10:33:51 ericn Exp $"
 
 /*
  * fbImage.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: fbImage.h,v $
- * Revision 1.3  2006-10-16 22:35:17  ericn
+ * Revision 1.4  2006-11-06 10:33:51  ericn
+ * -allow construction from fbMem
+ *
+ * Revision 1.3  2006/10/16 22:35:17  ericn
  * -added validate() method
  *
  * Revision 1.2  2006/08/16 02:38:00  ericn
@@ -42,6 +45,8 @@ public:
    fbImage_t( image_t const &image, 
               mode_t         mode );
    fbImage_t( unsigned x, unsigned y, unsigned w, unsigned h ); // from FB
+   fbImage_t( fbPtr_t &mem, unsigned w, unsigned h ); // from fb mem
+
    ~fbImage_t( void );
 
    mode_t   mode( void ) const { return mode_ ; }

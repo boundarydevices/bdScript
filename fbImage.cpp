@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbImage.cpp,v $
- * Revision 1.2  2006-08-16 02:38:07  ericn
+ * Revision 1.3  2006-11-06 10:33:54  ericn
+ * -allow construction from fbMem
+ *
+ * Revision 1.2  2006/08/16 02:38:07  ericn
  * -update to use fbPtr_t, allow 4444 support
  *
  * Revision 1.1  2006/06/14 13:55:24  ericn
@@ -85,6 +88,15 @@ fbImage_t::fbImage_t(
          inPix  += fb.getWidth();
       }
    }
+}
+
+fbImage_t::fbImage_t( fbPtr_t &mem, unsigned w, unsigned h ) // from fb mem
+   : mode_(rgb565)
+   , w_( w )
+   , h_( h )
+   , stride_( ((w+7)/8)*8 )
+   , ptr_(mem)
+{
 }
 
 fbImage_t::~fbImage_t(void)
