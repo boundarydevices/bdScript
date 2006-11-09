@@ -1,5 +1,5 @@
 #ifndef __FBCMDCLEAR_H__
-#define __FBCMDCLEAR_H__ "$Id: fbCmdClear.h,v 1.1 2006-10-16 22:45:32 ericn Exp $"
+#define __FBCMDCLEAR_H__ "$Id: fbCmdClear.h,v 1.2 2006-11-09 16:34:34 ericn Exp $"
 
 /*
  * fbCmdClear.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: fbCmdClear.h,v $
- * Revision 1.1  2006-10-16 22:45:32  ericn
+ * Revision 1.2  2006-11-09 16:34:34  ericn
+ * -allow re-targeting Y and destRam
+ *
+ * Revision 1.1  2006/10/16 22:45:32  ericn
  * -Initial import
  *
  *
@@ -37,6 +40,14 @@ public:
    
    unsigned getDestX( void ) const ;
    void setDestX( unsigned xPos );
+
+   //
+   // Y-position is folded into ram offset (always row 0)
+   //
+   unsigned getDestRamOffs( void ) const ;
+   void setDestRamOffs( unsigned offs );
+
+   void moveDestY( int numRows );
 
 private:
    unsigned long * const data_ ;

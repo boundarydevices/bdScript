@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdClear.cpp,v $
- * Revision 1.2  2006-10-19 00:35:32  ericn
+ * Revision 1.3  2006-11-09 16:34:43  ericn
+ * -allow re-targeting Y and destRam
+ *
+ * Revision 1.2  2006/10/19 00:35:32  ericn
  * -debugPrint, not printf
  *
  * Revision 1.1  2006/10/16 22:45:31  ericn
@@ -125,6 +128,25 @@ void fbCmdClear_t::setDestX( unsigned xPos )
    }
 }
 
+unsigned fbCmdClear_t::getDestRamOffs( void ) const 
+{
+   return cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)];
+}
+
+void fbCmdClear_t::setDestRamOffs( unsigned offs )
+{
+   cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = offs ;
+}
+
+void fbCmdClear_t::moveDestY( int numRows )
+{
+   unsigned destRamOffs = cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)];
+   
+   fbDevice_t &fb = getFB();
+   destRamOffs += (numRows*fb.getWidth()*2);
+
+   cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
+}
 
 #ifdef MODULETEST
 #include <stdio.h>

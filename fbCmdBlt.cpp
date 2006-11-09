@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.cpp,v $
- * Revision 1.2  2006-10-16 22:37:17  ericn
+ * Revision 1.3  2006-11-09 16:35:04  ericn
+ * -allow re-targeting Y and destRam
+ *
+ * Revision 1.2  2006/10/16 22:37:17  ericn
  * -add membbers getDestX(), setDestX(), getWidth()
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -104,11 +107,11 @@ void fbBlt_t::set(
    cmdMem_[BLTREG(SMIDRAW_2D_Dimension)]    = (w<<16) | h ;
    cmdMem_[BLTREG(SMIDRAW_2D_Clip_TL)]      = 1 << 13 ;
    cmdMem_[BLTREG(SMIDRAW_2D_Clip_BR)]      = ( desth << 16 ) | destw ;
-   cmdMem_[BLTREG(SMIDRAW_2D_Pitch)]        = ( destw << 16 ) | srcImg.stride();
+   cmdMem_[BLTREG(SMIDRAW_2D_Pitch)]        = ( destw << 16 ) | srcImg.stridePixels();
    cmdMem_[BLTREG(SMIDRAW_2D_Stretch_Format)] = ( cmdMem_[BLTREG(SMIDRAW_2D_Stretch_Format)] & 0xFFFFF000 )
                                                   | h ;
-   cmdMem_[BLTREG(SMIDRAW_2D_Window_Width)] = ( destw << 16 ) | srcImg.stride();
-   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = srcImg.ramOffset() + srcy*srcImg.stride()*2;
+   cmdMem_[BLTREG(SMIDRAW_2D_Window_Width)] = ( destw << 16 ) | srcImg.stridePixels();
+   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = srcImg.ramOffset() + srcx*2 + srcy*srcImg.strideBytes();
    cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
 }
 
@@ -159,11 +162,33 @@ void fbBlt_t::setDestX( unsigned destx )
    cmdMem_[BLTREG(SMIDRAW_2D_Destination)] |= (destx << 16 );
 }
 
-unsigned fbBlt_t::getWidth( void ) const 
+unsigned fbBlt_t::getDestRamOffs( void ) const 
 {
-   return cmdMem_[BLTREG(SMIDRAW_2D_Dimension)] >> 16 ;
+   return cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)];
 }
 
+void fbBlt_t::setDestRamOffs( unsigned offs )
+{
+   cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)] = offs ;
+}
+
+void fbBlt_t::moveDestY( int numRows )
+{
+   unsigned const w = getWidth();
+   unsigned destRamOffs = cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)];
+   cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)] = destRamOffs + numRows*w*2 ;
+}
+
+
+unsigned fbBlt_t::getWidth( void ) const 
+{
+   return cmdMem_[BLTREG(SMIDRAW_2D_Clip_BR)] & 0xFFFF ;
+}
+
+void fbBlt_t::setSourceRamOffs( unsigned offs )
+{
+   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = offs ;
+}
 
 int fbBlt( unsigned long    destRamOffs,
            unsigned         destx,
