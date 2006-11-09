@@ -180,8 +180,10 @@ ifeq (y,$(KERNEL_FB_SM501))
 OBJS += fbMem.o yuyv.o
 SM501LIB = $(INSTALL_ROOT)/lib/libSM501.a
 SM501OBJS = asyncScreenObj.o \
+            cylinderShadow.o \
             fbcCircular.o \
             fbcHideable.o \
+            fbcMoveable.o \
             fbcMoveHide.o \
             fbCmdBlt.o \
             fbCmdClear.o \
@@ -192,6 +194,7 @@ SM501OBJS = asyncScreenObj.o \
             fbImage.o \
             fbMem.o \
             img4444.o \
+            slotWheel.o \
             sm501alpha.o \
             vsyncSignal.o \
             yuvSignal.o
@@ -364,6 +367,33 @@ odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
+slotWheelMain.o: slotWheel.cpp slotWheel.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+slotWheel: slotWheelMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o slotWheel slotWheelMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle slotWheel | sort >slotWheel.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+moveableMain.o: fbcMoveable.cpp fbcMoveable.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST_MOVEABLE -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+moveable: moveableMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o moveable moveableMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle moveable | sort >moveable.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+tradeShow: tradeShow.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ tradeShow.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle $@ | sort >$@.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
 mpegQueueMain.o: mpegQueue.cpp mpegQueue.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -DMD5OUTPUT -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
@@ -405,6 +435,18 @@ shadeGrad: shadeGrad.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o shadeGrad shadeGrad.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle shadeGrad | sort >shadeGrad.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+cylinderPNG: cylinderPNG.o $(LIB) Makefile $(LIBBDGRAPH) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ $@.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lSM501 -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+cylinderShadow: cylinderShadow.cpp $(LIB) Makefile $(LIBBDGRAPH) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -DMODULETEST=1 -o $@ $@.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lSM501 -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
