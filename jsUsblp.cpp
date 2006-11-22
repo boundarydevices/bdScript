@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsUsblp.cpp,v $
- * Revision 1.1  2006-10-29 21:59:10  ericn
+ * Revision 1.2  2006-11-22 17:19:02  ericn
+ * -allow skip of output, retry USB writes
+ *
+ * Revision 1.1  2006/10/29 21:59:10  ericn
  * -Initial import
  *
  *
@@ -31,8 +34,10 @@ public:
    ~jsUsblpPoll_t( void );
 
    virtual void onDataIn( void );
+   int write( void const *data, int length );
 
    JSObject *obj_ ;
+   bool      skipOutput_ ;
    FILE     *fLog_ ;
 };
 
@@ -42,6 +47,7 @@ jsUsblpPoll_t::jsUsblpPoll_t( JSObject *devObj )
                   2<<20,      // 2 MB
                   4096 )
    , obj_( devObj )
+   , skipOutput_( false )
    , fLog_( 0 )
 {
    JS_AddRoot( execContext_, &obj_ );
@@ -71,6 +77,14 @@ void jsUsblpPoll_t::onDataIn( void )
       while( read( temp, sizeof(temp), numRead ) )
          ;
    } // no handler defined
+}
+
+int jsUsblpPoll_t::write( void const *data, int length )
+{
+   if( skipOutput_ )
+      return length ;
+   else
+      return usblpPoll_t::write(data,length);
 }
 
 static JSObject *lpProto = NULL ;
@@ -134,17 +148,22 @@ jsWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       {
          JSString *str = JS_ValueToString(cx, argv[arg]);
          if( str ){
-            unsigned const segLength = JS_GetStringLength( str );
+            unsigned segLength = JS_GetStringLength( str );
             char const *outData = JS_GetStringBytes( str );
-            int numWritten = dev->write( outData, segLength );
-            if( 0 < numWritten ){
-               totalLength += numWritten ;
-               if( dev->fLog_ ){
-                  fwrite( outData, 1, numWritten, dev->fLog_ );
+            while( 0 < segLength ){
+               int numWritten = dev->write( outData, segLength );
+               if( 0 < numWritten ){
+                  totalLength += numWritten ;
+                  if( dev->fLog_ ){
+                     fwrite( outData, 1, numWritten, dev->fLog_ );
+                  }
+                  segLength -= numWritten ;
+                  outData += numWritten ;
                }
-            }
-            else if( 0 > numWritten ){
-               JS_ReportError( cx, "usblp: short write %d of %u\n", numWritten, segLength );
+               else {
+                  JS_ReportError( cx, "usblp: short write %d of %u\n", numWritten, segLength );
+                  break ;
+               }
             }
          }
          else
@@ -213,7 +232,7 @@ static JSBool
 jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    static char const usage[] = {
-      "Usage: imageToPS( { image: data, x:0, y:0, w:10, h:10 } ) );\n" 
+      "Usage: lp.imageToPS( { image: data, x:0, y:0, w:10, h:10 } ) );\n" 
    };
 
    *rval = JSVAL_FALSE ;
@@ -292,7 +311,7 @@ jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    if( dev )
    {
       JSString *path ;
-      if( ( 1 == argc )
+      if( ( 1 <= argc )
           &&
           JSVAL_IS_STRING(argv[0])
           &&
@@ -306,9 +325,13 @@ jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          }
          else
             JS_ReportError( cx, "startLog(\"%s\"): %s\n", JS_GetStringBytes(path), strerror(errno));
+         if( ( 1 < argc ) && JSVAL_IS_BOOLEAN(argv[1]) ){
+            dev->skipOutput_ = ( 0 != JSVAL_TO_BOOLEAN( argv[1] ) );
+            printf( dev->skipOutput_ ? "skipping USB output\n" : "performing USB output\n" );
+         }
       }
       else
-         JS_ReportError( cx, "Usage: lp.startLog( path )\n" );
+         JS_ReportError( cx, "Usage: lp.startLog( path, [skipOutput=false] )\n" );
    }
    else
       JS_ReportError( cx, "Invalid usblp object\n" );
