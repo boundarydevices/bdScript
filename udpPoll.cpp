@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: udpPoll.cpp,v $
- * Revision 1.2  2004-01-01 20:11:42  ericn
+ * Revision 1.3  2006-11-22 17:15:45  ericn
+ * -write msgs to stdout in base (abstract) onMsg() routine
+ *
+ * Revision 1.2  2004/01/01 20:11:42  ericn
  * -added isOpen() routine, and switched pollHandlers to use close()
  *
  * Revision 1.1  2003/12/28 20:56:07  ericn
@@ -59,6 +62,8 @@ void udpPoll_t :: onMsg
      sockaddr_in const &sender )
 {
    printf( "received %u bytes from %s/%u\n", msgLen, inet_ntoa( sender.sin_addr ), ntohs( sender.sin_port ) );
+   fwrite( msg, msgLen, 1, stdout );
+   printf( "\n" );
 }
 
 void udpPoll_t :: onDataAvail( void )
