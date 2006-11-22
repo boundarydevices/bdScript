@@ -28,6 +28,9 @@ int main( int argc, char const * const argv[] )
             int const sFd = socket( AF_INET, SOCK_DGRAM, 0 );
             if( 0 <= sFd )
             {
+               int doit = 1 ;
+               setsockopt( sFd, SOL_SOCKET, SO_BROADCAST, &doit, sizeof( doit ) );
+
                sockaddr_in remote ;
                remote.sin_family = AF_INET ;
                remote.sin_addr   = targetIP ;
