@@ -52,3 +52,6 @@ imgToPNG
 moveable
 slotWheel
 tradeShow
+setVolume
+udpRx
+tradeShowAux
