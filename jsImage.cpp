@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.35  2006-10-29 21:56:26  ericn
+ * Revision 1.36  2006-11-22 17:26:28  ericn
+ * -add imageToPS global method
+ *
+ * Revision 1.35  2006/10/29 21:56:26  ericn
  * -add imageInfo() function
  *
  * Revision 1.34  2006/03/28 04:16:50  ericn
@@ -134,6 +137,7 @@
 #include "dither.h"
 #include "jsBitmap.h"
 #include "imageInfo.h"
+#include "imageToPS.h"
 
 #if CONFIG_JSCAIRO == 1
 #include "jsCairo.h"
@@ -958,8 +962,98 @@ jsImageInfo( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+static bool imagePsOutput( char const *outData,
+                           unsigned    outLength,
+                           void       *opaque )
+{
+   jsval *rval = (jsval *)opaque ;
+   if( JSVAL_IS_STRING( *rval ) ){
+      JSString *oldStr = JSVAL_TO_STRING( *rval );
+      unsigned oldLen = JS_GetStringLength( oldStr );
+      unsigned newLen = oldLen + outLength ;
+      char *sData = (char *)JS_malloc( execContext_, newLen );
+      memcpy( sData, JS_GetStringBytes(oldStr), oldLen );
+      memcpy( sData+oldLen, outData, outLength );
+      JSString *sOut = JS_NewString( execContext_, sData, newLen );
+      *rval = STRING_TO_JSVAL( sOut );
+   }
+   else {
+      JSString *sOut = JS_NewStringCopyN( execContext_, outData, outLength );
+      *rval = STRING_TO_JSVAL( sOut );
+   }
+   return true ;
+}
+
+static JSBool
+jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   static char const usage[] = {
+      "Usage: imageToPS( { image: data, x:0, y:0, w:10, h:10 } );\n" 
+   };
+
+   *rval = JSVAL_FALSE ;
+   JSObject *paramObj ;
+   if( ( 1 == argc ) 
+       && 
+       JSVAL_IS_OBJECT(argv[0])
+       &&
+       ( 0 != ( paramObj = JSVAL_TO_OBJECT(argv[0]) ) ) )
+   {
+      JSString *sImageData ;
+      unsigned x, y ;
+      jsval val ;
+      if( JS_GetProperty( cx, paramObj, "x", &val ) 
+          && 
+          ( x = JSVAL_TO_INT(val), JSVAL_IS_INT( val ) )
+          &&
+          JS_GetProperty( cx, paramObj, "y", &val ) 
+          && 
+          ( y = JSVAL_TO_INT(val), JSVAL_IS_INT( val ) )
+          &&
+          JS_GetProperty( cx, paramObj, "image", &val ) 
+          && 
+          JSVAL_IS_STRING( val )
+          &&
+          ( 0 != ( sImageData = JSVAL_TO_STRING( val ) ) ) )
+      {
+         char const *const cImage = JS_GetStringBytes( sImageData );
+         unsigned const    imageLen = JS_GetStringLength( sImageData );
+         imageInfo_t imInfo ;
+         if( getImageInfo( cImage, imageLen, imInfo ) ){
+            unsigned w = imInfo.width_ ;
+            unsigned h = imInfo.height_ ;
+            if( JS_GetProperty( cx, paramObj, "w", &val ) && JSVAL_IS_INT( val ) )
+               w = JSVAL_TO_INT( val );
+            if( JS_GetProperty( cx, paramObj, "h", &val ) && JSVAL_IS_INT( val ) )
+               h = JSVAL_TO_INT( val );
+
+            rectangle_t r ;
+            r.xLeft_ = x ;
+            r.yTop_ = y ;
+            r.width_ = w ;
+            r.height_ = h ;
+
+            if( imageToPS( cImage, imageLen,
+                           r, imagePsOutput, rval ) ){
+            }
+            else
+               JS_ReportError( cx, "imageToPS: write cancelled\n" );
+         }
+         else
+            JS_ReportError( cx, "imageToPS: Invalid or unsupported image\n" );
+      }
+      else
+         JS_ReportError( cx, usage );
+   }
+   else
+      JS_ReportError( cx, usage );
+   
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec functions_[] = {
     {"imageInfo",    jsImageInfo,        0},
+    {"imageToPS",    jsImageToPS,        0},
     {0}
 };
 
