@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsSerial.cpp,v $
- * Revision 1.2  2005-11-06 00:49:38  ericn
+ * Revision 1.3  2006-11-22 17:25:49  ericn
+ * -add setRTS() routine
+ *
+ * Revision 1.2  2005/11/06 00:49:38  ericn
  * -more compiler warning cleanup
  *
  * Revision 1.1  2004/03/27 20:24:35  ericn
@@ -33,6 +36,7 @@
 #include "js/jscntxt.h"
 #include "serialPoll.h"
 #include "baudRate.h"
+#include "setSerial.h"
 
 static JSObject *spProto = NULL ;
 
@@ -493,6 +497,28 @@ jsSetDelay( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 }
 
 static JSBool
+jsSetRTS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   jsPort_t *port = (jsPort_t *)JS_GetInstancePrivate( cx, obj, &jsSerialPortClass_, NULL );
+   if( port )
+   {
+      if( ( 1 == argc ) && JSVAL_IS_BOOLEAN( argv[0] ) )
+      {
+         bool const asserted = ( 0 != JSVAL_TO_BOOLEAN(argv[0]) );
+         if( 0 == setRTS( port->getFd(), asserted ) )
+            printf( "%s RTS\n", asserted ? "asserted" : "cleared" );
+         else
+            JS_ReportError( cx, "Error %d setting RTS\n" );
+      }
+      else
+         JS_ReportError( cx, "Usage: scanner.setBits( 0-500000);" );
+   }
+
+   return JS_TRUE ;
+}
+
+static JSBool
 jsRead( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
@@ -553,6 +579,7 @@ static JSFunctionSpec serialPort_methods[] = {
    { "setBits",         jsSetBits,   0,0,0 },
    { "getDelay",        jsGetDelay,  0,0,0 },
    { "setDelay",        jsSetDelay,  0,0,0 },
+   { "setRTS",          jsSetRTS,    0,0,0 },
    { 0 }
 };
 
