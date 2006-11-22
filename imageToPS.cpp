@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imageToPS.cpp,v $
- * Revision 1.1  2006-10-29 21:59:10  ericn
+ * Revision 1.2  2006-11-22 17:26:54  ericn
+ * -add newline to image output
+ *
+ * Revision 1.1  2006/10/29 21:59:10  ericn
  * -Initial import
  *
  *
@@ -22,7 +25,7 @@
 #include "ascii85.h"
 
 static char const preambleFormat[] = {
-   "gsave"
+   "gsave\n"
    "/pstr %u string def\n"                // bytes/line
    "/inputf\n"
      "currentfile\n"
