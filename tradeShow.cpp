@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: tradeShow.cpp,v $
- * Revision 1.1  2006-11-09 17:09:01  ericn
+ * Revision 1.2  2006-11-22 17:18:11  ericn
+ * -send broadcast UDP
+ *
+ * Revision 1.1  2006/11/09 17:09:01  ericn
  * -Initial import
  *
  *
@@ -37,6 +40,11 @@
 #include "ftObjs.h"
 #include <string>
 #include <map>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 
 typedef dictionary_t<std::string> stringDictionary_t ;
 typedef std::map<std::string,freeTypeFont_t *> fontDictionary_t ;
@@ -142,6 +150,8 @@ struct tradeShowData_t {
    fontDictionary_t     fonts_ ;
    textOut_t           *wheelCandy_ ;
    unsigned             numWheelCandy_ ;
+   int                  sockFd_ ;
+   sockaddr_in          remote_ ;
 };
 
 
@@ -701,6 +711,9 @@ static void videoOutput( int signo, void *param )
                {
                   data.winningElement_ = outcome.elements_[0];
                   data.state_ = win0clear ;
+                  std::string const &sElement = data.elements_[data.winningElement_];
+                  sendto( data.sockFd_, sElement.c_str(), sElement.size(), 0, 
+                          (struct sockaddr *)&data.remote_, sizeof( data.remote_ ) );
                }
                else {
                   data.restartAt_ = tickMs() + 1500 ;
@@ -1175,6 +1188,14 @@ debugPrint( "image %ux%u\n", fbi.width(), fbi.height() );
                }
                printf( "%u wheel candy actions\n", data.numWheelCandy_ );
 
+               data.sockFd_ = socket( AF_INET, SOCK_DGRAM, 0 );
+               int doit = 1 ;
+               setsockopt( data.sockFd_, SOL_SOCKET, SO_BROADCAST, &doit, sizeof( doit ) );
+               data.remote_.sin_family      = AF_INET ;
+               data.remote_.sin_addr.s_addr = 0xFFFFFFFF ;
+               inet_aton( "192.168.1.255", (in_addr *)&data.remote_.sin_addr.s_addr );
+               data.remote_.sin_port        = 0xBDBD ;
+
                fbCommandList_t wheelCmdList ;
                data.state_ = initialize ;
 
@@ -1238,7 +1259,7 @@ debugPrint( "image %ux%u\n", fbi.width(), fbi.height() );
                stopWheelsCmdList.push( 
                   new fbCmdClear_t(
                      0,    // graphics RAM
-                     0, yPos, fb.getWidth(), data.elementHeight_/2 )
+                     0, 0, fb.getWidth(), yPos+data.elementHeight_/2 )
                );
                // and bottom
                stopWheelsCmdList.push( new fbWait_t( WAITFORDRAWINGENGINE, DRAWINGENGINEIDLE ) );
