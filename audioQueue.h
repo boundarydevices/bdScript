@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.17 2006-09-23 22:16:55 ericn Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.18 2006-12-01 18:29:54 tkisky Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.17  2006-09-23 22:16:55  ericn
+ * Revision 1.18  2006-12-01 18:29:54  tkisky
+ * -added DEFAULT_PLAYBACK_SPEED
+ *
+ * Revision 1.17  2006/09/23 22:16:55  ericn
  * -match effect_t in include/linux/soundcard.h for raw data
  *
  * Revision 1.16  2006/05/14 14:42:48  ericn
@@ -88,6 +91,7 @@
 extern unsigned char getVolume( void );
 extern void setVolume( unsigned char volume ); // range is 0-100
 
+#define DEFAULT_PLAYBACK_SPEED 44100 //48000	//44100 for pxa
 
 class audioQueue_t {
 public:
@@ -237,6 +241,7 @@ private:
    CleanNoiseWork* cnw;
 #endif
 };
+audioQueue_t &getAudioQueue( void );
 
 int openReadFd( void );
 void closeReadFd( void );
