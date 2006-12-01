@@ -1,5 +1,5 @@
 #ifndef __FLASHTHREAD_H__
-#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.4 2006-06-14 13:55:43 ericn Exp $"
+#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.5 2006-12-01 18:34:11 tkisky Exp $"
 
 /*
  * flashThread.h
@@ -31,7 +31,10 @@
  * Change History : 
  *
  * $Log: flashThread.h,v $
- * Revision 1.4  2006-06-14 13:55:43  ericn
+ * Revision 1.5  2006-12-01 18:34:11  tkisky
+ * -friend function definition
+ *
+ * Revision 1.4  2006/06/14 13:55:43  ericn
  * -track exec and blt time
  *
  * Revision 1.3  2003/11/24 19:42:05  ericn
@@ -132,6 +135,8 @@ private:
    friend void flashSoundComplete( void *param );
    friend class flashSoundMixer ;
 };
+
+void *flashThread( void *params );
 
 #endif
 

@@ -1,5 +1,5 @@
 #ifndef __CCACTIVEURL_H__
-#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.7 2004-09-03 15:08:43 ericn Exp $"
+#define __CCACTIVEURL_H__ "$Id: ccActiveURL.h,v 1.8 2006-12-01 18:31:22 tkisky Exp $"
 
 /*
  * ccActiveURL.h
@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: ccActiveURL.h,v $
- * Revision 1.7  2004-09-03 15:08:43  ericn
+ * Revision 1.8  2006-12-01 18:31:22  tkisky
+ * -friend function definition
+ *
+ * Revision 1.7  2004/09/03 15:08:43  ericn
  * -support useCache for http gets
  *
  * Revision 1.6  2003/12/06 22:06:22  ericn
@@ -188,5 +191,6 @@ private:
    list_head   hash_[numHashBuckets_];
 };
 
+curlCache_t &getCurlCache( void );
 #endif
 

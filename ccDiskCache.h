@@ -1,5 +1,5 @@
 #ifndef __CCDISKCACHE_H__
-#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.4 2003-12-06 22:06:37 ericn Exp $"
+#define __CCDISKCACHE_H__ "$Id: ccDiskCache.h,v 1.5 2006-12-01 18:32:39 tkisky Exp $"
 
 /*
  * ccDiskCache.h
@@ -14,7 +14,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.h,v $
- * Revision 1.4  2003-12-06 22:06:37  ericn
+ * Revision 1.5  2006-12-01 18:32:39  tkisky
+ * -friend function definition
+ *
+ * Revision 1.4  2003/12/06 22:06:37  ericn
  * -added support for temp file and offset
  *
  * Revision 1.3  2003/08/01 14:28:35  ericn
@@ -166,7 +169,8 @@ private:
    list_head     mru_ ;
 };
 
-
+void shutdownCCDiskCache( void );
+ccDiskCache_t &getDiskCache( void );
 
 
 #endif
