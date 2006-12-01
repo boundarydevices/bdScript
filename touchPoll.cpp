@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
- * Revision 1.13  2006-09-25 19:19:50  ericn
+ * Revision 1.14  2006-12-01 18:25:32  tkisky
+ * -change default touchscreen device name
+ *
+ * Revision 1.13  2006/09/25 19:19:50  ericn
  * -remove debug msg
  *
  * Revision 1.12  2006/09/25 18:50:34  ericn
@@ -21,7 +24,7 @@
  * -printf, not debugPrint in base class onTouch/onRelease
  *
  * Revision 1.9  2005/11/17 03:48:26  ericn
- * -allow environment override of device, change default to /dev/misc/x
+ * -allow environment override of device, change default to /dev/touch_ucb1x00
  *
  * Revision 1.8  2004/12/28 03:48:01  ericn
  * -clean queue on exit
@@ -90,7 +93,7 @@ static char const *getTouchDev( char const *devName )
    if( 0 != envDev )
       devName = envDev ;
    if( 0 == devName )
-      devName = "/dev/misc/touchscreen/ucb1x00" ;
+      devName = "/dev/touch_ucb1x00" ;
    return devName ;
 }
 
