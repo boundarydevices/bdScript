@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: tsThread.cpp,v $
- * Revision 1.12  2003-11-24 19:41:40  ericn
+ * Revision 1.13  2006-12-01 18:47:14  tkisky
+ * -touchscreen device name
+ *
+ * Revision 1.12  2003/11/24 19:41:40  ericn
  * -modified to prevent blocking on touches
  *
  * Revision 1.11  2003/07/03 13:34:57  ericn
@@ -25,7 +28,7 @@
  * -modified to have touch-screen thread close channel, added close() method
  *
  * Revision 1.7  2002/12/23 05:09:35  ericn
- * -modified to use either /dev/input/event0 or /dev/touchscreen/ucb1x00
+ * -modified to use either /dev/input/event0 or /dev/touch_ucb1x00
  *
  * Revision 1.6  2002/12/15 00:00:22  ericn
  * -removed debug msg
@@ -62,7 +65,7 @@
 #if TSINPUTAPI == 1
 #define TSDEVICE "/dev/input/event0"
 #else
-#define TSDEVICE "/dev/touchscreen/ucb1x00"
+#define TSDEVICE "/dev/touch_ucb1x00"
 #endif
 static bool volatile shutdown = false ;
 bool volatile touchReset_ = false ;

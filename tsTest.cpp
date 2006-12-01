@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: tsTest.cpp,v $
- * Revision 1.3  2002-12-26 15:13:51  ericn
+ * Revision 1.4  2006-12-01 18:46:50  tkisky
+ * -touchscreen device name
+ *
+ * Revision 1.3  2002/12/26 15:13:51  ericn
  * -fixed overrun problem
  *
  * Revision 1.2  2002/12/23 05:10:45  ericn
@@ -67,7 +70,7 @@ static void showSamples( timeval const &now, timeval const &start,
 
 int main( int argc, char const * const argv[] )
 {
-   char const *deviceName = "/dev/touchscreen/ucb1x00" ;
+   char const *deviceName = "/dev/touch_ucb1x00" ;
    if( 2 == argc )
       deviceName = argv[1];
    
