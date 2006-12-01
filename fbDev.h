@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.24 2006-09-24 16:20:24 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.25 2006-12-01 19:57:21 tkisky Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.24  2006-09-24 16:20:24  ericn
+ * Revision 1.25  2006-12-01 19:57:21  tkisky
+ * -make odometer compile
+ *
+ * Revision 1.24  2006/09/24 16:20:24  ericn
  * -add render with transparent color
  *
  * Revision 1.23  2006/08/16 14:49:22  ericn
@@ -126,11 +129,11 @@ class fbDevice_t {
 public:
    bool isOpen( void ) const { return 0 != mem_ ; }
 
-#ifdef KERNEL_FB_SM501
+//#ifdef KERNEL_FB_SM501
    bool syncCount( unsigned long &value ) const ;
 
    void waitSync( unsigned long &syncCount ) const ;
-#endif
+//#endif
 
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }
