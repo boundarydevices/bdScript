@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
- * Revision 1.22  2005-11-05 20:22:04  ericn
+ * Revision 1.23  2006-12-01 18:33:33  tkisky
+ * -include assert.h
+ *
+ * Revision 1.22  2005/11/05 20:22:04  ericn
  * -fix signed/unsigned test
  *
  * Revision 1.21  2004/12/28 03:32:57  ericn
@@ -86,6 +89,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #define MAXARGS 8
 
