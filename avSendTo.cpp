@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: avSendTo.cpp,v $
- * Revision 1.20  2006-03-28 04:10:33  ericn
+ * Revision 1.21  2006-12-01 18:30:42  tkisky
+ * -touchscreen device name
+ *
+ * Revision 1.20  2006/03/28 04:10:33  ericn
  * -bring up to date (qualify global routines)
  *
  * Revision 1.19  2003/11/24 22:49:43  ericn
@@ -1152,7 +1155,7 @@ static void *pollThread( void *arg )
          }
       }
       else
-         perror( "/dev/touchscreen/ucb1x00" );
+         perror( "/dev/touch_ucb1x00" );
    }
    else
       perror( "/dev/ttyS2" );
