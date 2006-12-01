@@ -16,7 +16,10 @@
  * Change History : 
  *
  * $Log: fbcHideable.cpp,v $
- * Revision 1.1  2006-10-16 22:45:37  ericn
+ * Revision 1.2  2006-12-01 22:49:50  tkisky
+ * -include assert
+ *
+ * Revision 1.1  2006/10/16 22:45:37  ericn
  * -Initial import
  *
  *
@@ -25,6 +28,7 @@
 
 #include "fbcHideable.h"
 #include <linux/sm501-int.h>
+#include <assert.h>
 
 fbcHideable_t::fbcHideable_t
    ( fbCommandList_t &cmdList,

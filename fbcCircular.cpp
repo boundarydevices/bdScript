@@ -26,7 +26,10 @@
  * Change History : 
  *
  * $Log: fbcCircular.cpp,v $
- * Revision 1.1  2006-10-16 22:45:35  ericn
+ * Revision 1.2  2006-12-01 22:49:50  tkisky
+ * -include assert
+ *
+ * Revision 1.1  2006/10/16 22:45:35  ericn
  * -Initial import
  *
  *
@@ -37,6 +40,7 @@
 #include "fbcCircular.h"
 
 #include <linux/sm501-int.h>
+#include <assert.h>
 
 static fbcCircular_t::state_t const unknownState_ = { 
       displayState_: fbcCircular_t::unknown_e

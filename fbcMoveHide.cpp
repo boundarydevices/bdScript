@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.cpp,v $
- * Revision 1.2  2006-10-25 23:27:24  ericn
+ * Revision 1.3  2006-12-01 22:49:50  tkisky
+ * -include assert
+ *
+ * Revision 1.2  2006/10/25 23:27:24  ericn
  * -two-step move
  *
  * Revision 1.1  2006/10/16 22:45:39  ericn
@@ -22,6 +25,7 @@
 
 #include "fbcHideable.h"
 #include <linux/sm501-int.h>
+#include <assert.h>
 
 fbcMoveHide_t::state_t const fbcMoveHide_t::unknownState_ = {
    state_: unknown_e,
