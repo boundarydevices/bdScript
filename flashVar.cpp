@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.9  2006-03-29 18:47:39  tkisky
+ * Revision 1.10  2006-12-01 18:37:43  tkisky
+ * -allow variables to be saved to file
+ *
+ * Revision 1.9  2006/03/29 18:47:39  tkisky
  * -minor
  *
  * Revision 1.8  2005/11/22 17:41:58  tkisky
@@ -56,7 +59,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-//#define DEBUGPRINT
+#define DEBUGPRINT
 #include "debugPrint.h"
 
 static char const deviceName_[] = {
@@ -67,6 +70,11 @@ char const * GetFlashDev()
    char const *devName = getenv( "FLASHVARDEV" );
    if( 0 == devName ) devName = deviceName_;
    return devName;
+}
+
+unsigned int IsDevice(char const* devName)
+{
+    return ((devName[0]=='/') && (devName[1]=='d') && (devName[2]=='e') && (devName[3]=='v'));
 }
 
 static unsigned const pageSize = 4096 ;
@@ -102,47 +110,56 @@ readVars_t :: readVars_t( void )
    maxSize_ = 0 ;
 
    char const *devName = GetFlashDev();
+   unsigned int bDevice = IsDevice(devName);
    debugPrint( "opening flash device %s\n", devName );
    
    int fd = open( devName, O_RDONLY );
-   if( 0 <= fd )
+   if ( 0 <= fd )
    {
-      mtd_info_t meminfo;
-      if( ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) == 0)
-      {
-         debugPrint( "flags       0x%lx\n", meminfo.flags ); 
-         debugPrint( "size        0x%lx\n", meminfo.size ); 
-         debugPrint( "erasesize   0x%lx\n", meminfo.erasesize ); 
-         debugPrint( "oobblock    0x%lx\n", meminfo.oobblock ); 
-         debugPrint( "oobsize     0x%lx\n", meminfo.oobsize ); 
-         debugPrint( "ecctype     0x%lx\n", meminfo.ecctype ); 
-         debugPrint( "eccsize     0x%lx\n", meminfo.eccsize ); 
-         debugPrint( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
-
-         unsigned offset = meminfo.size-meminfo.erasesize ;
-         image_ = (char *)malloc( meminfo.erasesize );
-
-         if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
+      if (bDevice) {
+         mtd_info_t meminfo;
+         if( ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) == 0)
          {
-            // nearest size in pages (probably always equal)
-            maxSize_ = ( meminfo.erasesize / pageSize ) * pageSize ;
+            debugPrint( "flags       0x%lx\n", meminfo.flags ); 
+            debugPrint( "size        0x%lx\n", meminfo.size ); 
+            debugPrint( "erasesize   0x%lx\n", meminfo.erasesize ); 
+//	    debugPrint( "oobblock    0x%lx\n", meminfo.oobblock ); 
+            debugPrint( "oobsize     0x%lx\n", meminfo.oobsize ); 
+            debugPrint( "ecctype     0x%lx\n", meminfo.ecctype ); 
+            debugPrint( "eccsize     0x%lx\n", meminfo.eccsize ); 
+            debugPrint( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
 
+            unsigned offset = meminfo.size-meminfo.erasesize ;
+
+            if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
+            {
+               // nearest size in pages (probably always equal)
+               maxSize_ = ( meminfo.erasesize / pageSize ) * pageSize ;
+	    } else perror( "lseek" );
+         } else perror( "MEMGETINFO" );
+      } else {
+	maxSize_ = 0x40000;
+      }
+      if (maxSize_) {
+            image_ = (char *)malloc( maxSize_ );
             debugPrint( "maxSize 0x%x\n", maxSize_ );
 
             char *nextIn = (char *)image_ ;
             while( bytesUsed_ < maxSize_ )
             {
                int numRead = read( fd, nextIn, pageSize );
+	       if (numRead>0) {
+                  bytesUsed_ += numRead ;
+                  nextIn    += numRead ;
+	       }
                if( pageSize == (unsigned)numRead )
                {
-                  bytesUsed_ += pageSize ;
-                  nextIn    += pageSize ;
                   if( '\xff' == nextIn[-1] )
                      break; // end of data
                }
                else
                {
-                  perror( "read" );
+                  if (bDevice) perror( "read" );
                   break;
                }
             }
@@ -196,13 +213,7 @@ readVars_t :: readVars_t( void )
             }
 
             worked_ = true ;
-         }
-         else
-            perror( "lseek" );
       }
-      else
-         perror( "MEMGETINFO" );
-
       close( fd );
    }
    else
@@ -254,7 +265,7 @@ bool varIter_t::next
    {
       char const c = *next_++ ;
 
-debugPrint( "state %d, char %c <%02x>\n", state, c, c );
+//debugPrint( "state %d, char %c <%02x>\n", state, c, c );
       if( nameChar == state )
       {
          if( '=' == c )
@@ -309,6 +320,7 @@ char const *readFlashVar( char const *varName )
       char const *data ; unsigned dataLen ;
       while( it.next( name, nameLen, data, dataLen ) )
       {
+debugPrint( "%s %s\n", varName,name );
          if( varNameLen == nameLen )
          {
             if( 0 == memcmp( varName, name, varNameLen ) )
@@ -326,12 +338,36 @@ char const *readFlashVar( char const *varName )
          {
             memcpy( out, rVal, rLen );
             out[rLen] = '\0' ; // NULL terminate
+debugPrint( "%s\n", out );
+
             return out ;
          }
       }
    }
 
    return 0 ;
+}
+
+
+struct entry_t {
+	char const *name ; 
+	unsigned    nameLen ;
+	char const *data ; 
+	unsigned    dataLen ;
+};
+void writeEntries(int fd, entry_t* pe,int cnt,int totalExpected)
+{
+	int numWritten = 0 ;
+	for ( int i=0; i < cnt; i++ ) {
+		entry_t const &entry = pe[i];
+		numWritten += write( fd, entry.name, entry.nameLen );
+		numWritten += write( fd, "=", 1 );
+		numWritten += write( fd, entry.data, entry.dataLen );
+		numWritten += write( fd, "\n", 1 );
+	}
+	if( numWritten == totalExpected ) {
+		printf( "wrote %u bytes of unique data\n", numWritten );
+	} else  printf( "write error: %d of %u\n", numWritten, totalExpected );
 }
 
 //
@@ -342,12 +378,14 @@ void writeFlashVar( char const *name,
 {
    readVars_t rv ;
    char const *devName = GetFlashDev();
+   debugPrint( "opening flash device %s\n", devName );
    if( rv.worked() )
    {
       unsigned const nameLen = strlen( name );
       unsigned const dataLen = strlen( value );
       unsigned const avail = rv.maxSize() - rv.bytesUsed();
-      if( avail > nameLen + dataLen + 2 )
+      unsigned int bDevice = IsDevice(devName);
+      if (bDevice && ( avail > nameLen + dataLen + 2 ))
       {
          int fd = open( devName, O_WRONLY );
          if( 0 <= fd )
@@ -385,8 +423,9 @@ void writeFlashVar( char const *name,
                else
                   fprintf( stderr, "erase size mismatch: rv %u, mi %u\n", rv.maxSize(), meminfo.erasesize );
             }
-            else
+            else {
                perror( "MEMGETINFO" );
+	    }
 
             close( fd );
          }
@@ -395,7 +434,7 @@ void writeFlashVar( char const *name,
       }
       else
       {
-         fprintf( stderr, "Collapse not implemented\n" );
+         fprintf( stderr, "Collapse vars\n" );
          
          // 
          // first, find number of entries by searching for newlines
@@ -417,16 +456,10 @@ void writeFlashVar( char const *name,
                break;
          }
 
-         struct entry_t {
-            char const *name ; 
-            unsigned    nameLen ;
-            char const *data ; 
-            unsigned    dataLen ;
-         };
          
-         if( 0 < maxEntries )
+         if ( 1 )
          {
-            printf( "%u entries in list\n", maxEntries );
+            printf( "%u entries in list\n", maxEntries+1 );
             
             unsigned numUnique = 0 ;
             unsigned uniqueSize = 0 ;
@@ -506,47 +539,36 @@ printf( "saving %u bytes\n", uniqueSize );
                int fd = open( devName, O_WRONLY );
                if( 0 <= fd )
                {
-                  mtd_info_t meminfo;
-                  if( 0 == ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) )
-                  {
-                     if( meminfo.erasesize == rv.maxSize() )
+		  if (bDevice) {
+                     mtd_info_t meminfo;
+                     if( 0 == ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) )
                      {
-                        unsigned offset = meminfo.size-meminfo.erasesize ;
-                        erase_info_t erase;
-                        erase.start = offset ;
-                        erase.length = meminfo.erasesize;
-                        if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
+                        if( meminfo.erasesize == rv.maxSize() )
                         {
-                           if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
+                           unsigned offset = meminfo.size-meminfo.erasesize ;
+                           erase_info_t erase;
+                           erase.start = offset ;
+                           erase.length = meminfo.erasesize;
+                           if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
                            {
-                              int numWritten = 0 ;
-                              for( i = 0 ; i < numUnique ; i++ )
+                              if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
                               {
-                                 entry_t const &entry = entries[i];
-                                 numWritten += write( fd, entry.name, entry.nameLen );
-                                 numWritten += write( fd, "=", 1 );
-                                 numWritten += write( fd, entry.data, entry.dataLen );
-                                 numWritten += write( fd, "\n", 1 );
-                              }
-
-                              if( (unsigned)numWritten == uniqueSize )
-                              {
-                                 printf( "wrote %u bytes of unique data\n", uniqueSize );
+				writeEntries(fd, entries,numUnique,uniqueSize);
                               }
                               else
-                                 printf( "write error: %d of %u\n", numWritten, uniqueSize );
+                                 perror( "lseek3" );
                            }
                            else
-                              perror( "lseek3" );
+                              fprintf( stderr, "erase error %m\n" );
                         }
                         else
-                           fprintf( stderr, "erase error %m\n" );
+                           fprintf( stderr, "erase size mismatch: rv %u, mi %u\n", rv.maxSize(), meminfo.erasesize );
                      }
                      else
-                        fprintf( stderr, "erase size mismatch: rv %u, mi %u\n", rv.maxSize(), meminfo.erasesize );
-                  }
-                  else
-                     perror( "MEMGETINFO" );
+                        perror( "MEMGETINFO" );
+		  } else {
+			writeEntries(fd, entries,numUnique,uniqueSize);
+		  }
       
                   close( fd );
                }
