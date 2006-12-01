@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mp3Play.cpp,v $
- * Revision 1.6  2006-09-04 14:32:12  ericn
+ * Revision 1.7  2006-12-01 18:20:11  tkisky
+ * -change crlf to lf
+ *
+ * Revision 1.6  2006/09/04 14:32:12  ericn
  * -show fragments, fix compile warnings, set volume
  *
  * Revision 1.5  2006/05/09 03:36:41  ericn
