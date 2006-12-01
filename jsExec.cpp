@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.90  2006-10-29 21:57:12  ericn
+ * Revision 1.91  2006-12-01 18:39:37  tkisky
+ * -better stack dump on error
+ *
+ * Revision 1.90  2006/10/29 21:57:12  ericn
  * -add jsUsblp initialization
  *
  * Revision 1.89  2006/10/05 14:40:51  ericn
@@ -846,11 +849,71 @@ int prMain(int argc, char **argv, bool )
 static struct sigaction sa;
 static struct sigaction oldint;
 
-void handler(int sig) 
+void dumparea(unsigned int* p, int size)
+{
+	fprintf( stderr, "%p ",p);
+	while (size > 0) {
+		fprintf(stderr, "%08x ",*p);
+		p++;
+		size -= 4;
+		if ( (((int)p)&0xf)==0) fprintf(stderr,"\n%p ",p);
+	}
+	fprintf( stderr, "\n");
+}
+struct sigcontext1 {
+	unsigned long trap_no;
+	unsigned long error_code;
+	unsigned long oldmask;
+	unsigned long arm_r0;
+	unsigned long arm_r1;
+	unsigned long arm_r2;
+	unsigned long arm_r3;
+	unsigned long arm_r4;
+	unsigned long arm_r5;
+	unsigned long arm_r6;
+	unsigned long arm_r7;
+	unsigned long arm_r8;
+	unsigned long arm_r9;
+	unsigned long arm_r10;
+	unsigned long arm_fp;
+	unsigned long arm_ip;
+	unsigned long arm_sp;
+	unsigned long arm_lr;
+	unsigned long arm_pc;
+	unsigned long arm_cpsr;
+	unsigned long fault_address;
+};
+
+struct ucontext1 {
+        unsigned long     uc_flags;
+        struct ucontext  *uc_link;
+        stack_t           uc_stack;
+        struct sigcontext1 uc_mcontext;
+};
+
+void handler(int sig,siginfo_t* si,void* p) 
 {
    pthread_t me = pthread_self();
-   fprintf( stderr, "got signal, stack == %p (id %x)\n", &sig, me );
+   fprintf( stderr, "got signal %i, si=%p p=%p, stack == %p\n", sig, si,p,&me );
+//   fprintf( stderr, "pid=%x, uid=%x\n",si->si_pid,si->si_uid); //pid not part of segv union
    fprintf( stderr, "sighandler at %p\n", handler );
+   fprintf( stderr, "Failed access %p\n", (si->si_addr));
+   struct ucontext1* pu = (struct ucontext1*)p;
+   struct sigcontext1* uc = &pu->uc_mcontext;
+   fprintf( stderr,"uc_mcontext:\n");
+   fprintf( stderr,"r0:%08lx r1:%08lx r2:%08lx r3:%08lx\n",uc->arm_r0,uc->arm_r1,uc->arm_r2,uc->arm_r3);
+   fprintf( stderr,"r4:%08lx r5:%08lx r6:%08lx r7:%08lx\n",uc->arm_r4,uc->arm_r5,uc->arm_r6,uc->arm_r7);
+   fprintf( stderr,"r8:%08lx r9:%08lx sl:%08lx fp:%08lx\n",uc->arm_r8,uc->arm_r9,uc->arm_r10,uc->arm_fp);
+   fprintf( stderr,"ip:%08lx sp:%08lx lr:%08lx pc:%08lx\n",uc->arm_ip,uc->arm_sp,uc->arm_lr,uc->arm_pc);
+   fprintf( stderr,"cpsr:%08lx fault:%08lx\n",uc->arm_cpsr,uc->fault_address);
+
+
+   fprintf( stderr,"siginfo:\n");
+   dumparea((unsigned int *)si,sizeof(siginfo_t));
+   fprintf( stderr,"ucontext:\n");
+   dumparea((unsigned int *)p,sizeof(struct ucontext));
+   fprintf( stderr,"stack:\n");
+   dumparea((unsigned int *)(uc->arm_sp), ((uc->arm_sp|0xfff)+1) - uc->arm_sp);
 
    unsigned long addr = (unsigned long)&sig ;
    unsigned long page = addr & ~0xFFF ; // 4K
@@ -870,8 +933,11 @@ void handler(int sig)
 
    fprintf( stderr, "Handler done.\n" );
    fflush( stderr );
-   if( oldint.sa_handler )
-      oldint.sa_handler( sig );
+   if (oldint.sa_flags & SA_SIGINFO) {
+	if (oldint.sa_sigaction) oldint.sa_sigaction(sig,si,p);
+   } else {
+        if( oldint.sa_handler ) oldint.sa_handler( sig );
+   }
 
    exit( 1 );
 }
@@ -897,9 +963,9 @@ int main( int argc, char *argv[] )
    if( 2 <= argc )
    {
       // Initialize the sa structure
-      sa.sa_handler = handler;
+      sa.sa_sigaction = handler;
       sigemptyset(&sa.sa_mask);
-      sa.sa_flags = 0;
+      sa.sa_flags = SA_SIGINFO;
 #ifdef KERNEL_FB
       getFB( "/dev/fb0" );
 #else
