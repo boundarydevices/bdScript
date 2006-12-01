@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.46  2006-09-25 16:11:27  ericn
+ * Revision 1.47  2006-12-01 18:29:07  tkisky
+ * -debug rate prints
+ *
+ * Revision 1.46  2006/09/25 16:11:27  ericn
  * -get rid of compiler warnings
  *
  * Revision 1.45  2006/09/23 22:17:16  ericn
@@ -154,6 +157,7 @@
 #include "audioQueue.h"
 #include "semClasses.h"
 #include <unistd.h>
+#include <assert.h>
 #include "codeQueue.h"
 #include "mad.h"
 #include <fcntl.h>
@@ -645,12 +649,12 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                if( headers.worked() )
                {
 
-/*
+
                   printf( "playback %u bytes (%lu seconds) from %p here\n", 
                           item->length_, 
                           headers.lengthSeconds(),
                           item->data_ );
-*/
+
 
                   struct mad_stream stream;
                   struct mad_frame	frame;
@@ -681,7 +685,9 @@ unsigned wrote = 0 ;
                               {
                                  fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
                                  break;
-                              }
+                              } else {
+                                 fprintf( stderr, "Setting rate1 to %d:%m\n", sampleRate );
+			      }
                            }
 
                            nChannels = MAD_NCHANNELS(&frame.header) ;
@@ -849,7 +855,10 @@ wrote += numWritten ;
                                     if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
                                        fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
                                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
-                                       fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                       fprintf( stderr, "Error setting sampling rate to %d:%m\n",sampleRate);
+				    else {
+                                       fprintf( stderr, "Setting rate2 to %d:%m\n", sampleRate );
+				    } 
                                  }
                               }
                            }
@@ -976,6 +985,9 @@ wrote += numWritten ;
                   lastSampleRate = header.sampleRate_ ;
                   if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastSampleRate );
+		  else {
+                     fprintf( stderr, "Setting rate3 to %d:%m\n", lastSampleRate );
+		  }
                }
 
                if( 1 == header.numChannels_ )
@@ -1069,6 +1081,9 @@ wrote += numWritten ;
                   lastRecordRate = header->sampleRate_ ;
                   if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
+		  else {
+                     fprintf( stderr, "Setting rate4 to %d:%m\n", lastRecordRate );
+		  }
                }
 
                header->numChannels_ = 1 ;
@@ -1208,7 +1223,10 @@ printf( "allocate frames: %u x %u\n", width, height );
                                           if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &nChannels ) )
                                              fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
                                           if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
-                                             fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );                              
+                                             fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
+					  else {
+                                             fprintf( stderr, "Setting rate5 to %d:%m\n", sampleRate );
+					  }
                                        }
                                     }
                                  }
@@ -1396,9 +1414,12 @@ audioQueue_t :: audioQueue_t( void )
       if( 0 != ioctl( readFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
 
-      int speed = 44100 ;
+      int speed = DEFAULT_PLAYBACK_SPEED;
       if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
+      else {
+         fprintf( stderr, "Setting rate6 to %u\n", speed );
+      }
 
       int recordLevel = 0 ;
       if( 0 != ioctl( readFd, MIXER_READ( SOUND_MIXER_MIC ), &recordLevel ) )
