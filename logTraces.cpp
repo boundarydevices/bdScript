@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: logTraces.cpp,v $
- * Revision 1.3  2006-10-10 20:40:44  ericn
+ * Revision 1.4  2006-12-01 19:38:08  tkisky
+ * -include <assert.h>
+ *
+ * Revision 1.3  2006/10/10 20:40:44  ericn
  * -make dictionary dynamic
  *
  * Revision 1.2  2006/09/17 15:55:23  ericn
@@ -40,6 +43,7 @@
 #include "rtSignal.h"
 #include <signal.h>
 #include <sys/mman.h>
+#include <assert.h>
 
 typedef dictionary_t<std::string> stringDictionary_t ;
 static stringDictionary_t *srcDict_ ;
