@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: madDecode.cpp,v $
- * Revision 1.10  2006-09-23 19:33:22  ericn
+ * Revision 1.11  2006-12-01 18:40:42  tkisky
+ * -compiler warnings
+ *
+ * Revision 1.10  2006/09/23 19:33:22  ericn
  * -add output to standalone prog
  *
  * Revision 1.9  2006/09/05 02:16:32  ericn
@@ -88,7 +91,7 @@ void madDecoder_t :: feed( void const *inData, unsigned long inBytes )
       }
       else
       {
-         fprintf( stderr, "packet too big %lu/%lu\n", assEndLength_, inBytes );
+         fprintf( stderr, "packet too big %u/%lu\n", assEndLength_, inBytes );
       }
       assEndLength_ = 0 ;
    }
@@ -545,7 +548,7 @@ int main( int argc, char const * const argv[] )
                if( 0 != ioctl( dspFd, SNDCTL_DSP_CHANNELS, &channels ) )
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS)\n" );
    
-               int speed = 44100 ;
+               int speed = DEFAULT_PLAYBACK_SPEED;
                while( 0 < speed )
                {
                   if( 0 == ioctl( dspFd, SNDCTL_DSP_SPEED, &speed ) )

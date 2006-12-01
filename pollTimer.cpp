@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
- * Revision 1.3  2006-10-07 16:13:43  ericn
+ * Revision 1.4  2006-12-01 18:44:22  tkisky
+ * -compiler warnings
+ *
+ * Revision 1.3  2006/10/07 16:13:43  ericn
  * -added include
  *
  * Revision 1.2  2004/09/09 21:02:36  tkisky
@@ -32,7 +35,8 @@
 #include <poll.h>
 #include "tickMs.h"
 
-static timerPollHandler_t *timer_ = 0 ;
+class timerPollHandler_t;
+static timerPollHandler_t* timer_ = NULL ;
 
 class timerPollHandler_t : public pollHandler_t {
 public:
