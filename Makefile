@@ -20,10 +20,10 @@ endif
 endif
 endif
 
-ifneq (,$(findstring 2.6, $(CONFIG_KERNELPATH)))
-   KERNEL_VER=-DKERNEL_2_6
-else
+ifneq (,$(findstring 2.4, $(CONFIG_KERNELPATH)))
    KERNEL_VER=-DKERNEL_2_4
+else
+   KERNEL_VER=-DKERNEL_2_6
 endif
 
 MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
@@ -217,7 +217,10 @@ ifeq (y,$(CONFIG_LIBFLASH))
    OBJS += flashThread.o 
 endif       
 
-INSTALL_ROOT ?= ../install/arm-linux
+ifdef INSTALLPATH
+INSTALL_ROOT?=$(INSTALLPATH)
+endif
+INSTALL_ROOT?=../../install
 
 CROSS_COMPILE ?= arm-linux-
 CC= $(CROSS_COMPILE)gcc
@@ -291,7 +294,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) $(CFLAGS) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
