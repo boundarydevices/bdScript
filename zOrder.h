@@ -1,5 +1,5 @@
 #ifndef __ZORDER_H__
-#define __ZORDER_H__ "$Id: zOrder.h,v 1.2 2003-11-24 19:08:46 ericn Exp $"
+#define __ZORDER_H__ "$Id: zOrder.h,v 1.3 2006-12-01 18:47:47 tkisky Exp $"
 
 /*
  * zOrder.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: zOrder.h,v $
- * Revision 1.2  2003-11-24 19:08:46  ericn
+ * Revision 1.3  2006-12-01 18:47:47  tkisky
+ * -friend function definition
+ *
+ * Revision 1.2  2003/11/24 19:08:46  ericn
  * -modified to check range of inputs to getBox()
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -88,5 +91,6 @@ private:
 };
 
 
+zOrderMapStack_t &getZMap();
 #endif
 
