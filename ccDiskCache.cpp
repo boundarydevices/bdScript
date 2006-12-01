@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: ccDiskCache.cpp,v $
- * Revision 1.7  2005-11-05 23:22:05  ericn
+ * Revision 1.8  2006-12-01 18:32:12  tkisky
+ * -compiler warnings
+ *
+ * Revision 1.7  2005/11/05 23:22:05  ericn
  * -fixed compiler warnings
  *
  * Revision 1.6  2004/09/03 15:08:43  ericn
@@ -91,14 +94,14 @@ bool ccDiskCache_t :: find
          }
          else
          {
-            fprintf( stderr, "%s:%s:request for incomplete file, sequence %lu, url %s\n", __FILE__,
+            fprintf( stderr, "%s:%s:request for incomplete file, sequence %u, url %s\n", __FILE__,
                      __PRETTY_FUNCTION__, sequence, url );
             ABORT( 1 );
          }
       }
       else
       {
-         fprintf( stderr, "%s:%s:Cache not consistent for sequence %lu, url %s\n", __FILE__,
+         fprintf( stderr, "%s:%s:Cache not consistent for sequence %u, url %s\n", __FILE__,
                   __PRETTY_FUNCTION__, sequence, url );
          ABORT( 1 );
       }
@@ -139,25 +142,25 @@ void ccDiskCache_t :: inUse
                }
                else
                {
-                  fprintf( stderr, "%s:%s: error mapping file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+                  fprintf( stderr, "%s:%s: error mapping file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
                   ABORT( 1 );
                }
             }
             else
             {
-               fprintf( stderr, "%s:%s: file %lu too short\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+               fprintf( stderr, "%s:%s: file %u too short\n", __FILE__, __PRETTY_FUNCTION__, sequence );
                ABORT( 1 );
             }
          }
          else
          {
-            fprintf( stderr, "%s:%s: error opening object %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+            fprintf( stderr, "%s:%s: error opening object %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
             ABORT( 1 );
          }
       }
       else
       {
-         fprintf( stderr, "%s:%s: attempt to re-allocate object %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "%s:%s: attempt to re-allocate object %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
          fprintf( stderr, "header %s, fd %d, data %p\n", header.completed_ ? "completed" : "incomplete",
                           header.fd_, header.data_ );
          ABORT( 1 );
@@ -165,7 +168,7 @@ void ccDiskCache_t :: inUse
    }
    else
    {
-      fprintf( stderr, "%s:%s: Invalid sequence %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+      fprintf( stderr, "%s:%s: Invalid sequence %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
 }
@@ -219,13 +222,13 @@ void ccDiskCache_t :: notInUse( unsigned sequence )
       }
       else
       {
-         fprintf( stderr, "%s:%s Attempt to free unused file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "%s:%s Attempt to free unused file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
          ABORT( 1 );
       }
    }
    else
    {
-      fprintf( stderr, "%s:%s Invalid sequence %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+      fprintf( stderr, "%s:%s Invalid sequence %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
 }
@@ -245,10 +248,10 @@ bool ccDiskCache_t :: deleteFromCache( char const *url )
             return true ;
          }
          else
-            fprintf( stderr, "Can't delete %lu:%s: file in use\n", sequence, url );
+            fprintf( stderr, "Can't delete %u:%s: file in use\n", sequence, url );
       }
       else
-         fprintf( stderr, "Error getting sequence %lu:%s for deletion\n", sequence, url );
+         fprintf( stderr, "Error getting sequence %u:%s for deletion\n", sequence, url );
    }
 
    return false ;
@@ -327,17 +330,17 @@ bool ccDiskCache_t :: allocateMore
             return true ;
          } // had or made space
          else
-            fprintf( stderr, "Insufficient cache space to grow item %lu\n", sequence );
+            fprintf( stderr, "Insufficient cache space to grow item %u\n", sequence );
       }
       else
       {
-         fprintf( stderr, "%s:%s Attempt to grow completed file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "%s:%s Attempt to grow completed file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
          ABORT( 1 );
       }
    }
    else
    {
-      fprintf( stderr, "%s:%s Attempt to grow non-existent file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+      fprintf( stderr, "%s:%s Attempt to grow non-existent file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
 
@@ -378,13 +381,13 @@ void ccDiskCache_t :: discardTemp( unsigned sequence )
       }
       else
       {
-         fprintf( stderr, "%s:%s:Attempt to discard completed file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "%s:%s:Attempt to discard completed file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
          ABORT( 1 );
       }
    }
    else
    {
-      fprintf( stderr, "%s:%s Attempt to discard non-existent file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+      fprintf( stderr, "%s:%s Attempt to discard non-existent file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
 }
@@ -436,7 +439,7 @@ bool ccDiskCache_t :: storeData
                         }
                         else
                         {
-                           fprintf( stderr, "I/O error %m:%d out of %u bytes written for file %lu\n",
+                           fprintf( stderr, "I/O error %m:%d out of %u bytes written for file %u\n",
                                     numWritten, size, sequence );
                            failed = true ;
                         }
@@ -481,13 +484,13 @@ bool ccDiskCache_t :: storeData
       }
       else
       {
-         fprintf( stderr, "%s:%s:Attempt to store completed file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+         fprintf( stderr, "%s:%s:Attempt to store completed file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
          ABORT( 1 );
       }
    }
    else
    {
-      fprintf( stderr, "%s:%s Attempt to store non-existent file %lu\n", __FILE__, __PRETTY_FUNCTION__, sequence );
+      fprintf( stderr, "%s:%s Attempt to store non-existent file %u\n", __FILE__, __PRETTY_FUNCTION__, sequence );
       ABORT( 1 );
    }
    return false ;
