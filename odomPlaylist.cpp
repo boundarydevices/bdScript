@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.11  2006-10-10 20:50:51  ericn
+ * Revision 1.12  2006-12-01 19:57:53  tkisky
+ * -include <assert.h>
+ *
+ * Revision 1.11  2006/10/10 20:50:51  ericn
  * -use fds, not playlist in odomVideo constructor
  *
  * Revision 1.10  2006/09/24 16:26:34  ericn
@@ -65,6 +68,7 @@
 #include "rtSignal.h"
 #include <signal.h>
 #include "multiSignal.h"
+#include <assert.h>
 
 #define PLAYLISTMASK (odomPlaylist_t::MAXENTRIES-1)
 
