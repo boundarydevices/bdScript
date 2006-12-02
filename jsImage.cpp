@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.36  2006-11-22 17:26:28  ericn
+ * Revision 1.37  2006-12-02 14:21:38  ericn
+ * -updated usage for image.draw()
+ *
+ * Revision 1.36  2006/11/22 17:26:28  ericn
  * -add imageToPS global method
  *
  * Revision 1.35  2006/10/29 21:56:26  ericn
@@ -251,7 +254,7 @@ jsImageDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    } // need at least two params
    else
    {
-      JS_ReportError( cx, "Usage: image().draw( x, y )" );
+      JS_ReportError( cx, "Usage: image().draw( x, y [,image|bitmap] )" );
       JS_ReportError( cx, "#args == %d", argc );
    }
 
