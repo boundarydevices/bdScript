@@ -1,5 +1,5 @@
 #ifndef __BMPTOPNG_H__
-#define __BMPTOPNG_H__ "$Id: bmpToPNG.h,v 1.1 2006-12-03 00:33:02 ericn Exp $"
+#define __BMPTOPNG_H__ "$Id: bmpToPNG.h,v 1.2 2006-12-03 01:02:21 ericn Exp $"
 
 /*
  * bmpToPNG.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: bmpToPNG.h,v $
- * Revision 1.1  2006-12-03 00:33:02  ericn
+ * Revision 1.2  2006-12-03 01:02:21  ericn
+ * -fix include reference
+ *
+ * Revision 1.1  2006/12/03 00:33:02  ericn
  * -Initial import
  *
  *
@@ -19,7 +22,7 @@
  * Copyright Boundary Devices, Inc. 2006
  */
 
-#ifndef __IMAGE_H__
+#ifndef __BITMAP_H__
 #include "bitmap.h"
 #endif
 
