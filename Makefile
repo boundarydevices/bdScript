@@ -38,6 +38,7 @@ OBJS = \
        baudRate.o \
        bitmap.o \
        blockSig.o \
+       bmpToPNG.o \
        box.o \
        ccActiveURL.o \
        ccDiskCache.o \
@@ -700,6 +701,13 @@ imgToPNGMain.o : imgToPNG.cpp Makefile
 imgToPNG : imgToPNGMain.o $(LIB) 
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgToPNG imgToPNGMain.o $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lstdc++ -lpng -lz
 	$(STRIP) imgToPNG
+
+bmpToPNGMain.o : bmpToPNG.cpp Makefile
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o bmpToPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) bmpToPNG.cpp
+
+bmpToPNG : bmpToPNGMain.o $(LIB) 
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o bmpToPNG bmpToPNGMain.o $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lstdc++ -lpng -lz
+	$(STRIP) bmpToPNG
 
 bc : dummyBC.cpp
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o bc dummyBC.cpp -lstdc++
