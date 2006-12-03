@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: bmpToPNG.cpp,v $
- * Revision 1.1  2006-12-03 00:33:05  ericn
+ * Revision 1.2  2006-12-03 01:02:42  ericn
+ * -set bit is black
+ *
+ * Revision 1.1  2006/12/03 00:33:05  ericn
  * -Initial import
  *
  *
@@ -125,8 +128,8 @@ static void collapse_png_data(
 }
 
 static char const *const rgbBW_[] = {
-   "\x00\x00\x00\xff"      // black, opaque
-,  "\xff\xff\xff\x00"      // white, transparent
+   "\xff\xff\xff\xff"      // white, opaque
+,  "\x00\x00\x00\xff"      // black, opaque
 };
 
 static void bits_to_rgb24( 
@@ -244,7 +247,7 @@ int main( int argc, char const * const argv[] )
          unsigned char *outRow = bitmapBytes+row*bpl ;
          for( unsigned col = 0 ; col < img.width_ ; col++ )
          {
-            if( dither.isWhite(col,row) )
+            if( dither.isBlack(col,row) )
                *outRow |= mask ;
             else
                *outRow &= ~mask ;
