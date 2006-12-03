@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsPNG.cpp,v $
- * Revision 1.1  2006-05-14 14:51:36  ericn
+ * Revision 1.2  2006-12-03 00:40:18  ericn
+ * -spaces not tabs
+ *
+ * Revision 1.1  2006/05/14 14:51:36  ericn
  * -Initial import
  *
  *
@@ -52,18 +55,18 @@ jsImgToPNG( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          unsigned short const *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
          if( JS_GetStringLength( pixStr ) == width * height * sizeof( pixMap[0] ) )
          {
-		image_t img( pixMap, width, height);
-		void const *pngData ;
-		unsigned    pngSize ;
-		if( imageToPNG( img, pngData, pngSize ) )
-		{
-			JSString *sPNG = JS_NewStringCopyN( cx, (char *)pngData, pngSize );
-			*rval = STRING_TO_JSVAL(sPNG);
-			free((void *)pngData);
-		}
-		else
-		   JS_ReportError(cx, "Error converting to PNG\n" );
-		img.disown();
+            image_t img( pixMap, width, height);
+            void const *pngData ;
+            unsigned    pngSize ;
+            if( imageToPNG( img, pngData, pngSize ) )
+            {
+               JSString *sPNG = JS_NewStringCopyN( cx, (char *)pngData, pngSize );
+               *rval = STRING_TO_JSVAL(sPNG);
+               free((void *)pngData);
+            }
+            else
+               JS_ReportError(cx, "Error converting to PNG\n" );
+            img.disown();
          }
          else
             JS_ReportError( cx, "Invalid pixmap" );
