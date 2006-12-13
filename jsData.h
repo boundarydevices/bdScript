@@ -1,5 +1,5 @@
 #ifndef __JSDATA_H__
-#define __JSDATA_H__ "$Id: jsData.h,v 1.3 2006-11-09 16:33:45 ericn Exp $"
+#define __JSDATA_H__ "$Id: jsData.h,v 1.4 2006-12-13 21:27:09 ericn Exp $"
 
 /*
  * jsData.h
@@ -17,8 +17,8 @@
  * Change History : 
  *
  * $Log: jsData.h,v $
- * Revision 1.3  2006-11-09 16:33:45  ericn
- * -add operator JSObject *
+ * Revision 1.4  2006-12-13 21:27:09  ericn
+ * -added operator jsObject *
  *
  * Revision 1.2  2006/11/05 18:19:18  ericn
  * -allow nested jsData_t's
@@ -65,7 +65,6 @@ public:
 
    operator JSRuntime *(void) const { return rt_ ; }
    operator JSContext *(void) const { return cx_ ; }
-   operator JSObject *(void) const { return obj_ ; }
 
 private:
    char const * const fileName_ ;
