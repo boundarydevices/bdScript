@@ -8,8 +8,8 @@
  * Change History : 
  *
  * $Log: setSerial.cpp,v $
- * Revision 1.4  2006-11-22 17:17:37  ericn
- * -add setRTS() routine
+ * Revision 1.5  2006-12-13 21:24:04  ericn
+ * -add setRTS routine
  *
  * Revision 1.3  2006/10/25 23:26:13  ericn
  * -actuall set the baud rate
@@ -26,16 +26,9 @@
 
 
 #include "setSerial.h"
-#include <unistd.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <sys/ioctl.h>
-#include <signal.h>
-#include <sys/poll.h>
-#include <ctype.h>
 #include "baudRate.h"
-#include <stdlib.h>
+#include <stdio.h>
+#include <termios.h>
 
 int setBaud( int fd, unsigned baud )
 {
@@ -160,21 +153,3 @@ int setRaw( int fd ) // no echo or character processing
    return rval ;
 }
 
-int setRTS( int fd, bool asserted )
-{
-   int rval ;
-   int line ;
-   if( 0 == ( rval = ioctl(fd, TIOCMGET, &line) ) )
-   {
-      if( asserted  )
-         line |= TIOCM_RTS ;
-      else
-         line &= ~TIOCM_RTS ;
-      if( 0 != ( rval = ioctl(fd, TIOCMSET, &line) ) )
-         perror( "TIOCMGET" );
-   }
-   else
-      perror( "TIOCMGET" );
-
-   return rval ;
-}
