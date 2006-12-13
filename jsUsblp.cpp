@@ -9,8 +9,8 @@
  * Change History : 
  *
  * $Log: jsUsblp.cpp,v $
- * Revision 1.2  2006-11-22 17:19:02  ericn
- * -allow skip of output, retry USB writes
+ * Revision 1.3  2006-12-13 21:25:01  ericn
+ * -add jsBitmapToSwecoin method
  *
  * Revision 1.1  2006/10/29 21:59:10  ericn
  * -Initial import
@@ -26,7 +26,10 @@
 #include "codeQueue.h"
 #include "imageInfo.h"
 #include "imageToPS.h"
+#include "bitmap.h"
+#include "jsBitmap.h"
 #include <errno.h>
+#include <alloca.h>
 
 class jsUsblpPoll_t : public usblpPoll_t {
 public:
@@ -34,10 +37,8 @@ public:
    ~jsUsblpPoll_t( void );
 
    virtual void onDataIn( void );
-   int write( void const *data, int length );
 
    JSObject *obj_ ;
-   bool      skipOutput_ ;
    FILE     *fLog_ ;
 };
 
@@ -47,7 +48,6 @@ jsUsblpPoll_t::jsUsblpPoll_t( JSObject *devObj )
                   2<<20,      // 2 MB
                   4096 )
    , obj_( devObj )
-   , skipOutput_( false )
    , fLog_( 0 )
 {
    JS_AddRoot( execContext_, &obj_ );
@@ -77,14 +77,6 @@ void jsUsblpPoll_t::onDataIn( void )
       while( read( temp, sizeof(temp), numRead ) )
          ;
    } // no handler defined
-}
-
-int jsUsblpPoll_t::write( void const *data, int length )
-{
-   if( skipOutput_ )
-      return length ;
-   else
-      return usblpPoll_t::write(data,length);
 }
 
 static JSObject *lpProto = NULL ;
@@ -148,22 +140,17 @@ jsWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       {
          JSString *str = JS_ValueToString(cx, argv[arg]);
          if( str ){
-            unsigned segLength = JS_GetStringLength( str );
+            unsigned const segLength = JS_GetStringLength( str );
             char const *outData = JS_GetStringBytes( str );
-            while( 0 < segLength ){
-               int numWritten = dev->write( outData, segLength );
-               if( 0 < numWritten ){
-                  totalLength += numWritten ;
-                  if( dev->fLog_ ){
-                     fwrite( outData, 1, numWritten, dev->fLog_ );
-                  }
-                  segLength -= numWritten ;
-                  outData += numWritten ;
+            int numWritten = dev->write( outData, segLength );
+            if( 0 < numWritten ){
+               totalLength += numWritten ;
+               if( dev->fLog_ ){
+                  fwrite( outData, 1, numWritten, dev->fLog_ );
                }
-               else {
-                  JS_ReportError( cx, "usblp: short write %d of %u\n", numWritten, segLength );
-                  break ;
-               }
+            }
+            else if( 0 > numWritten ){
+               JS_ReportError( cx, "usblp: short write %d of %u\n", numWritten, segLength );
             }
          }
          else
@@ -232,7 +219,7 @@ static JSBool
 jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    static char const usage[] = {
-      "Usage: lp.imageToPS( { image: data, x:0, y:0, w:10, h:10 } ) );\n" 
+      "Usage: imageToPS( { image: data, x:0, y:0, w:10, h:10 } ) );\n" 
    };
 
    *rval = JSVAL_FALSE ;
@@ -301,6 +288,76 @@ jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+static JSBool
+jsBitmapToSwecoin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   jsUsblpPoll_t *dev = (jsUsblpPoll_t *)JS_GetInstancePrivate( cx, obj, &jsUsblpClass_, NULL );
+   if( dev )
+   {
+      JSObject *objBmp ;
+      if( ( 1 == argc )
+          &&
+          JSVAL_IS_OBJECT( argv[0] )
+          &&
+          ( 0 != ( objBmp = JSVAL_TO_OBJECT(argv[0]) ) )
+          &&
+          JS_InstanceOf( cx, objBmp, &jsBitmapClass_, NULL ) )
+      {
+         jsval widthVal, heightVal, dataVal ;
+         if( JS_GetProperty( cx, objBmp, "width", &widthVal )
+             &&
+             JS_GetProperty( cx, objBmp, "height", &heightVal )
+             &&
+             JS_GetProperty( cx, objBmp, "pixBuf", &dataVal )
+             &&
+             JSVAL_IS_STRING( dataVal ) )
+         {
+            bitmap_t bmp( (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
+                          JSVAL_TO_INT( widthVal ),
+                          JSVAL_TO_INT( heightVal ) );
+            unsigned char const *nextRow = bmp.getMem();
+            unsigned char bpl = bmp.bytesPerRow();
+            char const pixelBytes = (bmp.getWidth()+7)/8 ;
+            char const pixelsPlusHeader = pixelBytes+3 ;
+            unsigned const imageSize = bmp.getHeight()*pixelsPlusHeader+1 ;
+            char *const imgBuf = (char *)malloc( imageSize );
+            char *nextOut = imgBuf ;
+
+            for( unsigned i = 0 ; i < bmp.getHeight(); i++, nextRow += bpl, nextOut += pixelsPlusHeader ){
+               nextOut[0] = '\x1b' ;
+               nextOut[1] = 's' ;
+               nextOut[2] = pixelBytes ;
+               memcpy( nextOut+3, nextRow, pixelBytes );
+            } // write each row of output
+            
+            unsigned bytesLeft = imageSize ;
+            nextOut = imgBuf ;
+            while( 0 < bytesLeft ){
+               int numWritten = dev->write( nextOut, bytesLeft );
+               if( 0 < numWritten ){
+                  if( dev->fLog_ )
+                     fwrite( nextOut, 1, numWritten, dev->fLog_ );
+                  nextOut += numWritten ;
+                  bytesLeft -= numWritten ;
+               }
+               else {
+                  JS_ReportError( cx, "short write: %d of %d\n", numWritten, bytesLeft );
+                  break ;
+               }
+            }
+            *rval = JSVAL_TRUE ;
+         }
+         else
+            JS_ReportError( cx, "Invalid bitmap" );
+      }
+      else
+         JS_ReportError( cx, "Usage: usblp.bitmapToSwecoin(bitmap)\n" );
+   }
+   else
+      JS_ReportError( cx, "Invalid usblp object\n" );
+   return JS_TRUE ;
+}
 
 static JSBool
 jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -311,7 +368,7 @@ jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    if( dev )
    {
       JSString *path ;
-      if( ( 1 <= argc )
+      if( ( 1 == argc )
           &&
           JSVAL_IS_STRING(argv[0])
           &&
@@ -325,13 +382,9 @@ jsStartLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          }
          else
             JS_ReportError( cx, "startLog(\"%s\"): %s\n", JS_GetStringBytes(path), strerror(errno));
-         if( ( 1 < argc ) && JSVAL_IS_BOOLEAN(argv[1]) ){
-            dev->skipOutput_ = ( 0 != JSVAL_TO_BOOLEAN( argv[1] ) );
-            printf( dev->skipOutput_ ? "skipping USB output\n" : "performing USB output\n" );
-         }
       }
       else
-         JS_ReportError( cx, "Usage: lp.startLog( path, [skipOutput=false] )\n" );
+         JS_ReportError( cx, "Usage: lp.startLog( path )\n" );
    }
    else
       JS_ReportError( cx, "Invalid usblp object\n" );
@@ -366,11 +419,12 @@ jsStopLog( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 }
 
 static JSFunctionSpec usblp_methods[] = {
-   { "write",           jsWrite,     0,0,0 },
-   { "read",            jsRead,      0,0,0 },
-   { "imageToPS",       jsImageToPS, 0,0,0 },
-   { "startLog",        jsStartLog,  0,0,0 },
-   { "stopLog",         jsStopLog,   0,0,0 },
+   { "write",           jsWrite,           0,0,0 },
+   { "read",            jsRead,            0,0,0 },
+   { "imageToPS",       jsImageToPS,       0,0,0 },
+   { "bitmapToSwecoin", jsBitmapToSwecoin, 0,0,0 },
+   { "startLog",        jsStartLog,        0,0,0 },
+   { "stopLog",         jsStopLog,         0,0,0 },
    { 0 }
 };
 
