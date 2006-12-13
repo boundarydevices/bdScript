@@ -9,7 +9,7 @@
  * Change History : 
  *
  * $Log: jsCurl.cpp,v $
- * Revision 1.28  2006-11-22 17:16:39  ericn
+ * Revision 1.29  2006-12-13 21:27:37  ericn
  * -better error msg
  *
  * Revision 1.27  2006/05/14 14:33:16  ericn
@@ -574,8 +574,7 @@ bool queueCurlRequest
                         } // string value
                         else 
                         {
-                           JS_ReportError( request.cx_, "Invalid urlParam <%s>. value must be string, not %d",
-                                           paramName.c_str(), valType );
+                           JS_ReportError( request.cx_, "Invalid urlParam value:must be string" );
                         }
                      }
                      else
