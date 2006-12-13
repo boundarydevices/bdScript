@@ -20,10 +20,10 @@ endif
 endif
 endif
 
-ifneq (,$(findstring 2.4, $(CONFIG_KERNELPATH)))
-   KERNEL_VER=-DKERNEL_2_4
-else
+ifneq (,$(findstring 2.6, $(CONFIG_KERNELPATH)))
    KERNEL_VER=-DKERNEL_2_6
+else
+   KERNEL_VER=-DKERNEL_2_4
 endif
 
 MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
@@ -38,7 +38,6 @@ OBJS = \
        baudRate.o \
        bitmap.o \
        blockSig.o \
-       bmpToPNG.o \
        box.o \
        ccActiveURL.o \
        ccDiskCache.o \
@@ -184,7 +183,6 @@ SM501OBJS = asyncScreenObj.o \
             cylinderShadow.o \
             fbcCircular.o \
             fbcHideable.o \
-            fbcMoveable.o \
             fbcMoveHide.o \
             fbCmdBlt.o \
             fbCmdClear.o \
@@ -218,10 +216,7 @@ ifeq (y,$(CONFIG_LIBFLASH))
    OBJS += flashThread.o 
 endif       
 
-ifdef INSTALLPATH
-INSTALL_ROOT?=$(INSTALLPATH)
-endif
-INSTALL_ROOT?=../../install
+INSTALL_ROOT ?= ../install/arm-linux
 
 CROSS_COMPILE ?= arm-linux-
 CC= $(CROSS_COMPILE)gcc
@@ -244,7 +239,6 @@ ifneq (,$(findstring arm, $(CC)))
           -I$(INSTALL_ROOT)/include/mad \
           -I$(INSTALL_ROOT)/include/nspr \
           -I$(INSTALL_ROOT)/include/freetype2 \
-          -I$(INSTALL_ROOT)/include/libavcodec \
           -I$(TOOLCHAINROOT)/include 
    LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
@@ -271,6 +265,11 @@ IFLAGS += -I$(INSTALL_ROOT)/include/cairo
 LIBS   +=-lCurlCache -lcairo -lpixman -lfontconfig -lexpat
 endif
 
+ifeq (y,$(CONFIG_FFMPEG))
+IFLAGS += -I$(INSTALL_ROOT)/include/libavcodec -I$(INSTALL_ROOT)/include/libavformat -I$(INSTALL_ROOT)/include/libavutil
+LIBS   +=-lavformat -lavcodec -lavutil -lxvidcore -lz
+endif
+
 ODOMOBJS = \
        mpegRxUDP.o \
        odomCommand.o \
@@ -295,7 +294,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) $(CFLAGS) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
@@ -339,7 +338,7 @@ testJS: testJS.cpp $(LIB) Makefile
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -ggdb -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -381,26 +380,9 @@ slotWheel: slotWheelMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
-moveableMain.o: fbcMoveable.cpp fbcMoveable.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST_MOVEABLE -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-moveable: moveableMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
-	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o moveable moveableMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle moveable | sort >moveable.map
-	cp $@ $@.prestrip
-	$(STRIP) $@
-
 tradeShow: tradeShow.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ tradeShow.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle $@ | sort >$@.map
-	cp $@ $@.prestrip
-	$(STRIP) $@
-
-tradeShowAux: tradeShowAux.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
-	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ tradeShowAux.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle $@ | sort >$@.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -702,13 +684,6 @@ imgToPNG : imgToPNGMain.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o imgToPNG imgToPNGMain.o $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lstdc++ -lpng -lz
 	$(STRIP) imgToPNG
 
-bmpToPNGMain.o : bmpToPNG.cpp Makefile
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o bmpToPNGMain.o -O2 -D__STANDALONE__ $(IFLAGS) bmpToPNG.cpp
-
-bmpToPNG : bmpToPNGMain.o $(LIB) 
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o bmpToPNG bmpToPNGMain.o $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lstdc++ -lpng -lz
-	$(STRIP) bmpToPNG
-
 bc : dummyBC.cpp
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o bc dummyBC.cpp -lstdc++
 	$(STRIP) $@
@@ -942,6 +917,14 @@ imgTransparent: imgTransparentMain.o Makefile $(LIB)
 
 mpegSendUDP: mpegSendUDP.cpp mpegUDP.h mpegPS.cpp mpegPS.h mpegStream.cpp mpegStream.h
 	gcc -o mpegSendUDP mpegSendUDP.cpp memFile.cpp mpegPS.cpp mpegStream.cpp -lsupc++
+
+ffmpeg_test: ffmpeg_test.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -ggdb -fno-rtti -o ffmpeg_test -D__STANDALONE__ -Xlinker -Map -Xlinker ffmpeg_test.map ffmpeg_test.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
+#	$(STRIP) $@
+
+xvidToZip: xvidToZip.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o xvidToZip -D__STANDALONE__ -Xlinker -Map -Xlinker xvidToZip.map xvidToZip.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
+	$(STRIP) $@
 
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
