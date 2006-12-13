@@ -8,8 +8,8 @@
  * Change History : 
  *
  * $Log: fbCmdClear.cpp,v $
- * Revision 1.3  2006-11-09 16:34:43  ericn
- * -allow re-targeting Y and destRam
+ * Revision 1.4  2006-12-13 21:30:54  ericn
+ * -more explicit form of constructor
  *
  * Revision 1.2  2006/10/19 00:35:32  ericn
  * -debugPrint, not printf
@@ -72,11 +72,10 @@ fbCmdClear_t::fbCmdClear_t
    , data_( new unsigned long [size()/sizeof(data_[0])] )
    , cmdMem_( data_ )
 {
+   unsigned const screenWidth = getFB().getWidth();
    memcpy( cmdMem_, clrCommand_, size() );
 
-   fbDevice_t &fb = getFB();
-
-   destRamOffs += (desty*fb.getWidth()*2);
+   destRamOffs += (desty*screenWidth*2);
    desty = 0 ;
 
    unsigned const bottom = desty+desth ;
@@ -87,11 +86,43 @@ fbCmdClear_t::fbCmdClear_t
    cmdMem_[CLRREG(SMIDRAW_2D_Foreground)]   = rgb16 ;
    cmdMem_[CLRREG(SMIDRAW_2D_Clip_TL)]      = 1 << 13 ;
    cmdMem_[CLRREG(SMIDRAW_2D_Clip_BR)]      = ( bottom << 16 ) | right ;
-   cmdMem_[CLRREG(SMIDRAW_2D_Pitch)]        = ( fb.getWidth() << 16 ) | 1 ;
-   cmdMem_[CLRREG(SMIDRAW_2D_Window_Width)] = ( fb.getWidth() << 16 ) | 1 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Pitch)]        = ( screenWidth << 16 ) | 1 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Window_Width)] = ( screenWidth << 16 ) | 1 ;
    cmdMem_[CLRREG(SMIDRAW_2D_Source_Base)]  = 0 ;
    cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
 }
+
+fbCmdClear_t::fbCmdClear_t
+   ( unsigned long    destRamOffs,
+     unsigned         destx,
+     unsigned         desty,
+     unsigned         destw,
+     unsigned         desth,
+     unsigned         screenWidth,
+     unsigned short   rgb16 )
+   : fbCommand_t(sizeof(clrCommand_))
+   , data_( new unsigned long [size()/sizeof(data_[0])] )
+   , cmdMem_( data_ )
+{
+   memcpy( cmdMem_, clrCommand_, size() );
+
+   destRamOffs += (desty*screenWidth*2);
+   desty = 0 ;
+
+   unsigned const bottom = desty+desth ;
+   unsigned const right = destx+destw ;
+
+   cmdMem_[CLRREG(SMIDRAW_2D_Destination)]  = ( destx << 16 ) | desty ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Dimension)]    = (destw<<16) | desth ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Foreground)]   = rgb16 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Clip_TL)]      = 1 << 13 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Clip_BR)]      = ( bottom << 16 ) | right ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Pitch)]        = ( screenWidth << 16 ) | 1 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Window_Width)] = ( screenWidth << 16 ) | 1 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Source_Base)]  = 0 ;
+   cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
+}
+
 
 fbCmdClear_t::~fbCmdClear_t( void )
 {
@@ -128,25 +159,6 @@ void fbCmdClear_t::setDestX( unsigned xPos )
    }
 }
 
-unsigned fbCmdClear_t::getDestRamOffs( void ) const 
-{
-   return cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)];
-}
-
-void fbCmdClear_t::setDestRamOffs( unsigned offs )
-{
-   cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = offs ;
-}
-
-void fbCmdClear_t::moveDestY( int numRows )
-{
-   unsigned destRamOffs = cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)];
-   
-   fbDevice_t &fb = getFB();
-   destRamOffs += (numRows*fb.getWidth()*2);
-
-   cmdMem_[CLRREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
-}
 
 #ifdef MODULETEST
 #include <stdio.h>
