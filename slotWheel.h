@@ -1,5 +1,5 @@
 #ifndef __SLOTWHEEL_H__
-#define __SLOTWHEEL_H__ "$Id: slotWheel.h,v 1.1 2006-11-09 17:09:01 ericn Exp $"
+#define __SLOTWHEEL_H__ "$Id: slotWheel.h,v 1.2 2006-12-13 21:22:29 ericn Exp $"
 
 /*
  * slotWheel.h
@@ -27,8 +27,8 @@
  * Change History : 
  *
  * $Log: slotWheel.h,v $
- * Revision 1.1  2006-11-09 17:09:01  ericn
- * -Initial import
+ * Revision 1.2  2006-12-13 21:22:29  ericn
+ * -updated
  *
  *
  *
@@ -53,9 +53,8 @@ public:
 
    void start( unsigned targetOffset );
    bool isRunning( void ) const { return ( idle != state_ ) && ( done != state_ ); }
-   unsigned getOffset( void ) const { return targetOffs_ ; }
 
-   void tick(unsigned long syncCount);
+   void tick(unsigned long t);
 
 private:
    enum state_e {
@@ -64,7 +63,6 @@ private:
       accel,
       decel,
       bounce,
-      finishing,
       done
    };
 
@@ -72,14 +70,13 @@ private:
    fbcCircular_t  *circ_ ;
    state_e         state_ ;
    unsigned const  height_ ;
-   unsigned const  width_ ;
    unsigned        position_ ;
-   unsigned        targetOffs_ ;
 
    // motion params
    int             backSlope_ ;
    int             bounceDist_ ;
-   double          bounceSpeed_ ;
+   int             bounceMag_ ;
+   int             bounceSpeed_ ;
    int             maxAccel_ ;
    int             maxBack_ ;
    int             startPos_ ;
@@ -88,20 +85,9 @@ private:
    double          fDecel_ ;
 
    // calculated values
-   unsigned        maxAccelSquared_ ;
    unsigned        tBackEnd_ ;
    unsigned        tAccelEnd_ ;
    unsigned        tDecelEnd_ ;
-   unsigned        tBounceEnd_ ;
-
-   long            predictedDecelEnd_ ;
-
-   // calculated, then saved at run-time
-   long            decelEndPos_ ;
-   long            bounceMag_ ;
-   
-   unsigned long   startTick_ ;
-   unsigned long   decelSlop_ ;
 };
 
 #endif
