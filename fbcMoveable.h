@@ -1,5 +1,5 @@
 #ifndef __FBCMOVEABLE_H__
-#define __FBCMOVEABLE_H__ "$Id: fbcMoveable.h,v 1.1 2006-11-09 17:09:01 ericn Exp $"
+#define __FBCMOVEABLE_H__ "$Id: fbcMoveable.h,v 1.2 2006-12-13 21:29:25 ericn Exp $"
 
 /*
  * fbcMoveable.h
@@ -12,8 +12,8 @@
  * Change History : 
  *
  * $Log: fbcMoveable.h,v $
- * Revision 1.1  2006-11-09 17:09:01  ericn
- * -Initial import
+ * Revision 1.2  2006-12-13 21:29:25  ericn
+ * -updates
  *
  *
  *
@@ -51,12 +51,7 @@ public:
    void setY( unsigned y );
    inline void setPos( unsigned x, unsigned y );
 
-   // use this when the position jumps (skips the clear of the old location)
-   void jumpTo( unsigned x, unsigned y );
-
    inline unsigned getWidth( void ) const ;
-
-   void setSourceOrigin( unsigned srcX, unsigned srcY );
 
 private:
    fbcMoveable_t( fbcMoveable_t const & ); // no copies
@@ -73,7 +68,6 @@ private:
    state_t        commandState_ ;
    state_t        offScreenState_ ;
 
-   fbImage_t      srcImage_ ;
    fbJump_t      *jump1_ ;
    fbWait_t      *wait1_ ;
    fbCmdClear_t  *clr_ ;
@@ -81,7 +75,6 @@ private:
    fbBlt_t       *blt_ ;
 
    unsigned       cmdY_ ;
-   unsigned       skipSize_ ;
 };
 
 unsigned fbcMoveable_t::getX( void ) const {
@@ -99,7 +92,7 @@ unsigned fbcMoveable_t::getWidth( void ) const {
 void fbcMoveable_t::setPos( unsigned x, unsigned y ){
    setX( x ); setY( y );
 }
-   
+
 bool fbcMoveable_t::state_t::operator==(state_t const &rhs ) const {
    int diff = diff = xPos_ - rhs.xPos_ ;
    if( 0 == diff )
