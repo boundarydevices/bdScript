@@ -1,5 +1,5 @@
 #ifndef __FBCMDBLT_H__
-#define __FBCMDBLT_H__ "$Id: fbCmdBlt.h,v 1.3 2006-11-09 16:35:01 ericn Exp $"
+#define __FBCMDBLT_H__ "$Id: fbCmdBlt.h,v 1.4 2006-12-13 21:31:30 ericn Exp $"
 
 /*
  * fbCmdBlt.h
@@ -19,8 +19,8 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.h,v $
- * Revision 1.3  2006-11-09 16:35:01  ericn
- * -allow re-targeting Y and destRam
+ * Revision 1.4  2006-12-13 21:31:30  ericn
+ * -allow re-targeting RAM
  *
  * Revision 1.2  2006/10/16 22:37:08  ericn
  * -add membbers getDestX(), setDestX(), getWidth()
@@ -69,19 +69,9 @@ public:
    unsigned getDestX( void ) const ;
    void setDestX( unsigned destx );
 
-   //
-   // Y-position is folded into ram offset (always row 0)
-   //
-   unsigned getDestRamOffs( void ) const ;
-   void setDestRamOffs( unsigned offs );
-   
-   // relative movement
    void moveDestY( int numRows );
 
    unsigned getWidth( void ) const ;
-
-   // image offset + x*2 + y*stride
-   void setSourceRamOffs( unsigned offs );
 
 private:
    unsigned long * const data_ ;
