@@ -1,5 +1,5 @@
 #ifndef __FBIMAGE_H__
-#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.5 2006-11-09 16:34:08 ericn Exp $"
+#define __FBIMAGE_H__ "$Id: fbImage.h,v 1.6 2006-12-13 21:29:56 ericn Exp $"
 
 /*
  * fbImage.h
@@ -15,8 +15,8 @@
  * Change History : 
  *
  * $Log: fbImage.h,v $
- * Revision 1.5  2006-11-09 16:34:08  ericn
- * -make stride() explicitly pixels or bytes
+ * Revision 1.6  2006-12-13 21:29:56  ericn
+ * -made stride more explicitly bytes vs. pixels
  *
  * Revision 1.4  2006/11/06 10:33:51  ericn
  * -allow construction from fbMem
@@ -55,8 +55,7 @@ public:
    mode_t   mode( void ) const { return mode_ ; }
    unsigned width( void ) const { return w_ ; }
    unsigned height( void ) const { return h_ ; }
-   unsigned stridePixels( void ) const { return stride_ ; }
-   unsigned strideBytes( void ) const { return 2*stride_ ; }
+   unsigned stride( void ) const { return stride_ ; }
 
    unsigned ramOffset( void ) const { return ptr_.getOffs(); }
    void    *pixels( void ) const { return ptr_.getPtr(); }
