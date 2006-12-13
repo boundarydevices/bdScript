@@ -697,27 +697,6 @@ ccWorker: ccWorker.cpp memFile.o Makefile
 ccActiveURL: ccActiveURL.cpp memFile.o $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -D__STANDALONE__ -o ccActiveURL ccActiveURL.cpp $(LIBS) -lCurlCache -lstdc++ -lcurl -lpthread
 
-testffFormat: testffFormat.cpp
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o testffFormat testffFormat.cpp $(LIBS) -lavformat -lavcodec -lm -lz
-	$(STRIP) $@
-
-ffFormat: ffFormat.cpp
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFormat ffFormat.cpp $(LIBS) -lavformat -lavcodec -lm -lz
-	$(STRIP) $@
-
-ffFrames: ffFrames.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffFrames ffFrames.cpp $(LIBS) -lavformat -lavcodec $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread
-	$(STRIP) $@
-
-ffPlay: ffPlay.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o ffPlay -Xlinker -Map -Xlinker ffPlay.map ffPlay.cpp $(LIBS) $(MPEG2LIBS) -lCurlCache -lmad -lid3tag -lm -lz -lpthread 
-	$(STRIP) $@
-
-ffTest: ffTest.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o ffTest -Xlinker -Map -Xlinker ffTest.map ffTest.cpp $(LIBS) -lCurlCache $(MPEG2LIBS) -lmad -lm -lz -lpthread -lCurlCache -lstdc++ 
-	$(NM) --demangle $@ | sort >$@.sym
-#	$(STRIP) $@
-
 mpDemux: mpDemux.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DSTANDALONE=1 -o mpDemux -Xlinker -Map -Xlinker mpDemux.map mpDemux.cpp $(LIBS) $(MPEG2LIBS) -lCurlCache -lmad -lm -lz -lpthread -lsupc++
 	$(STRIP) $@
