@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.20  2006-10-20 01:05:37  ericn
+ * Revision 1.21  2007-01-03 22:07:22  ericn
+ * -additional level of indirection (mediaQueue_t)
+ *
+ * Revision 1.20  2006/10/20 01:05:37  ericn
  * -don't TRACEMAD by default
  *
  * Revision 1.19  2006/10/16 22:33:30  ericn
@@ -87,18 +90,9 @@
 #include "yuyv.h"
 #include "debugPrint.h"
 #include "tickMs.h"
-#include <sys/ioctl.h>
-#include <linux/sm501yuv.h>
-#include <linux/sm501-int.h>
 #include <string.h>
 #include "fbDev.h"
 #include <sys/soundcard.h>
-// #define LOGTRACES
-#include "logTraces.h"
-
-static traceSource_t traceAudioDecode( "audioDecode" );
-static traceSource_t traceVideoDecode( "videoDecode" );
-static traceSource_t traceSkipB( "skipBFrames" );
 
 // #define USE_MMAP
 
@@ -110,241 +104,17 @@ static traceSource_t traceSkipB( "skipBFrames" );
 #include <openssl/md5.h>
 #endif
 
-// #define TRACEMAD
-
-extern "C" {
-#ifdef TRACEMPEG2
-extern int volatile in_mpeg2_slice ;
-extern int volatile in_mpeg2_convert ;
-extern int volatile in_mpeg2_dct_row ;
-extern int volatile in_mpeg2_dct_col ;
-extern int volatile in_mpeg2_dct_copy ;
-extern int volatile in_mpeg2_dct_add ;
-extern int volatile in_mpeg2_dct_init ;
-extern int volatile in_mpeg2_me ;
-#endif
-#ifdef TRACEMAD
-extern int volatile in_mad_synth_full ;
-extern int volatile in_mad_synth_half ;
-extern int volatile in_mad_synth_dct ;
-#endif
-
-int volatile in_mpeg2_parse = 0 ;
-int volatile in_write = 0 ;
-int volatile in_mp3_feed = 0 ;
-int volatile in_mp3_synth = 0 ;
-int volatile in_mp3_pull = 0 ;
-int volatile in_file_read = 0 ;
-};
-
-#define fieldsize( __st, __f ) sizeof( ((__st const *)0)->__f )
-
 #define AUDIOSAMPLESPERFRAME 4096
 
-class queueLock_t {
-public:
-   queueLock_t( unsigned volatile *lock, unsigned id = 1 );
-   ~queueLock_t( void );
-
-   bool weLocked( void ) const { return 0 == prevVal_ ; }
-   bool wasLocked( void ) const { return 0 != prevVal_ ; }
-   unsigned whoLocked( void ) const { return prevVal_ ; }
-
-private:
-   queueLock_t( queueLock_t const & );
-   unsigned volatile *lock_ ;
-   unsigned           id_ ;
-   unsigned           prevVal_ ;
-};
-
-queueLock_t::queueLock_t( 
-   unsigned volatile *lock,
-   unsigned id )
-   : lock_( lock )
-   , id_( id )
-{
-   debugPrint( "locking: %p/%d...", this, *lock );
-   unsigned old ;
-   unsigned newval = id_ ;
-   __asm__ __volatile__ (
-      "swp %0, %1, [%2]"
-      : "=&r" (old)
-      : "r" (newval), "r" (lock)
-      : "memory", "cc");
-   prevVal_ = old ;
-   debugPrint( "%d\n", *lock );
-}
-
-queueLock_t::~queueLock_t( void )
-{
-   if( weLocked() ){
-      debugPrint( "unlocking: %p/%d...", this, *lock_ );
-      unsigned ret ;
-      unsigned newval = 0 ;
-      unsigned volatile *lock = lock_ ; // need it in a register
-
-      __asm__ __volatile__ (
-         "swp %0, %1, [%2]"
-   	 : "=&r" (ret)
-   	 : "r" (newval), "r" (lock)
-   	 : "memory", "cc");
-      if( 0 == ret ){
-         printf( "failed unlock attempt for queue lock %p\n"
-                 "id %u\n"
-                 "prevVal %u\n"
-                 "locked by %u\n", lock_, id_, prevVal_, ret );
-         exit(1);
-      }
-      debugPrint( "%d\n", *lock );
-   }
-   else
-      debugPrint( "don't unlock\n" );
-}
-
-mpegQueue_t::entryHeader_t *mpegQueue_t::pullHead( entryHeader_t &eh )
-{
-   entryHeader_t *e = eh.next_ ;
-   if( e != &eh ){
-      e->next_->prev_ = &eh ;
-      eh.next_ = e->next_ ;
-      
-      e->next_ = e->prev_ = e ;     // decouple
-      return e ;
-   }
-
-   return 0 ;
-}
-
-void mpegQueue_t::pushTail( entryHeader_t &head, 
-                            entryHeader_t *entry )
-{
-   assert( entry );
-   assert( entry->next_ == entry );
-   assert( entry->prev_ == entry );
-
-   entry->prev_ = head.prev_;
-   entry->next_ = &head ;
-   head.prev_->next_ = entry ;
-   head.prev_ = entry ;
-}
-
-void mpegQueue_t::freeEntry( entryHeader_t *e )
-{
-   assert( e && ( e->next_ == e ) && ( e->prev_ == e ) );
-   delete [] (char *)e ;
-}
-   
-void mpegQueue_t::unlink( entryHeader_t &entry )
-{
-   assert( entry.next_ && ( entry.next_ != &entry ) );
-   assert( entry.prev_ && ( entry.prev_ != &entry ) );
-   entry.next_->prev_ = entry.prev_ ;
-   entry.prev_->next_ = entry.next_ ;
-
-   entry.next_ = entry.prev_ = &entry ;
-}
 
 mpegQueue_t::mpegQueue_t
    ( int      dspFd,
      int      yuvFd,
      unsigned msToBuffer,
      rectangle_t const &outRect )
-   : dspFd_( dspFd )
-   , yuvFd_( yuvFd )
-   , outRect_( outRect )
-   , bufferMs_( msToBuffer )
-   , lowWater_( bufferMs_/2 )
-   , highWater_( 2*bufferMs_ )
-   , audioBufferBytes_( 0 )
-   , flags_( 0 )
-   , prevOutWidth_( 0 )
-   , prevOutHeight_( 0 )
-   , prevOutBufferLength_( 0 )
-   , yuvOut_( 0 )
-   , inWidth_( 0 )
-   , inHeight_( 0 )
-   , inStride_( 0 )
-   , inBufferLength_( 0 )
-   , inRate_( 0 )
-   , msPerPic_( 0 )
-   , msOut_( 0LL )
-   , startMs_( 0LL )
-   , audioOffs_( 0LL )
-   , vallocCount_( 0 )
-   , vfreeCount_( 0 )
-   , aAllocCount_( 0 )
-   , aFreeCount_( 0 )
+   : mediaQueue_t( dspFd, yuvFd, msToBuffer, outRect )
    , decoder_( mpeg2_init() )
-   , vFramesQueued_( 0 )
-   , vFramesPlayed_( 0 )
-   , vFramesSkipped_( 0 )
-   , vFramesDropped_( 0 )
-   , audioPartial_( 0 )
-   , prevSampleRate_( 0 )
-   , prevChannels_( 0 )
-   , aFramesQueued_( 0 )
-   , aBytesQueued_( 0 )
-   , aFramesPlayed_( 0 )
-   , aFramesSkipped_( 0 )
-   , aFramesDropped_( 0 )
-   , firstVideoMs_( 0 )
-   , lastVideoMs_( 0 )
-   , firstAudioMs_( 0 )
-   , lastAudioMs_( 0 )
-   , firstVideoWrite_( 0 )
-   , lastVideoWrite_( 0 )
-   , firstAudioWrite_( 0 )
-   , lastAudioWrite_( 0 )
 {
-debugPrint( "fds: dsp(%d), yuv(%d)\n", dspFd_, yuvFd_ );   
-   videoFull_.locked_ = 0 ;
-   videoFull_.header_.when_ms_ = 0 ;
-   videoFull_.header_.prev_ 
-      = videoFull_.header_.next_ 
-      = &videoFull_.header_ ;
-   videoEmpty_.locked_ = 0 ;
-   videoEmpty_.header_.when_ms_ = 0 ;
-   videoEmpty_.header_.prev_ 
-      = videoEmpty_.header_.next_ 
-      = &videoEmpty_.header_ ;
-   decoderBufs_.locked_ = 0 ;
-   decoderBufs_.header_.when_ms_ = 0 ;
-   decoderBufs_.header_.prev_ 
-      = decoderBufs_.header_.next_ 
-      = &decoderBufs_.header_ ;
-   audioFull_.locked_ = 0 ;
-   audioFull_.header_.when_ms_ = 0 ;
-   audioFull_.header_.prev_ 
-      = audioFull_.header_.next_ 
-      = &audioFull_.header_ ;
-   audioEmpty_.locked_ = 0 ;
-   audioEmpty_.header_.when_ms_ = 0 ;
-   audioEmpty_.header_.prev_ 
-      = audioEmpty_.header_.next_ 
-      = &audioEmpty_.header_ ;
-
-   audio_buf_info ai ;
-   if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
-      audioBufferBytes_ = ai.bytes ;
-      debugPrint( "%llu ms/buffer @ 2 channels/44100 Hz\n",
-                  audioBufferMs( 44100, 2 ) );
-   }
-   else
-      perror( "GETOSPACE" );
-
-#ifdef MD5OUTPUT
-   MD5_Init( &videoMD5_ );
-#endif
-}
-
-void mpegQueue_t::cleanup( void )
-{
-   cleanDecoderBufs();
-   lockAndClean( decoderBufs_ );
-   lockAndClean( videoFull_ );
-   lockAndClean( videoEmpty_ );
-   lockAndClean( audioFull_ );
-   lockAndClean( audioEmpty_ );
 }
 
 mpegQueue_t::~mpegQueue_t( void )
@@ -353,88 +123,17 @@ mpegQueue_t::~mpegQueue_t( void )
 
    if( decoder_ )
       mpeg2_close(decoder_);
-#ifdef MD5OUTPUT
-   unsigned char md5[MD5_DIGEST_LENGTH];
-   MD5_Final( md5, &videoMD5_ );
-
-   printf( "   md5: " );
-   for( unsigned i = 0 ; i < MD5_DIGEST_LENGTH ; i++ ){
-      printf( "%02x ", md5[i] );
-   }
-   printf( "\n" );
-#endif
 }
    
-bool mpegQueue_t::started( void ) const 
-{ 
-   return 0 != flags_ & STARTED ; 
-}
-
-void mpegQueue_t::lockAndClean( queueHeader_t &qh )
-{
-   queueLock_t lockVideoQ( &qh.locked_ );
-   assert( lockVideoQ.weLocked() );
-   cleanQueue(qh);
-}
-
-void mpegQueue_t::cleanQueue( queueHeader_t &qh )
-{
-   assert( qh.locked_ );
-   entryHeader_t *next ;
-   while( 0 != ( next = pullHead( qh.header_ ) ) ){
-      freeEntry( next );
-   }
-}
-
-void mpegQueue_t::flushAudio(void)
-{
-   if( 0 != audioPartial_ ){
-      if( audioPartial_->length_ ){
-         audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
-         audioPartial_->numChannels_ = audioDecoder_.numChannels();
-         audioPartial_->offset_ = 0 ;
-
-         if( 0LL == firstAudioMs_ )
-            firstAudioMs_ = audioPartial_->header_.when_ms_ ;
-         lastAudioMs_ = audioPartial_->header_.when_ms_ ;
-         audioPartial_->header_.when_ms_ += audioOffs_ ;
-         queueLock_t lockAudioQ( &audioFull_.locked_, 1 );
-         assert( lockAudioQ.weLocked() ); // only reader side should fail
-
-         pushTail( audioFull_.header_, &audioPartial_->header_ );
-      }
-      else {
-         queueLock_t lockAudioQ( &audioEmpty_.locked_, 1 );
-         assert( lockAudioQ.weLocked() ); // only reader side should fail
-
-         pushTail( audioEmpty_.header_, &audioPartial_->header_ );
-      }
-      audioPartial_ = 0 ;
-   }
-}
-
-void mpegQueue_t::resetAudio(void)
-{
-   if( 0 != ioctl( dspFd_, SNDCTL_DSP_RESET, 0) ){
-      perror( "SNDCTL_DSP_RESET" );
-   }
-}
-
 void mpegQueue_t::feedAudio
    ( unsigned char const *data, 
      unsigned             length,
      bool                 discontinuity,
      long long            when_ms ) // transport PTS
 {
-   TRACE_T( traceAudioDecode, traceAudio );
-#if 1
-in_mp3_feed = 1 ;
    audioDecoder_.feed( data, length );
-in_mp3_feed = 0 ;
 
-in_mp3_synth = 1 ;
    while( audioDecoder_.getData() ){
-in_mp3_synth = 0 ;
 debugPrint( "%s\n", audioDecoder_.timerString() );
       do {
          if( 0 == audioPartial_ ){
@@ -446,9 +145,7 @@ debugPrint( "%s\n", audioDecoder_.timerString() );
          unsigned numRead ;
          unsigned short *next = audioPartial_->data_ + audioPartial_->length_ ;
 
-         in_mp3_pull = 1 ;
          if( audioDecoder_.readSamples( next, numFree, numRead ) ){
-            in_mp3_pull = 0 ;
             audioPartial_->length_ += numRead ;
             if( AUDIOSAMPLESPERFRAME == audioPartial_->length_ ){
                audioPartial_->sampleRate_ = audioDecoder_.sampleRate();
@@ -481,198 +178,12 @@ debugPrint( "audio %lld\n", audioPartial_->header_.when_ms_ );
             }
          }
          else {
-            in_mp3_pull = 0 ;
             break ;
          }
       } while( 1 );
-in_mp3_synth = 1 ;
    } // while more output synthesized
-in_mp3_synth = 0 ;
 if( flags_ & AUDIOIDLE )
    playAudio(tickMs());
-
-#endif
-}
-
-
-mpegQueue_t::videoEntry_t *mpegQueue_t::getPictureBuf(void)
-{
-   queueLock_t lockVideoQ( &videoEmpty_.locked_, 1 );
-   assert( lockVideoQ.weLocked() ); // only reader side should fail
-
-   entryHeader_t *next ;
-   while( 0 != ( next = pullHead( videoEmpty_.header_ ) ) ){
-      videoEntry_t *const ve = (videoEntry_t *)next ;
-      if( ve->length_ == inBufferLength_ ){
-debugPrint( "recycle buffer: %p\n", ve );
-         ve->width_ = inWidth_ ;
-         ve->height_ = inHeight_ ;
-         ++vallocCount_ ;
-         return ve ;
-      }
-      else {
-         freeEntry( next );
-      }
-   }
-
-
-   unsigned size = sizeof(videoEntry_t)
-                  -fieldsize(videoEntry_t,data_)
-                  +inBufferLength_ ;
-debugPrint( "allocate buffer of size : %u\n", size );
-   ++vallocCount_ ;
-
-   unsigned char * const data = new unsigned char [ size ];
-   videoEntry_t *const ve = (videoEntry_t *)data ;
-   ve->length_ = inBufferLength_ ;
-   ve->width_ = inWidth_ ;
-   ve->height_ = inHeight_ ;
-   ve->header_.next_ = ve->header_.prev_ = &ve->header_ ;
-
-   return ve ;
-}
-
-mpegQueue_t::audioEntry_t *mpegQueue_t::getAudioBuf( void )
-{
-   {
-      queueLock_t lockEmptyQ( &audioEmpty_.locked_, 1 );
-      assert( lockEmptyQ.weLocked() ); // only reader side should fail
-   
-      entryHeader_t *next ;
-      if( 0 != ( next = pullHead( audioEmpty_.header_ ) ) ){
-         audioEntry_t *const ae = (audioEntry_t *)next ;
-         ae->offset_ =
-         ae->length_ = 
-         ae->sampleRate_ =
-         ae->numChannels_ = 0 ;
-         ++aAllocCount_ ;
-         return ae ;
-debugPrint( "recycle buffer: %p\n", ae );
-      }
-   }
-
-   unsigned size = sizeof(audioEntry_t)
-                  -fieldsize(audioEntry_t,data_)
-                  +(AUDIOSAMPLESPERFRAME*fieldsize(audioEntry_t,data_[0]));
-debugPrint( "allocate buffer of size : %u\n", size );
-   ++aAllocCount_ ;
-
-   unsigned char * const data = new unsigned char [ size ];
-   audioEntry_t *const ae = (audioEntry_t *)data ;
-   ae->offset_ =
-   ae->length_ = 
-   ae->sampleRate_ =
-   ae->numChannels_ = 0 ;
-   ae->header_.next_ = ae->header_.prev_ = &ae->header_ ;
-
-   return ae ;
-}
-
-long long mpegQueue_t::audioBufferMs( unsigned speed, unsigned channels )
-{
-   /*
-    * bytes/second
-    */
-   unsigned bps = speed*channels*sizeof(unsigned short);
-   if( 0 < bps ){
-      return (audioBufferBytes_*1000)/bps ;
-   }
-   else {
-      fprintf( stderr, "Invalid channel count or speed: %u/%u\n", channels, speed );
-      return 0 ;
-   }
-}
-
-void mpegQueue_t::startPlayback( void )
-{
-   if( 0 == ( flags_ & STARTED ) ){
-      flags_ |= STARTED ;
-      
-      long long now = tickMs();
-
-      { // limit scope of lock
-         queueLock_t lockVideoQ( &videoFull_.locked_, 1 );
-         assert( lockVideoQ.weLocked() );
-
-         queueLock_t lockAudioQ( &audioFull_.locked_, 2 );
-         assert( lockAudioQ.weLocked() );
-   
-         entryHeader_t *firstVideo = videoFull_.header_.next_ ;
-         entryHeader_t *firstAudio = audioFull_.header_.next_ ;
-   
-         //
-         // use latter of two timestamps (to avoid zero case)
-         //
-         if( firstAudio->when_ms_ < firstVideo->when_ms_ ){
-            startMs_ = now - firstVideo->when_ms_ ;
-         }
-         else {
-            startMs_ = now - firstAudio->when_ms_ ;
-         }
-
-printf( "startMs_ %lld\n", startMs_ );
-
-         long long first = firstVideo->when_ms_ ;
-         long long last = first ;
-         entryHeader_t *entry = firstVideo ;
-         while( entry != &videoFull_.header_ ){
-            last = entry->when_ms_ ;
-            entry->when_ms_ += startMs_ ;
-            entry = entry->next_ ;
-         }
-         debugPrint( "\nvideo ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
-   
-         first = firstAudio->when_ms_ ;
-         last = first ;
-         audioOffs_ = startMs_ ;
-         entry = audioFull_.header_.next_ ;
-         while( entry != &audioFull_.header_ ){
-            last = entry->when_ms_ ;
-            entry->when_ms_ += audioOffs_ ;
-            entry = entry->next_ ;
-         }
-         debugPrint( "audio ms range: %llu..%llu (%lu ms)\n", first, last, (unsigned long)(last-first) );
-
-      } // scope of queue lock(s)
-
-      playAudio(now);
-   }
-}
-
-void mpegQueue_t::adjustPTS( long long startPts )
-{
-   if( flags_ & STARTED ){
-      long long nowPlus = tickMs() + bufferMs_ - startPts ;
-
-      startMs_ = audioOffs_ = nowPlus ;
-      msOut_ = startPts ;
-   }
-}
-
-void mpegQueue_t::queuePicture(videoEntry_t *ve)
-{
-   queueLock_t lockVideoQ( &videoFull_.locked_, 2 );
-   assert( lockVideoQ.weLocked() ); // only reader side should fail
-
-   if( 0LL == firstVideoMs_ ){
-      firstVideoMs_ = ve->header_.when_ms_ ;
-printf( "first video frame at %lld\n", firstVideoMs_ );
-   }
-   lastVideoMs_ = ve->header_.when_ms_ ;
-
-   ve->header_.when_ms_ += startMs_ ;
-
-   long int diff = (long)(ve->header_.when_ms_ - videoFull_.header_.next_->when_ms_ );
-   if( 0 > diff )
-      printf( "ms inversion: %lld/%lld (%ld)\n",
-              ve->header_.when_ms_,
-              videoFull_.header_.next_->when_ms_,
-              diff );
-
-   pushTail( videoFull_.header_, &ve->header_ );
-   ++vFramesQueued_ ;
-
-   assert( highWater_ms()*2 > videoTailFromNow() );
 }
 
 void mpegQueue_t::addDecoderBuf()
@@ -690,18 +201,6 @@ void mpegQueue_t::addDecoderBuf()
    pushTail( decoderBufs_.header_, &ve->header_ );
 }
 
-void mpegQueue_t::cleanDecoderBufs()
-{
-   queueLock_t lockEmptyQ( &videoEmpty_.locked_, 3 );
-   assert( lockEmptyQ.weLocked() );
-
-   entryHeader_t *e ;
-   while( 0 != ( e = pullHead( decoderBufs_.header_ ) ) ){
-      ++vfreeCount_ ;
-      pushTail( videoEmpty_.header_, e );
-   }
-}
-
 static char const cPicTypes[] = {
    "xIPBD"
 };
@@ -712,12 +211,9 @@ void mpegQueue_t::feedVideo
      bool                 discontinuity,
      long long            offset_ms ) // 
 {
-   TRACE_T( traceVideoDecode, traceVideo );
-   
    if( discontinuity ){
       if( 0 == (flags_ & NEEDIFRAME)){
          flags_ |= NEEDIFRAME ;
-         TRACEINCR(traceSkipB);
       }
       mpeg2_reset( decoder_, 1 );
       cleanDecoderBufs();
@@ -728,9 +224,7 @@ void mpegQueue_t::feedVideo
    mpeg2_info_t const *const infoptr = mpeg2_info( decoder_ );
    int mpState = -1 ;
    do {
-      in_mpeg2_parse = 1 ;
       mpState = mpeg2_parse( decoder_ );
-      in_mpeg2_parse = 0 ;
 
       switch( mpState )
       {
@@ -790,8 +284,6 @@ void mpegQueue_t::feedVideo
             if( flags_ & STARTED ){
                if( msVideoQueued() <= lowWater_ms() ){
                   debugPrint( "skipping b-frames w/%lu ms queued\n", msVideoQueued() );
-                  if( 0 == (flags_ & NEEDIFRAME))
-                     TRACEINCR(traceSkipB);
                   flags_ |= NEEDIFRAME ;
                }
             }
@@ -811,7 +303,6 @@ debugPrint( "%c", cPicTypes[picType] );
                       ||
                       ( msVideoQueued() >= lowWater_ms() ) ){
                      flags_ &= ~NEEDIFRAME ;
-                     TRACEDECR(traceSkipB);
                      debugPrint( "play b-frames...\n" );
                   }
                }
@@ -860,7 +351,6 @@ debugPrint( "\n%8lld - G", offset_ms );
             if( 0 != offset_ms )
                msOut_ = offset_ms ;
             if( 0 != (flags_ & NEEDIFRAME)){
-               TRACEDECR(traceSkipB);
                flags_ &= ~NEEDIFRAME ;
             }
 
@@ -887,435 +377,6 @@ debugPrint( "\n%8lld - G", offset_ms );
       }
    } while( ( -1 != mpState ) && ( STATE_BUFFER != mpState ) );
 }
-
-void mpegQueue_t::playAudio
-   ( long long when ) // in ms a.la. tickMs()
-{
-   if( flags_ & STARTED ){
-      audio_buf_info ai ;
-      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
-         unsigned bytesWritten = 0 ;
-         if( 0 < ai.fragments ){
-            queueLock_t lockAudioQ( &audioFull_.locked_, 3 );
-            if( lockAudioQ.weLocked() ){
-               while( !isEmpty( audioFull_.header_ ) ){
-                  audioEntry_t *const ae = (audioEntry_t *)audioFull_.header_.next_ ;
-                  long long timeDiff = ae->header_.when_ms_
-                                     - when 
-                                     - audioBufferMs( ae->sampleRate_, ae->numChannels_ );
-                  if( 0 > timeDiff ){
-                     if( ae->sampleRate_ != prevSampleRate_ ){
-                        printf( "%u samples/sec\n", ae->sampleRate_ );
-                        prevSampleRate_ = ae->sampleRate_ ;
-                        if( 0 != ioctl( dspFd_, SNDCTL_DSP_SPEED, &prevSampleRate_ ) )
-                           fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", prevSampleRate_ );
-                     }
-                     else if ( 0 == prevSampleRate_ ){
-                        printf( "No sample rate(yet)\n" );
-                     }
-                     if( ae->numChannels_ != prevChannels_ ){
-                        printf( "%u channels\n", ae->numChannels_ );
-                        prevChannels_ = ae->numChannels_ ;
-                        if( 0 != ioctl( dspFd_, SNDCTL_DSP_CHANNELS, &prevChannels_ ) )
-                           fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-                     }
-                     else if ( 0 == prevChannels_ ){
-                        printf( "No channel count(yet)\n" );
-                     }
-
-                     assert( ae->length_ > ae->offset_ ); // or why are we here?
-
-                     unsigned bytes = ( ae->length_ - ae->offset_ ) * sizeof(ae->data_[0]);
-                     int numWritten = write( dspFd_, ae->data_+ae->offset_, bytes );
-                     if( 0 < numWritten ){
-                        bytesWritten += numWritten ;
-                        if( 0 == firstAudioWrite_ )
-                           firstAudioWrite_ = tickMs();
-                        lastAudioWrite_ = tickMs();
-                        ae->offset_ += numWritten/sizeof(ae->data_[0]);
-
-                        assert( ae->offset_ <= ae->length_ );
-                        if( ae->offset_ >= ae->length_ ){
-                           ++aFramesPlayed_ ;
-                           entryHeader_t *const e = pullHead( audioFull_.header_ );
-                           assert( e );
-                           assert( e == (entryHeader_t *)ae );
-                           pushTail( audioEmpty_.header_, e );
-                           ++aFreeCount_ ; 
-                           continue ;
-                        } // finished this packet of audio
-                     }
-                     else if( ( -1 != numWritten ) || ( EAGAIN != errno ) ){
-                        fprintf( stderr, "Short audio write: %d/%d/%d/%u/%u/%u: %m\n", dspFd_, numWritten, errno, bytes, ae->offset_, ae->length_ );
-                        unsigned value ;
-                        if( 0 == ioctl( dspFd_, SOUND_PCM_READ_RATE, &value ) )
-                           fprintf( stderr, "speed %u\n", value );
-                        else
-                           perror( "PCM_READ_RATE" );
-                        if( 0 == ioctl( dspFd_, SOUND_PCM_READ_CHANNELS, &value ) )
-                           fprintf( stderr, "%u channels\n", value );
-                        else
-                           perror( "PCM_READ_CHANNELS" );
-                     }
-                     else {
-                        int prevErr = errno ;
-                        audio_buf_info ai2 ;
-                        if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai2) ){
-                           if( 0 < ai2.fragments ){
-                              printf( "EINTR? %d/%d/%s\n", numWritten, prevErr, strerror(prevErr) );
-                              continue ;
-                           }
-                        }
-                        else
-                           perror( "GETOSPACE2" );
-                     }
-                  } // time to play
-                  else
-                     debugPrint( "Not time yet: %lld/%lld, %lld\n", 
-                                 when, 
-                                 ae->header_.when_ms_,
-                                 audioBufferMs( ae->sampleRate_, ae->numChannels_ ) );
-      
-                  // continue from the middle
-                  break ;
-               }
-            }
-            else {
-               debugPrint( "~audioLock (%u)\n", lockAudioQ.whoLocked() );
-               flags_ |= AUDIOIDLE ;
-            }
-         } // have some space to write
-         if( ai.fragments == ai.fragstotal )
-            debugPrint( "audio stall: %u of %u filled\n", bytesWritten, ai.bytes );
-
-         if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
-            if( 0 != ai.fragments ){
-               flags_ |= AUDIOIDLE ;
-            }
-            else
-               flags_ &= ~AUDIOIDLE ;
-         }
-         else
-            perror( "GETOSPACE2" );
-      }
-      else
-         perror( "GETOSPACE" );
-   } // if we've started playback
-   else
-      printf( "audio not started\n" );
-}
-
-unsigned long mpegQueue_t::msVideoQueued( void ) const 
-{
-   entryHeader_t const * const head = videoFull_.header_.next_ ;
-   entryHeader_t const * const tail = videoFull_.header_.prev_ ;
-   unsigned long queueTime = (tail->when_ms_ - head->when_ms_);
-
-   debugPrint( "%lu: %p/%p: %lld..%lld\n", queueTime, head, tail, head->when_ms_, tail->when_ms_ );
-   return (unsigned long)( queueTime );
-}
-
-unsigned long mpegQueue_t::msAudioQueued( void ) const 
-{
-   entryHeader_t const * const head = audioFull_.header_.next_ ;
-   entryHeader_t const * const tail = audioFull_.header_.prev_ ;
-   unsigned long queueTime = (tail->when_ms_ - head->when_ms_);
-
-   debugPrint( "%lu: %p/%p: %lld..%lld\n", queueTime, head, tail, head->when_ms_, tail->when_ms_ );
-   return (unsigned long)( queueTime );
-}
-
-unsigned long mpegQueue_t::videoTailFromNow(void) const 
-{
-   unsigned long queueTime = 0 ;
-   if( 0 == (flags_ & STARTED) ){
-      entryHeader_t const * const tail = videoFull_.header_.prev_ ;
-      if( tail != &videoFull_.header_ ){
-         long delta = (tail->when_ms_ - tickMs());
-         if( 0 < delta )
-            queueTime = delta ;
-      }
-   } // clocks have been converted
-   else
-      queueTime = msVideoQueued();
-   
-   return queueTime ;
-}
-
-unsigned long mpegQueue_t::audioTailFromNow(void) const 
-{
-   unsigned long queueTime = 0 ;
-   if( 0 == (flags_ & STARTED) ){
-      entryHeader_t const * const tail = audioFull_.header_.prev_ ;
-      if( tail != &audioFull_.header_ ){
-         long delta = (tail->when_ms_ - tickMs());
-         if( 0 < delta )
-            queueTime = delta ;
-      }
-   } // clocks have been converted
-   else
-      queueTime = msAudioQueued();
-   
-   return queueTime ;
-}
-
-extern "C" {
-   void memcpyAlign4( void *dst, void const *src, unsigned len );
-};
-
-void mpegQueue_t::playVideo( long long when )
-{
-   if( flags_ & STARTED ){
-      queueLock_t lockVideoQ( &videoFull_.locked_, 3 );
-      queueLock_t lockEmptyQ( &videoEmpty_.locked_, 4 );
-      if( lockVideoQ.weLocked() && lockEmptyQ.weLocked() ){
-         while( !isEmpty( videoFull_.header_ ) ){
-            videoEntry_t *const ve = (videoEntry_t *)videoFull_.header_.next_ ;
-            if( 0 <= ( when-ve->header_.when_ms_ ) ){
-               // peek ahead (maybe we can skip a write
-               if( ( ve->header_.next_ != &videoFull_.header_ )
-                   &&
-                   ( 0 <= ( when-ve->header_.next_->when_ms_ ) ) ){
-                  debugPrint( "peek ahead: %llu/%llu/%llu (%lu ms queued)\n", 
-                              when, 
-                              ve->header_.when_ms_, 
-                              ve->header_.next_->when_ms_, 
-                              msVideoQueued() );
-                  entryHeader_t *const e = pullHead( videoFull_.header_ );
-                  assert( e );
-                  assert( e == (entryHeader_t *)ve );
-
-#ifdef MD5OUTPUT
-   MD5_Update(&videoMD5_, ve->data_, ve->length_ );
-#endif
-
-                  ++vfreeCount_ ;
-                  pushTail( videoEmpty_.header_, e );
-                  ++vFramesSkipped_ ;
-                  continue ;
-               } // skip: more than one frame is ready
-               else {
-                     ++vFramesPlayed_ ;
-                     if( ( ve->width_ != prevOutWidth_)
-                      ||
-                      ( ve->height_ != prevOutHeight_ ) ){
-                     prevOutWidth_ = ve->width_ ;
-                     prevOutHeight_ = ve->height_ ;
-                     prevOutBufferLength_ = ve->length_ ;
-
-                     struct sm501yuvPlane_t plane ;
-                     plane.xLeft_     = outRect_.xLeft_ ;
-                     plane.yTop_      = outRect_.yTop_ ;
-                     plane.inWidth_   = ve->width_ ;
-                     plane.inHeight_  = ve->height_ ;
-                     plane.outWidth_  = outRect_.width_ ;
-                     plane.outHeight_ = outRect_.height_ ;
-
-                     if( 0 != ioctl( yuvFd_, SM501YUV_SETPLANE, &plane ) )
-                     {
-                        perror( "setPlane" );
-                        exit(-1);
-                     }
-                     else {
-                        debugPrint( "setPlane success\n"
-                                    "%u:%u %ux%u -> %ux%u\n"
-                                    "offset == 0x%x\n", 
-                                    plane.xLeft_, plane.yTop_,
-                                    plane.inWidth_, plane.inHeight_,
-                                    plane.outWidth_, plane.outHeight_,
-                                    plane.planeOffset_ );
-                        fbDevice_t &fb = getFB();
-                        yuvOut_ = (unsigned *)( (char *)fb.getMem() + plane.planeOffset_ );
-                        reg_and_value rv ;
-                        rv.reg_ = SMIVIDEO_CTRL ;
-                        rv.value_ = SMIVIDEO_CTRL_ENABLE_YUV ;
-                        int res = ioctl( fb.getFd(), SM501_WRITEREG, &rv );
-			               if( 0 == res )
-                           debugPrint( "enabled YUV\n" );
-                        else
-                           debugPrint( "Error enabling YUV\n" );
-                     }
-                  }
-
-#ifdef USE_MMAP
-                  assert( 0 != yuvOut_ );
-                  in_write = 1 ;
-                  
-                  unsigned numCacheLines = ve->length_ / 32 ;
-                  unsigned long const *nextIn = (unsigned long const *)ve->data_ ;
-                  unsigned long *nextOut = (unsigned long *)yuvOut_ ;
-
-                  __asm__ volatile (
-                  "  pld   [%0, #32]\n"
-                  "  pld   [%0, #64]\n"
-                  "  pld   [%0, #96]\n"
-                  :
-                  : "r" (nextIn)
-                  );
-
-                  while( 0 < numCacheLines-- ){
-                    __asm__ volatile (
-                     "  pld   [%0, #32]\n"
-                     "  pld   [%0, #64]\n"
-                     "  pld   [%0, #96]\n"
-                     "  pld   [%0, #128]\n"
-                     :
-                     : "r" (nextIn)
-                    );
-                    nextOut[0] = nextIn[0];
-                    nextOut[1] = nextIn[1];
-                    nextOut[2] = nextIn[2];
-                    nextOut[3] = nextIn[3];
-                    nextOut[4] = nextIn[4];
-                    nextOut[5] = nextIn[5];
-                    nextOut[6] = nextIn[6];
-                    nextOut[7] = nextIn[7];
-
-                    nextOut += 8 ;
-                    nextIn += 8 ;
-                  }
-
-                  in_write = 0 ;
-
-                  entryHeader_t *const e = pullHead( videoFull_.header_ );
-                  assert( e );
-                  assert( e == (entryHeader_t *)ve );
-                  ++vfreeCount_ ;
-                  pushTail( videoEmpty_.header_, e );
-                  continue ;
-#else
-                  if( 0LL == firstVideoWrite_ )
-                     firstVideoWrite_ = when ;
-                  lastVideoWrite_ = when ;
-
-                  in_write = 1 ;
-
-                  int numWritten = write( yuvFd_, ve->data_, ve->length_ );
-                  in_write = 0 ;
-                  if( ve->length_ == (unsigned)numWritten ){
-                     entryHeader_t *const e = pullHead( videoFull_.header_ );
-                     assert( e );
-                     assert( e == (entryHeader_t *)ve );
-                     ++vfreeCount_ ;
-                     pushTail( videoEmpty_.header_, e );
-                     continue ;
-                  }
-                  else
-                     fprintf( stderr, "Short video write: %d/%d/%d/%u: %m\n", yuvFd_, numWritten, errno, ve->length_ );
-#endif
-               } // no peek ahead
-            } // time to play
-            else
-               debugPrint( "idle: %llu/%llu\n", when, ve->header_.when_ms_ );
-
-            // continue from the middle
-            break ;
-         }
-      }
-      else {
-         debugPrint( "vLock: %d/%d, %u/%u\n",  
-                     lockVideoQ.weLocked(), lockEmptyQ.weLocked(),
-                     lockVideoQ.whoLocked(), lockEmptyQ.whoLocked()
-                 );
-      }
-   } // if we've started playback
-   else
-      debugPrint( "idle\n" );
-}
-
-bool mpegQueue_t::isEmpty( void ) const {
-   if( isEmpty( videoFull_.header_ )
-       && 
-       isEmpty( audioFull_.header_ ) ){
-      audio_buf_info ai ;
-      if( 0 == ioctl( dspFd_, SNDCTL_DSP_GETOSPACE, &ai) ){
-         return( ai.fragments == ai.fragstotal );
-      }
-      else
-         perror( "GETOSPACE" );
-   }
-
-   return false ;
-}
-
-
-// checks for end of either of two queues
-void mpegQueue_t::dumpQueue( entryHeader_t const &eh,
-                             entryHeader_t const &eh2 )
-{
-   entryHeader_t const *prev = 0 ;
-   entryHeader_t const *next = eh.next_ ;
-   while( ( next != &eh ) && ( next != &eh2 ) && ( next != prev ) ){
-      printf( "   %p@%lld\n", next, next->when_ms_ );
-
-      // if( next == prev ) then the node has been detached
-      prev = next ;
-      next = next->next_ ;
-   }
-}
-
-void mpegQueue_t::dumpVideoQueue(void) const {
-   printf( "---> video queue\n" ); dumpQueue( videoFull_.header_, videoEmpty_.header_ );
-}
-
-void mpegQueue_t::dumpAudioQueue(void) const {
-   printf( "---> audio queue\n" ); dumpQueue( audioFull_.header_, audioEmpty_.header_ );
-}
-
-void mpegQueue_t::dumpStats(void) const 
-{
-   printf( "start offsets:\n"
-           "   %lld video\n"
-           "   %lld audio\n"
-           "%lu ms of video queued (%lu from now)\n"
-           "   low water mark:  %lu\n"
-           "   high water mark: %lu\n"
-           "   %u buffers allocated\n"
-           "   %u buffers freed\n"
-           "   %u video frames queued\n"
-           "   %u video frames played\n"
-           "   %u video frames skipped\n"
-           "   %u video frames dropped\n"
-           "%lu ms of audio queued (%lu from now)\n"
-           "   %u audio frames queued (%u bytes)\n"
-           "   %u audio frames played\n"
-           "   %u audio frames skipped\n"
-           "   %u audio frames dropped\n"
-           "   video ms range: %lld..%lld (%lu ms)\n"
-           "   video writes: %lld..%lld (%lu ms)\n"
-           "   audio ms range: %lld..%lld (%lu ms)\n"
-           "   audio writes: %lld..%lld (%lu ms)\n"
-         ,  startMs_
-         ,  audioOffs_
-         ,  msVideoQueued(), videoTailFromNow()
-         ,  lowWater_ms()
-         ,  highWater_ms()
-         ,  numAllocated()
-         ,  numFreed()
-         ,  vFramesQueued()
-         ,  vFramesPlayed()
-         ,  vFramesSkipped() 
-         ,  vFramesDropped()
-         ,  msAudioQueued(), audioTailFromNow()
-         ,  aFramesQueued(), aBytesQueued()
-         ,  aFramesPlayed()
-         ,  aFramesSkipped() 
-         ,  aFramesDropped()
-         ,  firstVideoMs_
-         ,  lastVideoMs_
-         ,  (unsigned long)( lastVideoMs_ - firstVideoMs_ )
-         ,  firstVideoWrite_
-         ,  lastVideoWrite_
-         ,  (unsigned long)( lastVideoWrite_ - firstVideoWrite_ )
-         ,  firstAudioMs_
-         ,  lastAudioMs_
-         ,  (unsigned long)( lastAudioMs_ - firstAudioMs_ )
-         ,  firstAudioWrite_
-         ,  lastAudioWrite_
-         ,  (unsigned long)( lastAudioWrite_ - firstAudioWrite_ )
-         );
-}
-
 
 #ifdef MODULETEST
 
