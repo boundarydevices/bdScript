@@ -173,7 +173,7 @@ else
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mediaQueue.o mpegQueue.o
 endif
 
 ifeq (y,$(KERNEL_FB_SM501))
@@ -361,11 +361,11 @@ odomCommand: odomCommandMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYR
 	$(STRIP) $@
 
 odomTTYMain.o: odomTTY.cpp odomTTY.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
 odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomTTY odomTTYMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o odomTTY odomTTYMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odomTTY | sort >odomTTY.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -903,6 +903,18 @@ ffmpeg_test: ffmpeg_test.cpp Makefile $(LIB)
 
 xvidToZip: xvidToZip.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o xvidToZip -D__STANDALONE__ -Xlinker -Map -Xlinker xvidToZip.map xvidToZip.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
+	$(STRIP) $@
+
+i2cwrite: i2cwrite.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o i2cwrite -D__STANDALONE__ -Xlinker -Map -Xlinker i2cwrite.map i2cwrite.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
+	$(STRIP) $@
+
+i2cwriteread: i2cwriteread.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o i2cwriteread -D__STANDALONE__ -Xlinker -Map -Xlinker i2cwriteread.map i2cwriteread.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
+	$(STRIP) $@
+
+i2cread: i2cread.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o i2cread -D__STANDALONE__ -Xlinker -Map -Xlinker i2cread.map i2cread.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
 	$(STRIP) $@
 
 #
