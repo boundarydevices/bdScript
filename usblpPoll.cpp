@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: usblpPoll.cpp,v $
- * Revision 1.1  2006-10-29 21:59:10  ericn
+ * Revision 1.2  2007-01-03 22:00:46  ericn
+ * -made log file public
+ *
+ * Revision 1.1  2006/10/29 21:59:10  ericn
  * -Initial import
  *
  *
@@ -55,6 +58,8 @@ usblpPoll_t::usblpPoll_t
 
 usblpPoll_t::~usblpPoll_t( void )
 {
+   if( fLog_ )
+      fclose( fLog_ );
    parent_.removeMe( *this );
    if( inData_ )
       delete [] inData_ ;
@@ -176,6 +181,8 @@ debugPrint( "writeSpace avail: %u/%u\n", outAdd_, outTake_ );
          int numWritten = ::write( fd_, outData_+outTake_, numAvail );
          if( 0 < numWritten )
          {
+            if( fLog_ )
+               fwrite( outData_+outTake_, 1, numWritten, fLog_ );
 debugPrint( "%d bytes written to device\n", numWritten );
             outTake_ += numWritten ;
             assert( outTake_ <= outBufferLength_ );
@@ -216,6 +223,7 @@ int usblpPoll_t::write( void const *data, int length )
             outAdd_ = 0 ; // wrap
          length -= spaceAvail ;
          numWritten += spaceAvail ;
+         data = ((char const *)data) + spaceAvail ;
 debugPrint( "add segment %u, now %u/%u\n", spaceAvail, outAdd_, outTake_ );
       }
       else {

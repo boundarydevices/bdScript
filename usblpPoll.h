@@ -1,5 +1,5 @@
 #ifndef __USBLPPOLL_H__
-#define __USBLPPOLL_H__ "$Id: usblpPoll.h,v 1.1 2006-10-29 21:59:10 ericn Exp $"
+#define __USBLPPOLL_H__ "$Id: usblpPoll.h,v 1.2 2007-01-03 22:00:04 ericn Exp $"
 
 /*
  * usblpPoll.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: usblpPoll.h,v $
- * Revision 1.1  2006-10-29 21:59:10  ericn
+ * Revision 1.2  2007-01-03 22:00:04  ericn
+ * -made log file public
+ *
+ * Revision 1.1  2006/10/29 21:59:10  ericn
  * -Initial import
  *
  *
@@ -24,6 +27,8 @@
 #ifndef __POLLHANDLER_H__
 #include "pollHandler.h"
 #endif
+
+#include <stdio.h>
 
 #define DEFAULT_USBLB_DEV "/dev/usb/lp0"
 
@@ -52,7 +57,7 @@ public:
    // returns number of bytes queued.
    int write( void const *data, int length );
 
-protected:
+public:
    unsigned const inBufferLength_ ;
    unsigned       inAdd_ ;
    unsigned       inTake_ ;
@@ -61,6 +66,8 @@ protected:
    unsigned       outAdd_ ;
    unsigned       outTake_ ;
    char * const   outData_ ;
+public:
+   FILE          *fLog_ ;
 };
 
 #endif
