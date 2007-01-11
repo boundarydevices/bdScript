@@ -62,3 +62,7 @@ i2cread
 i2cwrite
 i2cwriteread
 *.zip
+imgMonoToPCL
+\*.pcl
+*.pcl
+*.pdf
