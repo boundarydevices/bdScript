@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgGIF.cpp,v $
- * Revision 1.4  2006-09-24 16:21:05  ericn
+ * Revision 1.5  2007-01-11 21:32:14  ericn
+ * -prevent compiler warning about signed/unsigned chars
+ *
+ * Revision 1.4  2006/09/24 16:21:05  ericn
  * -add anigif support (alpha quality)
  *
  * Revision 1.3  2005/11/05 20:24:44  ericn
@@ -123,7 +126,7 @@ static void gif2PixMap( ColorMapObject const &map,
       }
    }
 
-   char const *raster = image.RasterBits ;
+   char const *raster = (char const *)image.RasterBits ;
    if( 0 == image.ImageDesc.Interlace )
    {
       for( int row = 0 ; row < image.ImageDesc.Height ; row++ )
@@ -245,7 +248,7 @@ static void gif2PixMap2( fbDevice_t           &fb,
       }
    }
 
-   char const *raster = image.RasterBits ;
+   char const *raster = (char const *)image.RasterBits ;
    if( 0 == image.ImageDesc.Interlace )
    {
       for( int row = 0 ; row < image.ImageDesc.Height ; row++ )
