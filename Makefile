@@ -917,6 +917,11 @@ i2cread: i2cread.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o i2cread -D__STANDALONE__ -Xlinker -Map -Xlinker i2cread.map i2cread.cpp $(LIBS) -lSM501 -lCurlCache -ljpeg -lcrypto -lpthread -lstdc++
 	$(STRIP) $@
 
+imgMonoToPCL: imgMonoToPCL.cpp Makefile
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DMODULETEST=1 -fno-rtti -o imgMonoToPCL -Xlinker -Map -Xlinker imgMonoToPCL.map imgMonoToPCL.cpp image.cpp dither.cpp imgFile.cpp memFile.cpp imgPNG.cpp imgJPEG.cpp imgGIF.cpp $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
+	$(STRIP) $@
+
+
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
 #
