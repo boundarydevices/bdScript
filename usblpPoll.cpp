@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: usblpPoll.cpp,v $
- * Revision 1.2  2007-01-03 22:00:46  ericn
+ * Revision 1.3  2007-01-11 23:15:13  ericn
+ * -initialize log member variable
+ *
+ * Revision 1.2  2007/01/03 22:00:46  ericn
  * -made log file public
  *
  * Revision 1.1  2006/10/29 21:59:10  ericn
@@ -45,6 +48,7 @@ usblpPoll_t::usblpPoll_t
    , outAdd_( 0 )
    , outTake_( 0 )
    , outData_( isOpen() ? new char [outBufferLength_] : 0 )
+   , fLog_( 0 )
 {
    if( isOpen() )
    {
