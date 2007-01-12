@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.91  2006-12-01 18:39:37  tkisky
+ * Revision 1.92  2007-01-12 00:02:51  ericn
+ * -show library addresses in stack dump
+ *
+ * Revision 1.91  2006/12/01 18:39:37  tkisky
  * -better stack dump on error
  *
  * Revision 1.90  2006/10/29 21:57:12  ericn
@@ -907,6 +910,13 @@ void handler(int sig,siginfo_t* si,void* p)
    fprintf( stderr,"ip:%08lx sp:%08lx lr:%08lx pc:%08lx\n",uc->arm_ip,uc->arm_sp,uc->arm_lr,uc->arm_pc);
    fprintf( stderr,"cpsr:%08lx fault:%08lx\n",uc->arm_cpsr,uc->fault_address);
 
+   FILE *fMaps = fopen( "/proc/self/maps", "rt" );
+   if( fMaps ){
+      char temp[132];
+      while( 0 != fgets( temp,sizeof(temp)-1,fMaps ) )
+         printf( "%s\n", temp );
+      fclose( fMaps );
+   }
 
    fprintf( stderr,"siginfo:\n");
    dumparea((unsigned int *)si,sizeof(siginfo_t));
