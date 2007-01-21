@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomCommand.cpp,v $
- * Revision 1.3  2006-09-05 02:17:19  ericn
+ * Revision 1.4  2007-01-21 21:38:03  ericn
+ * -add text output for rgba4444
+ *
+ * Revision 1.3  2006/09/05 02:17:19  ericn
  * -repeat-last-command feature
  *
  * Revision 1.2  2006/09/04 15:16:28  ericn
@@ -527,35 +530,44 @@ static bool caption(
          unsigned pointSize = strtoul( params[2], 0, 0 );
          unsigned x = strtoul( params[3], 0, 0 );
          unsigned y = strtoul( params[4], 0, 0 );
-         unsigned colorIdx = strtoul(params[5], 0, 0 );
+         unsigned color = strtoul(params[5], 0, 0 );
 
+         freeTypeString_t fts( *font, pointSize, captionText, next-captionText, fb.getWidth() );
          if( ( x < fb.getWidth() )
              &&
              ( y < fb.getHeight() ) ){
-            if( colorIdx < 16 ){
-               sm501alpha_t &alphaLayer = sm501alpha_t::get(sm501alpha_t::rgba44);
-               freeTypeString_t fts( *font, pointSize, captionText, next-captionText, fb.getWidth() );
-
-               printf( "caption at %u:%u, %ux%u, color %u\n",
-                       x, y,
-                       fts.getWidth(), fts.getHeight(),
-                       colorIdx );
+            if( graphicsLayer == odometerMode_ ){
+               //
+               // 8-bit 4:4 palettized alpha layer
+               //
+               if( color < 16 ){
+                  sm501alpha_t &alphaLayer = sm501alpha_t::get(sm501alpha_t::rgba44);
+   
+                  alphaLayer.drawText(                // highlight
+                     fts.getRow(0),
+                     fts.getWidth(), fts.getHeight(),
+                     x-2, y-2, 15 );
+                  alphaLayer.drawText(                // shadow
+                     fts.getRow(0),
+                     fts.getWidth(), fts.getHeight(),
+                     x+2, y+2, 0 );
+                  alphaLayer.drawText(                // actual color
+                     fts.getRow(0),
+                     fts.getWidth(), fts.getHeight(),
+                     x, y, color );
+                  return true ;
+               }
+               else
+                  snprintf( errorMsg, errorMsgLen, "invalid color %u, max is 15\n", color );
+            } // alpha layer is 8-bit 4/4
+            else {
+               sm501alpha_t &alphaLayer = sm501alpha_t::get(sm501alpha_t::rgba4444);
                alphaLayer.drawText(                // highlight
                   fts.getRow(0),
                   fts.getWidth(), fts.getHeight(),
-                  x-2, y-2, 15 );
-               alphaLayer.drawText(                // shadow
-                  fts.getRow(0),
-                  fts.getWidth(), fts.getHeight(),
-                  x+2, y+2, 0 );
-               alphaLayer.drawText(                // actual color
-                  fts.getRow(0),
-                  fts.getWidth(), fts.getHeight(),
-                  x, y, colorIdx );
-               return true ;
-            }
-            else
-               snprintf( errorMsg, errorMsgLen, "invalid position %u:%u", x, y );
+                  x-2, y-2, color );
+
+            } // alpha layer is 16-bit 4/4/4/4
          }
          else
             snprintf( errorMsg, errorMsgLen, "invalid position %u:%u", x, y );
@@ -564,7 +576,9 @@ static bool caption(
          snprintf( errorMsg, errorMsgLen, "Unknown font %s", params[1] );
    }
    else                                      //   0       1        2      3 4    5        6      ...
-      snprintf( errorMsg, errorMsgLen, "Usage: caption fontName pointSize x y colorIdx [param [param...]]\n" );
+      snprintf( errorMsg, errorMsgLen, "Usage: caption fontName pointSize x y  color [param [param...]]\n"
+                "   color should be 16-bit palette entry for mode 565\n"
+                "   or 24-bit 0xRRGGBB for mode 4444\n" );
 
    return false ;
 }

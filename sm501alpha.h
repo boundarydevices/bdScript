@@ -1,5 +1,5 @@
 #ifndef __SM501ALPHA_H__
-#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.3 2006-08-29 01:07:41 ericn Exp $"
+#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.4 2007-01-21 21:37:55 ericn Exp $"
 
 /*
  * sm501alpha.h
@@ -17,7 +17,10 @@
  * Change History : 
  *
  * $Log: sm501alpha.h,v $
- * Revision 1.3  2006-08-29 01:07:41  ericn
+ * Revision 1.4  2007-01-21 21:37:55  ericn
+ * -add text output for rgba4444
+ *
+ * Revision 1.3  2006/08/29 01:07:41  ericn
  * -add setPixel4444 method
  *
  * Revision 1.2  2006/08/22 17:05:23  ericn
@@ -61,14 +64,15 @@ public:
    //
    // draw text (alpha) into palettized buffer
    //    alpha is reduced to 4-bits from 8
-   //    color is set for any non-transparent bits
+   //    color is interpreted as a palette index in mode rgba44
+   //    or an rgb color (0xRRGGBB) in mode rgba4444
    //
    void drawText( unsigned char const *alpha, // 8-bit alpha
                   unsigned             srcWidth,
                   unsigned             srcHeight,
                   unsigned             destx,
                   unsigned             desty,
-                  unsigned char        colorIdx );
+                  unsigned             color );
 
 
    // -------------- only valid in 4:4 mode

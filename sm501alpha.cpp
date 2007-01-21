@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: sm501alpha.cpp,v $
- * Revision 1.2  2006-08-29 01:07:43  ericn
+ * Revision 1.3  2007-01-21 21:37:58  ericn
+ * -add text output for rgba4444
+ *
+ * Revision 1.2  2006/08/29 01:07:43  ericn
  * -add setPixel4444 method
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -69,8 +72,8 @@ void sm501alpha_t::clear
    unsigned const outStride = pos_.width_ * bytesPerPixel ;
 
    unsigned char *nextOut = ram_ 
-                          + (r.yTop_-pos_.yTop_)*outStride 
-                          + ((r.xLeft_-pos_.xLeft_)* bytesPerPixel);
+                            + (r.yTop_-pos_.yTop_)*outStride 
+                            + ((r.xLeft_-pos_.xLeft_)* bytesPerPixel);
    for( unsigned y = 0 ; y < r.height_ ; y++ )
    {
       memset( nextOut, 0, inStride );
@@ -129,34 +132,55 @@ void sm501alpha_t::drawText(
    unsigned             srcHeight,
    unsigned             destx,
    unsigned             desty,
-   unsigned char        colorIdx )
+   unsigned             color )
 {
    if( isOpen() ){
-      colorIdx &= 0x0F ;
-      unsigned const outStride = pos_.width_ ;
-      unsigned char *nextOut = ram_ 
-                               + (desty-pos_.yTop_)*outStride 
-                               + (destx-pos_.xLeft_);
-      for( unsigned y = 0 ; y < srcHeight ; y++ )
-      {
-         for( unsigned x = 0 ; x < srcWidth ; x++ ){
-            unsigned char a = *alpha++ ;
-            if( a ){
-               a >>= 4 ;
-               unsigned char inVal = nextOut[x];
-               if( inVal & 0xF0 ){
-                  // poor-man's blend
-                  unsigned char inAlpha = inVal >> 4 ;
-                  unsigned char outAlpha = (inAlpha + a)/2 ;
-                  unsigned char inColor = inVal & 0x0F ;
-                  unsigned char outColor = (colorIdx + inColor)/2 ;
-                  nextOut[x] = (outAlpha<<4)|outColor ;
-               }
-               else
-                  nextOut[x] = (a<<4)|colorIdx ;
-            } // at least semi-opaque
+      if( rgba44 == mode_ ){
+         color &= 0x0F ;
+         unsigned const outStride = pos_.width_ ;
+         unsigned char *nextOut = ram_ 
+                                  + (desty-pos_.yTop_)*outStride 
+                                  + (destx-pos_.xLeft_);
+         for( unsigned y = 0 ; y < srcHeight ; y++ )
+         {
+            for( unsigned x = 0 ; x < srcWidth ; x++ ){
+               unsigned char a = *alpha++ ;
+               if( a ){
+                  a >>= 4 ;
+                  unsigned char inVal = nextOut[x];
+                  if( inVal & 0xF0 ){
+                     // poor-man's blend
+                     unsigned char inAlpha = inVal >> 4 ;
+                     unsigned char outAlpha = (inAlpha + a)/2 ;
+                     unsigned char inColor = inVal & 0x0F ;
+                     unsigned char outColor = (color + inColor)/2 ;
+                     nextOut[x] = (outAlpha<<4)|outColor ;
+                  }
+                  else
+                     nextOut[x] = (a<<4)|color ;
+               } // at least semi-opaque
+            }
+            nextOut += outStride ;
          }
-         nextOut += outStride ;
+      }
+      else {
+         unsigned const outStride = 2*pos_.width_ ;
+         unsigned short *nextOut = (unsigned short *)
+                                   ( ram_ 
+                                     + (desty-pos_.yTop_)*outStride 
+                                     + (destx-pos_.xLeft_*sizeof(unsigned short)) );
+         unsigned short const rgb444 = (color & 0xF00000)>>12
+                                     | (color & 0x00F000)>>8
+                                     | (color & 0x0000F0)>>4 ;
+         for( unsigned y = 0 ; y < srcHeight ; y++ )
+         {
+            for( unsigned x = 0 ; x < srcWidth ; x++ ){
+               unsigned char a = *alpha++ ;
+               a >>= 4 ;
+               nextOut[x] = (((unsigned)a)<<12) | rgb444 ;
+            }
+            nextOut += pos_.width_ ;
+         }
       }
    }
 }
