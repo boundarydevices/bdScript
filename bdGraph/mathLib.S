@@ -64,4 +64,3 @@ __umull18:
 	mov		r0,r2,LSL # (32-18)
 	add		r0,r0,r3,LSR # (18)
 	mov		pc,lr
-	
