@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: multiSignal.cpp,v $
- * Revision 1.3  2006-10-16 22:29:01  ericn
+ * Revision 1.4  2007-04-30 17:13:24  ericn
+ * -fix fallback SIGIO handler
+ *
+ * Revision 1.3  2006/10/16 22:29:01  ericn
  * removed setSignalMask() routine, added dumpSignalHandlers()
  * moved blockSignal_t into blockSignal.h/.cpp
  *
@@ -63,7 +66,8 @@ static void sigioHandler( int signo, siginfo_t *info, void *context )
 {
    for( int i = minRtSignal() ; i < maxRtSignal(); i++ ){
       blockSignal_t block( i );
-      signalData_t *handlers = handlers_[i];
+      unsigned offs = i-SIGRTMIN;
+      signalData_t *handlers = handlers_[offs];
       if( handlers ){
          for( int j = 0 ; j < MAXHANDLERS_PER_SIGNAL ; j++ ){
             signalData_t &data = handlers[j];
