@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mediaQueue.cpp,v $
- * Revision 1.1  2007-01-03 22:12:10  ericn
+ * Revision 1.2  2007-05-03 20:50:37  ericn
+ * -fix leak of partial audio queue
+ *
+ * Revision 1.1  2007/01/03 22:12:10  ericn
  * -Initial import
  *
  *
@@ -191,6 +194,10 @@ void mediaQueue_t::cleanup( void )
    lockAndClean( videoEmpty_ );
    lockAndClean( audioFull_ );
    lockAndClean( audioEmpty_ );
+   if( audioPartial_ ){
+	   freeEntry( &audioPartial_->header_ );
+	   audioPartial_ = 0 ;
+   }
 }
 
 mediaQueue_t::~mediaQueue_t( void )
