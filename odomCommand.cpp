@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomCommand.cpp,v $
- * Revision 1.4  2007-01-21 21:38:03  ericn
+ * Revision 1.5  2007-05-03 20:59:57  ericn
+ * -include width in odom graphics
+ *
+ * Revision 1.4  2007/01/21 21:38:03  ericn
  * -add text output for rgba4444
  *
  * Revision 1.3  2006/09/05 02:17:19  ericn
@@ -111,7 +114,7 @@ static bool graphics(
    if( 3 == numParams ){
       char const *const graphName = params[1];
       char const *const dir = params[2];
-      odomGraphics_t *graphics = new odomGraphics_t(dir,odometerMode_);
+      odomGraphics_t *graphics = new odomGraphics_t(dir,odometerMode_,10,getFB().getWidth());
       if( graphics->worked() ){
          odomGraphicsByName_t::get().add( graphName, graphics );
          return true ;
