@@ -6,15 +6,16 @@ all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmSt
 
 -include config.mk
 
-KERNEL_BOARDTYPE ?= "NEON"
-ifeq ("BD2003",$(KERNEL_BOARDTYPE))
+KERNEL_BOARDTYPE ?= "HALOGEN"
+ifneq (,$(CONFIG_BD2003))
    HARDWARE_TYPE=-DCONFIG_BD2003
 else
-ifeq ("BD2004",$(KERNEL_BOARDTYPE))
+ifneq (,$(CONFIG_HALOGEN))
    HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
 else
-ifeq ("NEON",$(KERNEL_BOARDTYPE))
+ifneq (,$(CONFIG_NEON))
    HARDWARE_TYPE= -DNEON
+   
 else
 endif
 endif
@@ -26,7 +27,7 @@ else
    KERNEL_VER=-DKERNEL_2_4
 endif
 
-MPEG2LIBS = -lmpeg2 -lvo -lmpeg2convert
+MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
 
 #
 # These are needed with newer (0.4.0) mpeg2dec library
@@ -79,7 +80,6 @@ OBJS = \
        jsImage.o \
        jsJPEG.o \
        jsPNG.o \
-       jsKernel.o \
        jsMD5.o \
        jsMonWLAN.o \
        jsTouch.o \
@@ -270,6 +270,10 @@ IFLAGS += -I$(INSTALL_ROOT)/include/libavcodec -I$(INSTALL_ROOT)/include/libavfo
 LIBS   +=-lavformat -lavcodec -lavutil -lxvidcore -lz
 endif
 
+ifeq (y,$(KERNEL_SND))
+IFLAGS += -DALSA_SOUND=1
+endif
+
 ODOMOBJS = \
        mpegRxUDP.o \
        odomCommand.o \
@@ -280,10 +284,10 @@ ODOMOBJS = \
        odomStream.o \
        odomTouch.o \
        odomTTY.o \
-       odomValue.o \
        odomValue2.o \
        odomVideo.o \
        odometer.o
+#       odomValue.o \
 
 ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
 
@@ -338,7 +342,7 @@ testJS: testJS.cpp $(LIB) Makefile
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -369,6 +373,17 @@ odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	arm-linux-nm --demangle odomTTY | sort >odomTTY.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
+
+odomGraphicsMain.o: odomGraphics.cpp odomGraphics.h 
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+odomGraphics: odomGraphicsMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomGraphics odomGraphicsMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle odomGraphics | sort >odomGraphics.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
 
 slotWheelMain.o: slotWheel.cpp slotWheel.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
@@ -582,6 +597,11 @@ setBaud: setBaud.cpp $(LIB)
 	arm-linux-nm setBaud >setBaud.map
 	$(STRIP) setBaud
 
+miniterm: miniterm.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o miniterm miniterm.cpp $(LIBS) -lCurlCache -lstdc++ 
+	arm-linux-nm miniterm >miniterm.map
+	$(STRIP) miniterm
+
 serialSignal: serialSignal.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DMODULETEST -O2 -o serialSignal serialSignal.cpp $(LIBS) -lCurlCache -lsupc++ -lpthread
 	$(STRIP) serialSignal
@@ -745,7 +765,7 @@ avSendTo: avSendTo.cpp $(LIB)
 	$(STRIP) $@
 
 pollHandlerTest: pollHandler.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o pollHandlerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollHandlerTest.map pollHandler.cpp $(LIBS) -lCurlCache -lpthread
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o pollHandlerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollHandlerTest.map pollHandler.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 pollTimerTest: pollTimer.cpp $(LIB)
@@ -828,8 +848,16 @@ usbPostscriptMain.o: usbPostscript.cpp
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST -c $(IFLAGS) -O2 -o usbPostscriptMain.o usbPostscript.cpp
 
 usbPostscript: usbPostscriptMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbPostscript usbPostscriptMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbPostscript usbPostscriptMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle usbPostscript | sort >usbPostscript.map
+	$(STRIP) $@
+
+usbTermMain.o: usbTerm.cpp
+	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST -c $(IFLAGS) -O2 -o usbTermMain.o usbTerm.cpp
+
+usbTerm: usbTermMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbTerm usbTermMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	arm-linux-nm --demangle usbTerm | sort >usbTerm.map
 	$(STRIP) $@
 
 usblpPollMain.o: usblpPoll.cpp
@@ -930,7 +958,7 @@ imgMonoToPCL: imgMonoToPCL.cpp Makefile
 #	$(STRIP) $@
 #
 
-all: $(LIB) $(SM501LIB) $(ODOMLIB) curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
+all: $(LIB) curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
 
 .PHONY: install-libs install-headers
 
@@ -945,6 +973,7 @@ shared-headers = \
    dspOutSignal.h \
    fbCmdListSignal.h \
    fbDev.h \
+   ftObjs.h \
    hexDump.h  \
    image.h \
    imgGIF.h \
@@ -954,6 +983,7 @@ shared-headers = \
    macros.h \
    madDecode.h \
    madHeaders.h \
+   mediaQueue.h \
    memFile.h \
    mpegPS.h \
    mpegQueue.h \
