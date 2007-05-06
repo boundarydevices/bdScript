@@ -852,14 +852,6 @@ usbPostscript: usbPostscriptMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(L
 	arm-linux-nm --demangle usbPostscript | sort >usbPostscript.map
 	$(STRIP) $@
 
-usbTermMain.o: usbTerm.cpp
-	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST -c $(IFLAGS) -O2 -o usbTermMain.o usbTerm.cpp
-
-usbTerm: usbTermMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbTerm usbTermMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle usbTerm | sort >usbTerm.map
-	$(STRIP) $@
-
 usblpPollMain.o: usblpPoll.cpp
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -DMODULETEST_USBLP -c $(IFLAGS) -O2 -o usblpPollMain.o usblpPoll.cpp
 
