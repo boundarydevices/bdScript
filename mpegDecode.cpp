@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.16  2006-08-31 15:51:06  ericn
+ * Revision 1.17  2007-05-06 20:39:20  ericn
+ * -conditional YUV support
+ *
+ * Revision 1.16  2006/08/31 15:51:06  ericn
  * -remove unused code
  *
  * Revision 1.15  2006/08/31 03:45:27  ericn
@@ -122,12 +125,14 @@ mpegDecoder_t :: mpegDecoder_t( void )
 mpegDecoder_t :: ~mpegDecoder_t( void )
 {
    mpeg2_close( DECODER );
+#ifdef NEON
    while( !allocated_.empty() )
    {
       void *buf = allocated_.front();
       allocated_.pop_front();
       free( buf );
    }
+#endif
 }
 
 void mpegDecoder_t :: feed
@@ -145,6 +150,7 @@ void mpegDecoder_t :: feed
    }
 }
 
+#ifdef NEON
 void *mpegDecoder_t :: getPictureBuf( void )
 {
    if( !freeBufs_.empty() )
@@ -160,6 +166,7 @@ void *mpegDecoder_t :: getPictureBuf( void )
       return buf ;
    }
 }
+#endif
 
 inline void diffTime( timeval       &diff,
                       timeval const &early,
@@ -367,7 +374,9 @@ bool mpegDecoder_t :: getPicture
                   if( buf )
                   {
 picture = buf ;
+#ifdef NEON
                      freeBufs_.push_back( buf );
+#endif
 /*
 printf( "buf == %p/%p/%p --> %p\n",
         INFOPTR->display_fbuf->buf[0],
