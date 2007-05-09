@@ -8,7 +8,13 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.10  2006-12-01 18:37:43  tkisky
+ * Revision 1.12  2007-05-09 15:34:43  ericn
+ * -change to make flashVar useful in scripts
+ *
+ * Revision 1.11  2006/02/13 21:12:49  ericn
+ * -use 2.6 include files by default
+ *
+ * Revision 1.10  2006/12/01 18:37:43  tkisky
  * -allow variables to be saved to file
  *
  * Revision 1.9  2006/03/29 18:47:39  tkisky
@@ -47,10 +53,11 @@
 #include <fcntl.h>
 #include <time.h>
 #include <sys/mount.h>
-#ifndef KERNEL_2_6
-#include <linux/mtd/mtd.h>
-#else
+#ifndef KERNEL_2_4
+#include <linux/types.h>
 #include <mtd/mtd-user.h>
+#else
+#include <linux/mtd/mtd.h>
 #endif
 #include <syscall.h>
 #include <signal.h>
@@ -59,7 +66,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEBUGPRINT
+//#define DEBUGPRINT
 #include "debugPrint.h"
 
 static char const deviceName_[] = {
@@ -599,7 +606,7 @@ int main( int argc, char const * const argv[] )
             char const * value = readFlashVar( varName );
             if( value )
             {
-               printf( "%s=%s\n", varName, value );
+               printf( "%s\n", value );
                free( (char *)value );
             }
             else if( 0 == strcmp( varName, "fill" ) )
@@ -641,8 +648,10 @@ int main( int argc, char const * const argv[] )
                else
                   fprintf( stderr, "Error parsing flash variables\n" );
             }
-            else
-               printf( "%s is not set\n", varName );
+            else {
+               fprintf( stderr, "%s is not set\n", varName );
+	       return -1 ;
+	    }
             break;
          } // read flash var
       case 3:
