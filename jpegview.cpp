@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
 //  pScaleObj->m_flags = flags;
 	if (pScaleObj) if (pScaleObj->GetDimensions(&picWidth,&picHeight)) {
-		int fbDev = open( "/dev/fb0", O_RDWR );
+		int fbDev = open( "/dev/fb/0", O_RDWR );
 		if (fbDev) {
 			struct fb_fix_screeninfo fixed_info;
 			int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
@@ -148,26 +148,27 @@ int main(int argc, char *argv[])
 				struct fb_var_screeninfo variable_info;
 				err = ioctl( fbDev, FBIOGET_VSCREENINFO, &variable_info );
 				if( 0 == err ) {
+					int stride = fixed_info.line_length;
 					fbWidth   = variable_info.xres ;
 					fbHeight  = variable_info.yres ;
 					memSize = fixed_info.smem_len ;
-					printf("screen width:%d, Screen height:%d\n",fbWidth,fbHeight);
+					printf("screen width:%d, Screen height:%d stride:%d\n",fbWidth,fbHeight,stride);
 					printf("picture width:%d, picture height:%d\n",picWidth,picHeight);
 
 					BYTE *pDib = NULL;
 					if (stretch) pDib = pScaleObj->GetDibBits(fbWidth,fbHeight,	0,0,fbWidth,fbHeight,		0,0,0,0);
-					else 		 pDib = pScaleObj->GetDibBits(picWidth,picHeight,	0,0,picWidth,picHeight,		0,0,0,0);
+					else 		 pDib = pScaleObj->GetDibBits(picWidth,picHeight,0,0,picWidth,picHeight,	0,0,0,0);
 					if (pDib) {
 						fbMem = (unsigned short *) mmap( 0, memSize, PROT_WRITE, MAP_SHARED, fbDev, 0 );
 						if (fbMem) {
 							if (stretch) {
 //								ResourceView::RenderStretch(fbMem,fbWidth,fbHeight,flags,resource,length);
-								Scale16::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
+								Scale16::render(fbMem,fbWidth,fbHeight,stride,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 							} else {
 								left = (fbWidth-picWidth)>>1;
 								top = (fbHeight-picHeight)>>1;
 //								ResourceView::RenderCenter(fbMem,fbWidth,fbHeight,flags,resource,length);
-								Scale16::render(fbMem,fbWidth,fbHeight,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
+								Scale16::render(fbMem,fbWidth,fbHeight,stride,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
 //  Scale16::scale( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 							}
