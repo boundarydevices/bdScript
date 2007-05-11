@@ -15,13 +15,13 @@ public:
 	~Scale16();
 
 	static ImageData* GetImageData(const unsigned short *img, int imgWidth, int imgHeight);
-	static void render(unsigned short *fbMem,int fbWidth, int fbHeight,
+	static void render(unsigned short *fbMem,int fbWidth, int fbHeight,int fbStride,
 		int fbLeft, int fbTop,
 		unsigned char const *imgMem, int imgWidth, int imgHeight,
 		int imageDisplayLeft,int imageDisplayTop,int imageDisplayWidth,int imageDisplayHeight,
 		ConvertRgb24Line_t convertLineFunc=NULL);
 
-	static void scale(unsigned short *dest, int destWidth, int destHeight,
+	static void scale(unsigned short *dest, int destWidth, int destHeight, int destStride,
 		unsigned short const *img, int imgWidth, int imgHeight,
 		int picLeft, int picTop, int picWidth,int picHeight);
 

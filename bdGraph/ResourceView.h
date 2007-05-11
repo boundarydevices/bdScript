@@ -12,9 +12,9 @@ class ResourceView
 	ResourceView();
 	~ResourceView();
 public:
-	static void RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length);
-	static void RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length);
-	static void RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length);
+	static void RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length);
+	static void RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length);
+	static void RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length);
 	static void GetData16(const unsigned char* resource, unsigned int length,unsigned short **pfbMem,int* ppicWidth,int* ppicHeight,
 		ConvertRgb24Line_t convertLineFunc=NULL);
 };

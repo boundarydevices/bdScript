@@ -9,9 +9,9 @@ static inline int min(int x,int y)
 {
    return (x<y)? x : y;
 }
-static inline unsigned short * getPixel(unsigned short *fbMem, int fbWidth,int fbLeft, int fbTop)
+static inline unsigned short * getPixel(unsigned short *fbMem, int fbStride,int fbLeft, int fbTop)
 {
-    return fbMem + ((fbTop*fbWidth) + fbLeft);
+    return (unsigned short*)(((unsigned char*)(fbMem + fbLeft)) + (fbTop*fbStride));
 }
 static void ConvertRgb24Line(unsigned short* fbMem, unsigned char const *video,int cnt)
 {
@@ -20,7 +20,7 @@ static void ConvertRgb24Line(unsigned short* fbMem, unsigned char const *video,i
 	video += 3;
     } while ((--cnt)>0);
 }
-void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
+void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight, int fbStride,
      int fbLeft,				//placement on screen
      int fbTop,
      unsigned char const *imgMem,
@@ -60,13 +60,13 @@ void Scale16::render(unsigned short *fbMem,int fbWidth, int fbHeight,
    if (convertLineFunc==NULL)convertLineFunc = ConvertRgb24Line;
    if ((minWidth > 0) && (minHeight > 0))
    {
-      unsigned short *fbPix = getPixel(fbMem,fbWidth,fbLeft,fbTop);
+      unsigned short *fbPix = getPixel(fbMem,fbStride,fbLeft,fbTop);
 //      printf("fbWidth:%d, fbLeft:%d, fbTop:%d\n",fbWidth,fbLeft,fbTop);
 
       do
       {
          convertLineFunc(fbPix,imgMem,minWidth);
-		 fbPix += fbWidth;
+		 fbPix = (unsigned short *)(((unsigned char *)fbPix)+fbStride);
          imgMem += imgWidth3;
       } while (--minHeight);
    }
@@ -77,7 +77,7 @@ ImageData* Scale16::GetImageData(const unsigned short *img, int imgWidth, int im
 	return new SImageData16(imgWidth,imgHeight,img);
 }
 
-void Scale16::scale(unsigned short *dest, int destWidth, int destHeight,
+void Scale16::scale(unsigned short *dest, int destWidth, int destHeight, int destStride,
 	 unsigned short const *img, int imgWidth, int imgHeight,
 	 int picLeft, int picTop, int picWidth,int picHeight)
 {
@@ -89,7 +89,7 @@ void Scale16::scale(unsigned short *dest, int destWidth, int destHeight,
 			BYTE* dib = pScale->GetDibBits(destWidth,destHeight,0,0, destWidth,destHeight,
 				picLeft,picTop,picWidth,picHeight, NULL,0);
 			if (dib) {
-				render(dest,destWidth,destHeight,0,0,   dib,destWidth,destHeight, 0,0,destWidth,destHeight);
+				render(dest,destWidth,destHeight,destStride,0,0,   dib,destWidth,destHeight, 0,0,destWidth,destHeight);
 				delete [] dib;
 			}
 			pScale->Release();

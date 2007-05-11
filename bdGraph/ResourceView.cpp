@@ -76,7 +76,7 @@ void CResourceObj::Advance()
 ResourceView::ResourceView()
 {
 }
-void ResourceView::RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length)
+void ResourceView::RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length)
 {
     int picWidth,picHeight;
     int left,top;
@@ -98,7 +98,7 @@ void ResourceView::RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,i
 			{
 				left = (fbWidth-picWidth)>>1;
 				top = (fbHeight-picHeight)>>1;
-				Scale16::render(fbMem,fbWidth,fbHeight,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
+				Scale16::render(fbMem,fbWidth,fbHeight,fbStride,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 				delete[] pDib;
@@ -107,7 +107,7 @@ void ResourceView::RenderCenter(unsigned short *fbMem,int fbWidth,int fbHeight,i
 	}
 }
 
-void ResourceView::RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length)
+void ResourceView::RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length)
 {
     CResourceObj data;
     data.Init(resource,length);
@@ -121,14 +121,14 @@ void ResourceView::RenderStretch(unsigned short *fbMem,int fbWidth,int fbHeight,
 				0,0,fbWidth,fbHeight,
 				0,0,0,0))
 		{
-			Scale16::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
+			Scale16::render(fbMem,fbWidth,fbHeight,fbStride,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 			delete[] pDib;
 		}
 	}
 }
-void ResourceView::RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight,int flags,const unsigned char* resource,unsigned int length)
+void ResourceView::RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight,int fbStride,int flags,const unsigned char* resource,unsigned int length)
 {
     CResourceObj data;
     data.Init(resource,length);
@@ -142,7 +142,7 @@ void ResourceView::RenderStretch18(unsigned char *fbMem,int fbWidth,int fbHeight
 				0,0,fbWidth,fbHeight,
 				0,0,0,0))
 		{
-			Scale18::render(fbMem,fbWidth,fbHeight,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
+			Scale18::render(fbMem,fbWidth,fbHeight,fbStride,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 //	Scale16::scale( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 			delete[] pDib;
@@ -172,7 +172,7 @@ void ResourceView::GetData16(const unsigned char* resource, unsigned int length,
 					0,0,0,0))
 			{
 				fbMem = new unsigned short[picWidth*picHeight];
-				Scale16::render(fbMem,picWidth,picHeight,0,0,pDib,picWidth,picHeight,0,0,picWidth,picHeight,convertLineFunc);
+				Scale16::render(fbMem,picWidth,picHeight,picWidth<<1,0,0,pDib,picWidth,picHeight,0,0,picWidth,picHeight,convertLineFunc);
 				delete[] pDib;
 			}
 		}
