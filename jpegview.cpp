@@ -162,12 +162,12 @@ int main(int argc, char *argv[])
 						fbMem = (unsigned short *) mmap( 0, memSize, PROT_WRITE, MAP_SHARED, fbDev, 0 );
 						if (fbMem) {
 							if (stretch) {
-//								ResourceView::RenderStretch(fbMem,fbWidth,fbHeight,flags,resource,length);
+//								ResourceView::RenderStretch(fbMem,fbWidth,fbHeight,stride,flags,resource,length);
 								Scale16::render(fbMem,fbWidth,fbHeight,stride,0,0,pDib,fbWidth,fbHeight,0,0,fbWidth,fbHeight);
 							} else {
 								left = (fbWidth-picWidth)>>1;
 								top = (fbHeight-picHeight)>>1;
-//								ResourceView::RenderCenter(fbMem,fbWidth,fbHeight,flags,resource,length);
+//								ResourceView::RenderCenter(fbMem,fbWidth,fbHeight,stride,flags,resource,length);
 								Scale16::render(fbMem,fbWidth,fbHeight,stride,left,top,pDib,picWidth,picHeight,0,0,picWidth,picHeight);
 //  Scale16::scale( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
 //  std::scale16( (unsigned short *)fbMem, fbWidth, fbHeight,(unsigned short *)pDib, picWidth,picHeight, 0,0,picWidth,picHeight);
