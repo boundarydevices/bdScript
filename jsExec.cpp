@@ -9,7 +9,13 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.92  2007-01-12 00:02:51  ericn
+ * Revision 1.94  2007-05-18 19:38:36  ericn
+ * -add watchdog support
+ *
+ * Revision 1.93  2006/02/13 21:17:38  ericn
+ * -remove jsKernel reference
+ *
+ * Revision 1.92  2007/01/12 00:02:51  ericn
  * -show library addresses in stack dump
  *
  * Revision 1.91  2006/12/01 18:39:37  tkisky
@@ -352,7 +358,6 @@
 #include "jsProcess.h"
 #include "jsDir.h"
 #include "jsUDP.h"
-#include "jsKernel.h"
 #include "pollTimer.h"
 #include "memFile.h"
 #include "debugPrint.h"
@@ -453,6 +458,8 @@ jsQueueCode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static int fdWatchdog = -1 ;
+
 // returns true if execution should continue
 static bool mainLoop( pollHandlerSet_t &polls,
                       JSContext        *cx )
@@ -467,6 +474,10 @@ static bool mainLoop( pollHandlerSet_t &polls,
          JS_GC( cx );
       }
    }
+
+   if( 0 <= fdWatchdog )
+      write( fdWatchdog, "1", 1 );
+
    return !( gotoCalled_ || execCalled_ || exitRequested_ );
 }
 
@@ -560,12 +571,30 @@ jsPollStat( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsWdEnable( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   if( 0 > fdWatchdog ){
+	fdWatchdog = open( "/dev/watchdog", O_WRONLY );
+	if( 0 <= fdWatchdog ){
+		fcntl( fdWatchdog, F_SETFD, FD_CLOEXEC );
+	}
+	else {
+		JS_ReportError( cx, "watchdog: %m\n" );
+	}
+   }
+
+   *rval = (0 <= fdWatchdog) ? JSVAL_TRUE : JSVAL_FALSE ;
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
     {"garbageCollect",  jsGarbageCollect, 0},
     {"pollStat",        jsPollStat,       0},
     {"waitFor",         jsWaitFor,        0},
+    {"wdEnable",        jsWdEnable,       0},
     {0}
 };
 
@@ -601,7 +630,7 @@ static namedConstant_t constants_[] = {
  * and creates a context. */
 
 int prMain(int argc, char **argv, bool )
-{
+{   
    // initialize the JS run time, and return result in rt
    JSRuntime * const rt = JS_NewRuntime(4L * 1024L * 1024L);
    if( rt )
@@ -663,7 +692,6 @@ int prMain(int argc, char **argv, bool )
                   initJSProcess( cx, glob );
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );
-                  initJSKernel( cx, glob );
                   initJSSerial( cx, glob );
                   initJSFlashVar( cx, glob );
                   initJSButton( cx, glob );
@@ -841,6 +869,9 @@ int prMain(int argc, char **argv, bool )
    else
       fprintf( stderr, "Error initializing Javascript runtime\n" );
  
+   if( 0 <= fdWatchdog )
+      close( fdWatchdog );
+
    return 0;
 
 }
@@ -993,7 +1024,6 @@ int main( int argc, char *argv[] )
          }
       }
       char *exePath = argv[0];
-      
       {
          char temp[80];
          sprintf( temp, "/proc/%d/exe", getpid() );
