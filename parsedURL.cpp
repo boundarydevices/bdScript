@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.5  2006-02-13 21:07:52  ericn
+ * Revision 1.6  2007-06-27 02:29:44  ericn
+ * -put colon between host name and port
+ *
+ * Revision 1.5  2006/02/13 21:07:52  ericn
  * -add constants for http and https
  *
  * Revision 1.4  2005/11/06 00:49:49  ericn
@@ -246,8 +249,10 @@ void parsedURL_t :: getAbsolute( std::string &absolute ) const
       absolute = protocol_ ;
       absolute += "://" ;
       absolute += host_ ;
-      if( 0 != port_ )
+      if( 0 != port_ ){
+         absolute += ':' ;
          absolute += ultoa_t( port_, 0 ).getValue();
+      }
 
       absolute += '/' ;
 
@@ -281,6 +286,10 @@ int main( int argc, char const * const argv[] )
          rel.fixup( first );
          printf( "---> %s after fixup\n", argv[arg] );
          printURL( rel );
+	 std::string absolute ;
+         rel.getAbsolute(absolute);
+
+	 printf( "absolute: %s\n", absolute.c_str() );
       }
    }
    else
