@@ -8,8 +8,8 @@
  * Change History : 
  *
  * $Log: parsedURL.cpp,v $
- * Revision 1.6  2007-06-27 02:29:44  ericn
- * -put colon between host name and port
+ * Revision 1.7  2007-06-27 02:33:52  ericn
+ * -use parent's port number if present
  *
  * Revision 1.5  2006/02/13 21:07:52  ericn
  * -add constants for http and https
@@ -197,6 +197,7 @@ void parsedURL_t :: fixup( parsedURL_t const &parent )
       if( 0 == host_.size() )
       {
          host_ = parent.getHost();
+	 port_ = parent.getPort() ? parent.getPort() : 0 ;
 
          unsigned i = 0 ;
          if( !startsAtRoot_ )
