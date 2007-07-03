@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
- * Revision 1.27  2006-09-30 18:31:01  ericn
+ * Revision 1.28  2007-07-03 18:10:37  ericn
+ * -Optional UCB1400 GPIO
+ *
+ * Revision 1.27  2006/09/30 18:31:01  ericn
  * -add getPin(), setPin() methods
  *
  * Revision 1.26  2006/09/25 18:48:16  ericn
@@ -115,7 +118,11 @@
 #include "flashVar.h"
 #include "ucb1x00_pins.h"
 #include <math.h>
+
+#include "config.h"
+#ifdef CONFIG_MCP_UCB1400_TS
 #include "linux/ucb1x00-adc.h"
+#endif
 
 class jsTouchPoll_t : public touchPoll_t {
 public:
@@ -440,6 +447,7 @@ jsDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+#ifdef CONFIG_MCP_UCB1400_TS
 static JSBool
 jsGetPin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -504,6 +512,7 @@ jsSetPin( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+#endif
 
 static JSFunctionSpec touchMethods_[] = {
     {"getX",         jsGetTouchX,           0 },
@@ -513,8 +522,10 @@ static JSFunctionSpec touchMethods_[] = {
     {"setCooked",    jsSetCooked,           0 },
     {"touchTime",    jsTouchTime,           0 },
     {"releaseTime",  jsReleaseTime,         0 },
+#ifdef CONFIG_MCP_UCB1400_TS
     {"getPin",       jsGetPin,              0 },
     {"setPin",       jsSetPin,              0 },
+#endif
     {"dump",         jsDump,                0 },
     {0}
 };

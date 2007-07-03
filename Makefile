@@ -125,7 +125,6 @@ OBJS = \
        tcpPoll.o \
        trace.o \
        ttyPoll.o \
-       ucb1x00_pins.o \
        udpPoll.o \
        ultoa.o \
        ultodd.o \
@@ -148,6 +147,10 @@ KERNEL_FB ?= y
 CONFIG_JSCAIRO ?= n
 ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
+endif
+
+ifeq (y,$(KERNEL_MCP_UCB1400_TS))
+       OBJS += ucb1x00_pins.o
 endif
 
 ifeq (y,$(KERNEL_FB))
