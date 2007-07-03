@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
- * Revision 1.37  2006-12-02 14:21:38  ericn
+ * Revision 1.38  2007-07-03 18:07:14  ericn
+ * -added parameter for Scale16::scale
+ *
+ * Revision 1.37  2006/12/02 14:21:38  ericn
  * -updated usage for image.draw()
  *
  * Revision 1.36  2006/11/22 17:26:28  ericn
@@ -381,7 +384,8 @@ jsImageScale( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
                void *const pixMem = JS_malloc( cx, pixBytes );
                if (pixMem)
                {
-                  Scale16::scale( (unsigned short *)pixMem, destWidth, destHeight,pixMap, width,height, srcLeft,srcTop,srcWidth,srcHeight);
+                  Scale16::scale( (unsigned short *)pixMem, destWidth, destHeight, destWidth*sizeof(short),
+				  pixMap, width,height, srcLeft,srcTop,srcWidth,srcHeight);
 
                   JSString *sScaleMap = JS_NewString( cx, (char *)pixMem, pixBytes );
                   if( sScaleMap )
