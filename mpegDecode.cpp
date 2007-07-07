@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.17  2007-05-06 20:39:20  ericn
+ * Revision 1.18  2007-07-07 19:24:49  ericn
+ * -[mpegdecode] allow ACCEL environment variable to turn on acceleration
+ *
+ * Revision 1.17  2007/05/06 20:39:20  ericn
  * -conditional YUV support
  *
  * Revision 1.16  2006/08/31 15:51:06  ericn
@@ -479,6 +482,9 @@ int main( int argc, char const * const argv[] )
 {
    if( 2 <= argc )
    {
+if( 0 != getenv("ACCEL") )
+      mpeg2_accel (MPEG2_ACCEL_ARM);
+
       unsigned xPos = 0 ;
       unsigned yPos = 0 ;
       unsigned outWidth  = 0 ;
