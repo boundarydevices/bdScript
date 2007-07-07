@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.21  2007-01-03 22:07:22  ericn
+ * Revision 1.22  2007-07-07 19:25:09  ericn
+ * -remove old trace references
+ *
+ * Revision 1.21  2007/01/03 22:07:22  ericn
  * -additional level of indirection (mediaQueue_t)
  *
  * Revision 1.20  2006/10/20 01:05:37  ericn
@@ -105,7 +108,7 @@
 #endif
 
 #define AUDIOSAMPLESPERFRAME 4096
-
+unsigned int in_file_read = 0 ;
 
 mpegQueue_t::mpegQueue_t
    ( int      dspFd,
@@ -448,6 +451,7 @@ static void traceCallback( void *param )
       stats->inFileRead_++ ;
       isIdle = false ;
    }
+#if 0   
    if( in_mpeg2_parse ){
       stats->inParse_++ ;
       isIdle = false ;
@@ -464,14 +468,17 @@ static void traceCallback( void *param )
       stats->inAudioSynth_++ ;
       isIdle = false ;
    }
+#endif
    if( in_synth_frame ){
       stats->inAudioSynthFrame_++ ;
       isIdle = false ;
    }
+#if 0   
    if( in_mp3_pull ){
       stats->inAudioPull_++ ;
       isIdle = false ;
    }
+#endif
 #ifdef TRACEMPEG2
    if( in_mpeg2_slice ){
       stats->inSlice_++ ;
