@@ -6,20 +6,7 @@ all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmSt
 
 -include config.mk
 
-KERNEL_BOARDTYPE ?= "HALOGEN"
-ifneq (,$(CONFIG_BD2003))
-   HARDWARE_TYPE=-DCONFIG_BD2003
-else
-ifneq (,$(CONFIG_HALOGEN))
-   HARDWARE_TYPE=-DCONFIG_PXA_GAME_CONTROLLER
-else
-ifneq (,$(CONFIG_NEON))
-   HARDWARE_TYPE= -DNEON
-   
-else
-endif
-endif
-endif
+HARDWARE_TYPE= -DNEON
 
 ifneq (,$(findstring 2.6, $(CONFIG_KERNELPATH)))
    KERNEL_VER=-DKERNEL_2_6
@@ -133,6 +120,11 @@ OBJS = \
        flashVar.o \
        jsFlashVar.o \
 
+
+ifeq (y, $(CONFIG_MCP_UCB1400_TS))
+OBJS += ucb1x00_pins.o
+endif
+
 ifneq ("", $(CONFIG_JSGPIO))
 OBJS += jsGpio.o
 endif
@@ -143,14 +135,15 @@ OBJS += monitorWLAN.o
 endif
 endif
 
+ifeq (y,$(KERNEL_INPUT))
+OBJS += inputPoll.o \
+        jsInput.o
+endif
+
 KERNEL_FB ?= y
 CONFIG_JSCAIRO ?= n
 ifeq (y,$(CONFIG_JSCAIRO))
 OBJS += jsCairo.o
-endif
-
-ifeq (y,$(KERNEL_MCP_UCB1400_TS))
-       OBJS += ucb1x00_pins.o
 endif
 
 ifeq (y,$(KERNEL_FB))
@@ -200,6 +193,7 @@ SM501OBJS = asyncScreenObj.o \
             sm501alpha.o \
             vsyncSignal.o \
             yuvSignal.o
+OBJS += jsCursor.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))
@@ -330,6 +324,10 @@ dirTest: Makefile dirTest.o
 curlGet: curlGet.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl
 
+daemonize: daemonize.cpp $(LIB) Makefile
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o daemonize -O2 -DSTANDALONE $(IFLAGS) daemonize.cpp $(LIBS) -lCurlCache -lstdc++
+	$(STRIP) $@
+
 urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
@@ -406,11 +404,11 @@ tradeShow: tradeShow.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	$(STRIP) $@
 
 mpegQueueMain.o: mpegQueue.cpp mpegQueue.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -DMD5OUTPUT -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -DMD5OUTPUT -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
 mpegQueue: mpegQueueMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegQueue mpegQueueMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o mpegQueue mpegQueueMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle mpegQueue | sort >mpegQueue.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -490,14 +488,6 @@ odomValue2Main.o: odomValue2.cpp odomValue2.h
 odomValue2: odomValue2Main.o $(LIB) $(ODOMLIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue2 odomValue2Main.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
 	arm-linux-nm --demangle odomValue2 | sort >odomValue2.map
-
-ucb1x00_pinsMain.o: ucb1x00_pins.cpp ucb1x00_pins.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-ucb1x00_pins: ucb1x00_pinsMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ucb1x00_pins ucb1x00_pinsMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
-	arm-linux-nm --demangle ucb1x00_pins | sort >ucb1x00_pins.map
-
 
 sm501mem: sm501mem.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o sm501mem sm501mem.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
@@ -787,6 +777,10 @@ barcodePoll: barcodePoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o barcodePoll -DSTANDALONE=1 -Xlinker -Map -Xlinker barcodePoll.map barcodePoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread
 	$(STRIP) $@
 
+inputPoll: inputPoll.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o inputPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker inputPoll.map inputPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lsupc++
+	$(STRIP) $@
+
 serialPoll: serialPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o serialPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker serialPoll.map serialPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
@@ -944,6 +938,9 @@ imgMonoToPCL: imgMonoToPCL.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -DMODULETEST=1 -fno-rtti -o imgMonoToPCL -Xlinker -Map -Xlinker imgMonoToPCL.map imgMonoToPCL.cpp image.cpp dither.cpp imgFile.cpp memFile.cpp imgPNG.cpp imgJPEG.cpp imgGIF.cpp $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
 	$(STRIP) $@
 
+parsedURL: parsedURL.cpp Makefile
+	$(CC) $(HARDWARE_TYPE) -DSTANDALONE $(IFLAGS) -DMODULETEST=1 -fno-rtti -o parsedURL -Xlinker -Map -Xlinker parsedURL.map parsedURL.cpp $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
+	$(STRIP) $@
 
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
@@ -1013,7 +1010,6 @@ shared-headers += \
    odomDigit.h \
    odomGraphics.h \
    odomMode.h \
-   odomValue.h \
    odomValue2.h \
    odomVideo.h \
    sm501alpha.h

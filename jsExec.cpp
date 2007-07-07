@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.94  2007-05-18 19:38:36  ericn
+ * Revision 1.95  2007-07-07 00:25:52  ericn
+ * -[bdScript] added mouse cursor and input handling
+ *
+ * Revision 1.94  2007/05/18 19:38:36  ericn
  * -add watchdog support
  *
  * Revision 1.93  2006/02/13 21:17:38  ericn
@@ -354,6 +357,10 @@
 #include "jsMonWLAN.h"
 #endif
 
+#if KERNEL_INPUT == 1
+#include "jsInput.h"
+#endif
+
 #include "jsPing.h"
 #include "jsProcess.h"
 #include "jsDir.h"
@@ -415,6 +422,10 @@
 #include "jsStarUSB.h"
 #endif
 
+#ifdef KERNEL_FB_SM501YUV 
+#include "jsCursor.h"
+#endif
+
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
                JSObject **objp)
@@ -467,7 +478,7 @@ static bool mainLoop( pollHandlerSet_t &polls,
    if( !( gotoCalled_ || execCalled_ || exitRequested_ ) )
    {
       static unsigned iterations = 0 ;
-      if( !polls.poll( 5000 ) || ( 15 == ( iterations++ & 15 ) ) )
+      if( !polls.poll( 5000 ) || ( 1023 == ( iterations++ & 1023 ) ) )
 //   if( !polls.poll( 50 ) || ( 1 == ( iterations++ & 1 ) ) )
       {
          mutexLock_t lock( execMutex_ );
@@ -682,6 +693,9 @@ int prMain(int argc, char **argv, bool )
                   initJSUse( cx, glob );
                   initJSURL( cx, glob );
                   initJSFileIO( cx, glob );
+#if KERNEL_INPUT == 1
+                  initJSInput( cx, glob );
+#endif
 
 #if CONFIG_JSMONITORWLAN == 1
                   initSniffWLAN( cx, glob );
@@ -709,6 +723,10 @@ int prMain(int argc, char **argv, bool )
 #if CONFIG_JSCAIRO == 1
                   initJSCairo( cx, glob );
 #endif                  
+
+#ifdef KERNEL_FB_SM501YUV 
+                  initJSCursor( cx, glob );
+#endif
 
 #ifdef CONFIG_JSMP3
                   initJSMP3( cx, glob );
