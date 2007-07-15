@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.12  2007-05-09 15:34:43  ericn
+ * Revision 1.13  2007-07-15 21:45:32  ericn
+ * -added -erase command for testing
+ *
+ * Revision 1.12  2007/05/09 15:34:43  ericn
  * -change to make flashVar useful in scripts
  *
  * Revision 1.11  2006/02/13 21:12:49  ericn
@@ -85,6 +88,35 @@ unsigned int IsDevice(char const* devName)
 }
 
 static unsigned const pageSize = 4096 ;
+
+// returns 0 if successful, non-zero on errors
+static int flashVarOffset(int fdMTD, unsigned &offset, unsigned &maxSize){
+   int rval = -1 ;
+   mtd_info_t meminfo;
+   if( ioctl( fdMTD, MEMGETINFO, (unsigned long)&meminfo) == 0)
+   {
+      debugPrint( "flags       0x%lx\n", meminfo.flags ); 
+      debugPrint( "size        0x%lx\n", meminfo.size ); 
+      debugPrint( "erasesize   0x%lx\n", meminfo.erasesize ); 
+      //	    debugPrint( "oobblock    0x%lx\n", meminfo.oobblock ); 
+      debugPrint( "oobsize     0x%lx\n", meminfo.oobsize ); 
+      debugPrint( "ecctype     0x%lx\n", meminfo.ecctype ); 
+      debugPrint( "eccsize     0x%lx\n", meminfo.eccsize ); 
+      debugPrint( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
+      
+      offset = meminfo.size-meminfo.erasesize ;
+      
+      if( offset == (unsigned)lseek( fdMTD, offset, SEEK_SET ) )
+      {
+         // nearest size in pages (probably always equal)
+         maxSize = ( meminfo.erasesize / pageSize ) * pageSize ;
+         rval = 0 ;
+      } else perror( "lseek" );
+   } else perror( "MEMGETINFO" );
+
+   return rval ;
+}
+
 // #define TESTREST 1
 
 class readVars_t {
@@ -119,31 +151,13 @@ readVars_t :: readVars_t( void )
    char const *devName = GetFlashDev();
    unsigned int bDevice = IsDevice(devName);
    debugPrint( "opening flash device %s\n", devName );
-   
+
    int fd = open( devName, O_RDONLY );
    if ( 0 <= fd )
    {
-      if (bDevice) {
-         mtd_info_t meminfo;
-         if( ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) == 0)
-         {
-            debugPrint( "flags       0x%lx\n", meminfo.flags ); 
-            debugPrint( "size        0x%lx\n", meminfo.size ); 
-            debugPrint( "erasesize   0x%lx\n", meminfo.erasesize ); 
-//	    debugPrint( "oobblock    0x%lx\n", meminfo.oobblock ); 
-            debugPrint( "oobsize     0x%lx\n", meminfo.oobsize ); 
-            debugPrint( "ecctype     0x%lx\n", meminfo.ecctype ); 
-            debugPrint( "eccsize     0x%lx\n", meminfo.eccsize ); 
-            debugPrint( "numSectors  0x%lx\n", meminfo.size / meminfo.erasesize );
-
-            unsigned offset = meminfo.size-meminfo.erasesize ;
-
-            if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
-            {
-               // nearest size in pages (probably always equal)
-               maxSize_ = ( meminfo.erasesize / pageSize ) * pageSize ;
-	    } else perror( "lseek" );
-         } else perror( "MEMGETINFO" );
+      unsigned offset ;
+      if (bDevice && ( 0 == flashVarOffset(fd, offset, maxSize_) )){
+         printf( "flashVar offset 0x%x, max size %u\n", offset, maxSize_ );
       } else {
 	maxSize_ = 0x40000;
       }
@@ -609,7 +623,27 @@ int main( int argc, char const * const argv[] )
                printf( "%s\n", value );
                free( (char *)value );
             }
-            else if( 0 == strcmp( varName, "fill" ) )
+            else if( 0 == strcmp( varName, "-erase" ) ){
+               char const *devName = GetFlashDev();
+               int fd = open( devName, O_RDWR );
+               unsigned offset, maxSize ;
+               if( ( 0 <= fd )
+                   &&
+                   ( 0 == flashVarOffset(fd,offset,maxSize) ) ){
+                     erase_info_t erase;
+                     erase.start = offset ;
+                     erase.length = maxSize ;
+                     if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
+                     {
+                        printf( "Ok\n" );
+                     }
+                     else
+                        fprintf( stderr, "erase error %m\n" );
+               }
+               else
+                  fprintf( stderr, "%s: %m\n", devName );
+            }
+            else if( 0 == strcmp( varName, "-fill" ) )
             {
                char const * const name = "TEST" ;
                unsigned const nameLen = strlen( name );
