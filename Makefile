@@ -818,7 +818,7 @@ dnsPoll: dnsPoll.cpp Makefile $(LIB)
 	$(STRIP) $@
 
 flashVar: flashVar.cpp Makefile $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) $(KERNEL_VER) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) $(KERNEL_VER) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lsupc++
 	$(STRIP) $@
 
 tsTest: tsTest.cpp Makefile $(LIB)
