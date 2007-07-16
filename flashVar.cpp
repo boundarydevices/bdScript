@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
- * Revision 1.13  2007-07-15 21:45:32  ericn
+ * Revision 1.14  2007-07-16 18:36:15  ericn
+ * -don't re-write duplicate variables
+ *
+ * Revision 1.13  2007/07/15 21:45:32  ericn
  * -added -erase command for testing
  *
  * Revision 1.12  2007/05/09 15:34:43  ericn
@@ -157,7 +160,7 @@ readVars_t :: readVars_t( void )
    {
       unsigned offset ;
       if (bDevice && ( 0 == flashVarOffset(fd, offset, maxSize_) )){
-         printf( "flashVar offset 0x%x, max size %u\n", offset, maxSize_ );
+         debugPrint( "flashVar offset 0x%x, max size %u\n", offset, maxSize_ );
       } else {
 	maxSize_ = 0x40000;
       }
@@ -690,7 +693,11 @@ int main( int argc, char const * const argv[] )
          } // read flash var
       case 3:
          {
-            writeFlashVar( varName, argv[2] );
+            char const * oldval = readFlashVar( varName );
+            if( ( 0 == oldval ) || ( 0 != strcmp(argv[2],oldval) ) )
+            {
+               writeFlashVar( varName, argv[2] );
+            }
             break;
          } // write flash var
       default:
