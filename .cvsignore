@@ -67,3 +67,4 @@ imgMonoToPCL
 *.pcl
 *.pdf
 inputPoll
+daemonize

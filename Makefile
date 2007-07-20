@@ -2,17 +2,13 @@
 # Makefile for curlCache library and utility programs
 #
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar daemonize
 
 -include config.mk
 
 HARDWARE_TYPE= -DNEON
 
-ifneq (,$(findstring 2.6, $(CONFIG_KERNELPATH)))
-   KERNEL_VER=-DKERNEL_2_6
-else
-   KERNEL_VER=-DKERNEL_2_4
-endif
+KERNEL_VER=-DKERNEL_2_6
 
 MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
 
@@ -950,7 +946,7 @@ parsedURL: parsedURL.cpp Makefile
 #	$(STRIP) $@
 #
 
-all: $(LIB) curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar
+all: $(LIB) curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar daemonize
 
 .PHONY: install-libs install-headers
 
@@ -1022,6 +1018,7 @@ install-bin: all
 	$(OBJCOPY) -S -v jsExec   $(INSTALL_ROOT)/bin/jsExec
 	$(OBJCOPY) -S -v jpegview $(INSTALL_ROOT)/bin/jpegview
 	$(OBJCOPY) -S -v flashVar $(INSTALL_ROOT)/bin/flashVar
+	$(OBJCOPY) -S -v flashVar $(INSTALL_ROOT)/bin/daemonize
 	cp wget $(INSTALL_ROOT)/bin
 
 install: install-bin install-headers
