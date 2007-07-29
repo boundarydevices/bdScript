@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.8  2007-07-29 17:50:05  ericn
+ * Revision 1.9  2007-07-29 18:42:36  ericn
+ * -debugPrint(), not printf()
+ *
+ * Revision 1.8  2007/07/29 17:50:05  ericn
  * -Allow subset of flash movie
  *
  * Revision 1.7  2006/06/14 13:55:45  ericn
@@ -207,7 +210,7 @@ flashThread_t :: flashThread_t
          display_.clip_width = display_.width ;
          display_.clip_height = display_.height ;
       
-         printf( "   bpl %u\n"
+         debugPrint( "   bpl %u\n"
                  "   width %u\n"
                  "   height %u\n"
                  "   depth %u\n"
@@ -236,8 +239,8 @@ flashThread_t :: flashThread_t
          FlashMovie *fh = (FlashMovie *)hFlash ;
          fh->sm = mixer_ ;
 
-printf( "display at %u:%u %ux%u\n", screen_x_, screen_y_, screen_w_, screen_h_ );
-printf( "movie   at %u:%u %ux%u\n", movie_x_, movie_y_, movie_w_, movie_h_ );
+debugPrint( "display at %u:%u %ux%u\n", screen_x_, screen_y_, screen_w_, screen_h_ );
+debugPrint( "movie   at %u:%u %ux%u\n", movie_x_, movie_y_, movie_w_, movie_h_ );
          int create = pthread_create( &threadHandle_, 0, flashThread, this );
          if( 0 != create )
             perror( "flashThreadCreate" );
@@ -535,7 +538,7 @@ int main( int argc, char const * const argv[] )
          {
             struct FlashInfo fi;
             FlashGetInfo( hFlash, &fi );
-            printf( "   rate %lu\n"
+            debugPrint( "   rate %lu\n"
                     "   count %lu\n"
                     "   width %lu\n"
                     "   height %lu\n"
