@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
- * Revision 1.7  2005-08-12 04:20:18  ericn
+ * Revision 1.8  2007-07-29 18:43:09  ericn
+ * -Allow subset of flash movie
+ *
+ * Revision 1.7  2005/08/12 04:20:18  ericn
  * -removed unused include
  *
  * Revision 1.6  2003/11/28 14:57:41  ericn
@@ -116,10 +119,14 @@ struct flashPrivate_t {
                    unsigned long cacheHandle,
                    void const   *data,
                    unsigned long bytes,
-                   unsigned      x,
-                   unsigned      y,
-                   unsigned      w,
-                   unsigned      h,
+                   unsigned      screen_x,
+                   unsigned      screen_y,
+                   unsigned      screen_w,
+                   unsigned      screen_h,
+                   unsigned      movie_x,
+                   unsigned      movie_y,
+                   unsigned      movie_w,
+                   unsigned      movie_h,
                    unsigned      bgColor );
    ~flashPrivate_t( void );
 
@@ -137,11 +144,6 @@ private:
    JSObject  *const    obj_ ;
    unsigned long const cacheHandle_ ;
    parsedFlash_t      *flashData_ ;
-   unsigned      const x_ ;
-   unsigned      const y_ ;
-   unsigned      const w_ ;
-   unsigned      const h_ ;
-   unsigned      const bgColor_ ;
    flashThread_t      *thread_ ;
    flashPollHandler_t *pollHandler_ ;
 };
@@ -152,26 +154,26 @@ flashPrivate_t :: flashPrivate_t
      unsigned long cacheHandle,
      void const   *data,
      unsigned long bytes,
-     unsigned      x,
-     unsigned      y,
-     unsigned      w,
-     unsigned      h,
+     unsigned      screen_x,
+     unsigned      screen_y,
+     unsigned      screen_w,
+     unsigned      screen_h,
+     unsigned      movie_x,
+     unsigned      movie_y,
+     unsigned      movie_w,
+     unsigned      movie_h,
      unsigned      bgColor )
    : cx_( cx )
    , obj_( obj )
    , cacheHandle_( cacheHandle )
    , flashData_( new parsedFlash_t( data, bytes ) )
-   , x_( x )
-   , y_( y )
-   , w_( w )
-   , h_( h )
-   , bgColor_( bgColor )
    , thread_( 0 )
    , pollHandler_( 0 )
 {
    if( flashData_->worked() )
    {
-      thread_ = new flashThread_t( *flashData_, x_, y_, w_, h_, bgColor_, false );
+      thread_ = new flashThread_t( *flashData_, screen_x, screen_y, screen_w, screen_h, bgColor, false, 
+                                   movie_x, movie_y, movie_w, movie_h );
       if( ( 0 != thread_ ) && thread_->isAlive() )
       {
          pollHandler_ = new flashPollHandler_t( cx, obj, thread_->eventReadFd(), pollHandlers_ );
@@ -306,8 +308,14 @@ enum jsFlash_tinyid {
    FLASHMOVIE_PARAMS,
    FLASHMOVIE_NUMFRAMES,
    FLASHMOVIE_FRAMERATE,
+   FLASHMOVIE_X,
+   FLASHMOVIE_Y,
    FLASHMOVIE_WIDTH,
-   FLASHMOVIE_HEIGHT
+   FLASHMOVIE_HEIGHT,
+   FLASHMOVIE_MOVIEX,
+   FLASHMOVIE_MOVIEY,
+   FLASHMOVIE_MOVIEWIDTH,
+   FLASHMOVIE_MOVIEHEIGHT
 };
 
 static void jsFlashFinalize(JSContext *cx, JSObject *obj);
@@ -324,8 +332,14 @@ static JSPropertySpec flashMovieProperties_[] = {
   {"isLoaded",       FLASHMOVIE_ISLOADED,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"numFrames",      FLASHMOVIE_NUMFRAMES,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"frameRate",      FLASHMOVIE_FRAMERATE,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"x",              FLASHMOVIE_X,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"y",              FLASHMOVIE_Y,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"width",          FLASHMOVIE_WIDTH,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {"height",         FLASHMOVIE_HEIGHT,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"movie_x",        FLASHMOVIE_MOVIEX,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"movie_y",        FLASHMOVIE_MOVIEY,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"movie_w",        FLASHMOVIE_MOVIEWIDTH,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"movie_h",        FLASHMOVIE_MOVIEHEIGHT, JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -343,6 +357,7 @@ static void flashMovieOnComplete( jsCurlRequest_t &req, void const *data, unsign
 {
    fbDevice_t &fb = getFB();
    unsigned x = 0, y = 0, width = fb.getWidth(), height = fb.getHeight(), bgColor = 0 ;
+   unsigned movie_x = 0, movie_y = 0, movie_w = 0, movie_h = 0 ;
    jsval val ;
    if( JS_GetProperty( req.cx_, req.lhObj_, "x", &val ) && JSVAL_IS_INT( val ) )
       x = JSVAL_TO_INT( val );
@@ -354,13 +369,23 @@ static void flashMovieOnComplete( jsCurlRequest_t &req, void const *data, unsign
       height = JSVAL_TO_INT( val );
    if( JS_GetProperty( req.cx_, req.lhObj_, "bgColor", &val ) && JSVAL_IS_INT( val ) )
       bgColor = JSVAL_TO_INT( val );
-         
+   if( JS_GetProperty( req.cx_, req.lhObj_, "movie_x", &val ) && JSVAL_IS_INT( val ) )
+      movie_x = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "movie_y", &val ) && JSVAL_IS_INT( val ) )
+      movie_y = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "movie_w", &val ) && JSVAL_IS_INT( val ) )
+      movie_w = JSVAL_TO_INT( val );
+   if( JS_GetProperty( req.cx_, req.lhObj_, "movie_h", &val ) && JSVAL_IS_INT( val ) )
+      movie_h = JSVAL_TO_INT( val );
+
    flashPrivate_t * const privData = new flashPrivate_t( req.cx_, 
                                                          req.lhObj_, 
                                                          req.handle_, 
                                                          data, 
                                                          size,
-                                                         x, y, width, height, bgColor ); // placement new
+                                                         x, y, width, height, 
+                                                         movie_x, movie_y, movie_w, movie_h,
+                                                         bgColor );
    JS_SetPrivate( req.cx_, req.lhObj_, privData );
 
    if( privData->worked() )
@@ -436,6 +461,10 @@ static JSBool flashMovie( JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                   yPos = 0, 
                   width = fb.getWidth(), 
                   height = fb.getHeight(), 
+                  movie_x = 0,
+                  movie_y = 0,
+                  movie_w = 0,
+                  movie_h = 0,
                   bgColor = 0 ;
 
          jsval val ;
@@ -478,6 +507,46 @@ static JSBool flashMovie( JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
          else
             height = fb.getHeight();
          JS_DefineProperty( cx, thisObj, "height", INT_TO_JSVAL( height ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "movie_x", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            movie_x = JSVAL_TO_INT( val );
+         } // have movie x position
+         else
+            movie_x = 0 ;
+         JS_DefineProperty( cx, thisObj, "movie_x", INT_TO_JSVAL( movie_x ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "movie_y", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            movie_y = JSVAL_TO_INT( val );
+         } // have movie x position
+         else
+            movie_y = 0 ;
+         JS_DefineProperty( cx, thisObj, "movie_y", INT_TO_JSVAL( movie_y ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "movie_w", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            movie_w = JSVAL_TO_INT( val );
+         } // have movie x position
+         else
+            movie_w = 0 ;
+         JS_DefineProperty( cx, thisObj, "movie_w", INT_TO_JSVAL( movie_w ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
+
+         if( JS_GetProperty( cx, rhObj, "movie_h", &val ) 
+             &&
+             JSVAL_IS_INT( val ) )
+         {
+            movie_h = JSVAL_TO_INT( val );
+         } // have movie x position
+         else
+            movie_h = 0 ;
+         JS_DefineProperty( cx, thisObj, "movie_h", INT_TO_JSVAL( movie_h ), 0, 0, JSPROP_ENUMERATE|JSPROP_PERMANENT|JSPROP_READONLY );
 
          if( JS_GetProperty( cx, rhObj, "bgColor", &val ) 
              &&
