@@ -9,8 +9,8 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.96  2007-07-29 19:15:20  ericn
- * -optionally allow core files
+ * Revision 1.97  2007-07-29 19:18:17  ericn
+ * -remove printf
  *
  * Revision 1.95  2007/07/07 00:25:52  ericn
  * -[bdScript] added mouse cursor and input handling
@@ -1028,7 +1028,6 @@ int main( int argc, char *argv[] )
    {
       // Initialize the sa structure
       if( !allowCore ){
-         printf( "don't allow core file. print stack trace instead\n" );
          sa.sa_sigaction = handler;
          sigemptyset(&sa.sa_mask);
          sa.sa_flags = SA_SIGINFO;
