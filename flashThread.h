@@ -1,5 +1,5 @@
 #ifndef __FLASHTHREAD_H__
-#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.5 2006-12-01 18:34:11 tkisky Exp $"
+#define __FLASHTHREAD_H__ "$Id: flashThread.h,v 1.6 2007-07-29 17:50:05 ericn Exp $"
 
 /*
  * flashThread.h
@@ -31,7 +31,10 @@
  * Change History : 
  *
  * $Log: flashThread.h,v $
- * Revision 1.5  2006-12-01 18:34:11  tkisky
+ * Revision 1.6  2007-07-29 17:50:05  ericn
+ * -Allow subset of flash movie
+ *
+ * Revision 1.5  2006/12/01 18:34:11  tkisky
  * -friend function definition
  *
  * Revision 1.4  2006/06/14 13:55:43  ericn
@@ -56,6 +59,7 @@
 #include "flash/flash.h"
 #include "flash/swf.h"
 #include "flash/movie.h"
+#include "fbDev.h"
 
 class flashThread_t {
 public:
@@ -63,12 +67,16 @@ public:
    // initialization and destruction
    //
    flashThread_t( FlashHandle hFlash,
-                  unsigned    x, 
-                  unsigned    y,
-                  unsigned    w, 
-                  unsigned    h,
+                  unsigned    screen_x, 
+                  unsigned    screen_y,
+                  unsigned    screen_w,
+                  unsigned    screen_h,
                   unsigned    bgColor,
-                  bool        loop );
+                  bool        loop,
+		  unsigned    movie_x = 0,	// portion of movie to display
+		  unsigned    movie_y = 0,
+		  unsigned    movie_w = 0,	// scale of internal movie
+		  unsigned    movie_h = 0 );
    ~flashThread_t( void );
 
    bool isAlive( void ) const { return (pthread_t)-1 != threadHandle_ ; }
@@ -111,10 +119,14 @@ private:
 
    void sendCtrl( controlMsg_e type, unsigned param );
    FlashHandle const    hFlash_ ;
-   unsigned const       x_ ; 
-   unsigned const       y_ ;
-   unsigned const       w_ ;
-   unsigned const       h_ ;
+   unsigned             screen_x_ ; 
+   unsigned             screen_y_ ;
+   unsigned             screen_w_ ;
+   unsigned             screen_h_ ;
+   unsigned             movie_x_ ; 
+   unsigned             movie_y_ ;
+   unsigned             movie_w_ ;
+   unsigned             movie_h_ ;
    unsigned const       bgColor_ ;
    bool                 loop_ ;
    FlashDisplay         display_ ;

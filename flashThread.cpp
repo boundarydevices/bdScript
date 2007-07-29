@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.7  2006-06-14 13:55:45  ericn
+ * Revision 1.8  2007-07-29 17:50:05  ericn
+ * -Allow subset of flash movie
+ *
+ * Revision 1.7  2006/06/14 13:55:45  ericn
  * -track exec and blt time
  *
  * Revision 1.6  2006/06/12 13:04:43  ericn
@@ -106,17 +109,26 @@ void flashSoundMixer :: stopSounds()
 
 flashThread_t :: flashThread_t
    ( FlashHandle  hFlash,
-     unsigned     x, 
-     unsigned     y,
-     unsigned     w, 
-     unsigned     h,
+     unsigned     screen_x, 
+     unsigned     screen_y,
+     unsigned     screen_w, 
+     unsigned     screen_h,
      unsigned     bgColor,
-     bool         loop )
+     bool         loop,
+     unsigned     movie_x, // portion of movie to display
+     unsigned     movie_y,
+     unsigned     movie_w, // scale of internal movie
+     unsigned     movie_h
+   )
    : hFlash_( hFlash )
-   , x_( x )
-   , y_( y )
-   , w_( w )
-   , h_( h )
+   , screen_x_( screen_x )
+   , screen_y_( screen_y )
+   , screen_w_( screen_w )
+   , screen_h_( screen_h )
+   , movie_x_( movie_x )
+   , movie_y_( movie_y )
+   , movie_w_( movie_w ? movie_w : screen_w )
+   , movie_h_( movie_h ? movie_h : screen_h )
    , bgColor_( bgColor )
    , loop_( loop )
    , fbMem_( 0 )
@@ -148,12 +160,8 @@ flashThread_t :: flashThread_t
          fdWriteEvents_ = fdEvents[1];
          
          fbDevice_t &fb = getFB();
-         display_.width  = w ;
-         if( display_.width > fb.getWidth() )
-            display_.width = fb.getWidth();
-         display_.height = h ;
-         if( display_.height > fb.getHeight() )
-            display_.height = fb.getHeight();
+         display_.width  = movie_w_ ;
+         display_.height = movie_h_ ;
       
          unsigned short * const pixels = new unsigned short [ display_.width*display_.height ];
          display_.pixels = pixels ;
@@ -168,12 +176,29 @@ flashThread_t :: flashThread_t
          // set top row
          for( int i = 0 ; i < display_.width ; i++ )
             pixels[i] = bg ;
+         
          // set remaining rows 
          for( int i = 1 ; i < display_.height ; i++ )
             memcpy( pixels+(i*display_.width), pixels, display_.bpl );
-         fbMem_ = (unsigned short *)fb.getMem() + x_ + ( y_ * fb.getWidth() );
+
+         // clamp actual display parameters
+         unsigned left = fb.getHeight()-screen_y_ ;
+         if( left < screen_h_ )
+            screen_h_ = left ;
+         left = movie_h_-movie_y_ ;
+         if( screen_h_ > left )
+            screen_h_ = left ;
+         
+         left = fb.getWidth()-screen_x_ ;
+         if( left < screen_w_ )
+            screen_w_ = left ;
+         left = movie_w_-movie_x_ ;
+         if( screen_w_ > left )
+            screen_w_ = left ;
+
+         fbMem_ = (unsigned short *)fb.getMem() + screen_x_ + ( screen_y_ * fb.getWidth() );
          fbStride_ = fb.getWidth()*sizeof(pixels[0]);
-      
+
          display_.depth  = sizeof( pixels[0]);
          display_.bpp    = sizeof( pixels[0]);
          display_.flash_refresh = 0 ;
@@ -182,7 +207,7 @@ flashThread_t :: flashThread_t
          display_.clip_width = display_.width ;
          display_.clip_height = display_.height ;
       
-/*         debugPrint( "   bpl %u\n"
+         printf( "   bpl %u\n"
                  "   width %u\n"
                  "   height %u\n"
                  "   depth %u\n"
@@ -202,7 +227,7 @@ flashThread_t :: flashThread_t
                  display_.clip_y,
                  display_.clip_width, 
                  display_.clip_height );
-*/                 
+
          FlashGraphicInit( hFlash, &display_ );
       
          FlashSetGetUrlMethod( hFlash, getUrl, 0);
@@ -211,6 +236,8 @@ flashThread_t :: flashThread_t
          FlashMovie *fh = (FlashMovie *)hFlash ;
          fh->sm = mixer_ ;
 
+printf( "display at %u:%u %ux%u\n", screen_x_, screen_y_, screen_w_, screen_h_ );
+printf( "movie   at %u:%u %ux%u\n", movie_x_, movie_y_, movie_w_, movie_h_ );
          int create = pthread_create( &threadHandle_, 0, flashThread, this );
          if( 0 != create )
             perror( "flashThreadCreate" );
@@ -374,12 +401,14 @@ void *flashThread( void *param )
           if( tObj.display_.flash_refresh )
           {
              char *pixMem   = (char *)tObj.fbMem_ ;
-             char *flashMem = (char *)tObj.display_.pixels ;
-             unsigned const cacheLinesPerRow = tObj.display_.bpl / 32 ;
-             unsigned const leftover = tObj.display_.bpl - (cacheLinesPerRow*32);
-//printf( "%u bpl, %u cache lines, %u left over, fbStride %u\n", tObj.display_.bpl, cacheLinesPerRow, leftover, tObj.fbStride_ );
+             char *flashMem = ((char *)tObj.display_.pixels) + tObj.movie_x_*2 + tObj.movie_y_*tObj.display_.bpl ;
+             unsigned bytesPerLine = tObj.screen_w_*2 ;
+             unsigned const cacheLinesPerRow = bytesPerLine / 32 ;
+             unsigned const leftover = bytesPerLine - (cacheLinesPerRow*32);
+             unsigned const movieStride = tObj.movie_w_*2 ;
+debugPrint( "%u bpl, %u cache lines, %u left over, fbStride %u\n", bytesPerLine, cacheLinesPerRow, leftover, tObj.fbStride_ );
              start = tickMs();
-             for( int i = 0 ; i < tObj.display_.height ; i++ ){
+             for( unsigned i = 0 ; i < tObj.screen_h_ ; i++ ){
                   __asm__ volatile (
                      "  pld   [%0, #0]\n"
                      "  pld   [%0, #32]\n"
@@ -414,7 +443,8 @@ void *flashThread( void *param )
                   pixMem += leftover ;
                   flashMem += leftover ;
 
-                  pixMem   += tObj.fbStride_ - tObj.display_.bpl ;
+                  pixMem   += tObj.fbStride_ - bytesPerLine ;
+                  flashMem += movieStride - bytesPerLine ;
              }
 
              end = tickMs();
@@ -513,40 +543,45 @@ int main( int argc, char const * const argv[] )
                     fi.frameRate, fi.frameCount, fi.frameWidth, fi.frameHeight, fi.version );
 
             fbDevice_t &fb = getFB();
-            
-            unsigned targetX = 0 ;
-            unsigned targetY = 0 ;
-            unsigned targetWidth = fb.getWidth();
-            unsigned targetHeight = fb.getHeight();
+
+            unsigned screenX = 0 ;
+            unsigned screenY = 0 ;
+            unsigned screenWidth = fb.getWidth();
+            unsigned screenHeight = fb.getHeight();
+            unsigned movieX = 0 ;
+            unsigned movieY = 0 ;
+            unsigned movieWidth = 0 ;
+            unsigned movieHeight = 0 ;
             if( 2 < argc ){
-               targetX = strtoul(argv[2],0,0);
+               screenX = strtoul(argv[2],0,0);
                if( 3 < argc ){
-                  targetY = strtoul(argv[3],0,0);
+                  screenY = strtoul(argv[3],0,0);
                   if( 4 < argc ){
-                     targetWidth = strtoul(argv[4],0,0);
+                     screenWidth = strtoul(argv[4],0,0);
                      if( 5 < argc ){
-                        targetHeight = strtoul(argv[5],0,0);
+                        screenHeight = strtoul(argv[5],0,0);
+                        if( 6 < argc ){
+                           movieX = strtoul(argv[6],0,0);
+                           if( 7 < argc ){
+                              movieY = strtoul(argv[7],0,0);
+                              if( 8 < argc ){
+                                 movieWidth = strtoul(argv[8],0,0);
+                                 if( 9 < argc ){
+                                    movieHeight = strtoul(argv[9],0,0);
+                                 }
+                              }
+                           }
+                        }
                      }
                   }
                }
             }
-            
-            unsigned long const widthMult = fi.frameWidth / targetWidth ;
-            unsigned long const heightMult = fi.frameHeight/ targetHeight ;
-            unsigned flashWidth, flashHeight ;
-            if( widthMult > heightMult )
-            {
-               flashWidth  = fi.frameWidth/widthMult ;
-               flashHeight = fi.frameHeight/widthMult ;
-            }
-            else
-            {
-               flashWidth  = fi.frameWidth/heightMult ;
-               flashHeight = fi.frameHeight/heightMult ;
-            }
-            printf( "display at %ux%u\n", flashWidth, flashHeight );
 
-            flashThread_t flash( hFlash, targetX, targetY, flashWidth, flashHeight, 0xFFFFFF, true );
+            printf( "display at %u:%u %ux%u\n", screenX, screenY, screenWidth, screenHeight );
+            printf( "movie   at %u:%u %ux%u\n", movieX, movieY, movieWidth, movieHeight );
+
+            flashThread_t flash( hFlash, screenX, screenY, screenWidth, screenHeight, 0xFFFFFF, true,
+                                 movieX, movieY, movieWidth, movieHeight );
             while( 1 )
             {
                pollfd filedes[2];
@@ -571,7 +606,7 @@ int main( int argc, char const * const argv[] )
                            {
                               printf( "command %u\n", cmdId );
                               unsigned param = 0 ;
-         
+
                               flash.sendCtrl( (flashThread_t::controlMsg_e) cmdId, param );
                               printf( "max exec time %lu\n"
                                       "max blt time  %lu\n", 
