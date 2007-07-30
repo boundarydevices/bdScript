@@ -6,8 +6,6 @@ all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmSt
 
 -include config.mk
 
-HARDWARE_TYPE= -DNEON
-
 KERNEL_VER=-DKERNEL_2_6
 
 MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
