@@ -8,7 +8,16 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.47  2006-12-01 18:29:07  tkisky
+ * Revision 1.50  2007-07-30 22:33:24  ericn
+ * -Use KERNEL_FB_SM501, not NEON macro
+ *
+ * Revision 1.49  2006/02/14 01:21:47  ericn
+ * -Alsa driver needs format and channels after open
+ *
+ * Revision 1.48  2006/02/13 21:50:57  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.47  2006/12/01 18:29:07  tkisky
  * -debug rate prints
  *
  * Revision 1.46  2006/09/25 16:11:27  ericn
@@ -405,7 +414,7 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    unsigned const rowStride = frames.getRowStride();
    unsigned const height    = frames.getHeight();
 
-#ifndef NEON
+#if !defined(KERNEL_FB_SM501) || (KERNEL_FB_SM501 != 1)
    fbDevice_t    &fb = getFB();
    videoQueue_t :: entry_t *entry ;
 //   frames.setStart( tickMs() );
@@ -610,7 +619,8 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
    {
       if( 0 != ioctl(writeFd, SNDCTL_DSP_SYNC, 0 ) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SYNC):%m" );
-            
+
+#ifndef KERNEL_SND // ALSA needs format later
       int const format = AFMT_S16_LE ;
       if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
@@ -618,7 +628,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
       int const channels = 2 ;
       if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
-      
+#endif
       closeWriteFd();
    }
    else
@@ -642,6 +652,14 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
+#ifdef KERNEL_SND // ALSA needs format again
+               int const format = AFMT_S16_LE ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+               int const channels = 2 ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+#endif
                unsigned long numWritten = 0 ;
                _playing = true ;
 
@@ -1547,24 +1565,6 @@ bool audioQueue_t :: queueMPEG
    return queue_.push( item );
 }
    
-bool audioQueue_t :: interject
-   ( waveHeader_t const  &data )
-{
-   int dspFd = openWriteFd();
-   int const param = (int)&data ;
-   printf( "interject: %u channels, %u Hz, %u samples\n",
-           data.numChannels_,
-           data.sampleRate_,
-           data.numSamples_ );
-   if( 0 == ioctl( dspFd, SNDCTL_DSP_INTERJECT, param))
-      printf( "interjected\n" );
-   else 
-      perror( "SNDCTL_DSP_INTERJECT" );
-   closeWriteFd();
-
-   return true ;
-}
-
 bool audioQueue_t :: queuePlayback
    ( JSObject            *obj,
      waveHeader_t const  &data,

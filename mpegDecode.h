@@ -1,5 +1,5 @@
 #ifndef __MPEGDECODE_H__
-#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.6 2006-08-22 15:49:40 ericn Exp $"
+#define __MPEGDECODE_H__ "$Id: mpegDecode.h,v 1.7 2007-07-30 22:33:24 ericn Exp $"
 
 /*
  * mpegDecode.h
@@ -20,7 +20,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.h,v $
- * Revision 1.6  2006-08-22 15:49:40  ericn
+ * Revision 1.7  2007-07-30 22:33:24  ericn
+ * -Use KERNEL_FB_SM501, not NEON macro
+ *
+ * Revision 1.6  2006/08/22 15:49:40  ericn
  * -remove GOP, separate mask from picType
  *
  * Revision 1.5  2006/08/16 02:29:19  ericn
@@ -45,6 +48,7 @@
 
 #include <sys/time.h>
 #include <list>
+#include "config.h"
 
 class mpegDecoder_t {
 public:
@@ -117,7 +121,7 @@ private:
    long long            ptsIn_ ;
    long long            ptsOut_ ;
 
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
    //
    // Get a picture buffer. 
    //

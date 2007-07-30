@@ -1,5 +1,5 @@
 #ifndef __JSCURSOR_H__
-#define __JSCURSOR_H__ "$Id: jsCursor.h,v 1.1 2007-07-07 00:25:52 ericn Exp $"
+#define __JSCURSOR_H__ "$Id: jsCursor.h,v 1.2 2007-07-30 22:33:24 ericn Exp $"
 
 /*
  * jsCursor.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: jsCursor.h,v $
- * Revision 1.1  2007-07-07 00:25:52  ericn
+ * Revision 1.2  2007-07-30 22:33:24  ericn
+ * -Use KERNEL_FB_SM501, not NEON macro
+ *
+ * Revision 1.1  2007/07/07 00:25:52  ericn
  * -[bdScript] added mouse cursor and input handling
  *
  *
@@ -23,7 +26,7 @@
  * Copyright Boundary Devices, Inc. 2007
  */
 
-#if KERNEL_FB_SM501 == 1
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 
 	#include "js/jsapi.h"
 	

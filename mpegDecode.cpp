@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.18  2007-07-07 19:24:49  ericn
+ * Revision 1.19  2007-07-30 22:33:24  ericn
+ * -Use KERNEL_FB_SM501, not NEON macro
+ *
+ * Revision 1.18  2007/07/07 19:24:49  ericn
  * -[mpegdecode] allow ACCEL environment variable to turn on acceleration
  *
  * Revision 1.17  2007/05/06 20:39:20  ericn
@@ -128,7 +131,7 @@ mpegDecoder_t :: mpegDecoder_t( void )
 mpegDecoder_t :: ~mpegDecoder_t( void )
 {
    mpeg2_close( DECODER );
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
    while( !allocated_.empty() )
    {
       void *buf = allocated_.front();
@@ -153,7 +156,7 @@ void mpegDecoder_t :: feed
    }
 }
 
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 void *mpegDecoder_t :: getPictureBuf( void )
 {
    if( !freeBufs_.empty() )
@@ -237,7 +240,7 @@ bool mpegDecoder_t :: getPicture
 //            if( !haveVideoHeader_ )
             {
                haveVideoHeader_ = true ;
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
                mpegWidth_ = seq.width ;
                mpegStride_ = ((seq.width+15)/16)*16 ;
 #else
@@ -283,7 +286,7 @@ bool mpegDecoder_t :: getPicture
                printf( "varying width: %u/%u\n", seq.width, mpegWidth_ );
             }
 
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
             mpeg2_convert( DECODER, mpeg2convert_yuyv, NULL );
             mpeg2_custom_fbuf (DECODER, 1);
 #else
@@ -347,7 +350,7 @@ bool mpegDecoder_t :: getPicture
             {
                gettimeofday( &usStartDecode_, 0 );
 
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
                unsigned char *buf = (unsigned char *)getPictureBuf();
                unsigned ySize = mpegStride_*mpegHeight_ ; 
                unsigned uvSize = ySize / 2 ;
@@ -377,7 +380,7 @@ bool mpegDecoder_t :: getPicture
                   if( buf )
                   {
 picture = buf ;
-#ifdef NEON
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
                      freeBufs_.push_back( buf );
 #endif
 /*
