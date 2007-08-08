@@ -68,3 +68,13 @@ imgMonoToPCL
 *.pdf
 inputPoll
 daemonize
+fbAccel
+fbMem
+odomValue2
+sm501cmdlist
+sm501dump
+sm501mem
+sm501poke
+test
+vsync
+
