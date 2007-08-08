@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: sm501reg.cpp,v $
- * Revision 1.3  2006-08-16 02:27:49  ericn
+ * Revision 1.4  2007-08-08 17:12:01  ericn
+ * -[sm501] /dev/fb0 not /dev/fb/0
+ *
+ * Revision 1.3  2006/08/16 02:27:49  ericn
  * -fix register/value labels
  *
  * Revision 1.2  2006/06/10 16:28:19  ericn
@@ -34,7 +37,7 @@ int main( int argc, char const * const argv[] )
 	if( 1 < argc ){
 		unsigned long reg = strtoul(argv[1], 0, 0 );
 		printf( "register[0x%08lx] == ", reg );
-		int const fbDev = open( "/dev/fb/0", O_RDWR );
+		int const fbDev = open( "/dev/fb0", O_RDWR );
 		if( 0 <= fbDev ) {
 			int res = ioctl( fbDev, SM501_READREG, &reg );
 			if( 0 == res ){
@@ -57,7 +60,7 @@ int main( int argc, char const * const argv[] )
 			close( fbDev );
 		}
 		else
-			perror( "/dev/fb/0" );
+			perror( "/dev/fb0" );
 		printf( "\n" );
 	}
 	else

@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.25 2006-12-01 19:57:21 tkisky Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.26 2007-08-08 17:11:54 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,7 +13,10 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
- * Revision 1.25  2006-12-01 19:57:21  tkisky
+ * Revision 1.26  2007-08-08 17:11:54  ericn
+ * -[sm501] /dev/fb0 not /dev/fb/0
+ *
+ * Revision 1.25  2006/12/01 19:57:21  tkisky
  * -make odometer compile
  *
  * Revision 1.24  2006/09/24 16:20:24  ericn
@@ -293,7 +296,7 @@ private:
    friend class flashThread_t ;
 };
 
-fbDevice_t &getFB( char const *devName = "/dev/fb/0" );
+fbDevice_t &getFB( char const *devName = "/dev/fb0" );
 
 
 unsigned short fbDevice_t :: get16( unsigned long rgb )

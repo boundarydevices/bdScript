@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
 //  pScaleObj->m_flags = flags;
 	if (pScaleObj) if (pScaleObj->GetDimensions(&picWidth,&picHeight)) {
-		int fbDev = open( "/dev/fb/0", O_RDWR );
+		int fbDev = open( "/dev/fb0", O_RDWR );
 		if (fbDev) {
 			struct fb_fix_screeninfo fixed_info;
 			int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);

@@ -116,7 +116,7 @@ int main( int argc, char const * const argv[] )
          perror( argv[1] );
    }
    else
-      fprintf( stderr, "Usage: fbSet /dev/fb/0 0xFFFFFF\n" );
+      fprintf( stderr, "Usage: fbSet /dev/fb0 0xFFFFFF\n" );
    return 0 ;
 }   
 

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: sm501poke.cpp,v $
- * Revision 1.1  2006-08-16 17:31:05  ericn
+ * Revision 1.2  2007-08-08 17:12:00  ericn
+ * -[sm501] /dev/fb0 not /dev/fb/0
+ *
+ * Revision 1.1  2006/08/16 17:31:05  ericn
  * -Initial import
  *
  *
@@ -33,7 +36,7 @@ int main( int argc, char const * const argv[] )
 		unsigned long offset = strtoul(argv[1], 0, 0 );
       if( 0 == ( offset & 3 ) )
       {
-   		int const fbDev = open( "/dev/fb/0", O_RDWR );
+   		int const fbDev = open( "/dev/fb0", O_RDWR );
    		if( 0 <= fbDev ) {
             struct fb_fix_screeninfo fixed_info;
             int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
@@ -66,7 +69,7 @@ int main( int argc, char const * const argv[] )
    			close( fbDev );
    		}
    		else
-   			perror( "/dev/fb/0" );
+   			perror( "/dev/fb0" );
    		printf( "\n" );
       }
       else
