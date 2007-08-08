@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.97  2007-07-29 19:18:17  ericn
+ * Revision 1.98  2007-08-08 17:13:49  ericn
+ * -allow framebuffer device override with FRAMEBUFFER environment variable
+ *
+ * Revision 1.97  2007/07/29 19:18:17  ericn
  * -remove printf
  *
  * Revision 1.95  2007/07/07 00:25:52  ericn
@@ -1035,11 +1038,14 @@ int main( int argc, char *argv[] )
          sigaction(SIGSEGV, &sa, NULL);
       }
 
+      char const *fbDevice = getenv("FRAMEBUFFER");
+      if( 0 == fbDevice )
 #ifdef KERNEL_FB
-      getFB( "/dev/fb0" );
+         fbDevice = "/dev/fb0" ;
 #else
-      getFB( "/dev/lcd" );
+         fbDevice = "/dev/lcd" ;
 #endif      
+      getFB( fbDevice );
    
       for( unsigned i = 0 ; i < dim( requiredEnvVars ); i++ )
       {
