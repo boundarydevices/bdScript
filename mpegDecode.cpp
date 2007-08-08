@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.19  2007-07-30 22:33:24  ericn
+ * Revision 1.20  2007-08-08 17:08:21  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.19  2007/07/30 22:33:24  ericn
  * -Use KERNEL_FB_SM501, not NEON macro
  *
  * Revision 1.18  2007/07/07 19:24:49  ericn
@@ -571,7 +574,7 @@ if( 0 != getenv("ACCEL") )
             long long startMs = tickMs();
             bool haveHeader = false ;
             unsigned bytesPerPicture = 0 ;
-            int const fdYUV = open( "/dev/yuv", O_WRONLY );
+            int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
             fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
             char keyvalue = '\0' ;
             

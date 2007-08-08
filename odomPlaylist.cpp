@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomPlaylist.cpp,v $
- * Revision 1.12  2006-12-01 19:57:53  tkisky
+ * Revision 1.13  2007-08-08 17:08:24  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.12  2006/12/01 19:57:53  tkisky
  * -include <assert.h>
  *
  * Revision 1.11  2006/10/10 20:50:51  ericn
@@ -434,7 +437,7 @@ bool odomPlaylist_t::dispatch(
 int odomPlaylist_t::fdYUV( void )
 {
    if( 0 > fdYUV_ ) {
-      fdYUV_ = open( "/dev/yuv", O_WRONLY );
+      fdYUV_ = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
       fcntl(fdYUV_, F_SETFL, fcntl(fdYUV_, F_GETFL) | O_NONBLOCK | FASYNC );
       yuvInW_ = -1U ; // force ioctl
    }

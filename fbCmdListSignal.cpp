@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdListSignal.cpp,v $
- * Revision 1.1  2006-10-16 22:45:33  ericn
+ * Revision 1.2  2007-08-08 17:08:18  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.1  2006/10/16 22:45:33  ericn
  * -Initial import
  *
  *
@@ -37,7 +40,7 @@ fbCmdListSignal_t &fbCmdListSignal_t::get()
 }
 
 fbCmdListSignal_t::fbCmdListSignal_t( void )
-   : fd_( open( "/dev/sm501cmdlist", O_RDWR ) )
+   : fd_( open( "/dev/" SM501CMD_CLASS, O_RDWR ) )
    , signal_( nextRtSignal() )
 {
    if( isOpen() ){

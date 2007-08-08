@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: yuvSignal.cpp,v $
- * Revision 1.1  2006-10-16 22:45:55  ericn
+ * Revision 1.2  2007-08-08 17:08:29  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.1  2006/10/16 22:45:55  ericn
  * -Initial import
  *
  *
@@ -34,7 +37,7 @@ yuvSignal_t &yuvSignal_t::get()
 }
 
 yuvSignal_t::yuvSignal_t( void )
-   : fd_( open( "/dev/yuv", O_RDWR ) )
+   : fd_( open( "/dev/" SM501YUV_CLASS, O_RDWR ) )
    , signal_( nextRtSignal() )
 {
    if( isOpen() ){

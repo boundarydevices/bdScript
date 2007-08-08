@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <linux/sm501-int.h>
 #include <linux/sm501mem.h>
 #include <string.h>
 #include <errno.h>
@@ -10,8 +11,8 @@
 
 int main( int argc, char const * const argv[] )
 {
-   int const fd = open( "/dev/sm501mem", O_RDWR );
-   if( 0 <= fd ) {
+   int const fd = open( "/dev/" SM501MEM_CLASS, O_RDWR );
+   if( 0 <= fd ){
       if( 1 == argc ){
          unsigned long totalTicks = 0 ;
          unsigned totalAlloc = 0 ;
@@ -124,9 +125,9 @@ printf( "sm501free: %lx\n", allocations[i] );
       
 
       close( fd );
-   }
+   }
    else
-      perror( "/dev/fb/0" );
+      perror( "/dev/" SM501MEM_CLASS );
 
 	return 0 ;
 }

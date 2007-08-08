@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mediaQueue.cpp,v $
- * Revision 1.2  2007-05-03 20:50:37  ericn
+ * Revision 1.3  2007-08-08 17:08:20  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.2  2007/05/03 20:50:37  ericn
  * -fix leak of partial audio queue
  *
  * Revision 1.1  2007/01/03 22:12:10  ericn
@@ -1072,9 +1075,9 @@ int main( int argc, char const * const argv[] )
          }
       }
 
-      int const fdYUV = open( "/dev/yuv", O_WRONLY );
+      int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
       if( 0 > fdYUV ){
-         perror( "/dev/yuv" );
+         perror( "/dev/" SM501YUV_CLASS );
          return -1 ;
       }
       fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
@@ -1085,9 +1088,9 @@ int main( int argc, char const * const argv[] )
 
       int const pid_ = getpid();
       int const vsyncSignal = nextRtSignal();
-      int const fdSync = open( "/dev/sm501vsync", O_RDONLY );
+      int const fdSync = open( "/dev/" SM501INT_CLASS, O_RDONLY );
       if( 0 > fdSync ){
-         perror( "/dev/sm501sync" );
+         perror( "/dev/" SM501INT_CLASS );
          exit(-1);
       }
       fcntl(fdSync, F_SETOWN, pid_);

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.50  2007-07-30 22:33:24  ericn
+ * Revision 1.51  2007-08-08 17:08:17  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.50  2007/07/30 22:33:24  ericn
  * -Use KERNEL_FB_SM501, not NEON macro
  *
  * Revision 1.49  2006/02/14 01:21:47  ericn
@@ -437,7 +440,7 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    }
 #else
    
-   int const fdYUV = open( "/dev/yuv", O_WRONLY );
+   int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
    if( 0 <= fdYUV )
    {
 printf( "input row stride: %u\n", rowStride );
@@ -473,7 +476,7 @@ printf( "%u bytes/frame\n", bytesPerFrame );
       close( fdYUV );
    }
    else
-      perror( "/dev/yuv" );
+      perror( "/dev/" SM501YUV_CLASS );
 #endif 
    printf( "%u pictures\n", picCount );
    

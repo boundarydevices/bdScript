@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: odometer.cpp,v $
- * Revision 1.11  2006-10-10 20:51:10  ericn
+ * Revision 1.12  2007-08-08 17:08:26  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.11  2006/10/10 20:51:10  ericn
  * -remove deprecated test program
  *
  * Revision 1.10  2006/09/24 16:26:15  ericn
@@ -306,8 +309,8 @@ odometerSet_t::odometerSet_t( void )
    : cmdListSignal_( nextRtSignal() )
    , vsyncSignal_( nextRtSignal() )
    , pid_( getpid() )
-   , fdCmd_( open("/dev/sm501cmdlist", O_RDWR ) )
-   , fdSync_( open( "/dev/sm501vsync", O_RDONLY ) )
+   , fdCmd_( open("/dev/" SM501CMD_CLASS, O_RDWR ) )
+   , fdSync_( open("/dev/" SM501INT_CLASS, O_RDONLY ) )
    , cmdList_( 0 )
    , cmdListBytes_( 0 )
    , stopping_( false )

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: vsyncSignal.cpp,v $
- * Revision 1.1  2006-10-16 22:45:53  ericn
+ * Revision 1.2  2007-08-08 17:08:28  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.1  2006/10/16 22:45:53  ericn
  * -Initial import
  *
  *
@@ -23,6 +26,7 @@
 #include <fcntl.h>
 #include "rtSignal.h"
 #include <unistd.h>
+#include <linux/sm501-int.h>
 
 static vsyncSignal_t *instance_ = 0 ;
 
@@ -34,7 +38,7 @@ vsyncSignal_t &vsyncSignal_t::get()
 }
 
 vsyncSignal_t::vsyncSignal_t( void )
-   : fd_( open( "/dev/sm501vsync", O_RDONLY ) )
+   : fd_( open( "/dev/" SM501INT_CLASS, O_RDONLY ) )
    , signal_( nextRtSignal() )
 {
    if( isOpen() ){

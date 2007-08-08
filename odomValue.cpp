@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: odomValue.cpp,v $
- * Revision 1.3  2006-10-16 22:24:56  ericn
+ * Revision 1.4  2007-08-08 17:08:25  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.3  2006/10/16 22:24:56  ericn
  * -no background for alpha meters, check width & height of screen
  *
  * Revision 1.2  2006/09/23 15:27:06  ericn
@@ -468,15 +471,15 @@ numOdoms = 1 ;
          cmdList[i] = odometers[i]->cmdListMem_.getOffs();
       }
    
-      fOut = fopen( "/dev/sm501cmdlist", "wb" );
+      fOut = fopen( "/dev/" SM501CMD_CLASS, "wb" );
       if( !fOut ){
-         perror( "/dev/sm501cmdlist" );
+         perror( "/dev/" SM501CMD_CLASS );
          return -1 ;
       }
       
-      int const fdSync = open( "/dev/sm501vsync", O_RDONLY );
+      int const fdSync = open( "/dev/" SM501INT_CLASS, O_RDONLY );
       if( 0 > fdSync ){
-         perror( "/dev/sm501vsync" );
+         perror( "/dev/" SM501INT_CLASS );
          return -1 ;
       }
    

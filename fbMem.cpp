@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbMem.cpp,v $
- * Revision 1.3  2006-10-19 00:32:57  ericn
+ * Revision 1.4  2007-08-08 17:08:19  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.3  2006/10/19 00:32:57  ericn
  * -debugMsg(), not printf()
  *
  * Revision 1.2  2006/10/16 22:34:48  ericn
@@ -25,6 +28,7 @@
 #include "fbMem.h"
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <linux/sm501-int.h>
 #include <linux/sm501mem.h>
 #include "fbDev.h"
 #include <unistd.h>
@@ -84,7 +88,7 @@ void fbMemory_t::free( unsigned offs )
 }
 
 fbMemory_t::fbMemory_t( void )
-   : fd_( open( "/dev/sm501mem", O_RDWR ) )
+   : fd_( open( "/dev/" SM501MEM_CLASS, O_RDWR ) )
 {
    debugPrint( "opened fd %d\n", fd_ );
 }

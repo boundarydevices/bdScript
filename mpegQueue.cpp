@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: mpegQueue.cpp,v $
- * Revision 1.22  2007-07-07 19:25:09  ericn
+ * Revision 1.23  2007-08-08 17:08:22  ericn
+ * -[sm501] Use class names from sm501-int.h
+ *
+ * Revision 1.22  2007/07/07 19:25:09  ericn
  * -remove old trace references
  *
  * Revision 1.21  2007/01/03 22:07:22  ericn
@@ -607,9 +610,9 @@ int main( int argc, char const * const argv[] )
          }
       }
 
-      int const fdYUV = open( "/dev/yuv", O_WRONLY );
+      int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
       if( 0 > fdYUV ){
-         perror( "/dev/yuv" );
+         perror( "/dev/" SM501YUV_CLASS );
          return -1 ;
       }
       fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
@@ -620,9 +623,9 @@ int main( int argc, char const * const argv[] )
 
       int const pid_ = getpid();
       int const vsyncSignal = nextRtSignal();
-      int const fdSync = open( "/dev/sm501vsync", O_RDONLY );
+      int const fdSync = open( "/dev/" SM501INT_CLASS, O_RDONLY );
       if( 0 > fdSync ){
-         perror( "/dev/sm501sync" );
+         perror( "/dev/" SM501INT_CLASS );
          exit(-1);
       }
       fcntl(fdSync, F_SETOWN, pid_);
