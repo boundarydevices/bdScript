@@ -10,6 +10,10 @@ KERNEL_VER=-DKERNEL_2_6
 
 MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
 
+ifeq (y, $(CONFIG_MPLAYER))
+        MPEG2LIBS += -lavformat -lavutil -lavcodec -lxvidcore -lavutil 
+endif
+
 #
 # These are needed with newer (0.4.0) mpeg2dec library
 #
@@ -163,7 +167,7 @@ else
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mediaQueue.o mpegQueue.o
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mediaQueue.o mpegQueue.o aviHeader.o riffRead.o 
 endif
 
 ifeq (y,$(KERNEL_FB_SM501))
@@ -206,6 +210,10 @@ CONFIG_LIBFLASH?=y
 ifeq (y,$(CONFIG_LIBFLASH))       
    OBJS += flashThread.o 
 endif       
+
+ifeq (y,$(CONFIG_MPLAYER))
+   OBJS += mplayerWrap.o
+endif
 
 INSTALL_ROOT ?= ../install/arm-linux
 
@@ -753,6 +761,10 @@ avSendTo: avSendTo.cpp $(LIB)
 
 pollHandlerTest: pollHandler.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o pollHandlerTest -DSTANDALONE=1 -Xlinker -Map -Xlinker pollHandlerTest.map pollHandler.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+mplayerTest: mplayerWrap.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti  -o $@ -DSTANDALONE=1 -Xlinker -Map -Xlinker $@.map mplayerWrap.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 pollTimerTest: pollTimer.cpp $(LIB)
