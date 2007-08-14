@@ -784,7 +784,7 @@ barcodePoll: barcodePoll.cpp $(LIB)
 	$(STRIP) $@
 
 inputPoll: inputPoll.cpp $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o inputPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker inputPoll.map inputPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lsupc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o inputPoll -DINPUT_STANDALONE=1 -Xlinker -Map -Xlinker inputPoll.map inputPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lsupc++
 	$(STRIP) $@
 
 serialPoll: serialPoll.cpp $(LIB)

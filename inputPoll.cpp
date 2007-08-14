@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: inputPoll.cpp,v $
- * Revision 1.1  2007-07-07 00:25:52  ericn
+ * Revision 1.2  2007-08-14 16:39:05  ericn
+ * -update inputPoll test program
+ *
+ * Revision 1.1  2007/07/07 00:25:52  ericn
  * -[bdScript] added mouse cursor and input handling
  *
  *
@@ -96,6 +99,10 @@ void inputPoll_t::onDataAvail( void )
 
 int main( int argc, char const *const argv[] )
 {
+   if( 1 == argc ){
+      printf( "Usage: %s /dev/input/event0 [...]\n", argv[0]);
+      return 0 ;
+   }
 	pollHandlerSet_t handlers ;
 	inputPoll_t **pollers = new inputPoll_t *[argc-1];
 	for( int arg = 1 ; arg < argc ; arg++ ){
