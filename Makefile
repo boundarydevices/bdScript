@@ -2,8 +2,6 @@
 # Makefile for curlCache library and utility programs
 #
 
-all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph cbmStat jpegview flashVar daemonize
-
 -include config.mk
 
 KERNEL_VER=-DKERNEL_2_6
@@ -275,18 +273,10 @@ endif
 
 ODOMOBJS = \
        mpegRxUDP.o \
-       odomCommand.o \
        odomDigit.o \
        odomGraphics.o \
-       odomHighlight.o \
-       odomPlaylist.o \
-       odomStream.o \
-       odomTouch.o \
-       odomTTY.o \
        odomValue2.o \
-       odomVideo.o \
-       odometer.o
-#       odomValue.o \
+       odomVideo.o
 
 ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
 
@@ -357,26 +347,6 @@ jsData: jsData.cpp $(LIB) Makefile
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
-odomCommandMain.o: odomCommand.cpp odomCommand.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-odomCommand: odomCommandMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
-	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomCommand odomCommandMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle odomCommand | sort >odomCommand.map
-	cp $@ $@.prestrip
-	$(STRIP) $@
-
-odomTTYMain.o: odomTTY.cpp odomTTY.h 
-	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
-
-odomTTY: odomTTYMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
-	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o odomTTY odomTTYMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle odomTTY | sort >odomTTY.map
-	cp $@ $@.prestrip
-	$(STRIP) $@
-
 odomGraphicsMain.o: odomGraphics.cpp odomGraphics.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
@@ -386,7 +356,6 @@ odomGraphics: odomGraphicsMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRAR
 	arm-linux-nm --demangle odomGraphics | sort >odomGraphics.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
-
 
 slotWheelMain.o: slotWheel.cpp slotWheel.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
@@ -1032,12 +1001,14 @@ install-bin: all
 	cp wget $(INSTALL_ROOT)/bin
 
 install: install-bin install-headers
+all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph \
+        cbmStat jpegview flashVar daemonize $(ODOMLIB) $(SM501LIB)
 
 clean:
 	rm -f *.o *.a *.map *.lst *.sym *.prestrip bc curlGet dirTest \
 	   urlTest jsExec testJS ftRender madHeaders backtrace \
       cbmImage cbmGraph cbmReset cbmStat ffPlay ffTest jpegview \
-      mpeg2mp3 pixmanTest mpegQueue odomTTY mpegDecode \
+      mpeg2mp3 pixmanTest mpegQueue mpegDecode \
 	   pxaregs flashVar ftDump jsData setBaud serialSignal \
 	   serialCounts fbCmdClear sm501reg sm501dump imgFile \
       serialTouch odomValue fbcCircular fbcHideable odomValue2 \
