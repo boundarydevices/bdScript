@@ -125,7 +125,7 @@ printf( "sm501free: %lx\n", allocations[i] );
       
 
       close( fd );
-   }
+   }
    else
       perror( "/dev/" SM501MEM_CLASS );
 
