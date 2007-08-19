@@ -1,5 +1,5 @@
 #ifndef __INPUTPOLL_H__
-#define __INPUTPOLL_H__ "$Id: inputPoll.h,v 1.1 2007-07-07 00:25:52 ericn Exp $"
+#define __INPUTPOLL_H__ "$Id: inputPoll.h,v 1.2 2007-08-19 18:39:43 ericn Exp $"
 
 /*
  * inputPoll.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: inputPoll.h,v $
- * Revision 1.1  2007-07-07 00:25:52  ericn
+ * Revision 1.2  2007-08-19 18:39:43  ericn
+ * -fix declaration
+ *
+ * Revision 1.1  2007/07/07 00:25:52  ericn
  * -[bdScript] added mouse cursor and input handling
  *
  *
@@ -32,7 +35,7 @@ public:
    virtual void onData( struct input_event const &event );
 
    // implementation
-   virtual void inputPoll_t::onDataAvail( void );
+   virtual void onDataAvail( void );
 protected:
    char const *fileName_ ;
 };
