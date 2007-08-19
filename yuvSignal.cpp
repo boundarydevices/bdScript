@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: yuvSignal.cpp,v $
- * Revision 1.2  2007-08-08 17:08:29  ericn
+ * Revision 1.3  2007-08-19 19:17:52  ericn
+ * -[sm501] include SM-501 header
+ *
+ * Revision 1.2  2007/08/08 17:08:29  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.1  2006/10/16 22:45:55  ericn
@@ -26,6 +29,7 @@
 #include <fcntl.h>
 #include "rtSignal.h"
 #include <unistd.h>
+#include <linux/sm501-int.h>
 
 static yuvSignal_t *instance_ = 0 ;
 
