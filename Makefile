@@ -8,10 +8,6 @@ KERNEL_VER=-DKERNEL_2_6
 
 MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
 
-ifeq (y, $(CONFIG_MPLAYER))
-        MPEG2LIBS += -lavformat -lavutil -lavcodec -lxvidcore -lavutil 
-endif
-
 #
 # These are needed with newer (0.4.0) mpeg2dec library
 #
@@ -348,14 +344,13 @@ jsData: jsData.cpp $(LIB) Makefile
 	$(STRIP) $@
 
 odomGraphicsMain.o: odomGraphics.cpp odomGraphics.h 
-	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+	$(CC) -fno-rtti -ggdb -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
 odomGraphics: odomGraphicsMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomGraphics odomGraphicsMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -ggdb -D_REENTRANT=1 -o odomGraphics odomGraphicsMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	arm-linux-nm --demangle odomGraphics | sort >odomGraphics.map
 	cp $@ $@.prestrip
-	$(STRIP) $@
 
 slotWheelMain.o: slotWheel.cpp slotWheel.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
@@ -837,6 +832,10 @@ hexDump: hexDump.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o hexDump -D__STANDALONE__ -Xlinker -Map -Xlinker hexDump.map hexDump.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
+fbDev: fbDev.cpp Makefile $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -D__MODULETEST__ -Xlinker -Map -Xlinker hexDump.map fbDev.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
 vsync: vsync.cpp Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o vsync -D__STANDALONE__ -Xlinker -Map -Xlinker vsync.map vsync.cpp $(LIBS) -ljpeg -lcrypto -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
@@ -863,6 +862,18 @@ imgFile: $(IMGFILEOBJS) Makefile
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
       -Xlinker imgFile.map \
+      $(IMGFILEOBJS) \
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
+fbImageMain.o: fbImage.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+IMGFILEOBJS = fbImageMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o img4444.o sm501alpha.o
+fbImage: $(IMGFILEOBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker fbImage.map \
       $(IMGFILEOBJS) \
       $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
 	$(STRIP) $@
@@ -988,6 +999,10 @@ shared-headers += \
    odomValue2.h \
    odomVideo.h \
    sm501alpha.h
+endif
+
+ifeq (y, $(CONFIG_MPLAYER))
+        shared-headers += pollHandler.h mplayerWrap.h
 endif
 
 install-headers:
