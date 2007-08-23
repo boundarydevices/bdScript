@@ -1,5 +1,5 @@
 #ifndef __ODOMVIDEO_H__
-#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.6 2006-10-10 20:50:13 ericn Exp $"
+#define __ODOMVIDEO_H__ "$Id: odomVideo.h,v 1.7 2007-08-23 00:31:53 ericn Exp $"
 
 /*
  * odomVideo.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: odomVideo.h,v $
- * Revision 1.6  2006-10-10 20:50:13  ericn
+ * Revision 1.7  2007-08-23 00:31:53  ericn
+ * -use mplayer
+ *
+ * Revision 1.6  2006/10/10 20:50:13  ericn
  * -use fds, not playlist
  *
  * Revision 1.5  2006/09/17 15:53:54  ericn
@@ -35,6 +38,10 @@
  * Copyright Boundary Devices, Inc. 2006
  */
 
+
+#include "config.h"
+
+#ifndef CONFIG_MPLAYER
 
 #include "mpegQueue.h"
 #include "mpegStream.h"
@@ -79,6 +86,52 @@ private:
    long long                       lastPTS_ ;
    long long                       start_ ;
 };
+
+#else
+
+#include "fbDev.h"
+#include "mplayerWrap.h"
+#include "pollHandler.h"
+#include <stdio.h>
+
+class odomVideo_t {
+public:
+   odomVideo_t( char const        *fileName,
+                rectangle_t const &outRect,
+                char const       **extraParams = 0,
+                unsigned           numExtraParams = 0 );
+   ~odomVideo_t( void );
+
+   // returns true if ready to play
+   bool initialized( void ) const { return 0 != player_ ; }
+
+   // start playback (opens YUV) - returns true if successful
+   bool startPlayback( void );
+
+   // called repeatedly to decode frames to fill the output queue
+   // returns false when complete
+   bool playback( void ){ return completed(); }
+
+   bool completed( void );
+
+   // called to pump frame(s) to frame buffer from vsync
+   void doOutput( void ){}
+
+   // called from audio avail signal to fill audio buffer
+   void doAudio( void ){}
+
+   void dump( void ){}
+
+   void closed( void ){ closed_ = true ; }
+
+private:
+   mplayerWrap_t   *player_ ;
+   bool             closed_ ;
+   pollHandlerSet_t handlers_ ;
+   pollHandler_t  **pipeHandlers_ ;
+};
+
+#endif // using MPLAYER
 
 #endif
 
