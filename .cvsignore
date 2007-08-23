@@ -81,3 +81,5 @@ vsync
 yuvToRGB
 pxamem
 odomGraphics
+mplayerTest
+fbImage
