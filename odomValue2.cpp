@@ -7,7 +7,13 @@
  * Change History : 
  *
  * $Log: odomValue2.cpp,v $
- * Revision 1.3  2006-10-25 23:26:46  ericn
+ * Revision 1.5  2007-08-23 00:42:47  ericn
+ * -remove debug statement
+ *
+ * Revision 1.4  2002/12/15 08:39:10  ericn
+ * -Added width and height parameters, support scaling of images to fit
+ *
+ * Revision 1.3  2006/10/25 23:26:46  ericn
  * -handle dollar values going down
  *
  * Revision 1.2  2006/10/19 15:28:09  ericn
@@ -43,10 +49,10 @@ unsigned const decimalPos = 8 ;
       dig += 4 ; // make range 4..13
       return (unsigned short)( (dig<<12) | (dig<<8) | (dig<<4) | dig );
    }
-   #define COMMA1BACK   0xF0F0
-   #define COMMA2BACK   0xFF00
-   #define DECIMALBACK  0xF444
-   #define DOLLARBACK   0xF00F
+   #define COMMA1BACK   0xF0F0         // green
+   #define COMMA2BACK   0xFF00         // red
+   #define DECIMALBACK  0xF444         // gray
+   #define DOLLARBACK   0xF00F         // blue
 #else
    #define DIGITBACK(__dig)   0
    
@@ -60,56 +66,51 @@ odomValue2_t::odomValue2_t
    ( fbCommandList_t      &cmdList,
      odomGraphics_t const &graphics,
      unsigned             x,
-     unsigned             y )
+     unsigned             y,
+     unsigned             width,
+     unsigned             height )
    : graphics_( graphics )
    , alpha_( sm501alpha_t::get(sm501alpha_t::rgba4444) )
    , fbRam_( alpha_.fbRamOffset() )
-   , digitHeight_( graphics.decimalPoint_.height() )
+   , digitHeight_( graphics.getDecimal(0).height() )
+   , xLeft_( x )
    , comma1_( 
-        new fbcHideable_t( cmdList,
+        new fbcMoveHide_t( cmdList,
                            fbRam_,
-                           x 
-                              + 2*graphics.digitStrip_.width()
-                              + graphics.dollarSign_.width(),
+                           x + graphics.comma2Offset(0),
                            y,
                            getFB().getWidth(),
                            getFB().getHeight(),
-                           graphics.comma_,
+                           graphics.getComma(0),
                            0, 0, 
-                           graphics.comma_.width(),
-                           graphics.comma_.height(),
+                           graphics.getComma(0).width(),
+                           graphics.getComma(0).height(),
                            false, COMMA1BACK ) 
    )
    , comma2_( 
-        new fbcHideable_t( cmdList,
+        new fbcMoveHide_t( cmdList,
                            fbRam_,
-                           x 
-                              + 5*graphics.digitStrip_.width()
-                              + graphics.dollarSign_.width()
-                              + graphics.comma_.width(),
+                           x + graphics.comma1Offset(0),
                            y,
                            getFB().getWidth(),
                            getFB().getHeight(),
-                           graphics.comma_,
+                           graphics.getComma(0),
                            0, 0, 
-                           graphics.comma_.width(),
-                           graphics.comma_.height(),
+                           graphics.getComma(0).width(),
+                           graphics.getComma(0).height(),
                            false, COMMA2BACK ) 
    )
    , decimalPoint_(
-        new fbcHideable_t( cmdList,
+        new fbcMoveHide_t( cmdList,
                            fbRam_,
-                           x 
-                              + 8*graphics.digitStrip_.width()
-                              + graphics.dollarSign_.width()
-                              + 2*graphics.comma_.width(),
+                           x + graphics.decimalOffset(0),
                            y,
                            getFB().getWidth(),
                            getFB().getHeight(),
-                           graphics.decimalPoint_,
+                           graphics.getDecimal(0),
                            0, 0, 
-                           graphics.decimalPoint_.width(),
-                           graphics.decimalPoint_.height(),
+                           graphics.getDecimal(0).width(),
+                           graphics.getDecimal(0).height(),
                            false, DECIMALBACK ) 
    )
    , dollarSign_( 0 )
@@ -120,36 +121,39 @@ odomValue2_t::odomValue2_t
    , prevSig_( 0 )
    , updating_( false )
 {
+   printf( "inside odomValue2_t constructor\n" );
    unsigned const screenWidth = getFB().getWidth();
    unsigned const screenHeight = getFB().getHeight();
 
-   unsigned const startX = x ;
-   x += graphics.dollarSign_.width();
+   //
+   // command list is built based on max significant digits
+   // 
    unsigned dig ;
    for( dig = 0 ; dig < maxDigits_ ; dig++ ){
-      if( ( comma1Pos == dig ) || ( comma2Pos == dig ) )
-         x += graphics_.comma_.width();
-      else if( decimalPos == dig )
-         x += graphics_.decimalPoint_.width();
+      unsigned offs = graphics.digitOffset(0,maxDigits_-dig-1);
+printf( "digit %u at %u\n", dig, offs );
+fbImage_t const &image = graphics.getStrip(0);
       digits_[dig] = new fbcCircular_t( cmdList, fbRam_, 
-                                        x, y, screenWidth, screenHeight,
-                                        graphics.digitStrip_,
+                                        x + offs, y, 
+                                        screenWidth, screenHeight,
+                                        image,
                                         digitHeight_,
                                         0, false, DIGITBACK(dig) );
-      x += graphics.digitStrip_.width();
    }
 
    // allocate dollar sign last so it doesn't get cleared by digit clear
+   unsigned offs = x+graphics.dollarOffset(0);
+   printf( "dollar sign at %u\n", offs );
    dollarSign_ = new fbcMoveHide_t( cmdList,
                                     fbRam_,
-                                    startX,
+                                    x+graphics.dollarOffset(0),
                                     y,
                                     getFB().getWidth(),
                                     getFB().getHeight(),
-                                    graphics.dollarSign_,
+                                    graphics.getDollar(0),
                                     0, 0, 
-                                    graphics.dollarSign_.width(),
-                                    graphics.dollarSign_.height(),
+                                    graphics.getDollar(0).width(),
+                                    graphics.getDollar(0).height(),
                                     false, DOLLARBACK );
 }
 
@@ -157,7 +161,6 @@ odomValue2_t::odomValue2_t
 odomValue2_t::~odomValue2_t( void )
 {
 }
-
 
 void odomValue2_t::set
    ( unsigned char digits[maxDigits_],
@@ -185,7 +188,6 @@ void odomValue2_t::set
 
    updating_ = false ;
 }
-
 
 void odomValue2_t::executed()
 {
@@ -241,9 +243,40 @@ void odomValue2_t::updateCommandList()
       if( sigDigits_ != prevSig_ ){
          changed = true ;
 debugPrint( "%u significant digits, msd = %u, want %d, cmd %d\n", sigDigits_, msd, wantHidden_, cmdHidden_ );
-         dollarSign_->setX( digits_[msd]->getDestX() - dollarSign_->getWidth() );
+         fbImage_t const &dollar = graphics_.getDollar(sigDigits_);
+         unsigned const xPos = xLeft_ + graphics_.dollarOffset(sigDigits_);
+printf( "dollar sign at %u (width %u)\n", xPos, dollar.width() );
+         dollarSign_->setX( xPos );
+         dollarSign_->swapSource(dollar,0);
          if( sigDigits_ > prevSig_ )
             dollarSign_->skipHide();
+         fbImage_t const &digitStrip = graphics_.getStrip(sigDigits_);
+         if( graphics_.sigToIndex(prevSig_) != graphics_.sigToIndex(sigDigits_) ){
+            for( unsigned i = 0 ; i < maxDigits_ ; i++ ){
+               unsigned oldPos = graphics_.digitOffset(prevSig_,maxDigits_-i-1);
+               unsigned newPos = graphics_.digitOffset(sigDigits_,maxDigits_-i-1);
+               int const diff = newPos - oldPos ;
+               if( 0 != diff ){
+printf( "move digit %u by %d (%u to %u)\n", i, diff, oldPos, newPos );
+                  digits_[i]->setDestX( digits_[i]->getDestX() + diff );
+               }
+               digits_[i]->swapSource( digitStrip );
+            }
+
+            printf( "move decimal point to %u (width %u)\n", xLeft_ + graphics_.decimalOffset(sigDigits_), graphics_.getDecimal(sigDigits_).width() );
+            decimalPoint_->setX( xLeft_ + graphics_.decimalOffset(sigDigits_) );
+            decimalPoint_->swapSource( graphics_.getDecimal(sigDigits_), 0 );
+         }
+         if( 5 < sigDigits_ ){
+            printf( "move comma2 to %u\n", xLeft_ + graphics_.comma1Offset(sigDigits_) );
+            comma2_->setX( xLeft_ + graphics_.comma1Offset(sigDigits_) );
+            comma2_->swapSource( graphics_.getComma(sigDigits_), 0 );
+            if( 8 < sigDigits_ ){
+               printf( "move comma1 to %u\n", xLeft_ + graphics_.comma2Offset(sigDigits_) );
+               comma1_->setX( xLeft_ + graphics_.comma2Offset(sigDigits_) );
+               comma1_->swapSource( graphics_.getComma(sigDigits_), 0 );
+            }
+         }
          prevSig_ = sigDigits_ ;
       }
 
@@ -317,6 +350,7 @@ void odomValue2_t::dump( void )
 #include "tickMs.h"
 #include "multiSignal.h"
 #include "blockSig.h"
+#include "rawKbd.h"
 
 #define LOGTRACES
 #include "logTraces.h"
@@ -377,8 +411,36 @@ static void convertValue( char const *s, unsigned char value[] ){
    }
 }
 
-int main( int argc, char const * const argv[] )
+static unsigned windowWidth = getFB().getWidth();
+
+static void parseArgs( int &argc, char const **argv )
 {
+   for( int arg = 1 ; arg < argc -1 ; arg++ ){
+      char const *param = argv[arg];
+      if( '-' == *param ){
+         if( 'w' == tolower(param[1]) ){
+            windowWidth = strtoul(argv[arg+1],0,0);
+            for( int fwd = arg+2 ; fwd < argc ; fwd++ ){
+               argv[fwd-2] = argv[fwd];
+            }
+            argc -= 2 ;
+            arg-- ;
+         } // width command
+      }
+   }
+}
+
+static void printValue()
+{
+   printf( "$" );
+   for( unsigned i = 0 ; i < odomValue2_t::maxDigits_ ; i++ )
+      printf( "%u", value_[i] );
+   printf( "\n" );
+}
+
+int main( int argc, char const *argv[] )
+{
+   parseArgs( argc, argv );
    if( 1 < argc )
    {
       sigset_t blockThese ;
@@ -396,11 +458,13 @@ int main( int argc, char const * const argv[] )
          return -1 ;
       }
       
-      odomGraphics_t *graphics = new odomGraphics_t( argv[1], alphaLayer );
+      odomGraphics_t *graphics = new odomGraphics_t( argv[1], alphaLayer, odomValue2_t::maxDigits_, windowWidth );
       if( !graphics->worked() ){
          perror( argv[1] );
          return 1 ;
       }
+
+      printf( "loaded graphics from %s\n", argv[1] );
 
       if( 2 < argc ){
          convertValue( argv[2], value_ );
@@ -409,9 +473,11 @@ int main( int argc, char const * const argv[] )
       logTraces_t::get(true);
 
       fbCommandList_t cmdList ;
+      printf( "creating value\n" );
       odomValue_ = new odomValue2_t( cmdList, *graphics, 0, 0 );
       cmdList.push( new fbFinish_t );
 
+      printf( "set value\n" );
       odomValue_->set( value_, extra_ );
 
       fbPtr_t cmdListMem( cmdList.size() );
@@ -436,11 +502,13 @@ int main( int argc, char const * const argv[] )
       long long prevTick = startTick ;
 
       unsigned prevSync = vsyncCount ;
-      unsigned digitHeight = graphics->comma_.height();
+      unsigned digitHeight = graphics->height();
 
       odomValue_->show();
 
-      while( 50000 > (prevTick-startTick) ){
+      rawKbd_t kbd ;
+      bool doExit = false ;
+      while( !doExit && ( 50000 > (prevTick-startTick) ) ){
          pause();
          if( cmdComplete == vsyncCount ){
             unsigned ticks = (vsyncCount-prevSync)*3;
@@ -451,14 +519,12 @@ int main( int argc, char const * const argv[] )
             for( unsigned dig = odomValue2_t::maxDigits_ ; ( 0 < dig ); ){
                --dig ;
                value_[dig] += carry ;
-               if( carry )
-                  printf( "carry a %u\n", carry );
                carry = 0 ;
                while( extra_ >= digitHeight ){
                   extra_ -= digitHeight ;
                   value_[dig]++ ;
                   if( 9 < value_[dig] ){
-                     value_[dig] = 0 ;
+                     value_[dig] = 9 ;
                      carry++ ;
                   }
                }
@@ -473,10 +539,61 @@ int main( int argc, char const * const argv[] )
               odomValue_->set( value_, extra_ );
             }
          }
+         char c ;
+         if( kbd.read( c ) ){
+            switch( tolower( c ) ){
+               case '+' : {
+                  printf( "+++\n" );
+                  unsigned i ;
+                  for( i = 0 ; i < odomValue2_t::maxDigits_ ; i++ ){
+                     if( 0 == value_[i] )
+                        ;
+                     else
+                        break ;
+                  }
+                  if( 0 < i )
+                     value_[i-1] = 9 ;
+                  printValue();
+                  extra_ = 0 ;
+                  odomValue_->set( value_, extra_ );
+                  break ;
+               }
+               case '-' : {
+                  printf( "---\n" );
+                  unsigned i ;
+                  for( i = 0 ; i < odomValue2_t::maxDigits_ ; i++ ){
+                     if( 0 == value_[i] )
+                        ;
+                     else
+                        break ;
+                  }
+                  printf( "msd == %u\n", i );
+                  if( odomValue2_t::maxDigits_ > i ){
+                     value_[i] = 0 ;
+                     if( odomValue2_t::maxDigits_ > i+1 )
+                        value_[i+1] = 9 ;
+                  }
+                  printValue();
+                  extra_ = 0 ;
+                  odomValue_->set( value_, extra_ );
+                  break ;
+               }
+               case '\x03' :
+               case '\x1b' :
+                  doExit = true ;
+                  break ;
+               case '?' :
+                  for( unsigned i = 0 ; i < odomValue_->maxDigits_ ; i++ ){
+                     printf( "digit %u at %u\n", i, odomValue_->digits_[i]->getDestX() );
+                  }
+                  printf( "dollar sign at %u, width %u\n", odomValue_->dollarSign_->getX(), odomValue_->dollarSign_->getWidth() );
+                  break ;
+            }
+         }
       }
    }
    else
-      fprintf( stderr, "Usage: %s imgFile [imgFile...]\n", argv[0] );
+      fprintf( stderr, "Usage: %s path [path...]\n", argv[0] );
 
    return 0 ;
 }
