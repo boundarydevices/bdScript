@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mplayerWrap.cpp,v $
- * Revision 1.1  2007-08-14 12:59:26  ericn
+ * Revision 1.2  2007-08-23 00:31:32  ericn
+ * -allow const parameters
+ *
+ * Revision 1.1  2007/08/14 12:59:26  ericn
  * -import
  *
  *
@@ -29,7 +32,7 @@ mplayerWrap_t::mplayerWrap_t
      unsigned    y,
      unsigned    w,
      unsigned    h,
-     char      **options,
+     char const **options,
      unsigned    numOptions )
    : fileName_( strdup( fileName ) )
    , childPid_( -1 )
@@ -54,7 +57,7 @@ mplayerWrap_t::mplayerWrap_t
    int const numFixedArgs = (sizeof(args)/sizeof(args[0]));
    printf( "%u fixed args\n", numFixedArgs );
    int totalArgs = numFixedArgs + numOptions + 1 ;
-   char **fixedupArgs = new char *[totalArgs];
+   char const **fixedupArgs = new char const *[totalArgs];
    for( i = 0 ; i < numFixedArgs ; i++ ){
       fixedupArgs[i] = args[i];
    }
@@ -90,7 +93,10 @@ mplayerWrap_t::mplayerWrap_t
       close(childStdout[0]);
       close(childStderr[0]);
 
-      rval = execve( args[0], fixedupArgs, environ );
+      for( i = 0 ; fixedupArgs[i]; i++ ){
+         printf( "child param[%d] == %s\n", i, fixedupArgs[i] );
+      }
+      rval = execve( args[0], (char **)fixedupArgs, environ );
       printf( "execve: %m" );
 
       exit(0);
@@ -205,7 +211,7 @@ void myHandler_t :: onHUP( void )           // POLLHUP
    close();
 }
 
-int main( int argc, char **argv )
+int main( int argc, char const **argv )
 {
    if( 6 <= argc )
    {

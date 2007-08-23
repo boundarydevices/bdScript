@@ -1,5 +1,5 @@
 #ifndef __MPLAYERWRAP_H__
-#define __MPLAYERWRAP_H__ "$Id: mplayerWrap.h,v 1.1 2007-08-14 12:59:24 ericn Exp $"
+#define __MPLAYERWRAP_H__ "$Id: mplayerWrap.h,v 1.2 2007-08-23 00:31:32 ericn Exp $"
 
 /*
  * mplayerWrap.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: mplayerWrap.h,v $
- * Revision 1.1  2007-08-14 12:59:24  ericn
+ * Revision 1.2  2007-08-23 00:31:32  ericn
+ * -allow const parameters
+ *
+ * Revision 1.1  2007/08/14 12:59:24  ericn
  * -import
  *
  *
@@ -22,13 +25,13 @@
 
 class mplayerWrap_t {
 public:
-   mplayerWrap_t( char const *fileName,
-                  unsigned    x, 
-                  unsigned    y,
-                  unsigned    w,
-                  unsigned    h,
-                  char      **options = 0,
-                  unsigned    numOptions = 0 );
+   mplayerWrap_t( char const  *fileName,
+                  unsigned     x, 
+                  unsigned     y,
+                  unsigned     w,
+                  unsigned     h,
+                  char const **options = 0,
+                  unsigned     numOptions = 0 );
    virtual ~mplayerWrap_t( void );
 
    inline int pid( void ){ return childPid_ ; }
