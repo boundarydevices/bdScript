@@ -1,5 +1,5 @@
 #ifndef __FBMEM_H__
-#define __FBMEM_H__ "$Id: fbMem.h,v 1.2 2006-10-16 22:34:21 ericn Exp $"
+#define __FBMEM_H__ "$Id: fbMem.h,v 1.3 2007-08-23 00:28:22 ericn Exp $"
 
 /*
  * fbMem.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: fbMem.h,v $
- * Revision 1.2  2006-10-16 22:34:21  ericn
+ * Revision 1.3  2007-08-23 00:28:22  ericn
+ * -map memory separately from fb0
+ *
+ * Revision 1.2  2006/10/16 22:34:21  ericn
  * -added validate() method
  *
  * Revision 1.1  2006/08/16 17:31:05  ericn
@@ -40,7 +43,8 @@ class fbMemory_t {
    ~fbMemory_t( void );
 
    int fd_ ;
-   
+   void *memBase_ ;   
+
    friend class fbPtrImpl_t ;
    friend class fbPtr_t ;
 };

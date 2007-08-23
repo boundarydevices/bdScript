@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbMem.cpp,v $
- * Revision 1.4  2007-08-08 17:08:19  ericn
+ * Revision 1.5  2007-08-23 00:28:19  ericn
+ * -map memory separately from fb0
+ *
+ * Revision 1.4  2007/08/08 17:08:19  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.3  2006/10/19 00:32:57  ericn
@@ -30,12 +33,12 @@
 #include <fcntl.h>
 #include <linux/sm501-int.h>
 #include <linux/sm501mem.h>
-#include "fbDev.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include "dlList.h"
+#include <sys/mman.h>
 
 // #define DEBUGPRINT
 #include "debugPrint.h"
@@ -66,7 +69,7 @@ unsigned fbMemory_t::alloc( unsigned size )
    unsigned const inSize = size ;
    int rval = ioctl( fd_, SM501_ALLOC, &size );
    if( 0 == rval ){
-      debugPrint( "allocate %u bytes: %x\n", inSize, size );
+      debugPrint( "alloc fbRAM: %u bytes: 0x%x\n", inSize, size );
       ++numAlloc_ ;
       unsigned offs = size ;
       return offs ;
@@ -89,8 +92,19 @@ void fbMemory_t::free( unsigned offs )
 
 fbMemory_t::fbMemory_t( void )
    : fd_( open( "/dev/" SM501MEM_CLASS, O_RDWR ) )
+   , memBase_( 0 )
 {
    debugPrint( "opened fd %d\n", fd_ );
+   if( 0 <= fd_ ){
+      fcntl(fd_, F_SETFD, FD_CLOEXEC);
+      memBase_ = mmap( 0, SM501_FBMAX, PROT_WRITE|PROT_WRITE, MAP_SHARED, fd_, 0 );
+      if( MAP_FAILED == memBase_ ){
+         perror( "mmap sm501mem" );
+         memBase_ = 0 ;
+      }
+   }
+   else
+      perror( "/dev/" SM501MEM_CLASS );
 }
 
 
@@ -121,6 +135,7 @@ void fbPtrImpl_t :: releaseRef( void )
    if( 0 == count_ )
    {
       if( ptr_ && offs_ ){
+debugPrint( "free RAM 0x%x (%u)\n", offs_, size_ );
          fbMemory_t::get().free(offs_);
          offs_ = 0 ;
          ptr_  = 0 ;
@@ -186,7 +201,7 @@ fbPtr_t :: fbPtr_t( unsigned size )
 {
    unsigned offs = fbMemory_t::get().alloc(size);
    if( offs ){
-      void *ptr = offs ? (char *)getFB().getMem() + offs
+      void *ptr = offs ? (char *)fbMemory_t::get().memBase_ + offs
                        : 0 ;
       inst_ = new fbPtrImpl_t( offs, ptr, size );
 debugPrint( "new instance %p\n", inst_ );
@@ -249,8 +264,10 @@ int main( void )
          while(1){
             unsigned const allocSize = ( iteration & 7 ) + 1 ;
             fbPtr_t ptr( allocSize );
-            if( 0 == ptr.getPtr() )
+            if( 0 == ptr.getPtr() ){
+               fprintf( stderr, "Alloc error on iteration %u\n", iteration );
                break ;
+            }
       
       //      printf( "Alloc: %x/%p\n", ptr.getOffs(), ptr.getPtr() );
             allocations.push_back(ptr);
