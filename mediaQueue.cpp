@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mediaQueue.cpp,v $
- * Revision 1.3  2007-08-08 17:08:20  ericn
+ * Revision 1.4  2007-08-23 00:25:48  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.3  2007/08/08 17:08:20  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.2  2007/05/03 20:50:37  ericn
@@ -1080,6 +1083,7 @@ int main( int argc, char const * const argv[] )
          perror( "/dev/" SM501YUV_CLASS );
          return -1 ;
       }
+      fcntl(fdYUV, F_SETFD, FD_CLOEXEC);
       fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
 
       stats_t stats ;
@@ -1093,6 +1097,7 @@ int main( int argc, char const * const argv[] )
          perror( "/dev/" SM501INT_CLASS );
          exit(-1);
       }
+      fcntl(fdSync, F_SETFD, FD_CLOEXEC);
       fcntl(fdSync, F_SETOWN, pid_);
       fcntl(fdSync, F_SETSIG, vsyncSignal );
 

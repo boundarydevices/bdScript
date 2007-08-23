@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
- * Revision 1.20  2007-08-08 17:08:21  ericn
+ * Revision 1.21  2007-08-23 00:25:50  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.20  2007/08/08 17:08:21  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.19  2007/07/30 22:33:24  ericn
@@ -576,6 +579,7 @@ if( 0 != getenv("ACCEL") )
             unsigned bytesPerPicture = 0 ;
             int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
             fcntl(fdYUV, F_SETFL, fcntl(fdYUV, F_GETFL) | O_NONBLOCK | FASYNC );
+            fcntl( fdYUV, F_SETFD, FD_CLOEXEC );
             char keyvalue = '\0' ;
             
             unsigned long videoBytes = 0 ;

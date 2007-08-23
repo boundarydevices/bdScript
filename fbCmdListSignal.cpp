@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbCmdListSignal.cpp,v $
- * Revision 1.2  2007-08-08 17:08:18  ericn
+ * Revision 1.3  2007-08-23 00:25:54  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.2  2007/08/08 17:08:18  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.1  2006/10/16 22:45:33  ericn
@@ -44,6 +47,7 @@ fbCmdListSignal_t::fbCmdListSignal_t( void )
    , signal_( nextRtSignal() )
 {
    if( isOpen() ){
+      fcntl( fd_, F_SETFD, FD_CLOEXEC);
       fcntl( fd_, F_SETOWN, getpid());
       fcntl( fd_, F_SETSIG, signal_);
       

@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.51  2007-08-08 17:08:17  ericn
+ * Revision 1.52  2007-08-23 00:25:47  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.51  2007/08/08 17:08:17  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.50  2007/07/30 22:33:24  ericn
@@ -443,6 +446,7 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    int const fdYUV = open( "/dev/" SM501YUV_CLASS, O_WRONLY );
    if( 0 <= fdYUV )
    {
+      fcntl( fdYUV, F_SETFD, FD_CLOEXEC );
 printf( "input row stride: %u\n", rowStride );
 printf( "frame size: %u x %u\n", frames.maxWidth_, frames.maxHeight_ );
 printf( "queue size: %u x %u, %u, %u\n", 

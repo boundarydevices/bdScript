@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: yuvSignal.cpp,v $
- * Revision 1.3  2007-08-19 19:17:52  ericn
+ * Revision 1.4  2007-08-23 00:25:54  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.3  2007/08/19 19:17:52  ericn
  * -[sm501] include SM-501 header
  *
  * Revision 1.2  2007/08/08 17:08:29  ericn
@@ -47,6 +50,7 @@ yuvSignal_t::yuvSignal_t( void )
    if( isOpen() ){
       fcntl( fd_, F_SETOWN, getpid());
       fcntl( fd_, F_SETSIG, signal_);
+      fcntl( fd_, F_SETFD, FD_CLOEXEC );
    }
 }
 

@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: multiSignal.cpp,v $
- * Revision 1.5  2007-08-08 17:08:23  ericn
+ * Revision 1.6  2007-08-23 00:25:51  ericn
+ * -add CLOEXEC for file handles
+ *
+ * Revision 1.5  2007/08/08 17:08:23  ericn
  * -[sm501] Use class names from sm501-int.h
  *
  * Revision 1.4  2007/04/30 17:13:24  ericn
@@ -361,7 +364,7 @@ int main( int argc, char const * const argv[] ){
          int const vsyncSignal = nextRtSignal();
          printf( "signal number %d\n", vsyncSignal );
          int const fdSync = open( "/dev/" SM501INT_CLASS, O_RDONLY );
-
+         fcntl(fdSync, F_SETFD, FD_CLOEXEC);
          walkingDot_t **dots = new walkingDot_t *[count];
          unsigned xPos = 0 ;
          unsigned yPos = 0 ;
