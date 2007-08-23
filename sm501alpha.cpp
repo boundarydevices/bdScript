@@ -9,7 +9,13 @@
  * Change History : 
  *
  * $Log: sm501alpha.cpp,v $
- * Revision 1.3  2007-01-21 21:37:58  ericn
+ * Revision 1.5  2007-08-23 00:34:38  ericn
+ * -fix devname, add CLOEXEC, test by writing data to alpha layer
+ *
+ * Revision 1.4  2002/12/15 08:40:04  ericn
+ * -Fix 4444 text output (parentheses
+ *
+ * Revision 1.3  2007/01/21 21:37:58  ericn
  * -add text output for rgba4444
  *
  * Revision 1.2  2006/08/29 01:07:43  ericn
@@ -31,9 +37,9 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include "fbDev.h"
 #include <string.h>
 #include <assert.h>
+#include <sys/mman.h>
 
 static sm501alpha_t *inst = 0 ;
 
@@ -83,15 +89,16 @@ void sm501alpha_t::clear
 
 sm501alpha_t::sm501alpha_t( mode_t mode )
    : mode_( mode )
-   , fd_( open( "/dev/alpha", O_RDWR ) )
+   , fd_( open( "/dev/" SM501ALPHA_CLASS, O_RDWR ) )
    , pos_( makeRect(0,0,getFB().getWidth(), getFB().getHeight()) )
    , ram_( 0 )
    , ramOffs_( 0 )
 {
    if( isOpen() ){
+      fcntl( fd_, F_SETFD, FD_CLOEXEC);
+
       struct sm501_alphaPlane_t plane ;
-      fbDevice_t &fb = getFB();
-   
+
       plane.xLeft_  = pos_.xLeft_ ;
       plane.yTop_   = pos_.yTop_ ;
       plane.width_  = pos_.width_ ;
@@ -114,8 +121,13 @@ sm501alpha_t::sm501alpha_t( mode_t mode )
 
       int rval = ioctl( fd_, SM501ALPHA_SETPLANE, &plane );
       if( 0 == rval ){
-         unsigned char *const fbStart = (unsigned char *)fb.getMem();
-         ram_ = fbStart + plane.planeOffset_ ;
+         unsigned bytes = plane.width_*plane.height_*2 ;
+         printf( "mapping %u bytes of RAM\n", bytes );
+         ram_ = (unsigned char *)mmap( 0, bytes, PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0 );
+         if( MAP_FAILED == ram_ ){
+            perror( "mmap sm501alpha" );
+            ram_ = 0 ;
+         }
          ramOffs_ = plane.planeOffset_ ;
          return ;
       }
@@ -134,7 +146,7 @@ void sm501alpha_t::drawText(
    unsigned             desty,
    unsigned             color )
 {
-   if( isOpen() ){
+   if( isOpen() && ( 0 != ram_ ) ){
       if( rgba44 == mode_ ){
          color &= 0x0F ;
          unsigned const outStride = pos_.width_ ;
@@ -164,11 +176,11 @@ void sm501alpha_t::drawText(
          }
       }
       else {
-         unsigned const outStride = 2*pos_.width_ ;
+         unsigned const outStride = sizeof(unsigned short)*pos_.width_ ;
          unsigned short *nextOut = (unsigned short *)
                                    ( ram_ 
                                      + (desty-pos_.yTop_)*outStride 
-                                     + (destx-pos_.xLeft_*sizeof(unsigned short)) );
+                                     + (destx-pos_.xLeft_)*sizeof(unsigned short) );
          unsigned short const rgb444 = (color & 0xF00000)>>12
                                      | (color & 0x00F000)>>8
                                      | (color & 0x0000F0)>>4 ;
@@ -177,7 +189,8 @@ void sm501alpha_t::drawText(
             for( unsigned x = 0 ; x < srcWidth ; x++ ){
                unsigned char a = *alpha++ ;
                a >>= 4 ;
-               nextOut[x] = (((unsigned)a)<<12) | rgb444 ;
+               unsigned short rgb4444 = (((unsigned)a)<<12) | rgb444 ;
+               nextOut[x] = rgb4444 ;
             }
             nextOut += pos_.width_ ;
          }
@@ -192,6 +205,9 @@ void sm501alpha_t::draw4444(
    unsigned              w,      // padded to 16-bytes
    unsigned              h )
 {
+   if( !isOpen() || ( 0 == ram_ ) )
+      return ;
+
    unsigned const stride = ((w+7)/8)*8 ;
    x -= pos_.xLeft_ ;
    y -= pos_.yTop_ ;
@@ -215,6 +231,9 @@ void sm501alpha_t::draw4444(
    
 void sm501alpha_t::setPixel4444( unsigned x, unsigned y, unsigned long rgb )
 {
+   if( !isOpen() || ( 0 == ram_ ) )
+      return ;
+
    if( ( pos_.xLeft_ <= x )
        &&
        ( pos_.xLeft_ + pos_.width_ > x ) ){
@@ -237,6 +256,9 @@ void sm501alpha_t::setPixel4444( unsigned x, unsigned y, unsigned long rgb )
 
 unsigned short *sm501alpha_t::getRow( unsigned y )
 {
+   if( !isOpen() || ( 0 == ram_ ) )
+      return 0 ;
+
    unsigned bytesPerPixel = 1 + ( rgba4444 == mode_ );
    return (unsigned short *)
           (ram_+ (pos_.width_*bytesPerPixel));
@@ -244,6 +266,7 @@ unsigned short *sm501alpha_t::getRow( unsigned y )
 
 #ifdef MODULETEST
 
+#include "fbDev.h"
 
 int main( int argc, char const * const argv[] )
 {
@@ -253,9 +276,29 @@ int main( int argc, char const * const argv[] )
 
    sm501alpha_t &alpha = sm501alpha_t::get(mode);
    if( alpha.isOpen() ){
+      fbDevice_t &fb = getFB();
+      if( sm501alpha_t::rgba44 == mode ){
+         rectangle_t r ;
+         r.xLeft_ = 0 ;
+         r.yTop_ = 0 ;
+         r.width_ = fb.getWidth();
+         r.height_ = fb.getHeight() ;
+         unsigned char *pixels = new unsigned char [r.width_*r.height_];
+         memset(pixels, 0x88, r.width_*r.height_);
+         alpha.set(r,pixels);
+      }
+      else {
+         for( unsigned y = 0 ; y < fb.getHeight(); y++ ){
+            for( unsigned x = 0 ; x < fb.getWidth(); x++ ){
+               alpha.setPixel4444(x,y,0x80000000|(x+y));
+            }
+         }
+      }
       char inBuf[80];
       fgets(inBuf, sizeof(inBuf),stdin);
    }
+   else
+      perror( "/dev/" SM501ALPHA_CLASS );
 
    return 0 ;
 }
