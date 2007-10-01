@@ -4,7 +4,7 @@
  * (c) Copyright 2002 by M&N Logistik-Lösungen Online GmbH
  * set under the GPLv2
  *
- * $Id: pxaregs.c,v 1.2 2006-12-13 21:24:30 ericn Exp $
+ * $Id: pxaregs.c,v 1.4 2007-10-01 20:17:29 ericn Exp $
  *
  * Please send patches to h.schurig, working at mn-logistik.de
  * - added fix from Bernhard Nemec
@@ -272,6 +272,7 @@ static struct reg_info regs[] = {
 { "CCCR_L",    0x41300000,  0, 0x0000001f, 'x', "CM crystal freq to memory freq multiplier" }, 
 { "CCCR_M",    0x41300000,  5, 0x00000003, 'x', "CM memory freq to run mode freq multiplier" },
 { "CCCR_N",    0x41300000,  7, 0x00000007, 'x', "CM run mode freq to turbo freq multiplier" },
+{ "CCCR_A",    0x41300000, 25, 0x02000000, 'x', "Alternate setting for memory clock" }, 
 
 { "CKEN",      0x41300004,  0, 0xffffffff, 'x', "Clock Enable Register (3-36)" },
 { "CKEN_0",    0x41300004,  0, 0x00000001, 'd', "CM PWM0 clock enabled" },
@@ -291,6 +292,8 @@ static struct reg_info regs[] = {
 { "OSCC",      0x41300008,  0, 0xffffffff, 'x', "Oscillator Configuration Register (3-38)" },
 { "OSCC_OOK",  0x41300008,  0, 0x00000001, 'd', "CM 32.768 kHz oscillator enabled and stabilized" },
 { "OSCC_OON",  0x41300008,  1, 0x00000001, 'd', "CM 32.768 kHz oscillator enabled" },
+
+{ "CCSR",      0x4130000C,  0, 0xffffffff, 'x', "Core Clock Status Register" },
 
 // TODO: CP14-Registers (3-37)
 
@@ -1348,6 +1351,7 @@ static struct reg_info regs[] = {
 { "LCCR3_BPP3", 0x4400000C, 29, 0x00000001, 'x', "LCD bits per pixel" },
 { "LCCR3_DPC", 0x4400000C, 27, 0x00000007, 'd', "LCD double pixel clock rate at L_PCLK" },
 
+{ "LCCR4",     0x44000010,  0, 0xffffffff, 'x', "LCD Controller Control Register 4" },
 
 { "FBR0",      0x44000020,  0, 0xffffffff, 'x', "FBR0" },
 { "FBR1",      0x44000020,  0, 0xffffffff, 'x', "FBR1" },
@@ -1380,6 +1384,8 @@ static struct reg_info regs[] = {
 // TODO
 
 
+{ "LCDBSCNTR", 0x48000054,  0, 0xffffffff, 'x', "LCD Controller Buffer Strength" },
+{ "LCDBS",     0x48000054,  0, 0x0000000F, 'd', "LCD Buffer Strength (0-0xff)" },
 
 
 { "MDCNFG",         0x48000000, 0, 0xffffffff, 'x', "SDRAM Configuration Register (6-9)" },
