@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
- * Revision 1.17  2005-11-06 16:01:50  ericn
+ * Revision 1.18  2007-10-01 20:17:02  ericn
+ * -[screen] fix usage message for screen.buttonize
+ *
+ * Revision 1.17  2005/11/06 16:01:50  ericn
  * -KERNEL_FB, not CONFIG_BD2003
  *
  * Revision 1.16  2005/11/06 00:49:37  ericn
@@ -430,7 +433,7 @@ jsButtonize( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       getFB().buttonize( pressed, border, x1, y1, x2, y2, red, green, blue );
    }
    else
-      JS_ReportError( cx, "Usage: screen.box( x1, y1, x2, y2 [penWidth=1 [,color=0]] );" );
+      JS_ReportError( cx, "Usage: screen.buttonize( pressed, borderWidth, x1, y1, x2, y2, bgcolor );" );
 
    return JS_TRUE ;
 }
