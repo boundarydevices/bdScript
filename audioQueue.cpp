@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
+ * Revision 1.53  2007-12-28 00:27:20  ericn
+ * -[audioQueue] more updates to set format for ALSA
+ *
  * Revision 1.52  2007-08-23 00:25:47  ericn
  * -add CLOEXEC for file handles
  *
@@ -833,6 +836,14 @@ wrote += numWritten ;
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
+#ifdef KERNEL_SND // ALSA needs format again
+               int const format = AFMT_S16_LE ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+               int const channels = 2 ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+#endif
                _playing = true ;
                
                audio_buf_info ai ;
@@ -997,6 +1008,14 @@ wrote += numWritten ;
             writeFd = openWriteFd();
             if( 0 <= writeFd )
             {
+#ifdef KERNEL_SND // ALSA needs format again
+               int const format = AFMT_S16_LE ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+               int const channels = 2 ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+#endif
                _playing = true ;
 
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
@@ -1142,6 +1161,14 @@ wrote += numWritten ;
             writeFd = openWriteFd();
             if( 0 < writeFd )
             {
+#ifdef KERNEL_SND // ALSA needs format again
+               int const format = AFMT_S16_LE ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_SETFMT, &format) ) 
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_SETFMT):%m\n" );
+               int const channels = 2 ;
+               if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
+                  fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
+#endif
 printf( "MPEG playback here at x:%u, y:%u, w:%u, h:%u\n", item->xPos_, item->yPos_, item->width_, item->height_ );
                _playing = true ;
                
