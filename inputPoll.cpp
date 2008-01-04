@@ -7,6 +7,10 @@
  * Change History : 
  *
  * $Log: inputPoll.cpp,v $
+ * Revision 1.3  2008-01-04 23:29:54  ericn
+ * -prevent compiler warning (signed/unsigned comparison)
+ *
+ *
  * Revision 1.2  2007-08-14 16:39:05  ericn
  * -update inputPoll test program
  *
@@ -80,7 +84,7 @@ void inputPoll_t::onDataAvail( void )
 		    if( leftover ){
 			    unsigned left = sizeof(events[0])-leftover ;
 			    bytesRead = read( fd_, ((char *)events)+bytesRead, left );
-			    if( bytesRead == left ){
+			    if( bytesRead == (int)left ){
 				    itemsRead++ ;
 			    }
 		    } // try to read tail-end
