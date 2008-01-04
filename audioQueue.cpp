@@ -8,6 +8,10 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
+ * Revision 1.54  2008-01-04 23:28:15  ericn
+ * -more things conditional on JSMPEG
+ *
+ *
  * Revision 1.53  2007-12-28 00:27:20  ericn
  * -[audioQueue] more updates to set format for ALSA
  *
@@ -193,7 +197,7 @@
 #include "tickMs.h"
 #include "config.h"
 
-#ifdef CONFIG_JSMPEG
+#if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
 #include "videoQueue.h"
 #include "videoFrames.h"
 #include "mpDemux.h"
@@ -202,8 +206,11 @@
 #include "fbDev.h"
 #include "debugPrint.h"
 typedef int irqreturn_t ;
+
+#ifdef KERNEL_FB_SM501
 #include "linux/sm501-int.h"
 #include "linux/sm501yuv.h"
+#endif
 
 static bool volatile _cancel = false ;
 static bool volatile _playing = false ;
@@ -400,7 +407,7 @@ inline unsigned short scale( mad_fixed_t sample )
    return (unsigned short)( sample >> (MAD_F_FRACBITS-15) );
 }
 
-#ifdef CONFIG_JSMPEG
+#if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
 struct playbackStreams_t {
    mpegDemux_t::streamAndFrames_t const *audioFrames_ ;
    mpegDemux_t::streamAndFrames_t const *videoFrames_ ;
@@ -1155,7 +1162,7 @@ wrote += numWritten ;
             else
                perror( "audioReadFd" );
          }
-#ifdef CONFIG_JSMPEG
+#if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
          else if( audioQueue_t :: mpegPlay_ == item->type_ )
          {
             writeFd = openWriteFd();
