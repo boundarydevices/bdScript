@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
- * Revision 1.4  2006-12-01 18:44:22  tkisky
+ * Revision 1.5  2008-01-04 23:30:17  ericn
+ * -check KERNEL_BD_GENTIMER
+ *
+ * Revision 1.4  2006/12/01 18:44:22  tkisky
  * -compiler warnings
  *
  * Revision 1.3  2006/10/07 16:13:43  ericn
@@ -27,6 +30,9 @@
 
 
 #include "pollTimer.h"
+#include "config.h"
+
+#ifdef KERNEL_BD_GENTIMER
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
@@ -192,6 +198,10 @@ void pollTimer_t :: fire( void )
 {
    printf( "pollTimer_t::fire()\n" );
 }
+
+#else
+#error No GP timer support
+#endif // KERNEL_BD_GENTIMER
 
 #ifdef STANDALONE
 #include <stdio.h>
