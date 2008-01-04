@@ -213,6 +213,7 @@ INSTALL_ROOT ?= ../install/arm-linux
 
 CROSS_COMPILE ?= arm-linux-
 CC= $(CROSS_COMPILE)gcc
+NM= $(CROSS_COMPILE)nm
 LIBBDGRAPH=bdGraph/libbdGraph.a
 LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
             $(INSTALL_ROOT)/lib/libmpeg2.a \
@@ -332,14 +333,14 @@ testJS: testJS.cpp $(LIB) Makefile
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle jsExec | sort >jsExec.map
+	$(NM) --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
 jsData: jsData.cpp $(LIB) Makefile
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -DMODULETEST=1 -D_REENTRANT=1 -DXP_UNIX=1 $(IFLAGS) -O2 -o jsData jsData.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle jsData | sort >jsData.map
+	$(NM) --demangle jsData | sort >jsData.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -349,7 +350,7 @@ odomGraphicsMain.o: odomGraphics.cpp odomGraphics.h
 odomGraphics: odomGraphicsMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -ggdb -D_REENTRANT=1 -o odomGraphics odomGraphicsMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle odomGraphics | sort >odomGraphics.map
+	$(NM) --demangle odomGraphics | sort >odomGraphics.map
 	cp $@ $@.prestrip
 
 slotWheelMain.o: slotWheel.cpp slotWheel.h 
@@ -358,14 +359,14 @@ slotWheelMain.o: slotWheel.cpp slotWheel.h
 slotWheel: slotWheelMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o slotWheel slotWheelMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle slotWheel | sort >slotWheel.map
+	$(NM) --demangle slotWheel | sort >slotWheel.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
 tradeShow: tradeShow.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ tradeShow.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle $@ | sort >$@.map
+	$(NM) --demangle $@ | sort >$@.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -375,7 +376,7 @@ mpegQueueMain.o: mpegQueue.cpp mpegQueue.h
 mpegQueue: mpegQueueMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o mpegQueue mpegQueueMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegQueue | sort >mpegQueue.map
+	$(NM) --demangle mpegQueue | sort >mpegQueue.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -385,7 +386,7 @@ mpegStreamMain.o: mpegStream.cpp mpegStream.h
 mpegStream: mpegStreamMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegStream mpegStreamMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegStream | sort >mpegStream.map
+	$(NM) --demangle mpegStream | sort >mpegStream.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -395,21 +396,21 @@ mpegStreamMain2.o: mpegStream.cpp mpegStream.h
 mpegStream2: mpegStreamMain2.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegStream2 mpegStreamMain2.o $(LIBS) -lOdometer -lSM501 -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegStream2 | sort >mpegStream2.map
+	$(NM) --demangle mpegStream2 | sort >mpegStream2.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
 digitStrip: digitStrip.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o digitStrip digitStrip.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle digitStrip | sort >digitStrip.map
+	$(NM) --demangle digitStrip | sort >digitStrip.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
 shadeGrad: shadeGrad.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o shadeGrad shadeGrad.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle shadeGrad | sort >shadeGrad.map
+	$(NM) --demangle shadeGrad | sort >shadeGrad.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -431,7 +432,7 @@ dictionary.o: dictionary.cpp dictionary.h
 dictionary: dictionary.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o dictionary dictionary.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle dictionary | sort >dictionary.map
+	$(NM) --demangle dictionary | sort >dictionary.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -446,14 +447,14 @@ odomValueMain.o: odomValue.cpp odomValue.h
 
 odomValue: odomValueMain.o $(LIB) $(ODOMLIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue odomValueMain.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
-	arm-linux-nm --demangle odomValue | sort >odomValue.map
+	$(NM) --demangle odomValue | sort >odomValue.map
 
 odomValue2Main.o: odomValue2.cpp odomValue2.h 
 	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
 
 odomValue2: odomValue2Main.o $(LIB) $(ODOMLIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o odomValue2 odomValue2Main.o $(LIBS) -lCurlCache -lstdc++ -lOdometer -lSM501 -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz -lpthread
-	arm-linux-nm --demangle odomValue2 | sort >odomValue2.map
+	$(NM) --demangle odomValue2 | sort >odomValue2.map
 
 sm501mem: sm501mem.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o sm501mem sm501mem.o $(LIBS) -lCurlCache -lstdc++ -lCurlCache -lpng -ljpeg -lungif -lfreetype -lm -lz
@@ -499,66 +500,66 @@ fbCmdClear: fbCmdClearMain.o $(LIB) $(SM501LIB)
 
 sm501reg: sm501reg.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501reg sm501reg.cpp -lstdc++ 
-	arm-linux-nm sm501reg >sm501reg.map
+	$(NM) sm501reg >sm501reg.map
 	$(STRIP) sm501reg
 
 sm501poke: sm501poke.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501poke sm501poke.cpp -lstdc++ 
-	arm-linux-nm sm501poke >sm501poke.map
+	$(NM) sm501poke >sm501poke.map
 	$(STRIP) sm501poke
 
 sm501dump: sm501dump.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501dump sm501dump.cpp hexDump.o -lstdc++ 
-	arm-linux-nm sm501dump >sm501dump.map
+	$(NM) sm501dump >sm501dump.map
 	$(STRIP) sm501dump
 
 sm501cmdlist: sm501cmdlist.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501cmdlist sm501cmdlist.cpp -lstdc++ 
-	arm-linux-nm sm501cmdlist >sm501cmdlist.map
+	$(NM) sm501cmdlist >sm501cmdlist.map
 	$(STRIP) sm501cmdlist
 
 sm501alpha: sm501alpha.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o sm501alpha sm501alpha.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm sm501alpha >sm501alpha.map
+	$(NM) sm501alpha >sm501alpha.map
 	$(STRIP) sm501alpha
 
 multiSignal: multiSignal.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o multiSignal multiSignal.cpp $(LIBS) -lCurlCache -lpthread -lstdc++ 
-	arm-linux-nm multiSignal >multiSignal.map
+	$(NM) multiSignal >multiSignal.map
 
 videoSet: videoSet.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o videoSet videoSet.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm videoSet >videoSet.map
+	$(NM) videoSet >videoSet.map
 	$(STRIP) videoSet
 
 img4444: img4444.cpp $(LIB) $(SM501LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -D MODULETEST -o img4444 img4444.cpp $(LIBS) -lCurlCache -lSM501 -lpng -ljpeg -lungif -lz -lstdc++ 
-	arm-linux-nm img4444 >img4444.map
+	$(NM) img4444 >img4444.map
 	$(STRIP) img4444
 
 flashInt: flashInt.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o flashInt flashInt.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lm -lz -lssl -lcrypto -ldl -lstdc++
-	arm-linux-nm flashInt >flashInt.map
+	$(NM) flashInt >flashInt.map
 	$(STRIP) flashInt
 
 flashPlay: flashPlay.cpp $(LIB) 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o flashPlay flashPlay.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lm -lz -lssl -lcrypto -ldl -lstdc++
-	arm-linux-nm flashPlay >flashPlay.map
+	$(NM) flashPlay >flashPlay.map
 	$(STRIP) flashPlay
 
 rtsCTS: rtsCTS.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o rtsCTS rtsCTS.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm rtsCTS >rtsCTS.map
+	$(NM) rtsCTS >rtsCTS.map
 	$(STRIP) rtsCTS
 
 setBaud: setBaud.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o setBaud setBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm setBaud >setBaud.map
+	$(NM) setBaud >setBaud.map
 	$(STRIP) setBaud
 
 miniterm: miniterm.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o miniterm miniterm.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm miniterm >miniterm.map
+	$(NM) miniterm >miniterm.map
 	$(STRIP) miniterm
 
 serialSignal: serialSignal.cpp $(LIB)
@@ -571,22 +572,22 @@ ttySignal: ttySignal.cpp $(LIB)
 
 serialCounts: serialCounts.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o serialCounts serialCounts.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm serialCounts >serialCounts.map
+	$(NM) serialCounts >serialCounts.map
 	$(STRIP) serialCounts
 
 serialTouch: serialTouch.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o serialTouch serialTouch.cpp $(LIBS) -lCurlCache -lstdc++ 
-	arm-linux-nm serialTouch >serialTouch.map
+	$(NM) serialTouch >serialTouch.map
 	$(STRIP) serialTouch
 
 sm501flip: sm501flip.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o sm501flip sm501flip.cpp -lstdc++ 
-	arm-linux-nm sm501flip >sm501flip.map
+	$(NM) sm501flip >sm501flip.map
 	$(STRIP) sm501flip
 
 markSpace: markSpace.cpp
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o markSpace markSpace.cpp -lstdc++ 
-	arm-linux-nm markSpace >markSpace.map
+	$(NM) markSpace >markSpace.map
 	$(STRIP) markSpace
 
 flashThreadMain.o : flashThread.cpp
@@ -594,23 +595,23 @@ flashThreadMain.o : flashThread.cpp
 
 flashThread: flashThreadMain.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o flashThread flashThreadMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lpthread -lm -lz -lcrypto
-	arm-linux-nm flashThread >flashThread.map
+	$(NM) flashThread >flashThread.map
 	arm-linux-strip flashThread
 
 madDecode: madDecode.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE=1 $(IFLAGS) -o madDecode madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
-	arm-linux-nm madDecode >madDecode.map
+	$(NM) madDecode >madDecode.map
 
 madDecode2: madDecode.cpp $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) -fno-rtti $(HARDWARE_TYPE) -D_REENTRANT=1 -DSTANDALONE2=1 $(IFLAGS) -o madDecode2 madDecode.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache -lid3tag $(MPEG2LIBS) -lflash -lpthread -lm -lz
-	arm-linux-nm madDecode2 >madDecode2.map
+	$(NM) madDecode2 >madDecode2.map
 
 jpegview: jpegview.o $(LIBBDGRAPH)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -o jpegview jpegview.o -L./bdGraph -lbdGraph -lstdc++
 
 madTest: madTest.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o madTest madTest.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
-	arm-linux-nm madTest >madTest.map
+	$(NM) madTest >madTest.map
 	$(STRIP) madTest
 
 ftRender.o: ftObjs.h ftObjs.cpp Makefile
@@ -618,7 +619,7 @@ ftRender.o: ftObjs.h ftObjs.cpp Makefile
 
 ftRender: ftRender.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftRender ftRender.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
-	arm-linux-nm ftRender >ftRender.map
+	$(NM) ftRender >ftRender.map
 	$(STRIP) ftRender
 
 ftDump.o: ftObjs.h ftObjs.cpp Makefile
@@ -626,12 +627,12 @@ ftDump.o: ftObjs.h ftObjs.cpp Makefile
 
 ftDump: ftDump.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o ftDump ftDump.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
-	arm-linux-nm ftDump >ftDump.map
+	$(NM) ftDump >ftDump.map
 	$(STRIP) ftDump
 
 recordTest: recordTest.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o recordTest recordTest.o $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lpthread -lm -lz
-	arm-linux-nm recordTest >recordTest.map
+	$(NM) recordTest >recordTest.map
 	$(STRIP) recordTest
 
 madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
@@ -639,7 +640,7 @@ madHeadersMain.o: madHeaders.h madHeaders.cpp Makefile
 
 madHeaders: madHeadersMain.o Makefile $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o madHeaders madHeadersMain.o $(LIBS) -lCurlCache -lstdc++ -lmad -lid3tag -lm -lz
-	arm-linux-nm madHeaders >madHeaders.map
+	$(NM) madHeaders >madHeaders.map
 	$(STRIP) madHeaders
 
 imgJPEGMain.o : imgJPEG.cpp Makefile
@@ -800,7 +801,7 @@ mpegDecodeMain.o: mpegDecode.o
 
 mpegDecode: mpegDecodeMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegDecode mpegDecodeMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegDecode | sort >mpegDecode.map
+	$(NM) --demangle mpegDecode | sort >mpegDecode.map
 	$(STRIP) $@
 
 mpegRxUDPMain.o: mpegRxUDP.o
@@ -808,7 +809,7 @@ mpegRxUDPMain.o: mpegRxUDP.o
 
 mpegRxUDP: mpegRxUDPMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mpegRxUDP mpegRxUDPMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle mpegRxUDP | sort >mpegRxUDP.map
+	$(NM) --demangle mpegRxUDP | sort >mpegRxUDP.map
 	$(STRIP) $@
 
 usbPostscriptMain.o: usbPostscript.cpp
@@ -816,7 +817,7 @@ usbPostscriptMain.o: usbPostscript.cpp
 
 usbPostscript: usbPostscriptMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usbPostscript usbPostscriptMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle usbPostscript | sort >usbPostscript.map
+	$(NM) --demangle usbPostscript | sort >usbPostscript.map
 	$(STRIP) $@
 
 usblpPollMain.o: usblpPoll.cpp
@@ -824,7 +825,7 @@ usblpPollMain.o: usblpPoll.cpp
 
 usblpPoll: usblpPollMain.o $(LIB) $(SM501LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o usblpPoll usblpPollMain.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lSM501 -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
-	arm-linux-nm --demangle usblpPoll | sort >usblpPoll.map
+	$(NM) --demangle usblpPoll | sort >usblpPoll.map
 	$(STRIP) $@
 
 
