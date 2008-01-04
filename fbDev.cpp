@@ -8,7 +8,10 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
- * Revision 1.34  2006-10-16 22:35:53  ericn
+ * Revision 1.35  2008-01-04 23:28:39  ericn
+ * -more things conditional on KERNEL_FB_SM501
+ *
+ * Revision 1.34  2006/10/16 22:35:53  ericn
  * -use high bit to drive low bits in getRed(), getGreen, getBlue()
  *
  * Revision 1.33  2006/09/24 16:20:27  ericn
@@ -126,9 +129,12 @@
 #include <errno.h>
 #include "dither.h"
 #define irqreturn_t int
-#include <linux/sm501-int.h>
 #include <assert.h>
 #include "tickMs.h"
+
+#ifdef KERNEL_FB_SM501
+#include <linux/sm501-int.h>
+#endif
 
 // #define DEBUGPRINT
 #include "debugPrint.h"
@@ -481,6 +487,7 @@ void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
    }
 }
 
+#ifdef KERNEL_FB_SM501
 static unsigned long sm501_fb( fbDevice_t &fb )
 {
    unsigned long reg = 0x8000c ;
@@ -499,6 +506,7 @@ static void writeReg( int fd, unsigned long reg, unsigned long value )
    if( res )
       perror( "SM501_WRITEREG" );
 }
+#endif
 
 fbDevice_t :: fbDevice_t( char const *name )
    : fd_( open( name, O_RDWR ) )
