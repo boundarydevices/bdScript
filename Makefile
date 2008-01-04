@@ -6,7 +6,11 @@
 
 KERNEL_VER=-DKERNEL_2_6
 
+ifeq (y,$(CONFIG_LIBMPEG2))
 MPEG2LIBS = -lmpeg2arch -lmpeg2 -lmpeg2arch -lvo -lmpeg2convert -lmpeg2arch 
+else
+MPEG2LIBS=
+endif
 
 #
 # These are needed with newer (0.4.0) mpeg2dec library
@@ -117,7 +121,7 @@ ifeq (y, $(CONFIG_MCP_UCB1400_TS))
 OBJS += ucb1x00_pins.o
 endif
 
-ifneq ("", $(CONFIG_JSGPIO))
+ifeq ("y", x$(KERNEL_PXA_GPIO))
 OBJS += jsGpio.o
 endif
 
@@ -216,8 +220,10 @@ CC= $(CROSS_COMPILE)gcc
 NM= $(CROSS_COMPILE)nm
 LIBBDGRAPH=bdGraph/libbdGraph.a
 LIBRARYREFS=$(INSTALL_ROOT)/lib/libflash.a \
-            $(INSTALL_ROOT)/lib/libmpeg2.a \
             $(INSTALL_ROOT)/lib/libmad.a
+ifeq (y,$(CONFIG_LIBMPEG2))
+LIBRARYREFS += $(INSTALL_ROOT)/lib/libmpeg2.a
+endif
 
 ifneq (,$(findstring arm, $(CC)))
    AR=$(CROSS_COMPILE)ar
