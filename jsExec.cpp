@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
- * Revision 1.98  2007-08-08 17:13:49  ericn
+ * Revision 1.99  2008-01-04 23:31:15  ericn
+ * -conditionally include GPIO stuff
+ *
+ * Revision 1.98  2007/08/08 17:13:49  ericn
  * -allow framebuffer device override with FRAMEBUFFER environment variable
  *
  * Revision 1.97  2007/07/29 19:18:17  ericn
@@ -336,7 +339,7 @@
 #include "jsBCWidths.h"
 #endif
 
-#if CONFIG_JSGPIO == 1
+#ifdef KERNEL_PXA_GPIO
 #include "jsGpio.h"
 #endif
 
@@ -722,7 +725,7 @@ int prMain(int argc, char **argv, bool )
                   initJSBCWidths( cx, glob );
 #endif
 
-#if CONFIG_JSGPIO == 1
+#ifdef KERNEL_PXA_GPIO
                   initJSGpio( cx, glob );
 #endif                  
 
@@ -737,7 +740,7 @@ int prMain(int argc, char **argv, bool )
 #ifdef CONFIG_JSMP3
                   initJSMP3( cx, glob );
                   initJSVolume( cx, glob );
-   #ifdef CONFIG_JSMPEG
+   #if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
                   initJSMPEG( cx, glob );
    #endif
    
@@ -858,7 +861,7 @@ int prMain(int argc, char **argv, bool )
                   shutdownJSCairo();
 #endif
 
-#if CONFIG_JSGPIO == 1
+#ifdef KERNEL_PXA_GPIO
                   shutdownGpio();
 #endif
 
