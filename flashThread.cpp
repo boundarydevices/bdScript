@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: flashThread.cpp,v $
- * Revision 1.9  2007-07-29 18:42:36  ericn
+ * Revision 1.10  2008-01-04 23:29:10  ericn
+ * -pld instructions dependent on ARCH_PXA
+ *
+ * Revision 1.9  2007/07/29 18:42:36  ericn
  * -debugPrint(), not printf()
  *
  * Revision 1.8  2007/07/29 17:50:05  ericn
@@ -412,6 +415,7 @@ void *flashThread( void *param )
 debugPrint( "%u bpl, %u cache lines, %u left over, fbStride %u\n", bytesPerLine, cacheLinesPerRow, leftover, tObj.fbStride_ );
              start = tickMs();
              for( unsigned i = 0 ; i < tObj.screen_h_ ; i++ ){
+#if defined(CONFIG_ARCH_PXA) && (CONFIG_ARCH_PXA==1)
                   __asm__ volatile (
                      "  pld   [%0, #0]\n"
                      "  pld   [%0, #32]\n"
@@ -424,6 +428,7 @@ debugPrint( "%u bpl, %u cache lines, %u left over, fbStride %u\n", bytesPerLine,
                      :
                      : "r" (pixMem), "r" (flashMem)
                   );
+#endif
 //printf( "%p/%p\n", pixMem, flashMem ); fflush(stdout);
                   for( unsigned c = 0 ; c < cacheLinesPerRow ; c++ )
                   {
@@ -435,12 +440,14 @@ debugPrint( "%u bpl, %u cache lines, %u left over, fbStride %u\n", bytesPerLine,
                      *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
                      *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
                      *(unsigned long *)pixMem = *(unsigned long *)flashMem ; pixMem += 4 ; flashMem += 4 ;
+#if defined(CONFIG_ARCH_PXA) && (CONFIG_ARCH_PXA==1)
                      __asm__ volatile (
                         "  pld   [%0, #96]\n"
                         "  pld   [%1, #96]\n"
                         :
                         : "r" (pixMem), "r" (flashMem)
                      );
+#endif
                   }
                   memcpy( pixMem, flashMem, leftover );
                   pixMem += leftover ;
