@@ -11,6 +11,12 @@
 
 
 #include "jsGpio.h"
+#include "config.h"
+
+#ifndef KERNEL_PXA_GPIO
+#error No PXA GPIO support in kernel
+#endif
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/soundcard.h>
