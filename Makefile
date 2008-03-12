@@ -343,6 +343,13 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
+test: test.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o test test.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(NM) --demangle test | sort >test.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
 jsData: jsData.cpp $(LIB) Makefile
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -DMODULETEST=1 -D_REENTRANT=1 -DXP_UNIX=1 $(IFLAGS) -O2 -o jsData jsData.cpp $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
@@ -795,7 +802,7 @@ dnsPoll: dnsPoll.cpp Makefile $(LIB)
 	$(STRIP) $@
 
 flashVar: flashVar.cpp Makefile $(LIB)
-	$(CC) $(HARDWARE_TYPE) $(IFLAGS) $(KERNEL_VER) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lsupc++
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) $(KERNEL_VER) -fno-rtti -o flashVar -DSTANDALONE -Xlinker -Map -Xlinker flashVar.map flashVar.cpp pollHandler.o $(LIBS) -lCurlCache -lstdc++
 	$(STRIP) $@
 
 tsTest: tsTest.cpp Makefile $(LIB)
