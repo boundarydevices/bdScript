@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgFile.cpp,v $
- * Revision 1.5  2005-11-05 20:23:31  ericn
+ * Revision 1.6  2008-03-15 01:33:25  ericn
+ * -[imgFile] recognize JPEGs generated with ffmpeg
+ *
+ * Revision 1.5  2005/11/05 20:23:31  ericn
  * -add standalone utility
  *
  * Revision 1.4  2005/08/12 03:31:42  ericn
@@ -34,6 +37,8 @@
 #include "imgPNG.h"
 #include "imgGIF.h"
 #include <string.h>
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 #define __USEJPEG__ 1
 #define __USEPNG__ 1
@@ -61,8 +66,8 @@ bool imageFromFile( char const *fileName,
       else 
 #endif
 #ifdef __USEJPEG__
-      
-      if( ('\xff' == cData[0] ) && ( '\xd8' == cData[1] ) && ( '\xff' == cData[2] ) && ( '\xe0' == cData[3] ) )
+
+      if( ('\xff' == cData[0] ) && ( '\xd8' == cData[1] ) ) // && ( '\xff' == cData[2] ) && ( '\xe0' == cData[3] ) )
       {
          worked = imageJPEG( cData, fIn.getLength(), pixMap, width, height );
       }
@@ -76,6 +81,8 @@ bool imageFromFile( char const *fileName,
       else
 #endif
       {
+         debugPrint( "%s: Unknown file type %02x %02x %02x %02x\n", fileName, 
+                     cData[0], cData[1], cData[2], cData[3] );
          // empty else clause
       }
 
