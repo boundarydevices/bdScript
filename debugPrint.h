@@ -1,5 +1,5 @@
 #ifndef __DEBUGPRINT_H__
-#define __DEBUGPRINT_H__ "$Id: debugPrint.h,v 1.4 2005-11-05 20:22:32 ericn Exp $"
+#define __DEBUGPRINT_H__ "$Id: debugPrint.h,v 1.5 2008-04-01 18:55:27 ericn Exp $"
 
 /*
  * debugPrint.h
@@ -12,7 +12,10 @@
  * Change History : 
  *
  * $Log: debugPrint.h,v $
- * Revision 1.4  2005-11-05 20:22:32  ericn
+ * Revision 1.5  2008-04-01 18:55:27  ericn
+ * -make NODEBUGPRINT easier
+ *
+ * Revision 1.4  2005/11/05 20:22:32  ericn
  * -fix compiler warnings
  *
  * Revision 1.3  2004/07/28 14:27:27  ericn
@@ -28,6 +31,11 @@
  *
  * Copyright Boundary Devices, Inc. 2003
  */
+
+inline int noDebugPrint( char const *, ... )
+{
+   return 0 ;
+}
 
 #ifdef DEBUGPRINT
 #include <stdio.h>
@@ -49,11 +57,6 @@ inline void debugHex( char const *label, void const *data, unsigned size )
 #else
 
 #define debugPrint noDebugPrint
-inline int noDebugPrint( char const *, ... )
-{
-   return 0 ;
-}
-
 #define debugHex noDebugHex
 inline void noDebugHex( char const *, void const *, unsigned )
 {
