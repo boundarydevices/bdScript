@@ -1,5 +1,5 @@
 #ifndef __FTOBJS_H__
-#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.7 2004-07-25 22:33:59 ericn Exp $"
+#define __FTOBJS_H__ "$Id: ftObjs.h,v 1.8 2008-04-01 18:54:42 ericn Exp $"
 
 /*
  * ftObjs.h
@@ -18,7 +18,10 @@
  * Change History : 
  *
  * $Log: ftObjs.h,v $
- * Revision 1.7  2004-07-25 22:33:59  ericn
+ * Revision 1.8  2008-04-01 18:54:42  ericn
+ * -prevent copies
+ *
+ * Revision 1.7  2004/07/25 22:33:59  ericn
  * -added support for rotation
  *
  * Revision 1.6  2004/07/04 21:30:32  ericn
@@ -58,6 +61,8 @@ public:
    void dump( void ) const ;
 
    FT_Face face_ ;
+private:
+   freeTypeFont_t( freeTypeFont_t const & ); // no copies
 };
 
 
