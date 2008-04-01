@@ -126,11 +126,14 @@ all: $(LIB) buildSinTable fftTest fftTest-x86
 
 .PHONY: install install-lib
 
-
 install-lib:
-	cp -f -v $(LIB) $(INSTALL_ROOT)lib/$(LIB)
+	cp -f -v $(LIB) $(INSTALL_ROOT)/lib/$(LIB)
 
-install:  install-lib
+$(INSTALL_ROOT)/include/bdGraph: $(INSTALL_ROOT)
+	mkdir -p $@
+
+install:  install-lib $(INSTALL_ROOT)/include/bdGraph $(wildcard *.h)
+	cp -fv $(wildcard *.h) $(INSTALL_ROOT)/include/bdGraph
 
 clean:
 	rm -f *.o *.a *.map  $(LIB)
