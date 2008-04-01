@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: zOrder.cpp,v $
- * Revision 1.3  2003-11-24 19:08:49  ericn
+ * Revision 1.4  2008-04-01 18:53:31  ericn
+ * -update for Davinci
+ *
+ * Revision 1.3  2003/11/24 19:08:49  ericn
  * -modified to check range of inputs to getBox()
  *
  * Revision 1.2  2002/12/07 23:19:07  ericn
@@ -23,13 +26,21 @@
 
 
 #include "zOrder.h"
+#ifdef __DAVINCIFB__
+#include "fbDevices.h"
+#define SCREENWIDTH() getFbDevs().osd0().width()
+#define SCREENHEIGHT() getFbDevs().osd0().height()
+#else
 #include "fbDev.h"
+#define SCREENWIDTH() getFB().getWidth()
+#define SCREENHEIGHT() getFB().getHeight()
+#endif
 #include <assert.h>
 #include <stdio.h>
 
 zOrderMap_t :: zOrderMap_t( void )    // starts off empty
-   : width_( getFB().getWidth() ),
-     height_( getFB().getHeight() ),
+   : width_( SCREENWIDTH() ),
+     height_( SCREENHEIGHT() ),
      boxes_( new box_t::id_t [ width_*height_ ] )
 {
    memset( boxes_, -1, width_*height_*sizeof(boxes_[0]) );
