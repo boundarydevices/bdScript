@@ -1,5 +1,5 @@
 #ifndef __BOX_H__
-#define __BOX_H__ "$Id: box.h,v 1.2 2002-12-26 19:26:59 ericn Exp $"
+#define __BOX_H__ "$Id: box.h,v 1.3 2008-04-01 18:53:06 ericn Exp $"
 
 /*
  * box.h
@@ -11,7 +11,10 @@
  * Change History : 
  *
  * $Log: box.h,v $
- * Revision 1.2  2002-12-26 19:26:59  ericn
+ * Revision 1.3  2008-04-01 18:53:06  ericn
+ * -add transparencyMask_t
+ *
+ * Revision 1.2  2002/12/26 19:26:59  ericn
  * -added onMoveOff support
  *
  * Revision 1.1  2002/11/21 14:09:52  ericn
@@ -21,22 +24,6 @@
  *
  * Copyright Boundary Devices, Inc. 2002
  */
-
-class transparencyMask_t {
-public:
-   unsigned short const  width_ ;
-   unsigned short const  height_ ;
-   unsigned short *const data_ ;
-   
-   enum {
-      transparent_ = 0,
-      opaque_      = 0xFFFFFFFF
-   };
-
-   inline unsigned char value( unsigned short xOffs, unsigned short yOffs ) const ;
-private:
-};
-
 
 class box_t ;
 
@@ -124,22 +111,6 @@ void destroyBox( box_t * );
 // returns 0 if not found
 //
 box_t *getBoxById( box_t::id_t id );
-
-
-unsigned char transparencyMask_t :: value
-   ( unsigned short xOffs, 
-     unsigned short yOffs ) const 
-{ 
-   if( transparent_ != (unsigned long)data_ )
-   {
-      if( opaque_ != (unsigned long)data_ )
-         return data_[yOffs*width_+xOffs];
-      else
-         return 0xFF ;
-   }
-   else
-      return 0 ;
-}
 
 #endif
 

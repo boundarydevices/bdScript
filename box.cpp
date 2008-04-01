@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: box.cpp,v $
- * Revision 1.4  2003-09-06 04:54:34  ericn
+ * Revision 1.5  2008-04-01 18:53:06  ericn
+ * -add transparencyMask_t
+ *
+ * Revision 1.4  2003/09/06 04:54:34  ericn
  * -removed debug msgs
  *
  * Revision 1.3  2003/01/31 13:27:16  ericn
@@ -105,7 +108,7 @@ box_t *newBox( unsigned short xLeft,
 
             boxesById_[i] = newOne ;
             nextBoxId_ = i ;
-   
+
             return newOne ;
          }
       } // skip invalid box id
