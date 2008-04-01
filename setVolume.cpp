@@ -12,10 +12,11 @@ int main( int argc, char const * const argv[] )
       int dspFd = open( argv[1], O_WRONLY );
       if( 0 < dspFd ){
          unsigned long volume = strtoul(argv[2],0,0);
+         printf( "set volume to %u\n", volume );
          volume = (volume << 8) | volume ;
-         int rval = ioctl( dspFd, SOUND_MIXER_WRITE_VOLUME, &volume);
+         int rval = ioctl( dspFd, SOUND_MIXER_WRITE_PCM, &volume);
          if( 0 == rval ){
-            printf( "volume changed\n" );
+            printf( "volume changed to 0x%x\n", volume );
          }
          else
             perror(argv[2]);
