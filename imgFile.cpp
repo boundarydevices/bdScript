@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: imgFile.cpp,v $
+ * Revision 1.7  2008-06-06 21:44:25  ericn
+ * add Davinci support (fbDevices instead of fbDev.h)
+ *
  * Revision 1.6  2008-03-15 01:33:25  ericn
  * -[imgFile] recognize JPEGs generated with ffmpeg
  *
@@ -103,7 +106,11 @@ bool imageFromFile( char const *fileName,
 
 #ifdef STANDALONE
 #include <stdio.h>
+#ifdef __DAVINCIFB__
+#include "fbDevices.h"
+#else
 #include "fbDev.h"
+#endif
 #include <stdlib.h>
 
 int main( int argc, char const * const argv[] )
@@ -120,9 +127,12 @@ int main( int argc, char const * const argv[] )
          unsigned y = 0 ;
          if( 4 <= argc )
             y = strtoul( argv[3], 0, 0 );
+#ifdef __DAVINCIFB__
+#else
          getFB().render( x, y, 
                          image.width_, image.height_, 
                          (unsigned short *)image.pixData_ );
+#endif
       }
       else
          perror( argv[1] );
