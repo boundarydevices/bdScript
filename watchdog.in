@@ -1,0 +1,23 @@
+#
+# Command line:
+#
+/mmc/pgiMeters
+
+#
+# idle time (seconds) at startup
+#
+15
+
+#
+# watch points (timeout in seconds)
+# zero means don't monitor
+#
+MAINLOOP        4
+VSYNC           4
+CMDLIST         4
+AUDIOOUTPUT     10
+MPEGREAD        4
+VIDEOWRITE      4
+AUDIOWRITE      4
+
+
