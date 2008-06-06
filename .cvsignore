@@ -84,3 +84,9 @@ odomGraphics
 mplayerTest
 fbImage
 onGP
+fakeSASI
+miniterm
+saveTail
+tcpEcho
+watchdog
+processWrap
