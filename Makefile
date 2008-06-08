@@ -49,6 +49,7 @@ OBJS = \
        imgPNG.o \
        imgToPNG.o \
        imgTransparent.o \
+       jpegToYUV.o \
        jsAlphaMap.o \
        jsBCWidths.o \
        jsBitmap.o \
