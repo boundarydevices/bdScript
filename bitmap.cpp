@@ -7,7 +7,10 @@
  * Change History : 
  *
  * $Log: bitmap.cpp,v $
- * Revision 1.5  2004-11-16 07:29:33  tkisky
+ * Revision 1.6  2008-06-11 18:12:28  ericn
+ * remove dependency on macros.h
+ *
+ * Revision 1.5  2004/11/16 07:29:33  tkisky
  * -add SetBox
  *
  * Revision 1.4  2004/10/28 21:27:40  tkisky
@@ -26,7 +29,6 @@
  * Copyright Boundary Devices, Inc. 2004
  */
 #include <stdio.h>
-#include "macros.h"
 #include "bitmap.h"
 
 // #define DEBUGPRINT 1
@@ -120,7 +122,8 @@ void bitmap_t::bltFrom
       *nextOut = outChar ;
 }
 
-#define BigEndianToHost(a) networkToHost(a)				//(a<<24)|((a&0xff00)<<8)|((a&0xff0000)>>8)|(a>>24)
+#define BigEndianToHost(a) (a<<24)|((a&0xff00)<<8)|((a&0xff0000)>>8)|(a>>24)
+
 void bitmap_t::ClearBox(unsigned char* bmp,unsigned x,unsigned y,unsigned w,unsigned h,unsigned bmpStride )
 {
 	long unsigned int * base;
