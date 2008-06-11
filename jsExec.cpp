@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.100  2008-06-11 18:13:46  ericn
+ * -mainLoop() -- only garbage collect when something is active
+ *
  * Revision 1.99  2008-01-04 23:31:15  ericn
  * -conditionally include GPIO stuff
  *
@@ -487,11 +490,17 @@ static bool mainLoop( pollHandlerSet_t &polls,
    if( !( gotoCalled_ || execCalled_ || exitRequested_ ) )
    {
       static unsigned iterations = 0 ;
-      if( !polls.poll( 5000 ) || ( 1023 == ( iterations++ & 1023 ) ) )
-//   if( !polls.poll( 50 ) || ( 1 == ( iterations++ & 1 ) ) )
-      {
+      bool prevActive = false ;
+      bool active = polls.poll( 5000 );
+      if( active ){
+         iterations++ ;
+      }
+      else if( 1023 < iterations ){
+         fprintf( stderr, "garbage-collect..." );
          mutexLock_t lock( execMutex_ );
          JS_GC( cx );
+         fprintf( stderr, "done\n" );
+         iterations = 0 ;
       }
    }
 
