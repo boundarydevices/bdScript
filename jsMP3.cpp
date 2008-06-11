@@ -9,7 +9,13 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
- * Revision 1.26  2006-09-23 22:17:16  ericn
+ * Revision 1.28  2008-06-11 18:13:04  ericn
+ * -[jsMP3] add method mp3Close()
+ *
+ * Revision 1.27  2006/02/13 21:50:57  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.26  2006/09/23 22:17:16  ericn
  * -add interject() method
  *
  * Revision 1.25  2006/05/14 14:45:13  ericn
@@ -167,47 +173,8 @@ jsMP3Play( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
-static JSBool
-jsMP3Interject( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   jsval                dataVal ;
-   JSString            *dataStr ;
-   unsigned char const *data ;
-   if( JS_GetProperty( cx, obj, "decoded", &dataVal ) 
-       &&
-       JSVAL_IS_STRING( dataVal ) 
-       &&
-       ( 0 != ( dataStr = JSVAL_TO_STRING( dataVal ) ) ) 
-       &&
-       ( 0 != ( data = (unsigned char *)JS_GetStringBytes( dataStr ) ) ) )
-   {
-      audioQueue_t::waveHeader_t *waveHdr = (audioQueue_t::waveHeader_t *)data ;
-      unsigned decodedBytes = waveHdr->numSamples_*sizeof(waveHdr->samples_[0]);
-      unsigned waveSize = decodedBytes+sizeof(audioQueue_t::waveHeader_t)-sizeof(waveHdr->samples_);
-      if( waveSize == JS_GetStringLength(dataStr) ){
-         if( getAudioQueue().interject( *waveHdr ) )
-         {
-            JS_ReportError( cx, "played sound effect" );
-         }
-         else
-         {
-            JS_ReportError( cx, "Error queueing MP3 for playback" );
-         }
-      }
-      else
-         JS_ReportError( cx, "Invalid data size: expecting %u, got %u\n",
-                         waveSize, JS_GetStringLength(dataStr) );
-   }
-   else
-      JS_ReportError( cx, "Invalid MP3 data (must be pre-decoded)" );
-
-   *rval = JSVAL_TRUE ;
-   return JS_TRUE ;
-}
-
 static JSFunctionSpec mp3Methods_[] = {
     {"play",         jsMP3Play,           0 },
-    {"interject",    jsMP3Interject,      0 },
     {0}
 };
 
@@ -1021,6 +988,26 @@ jsMP3Cancel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
+static JSBool
+jsCloseAudio( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   unsigned numCancelled ;
+   if( getAudioQueue().clear( numCancelled ) )
+   {
+      *rval = INT_TO_JSVAL( numCancelled );
+   }
+   else
+      *rval = JSVAL_FALSE ;
+
+   setpriority(PRIO_PROCESS,getpid(),19);
+   
+   audioQueue_t::shutdown();
+   return JS_TRUE ;
+}
+
 static JSBool
 jsLastPlayStart( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -1039,6 +1026,7 @@ jsLastPlayEnd( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
 
 static JSFunctionSpec _functions[] = {
     {"mp3Cancel",           jsMP3Cancel,     0 },
+    {"mp3Close",            jsCloseAudio,     0 },
     {"lastPlayStart",       jsLastPlayStart, 0 },
     {"lastPlayEnd",         jsLastPlayEnd,   0 },
     {0}
