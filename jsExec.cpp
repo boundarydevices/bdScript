@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.101  2008-06-24 23:33:00  ericn
+ * [jsCursor] Add support for Davinci HW cursor
+ *
  * Revision 1.100  2008-06-11 18:13:46  ericn
  * -mainLoop() -- only garbage collect when something is active
  *
@@ -434,7 +437,9 @@
 #include "jsStarUSB.h"
 #endif
 
-#ifdef KERNEL_FB_SM501YUV 
+#if (defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)) \
+    || \
+    (defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1))
 #include "jsCursor.h"
 #endif
 
@@ -742,7 +747,9 @@ int prMain(int argc, char **argv, bool )
                   initJSCairo( cx, glob );
 #endif                  
 
-#ifdef KERNEL_FB_SM501YUV 
+#if (defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)) \
+    || \
+    (defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1))
                   initJSCursor( cx, glob );
 #endif
 

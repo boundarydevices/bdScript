@@ -9,7 +9,10 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
- * Revision 1.1  2007-07-07 00:25:52  ericn
+ * Revision 1.2  2008-06-24 23:32:27  ericn
+ * [jsCursor] Add support for Davinci HW cursor
+ *
+ * Revision 1.1  2007/07/07 00:25:52  ericn
  * -[bdScript] added mouse cursor and input handling
  *
  *
@@ -26,7 +29,14 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #define irqreturn_t int
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 #include <linux/sm501-int.h>
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+#include "davCursor.h"
+static davCursor_t *cursor_ = 0 ;
+#else
+#error Makefile should not build this
+#endif
 
 static JSBool
 jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -78,6 +88,7 @@ jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 			unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
 			if ( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
 			{
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 				unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
 				dither_t dither( pixData, bmWidth, bmHeight );
 
@@ -124,6 +135,14 @@ jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 				}
 
 				*rval = JSVAL_TRUE ;
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+JS_ReportError(cx, "create cursor here\n" );
+                                if( 0 == cursor_ ){
+                                   cursor_ = new davCursor_t();
+                                }
+				*rval = JSVAL_TRUE ;
+#else
+#endif
 			}
 			else
 				JS_ReportError( cx, "Invalid pixMap" );
@@ -154,6 +173,7 @@ jsSetCursorLocation( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 		    &&
 		    (y < fb.getHeight()) )
 		{
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 			unsigned long reg = SMIPCURSOR_LOC ;
 			int res = ioctl( fb.getFd(), SM501_READREG, &reg );
 			if( 0 == res ){
@@ -171,6 +191,16 @@ jsSetCursorLocation( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 			}
 			else
 				JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+if( cursor_ ){
+   cursor_->setPos( x, y );
+}
+else
+   JS_ReportError(cx, "set cursor location to %u, %u (no cursor)\n", x, y );
+				*rval = JSVAL_TRUE ;
+#else
+#endif
+
 		}
 		else
 			JS_ReportError( cx, "Cursor out of range[%u,%u]\n", fb.getWidth(), fb.getHeight() );
@@ -184,6 +214,7 @@ static JSBool
 jsEnableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
 	*rval = JSVAL_FALSE ;
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 	fbDevice_t &fb = getFB();
 	unsigned long reg = SMIPCURSOR_ADDR ;
 	int res = ioctl( fb.getFd(), SM501_READREG, &reg );
@@ -202,6 +233,12 @@ jsEnableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 	else
 		JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
 	
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+                                if( 0 == cursor_ )
+                                   cursor_ = new davCursor_t();
+				*rval = JSVAL_TRUE ;
+#else
+#endif
 	return JS_TRUE ;
 }
 
@@ -209,6 +246,7 @@ static JSBool
 jsDisableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
 	*rval = JSVAL_FALSE ;
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 	fbDevice_t &fb = getFB();
 	unsigned long reg = SMIPCURSOR_ADDR ;
 	int res = ioctl( fb.getFd(), SM501_READREG, &reg );
@@ -226,6 +264,15 @@ jsDisableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 	}
 	else
 		JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+                                if( 0 != cursor_ ){
+                                   delete cursor_ ;
+                                   cursor_ = 0 ;
+                                }
+
+				*rval = JSVAL_TRUE ;
+#else
+#endif
 	
 	return JS_TRUE ;
 }

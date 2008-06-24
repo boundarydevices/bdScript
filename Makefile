@@ -191,6 +191,10 @@ SM501OBJS = asyncScreenObj.o \
             vsyncSignal.o \
             yuvSignal.o
 OBJS += jsCursor.o
+else
+        ifeq (y,$(KERNEL_FB_DAVINCI))
+        OBJS += jsCursor.o davCursor.o 
+        endif
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))
