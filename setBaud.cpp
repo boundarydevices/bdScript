@@ -16,6 +16,9 @@
 #include <ctype.h>
 #include "baudRate.h"
 #include <stdlib.h>
+#include <linux/serial.h>
+#include "physMem.h"
+#include <string.h>
 
 static bool volatile doExit = false ;
 
@@ -56,11 +59,51 @@ static void setRaw( int fd,
    struct termios newState = oldState;
    newState.c_cc[VMIN] = 1;
 
+   bool nonStandard = false ;
    unsigned baudConst ;
-   baudRateToConst( baud, baudConst );
-
-   cfsetispeed(&newState, baudConst);
-   cfsetospeed(&newState, baudConst);
+   if( baudRateToConst( baud, baudConst ) ){
+      cfsetispeed(&newState, baudConst);
+      cfsetospeed(&newState, baudConst);
+   }
+   else {
+      cfsetispeed(&newState,B38400);
+      cfsetospeed(&newState,B38400);
+      fprintf( stderr, "Non-standard baud <%u>, old constant %u\n", baud, cfgetispeed(&newState) );
+      bool worked = false ;
+      struct serial_struct nuts;
+      int rval = ioctl(fd, TIOCGSERIAL, &nuts);
+      if( 0 == rval ){
+         unsigned const divisor = nuts.baud_base / baud ;
+         nuts.custom_divisor = divisor ;
+         printf( "custom divisor %lu (baud base %u)\n", nuts.custom_divisor, nuts.baud_base );
+         nuts.flags &= ~ASYNC_SPD_MASK;
+         nuts.flags |= ASYNC_SPD_CUST;
+         rval = ioctl(fd, TIOCSSERIAL, &nuts);
+         if( 0 == rval ){
+            printf( "baud changed\n" );
+            rval = ioctl(fd, TIOCGSERIAL, &nuts);
+            if( 0 == rval ){
+               printf( "divisor is now %u\n", nuts.custom_divisor );
+               worked = (nuts.custom_divisor == divisor);
+               if( worked ){
+                  physMem_t pm( 0x01c20000, 0x1000, O_RDWR );
+                  unsigned long div0 ;
+                  memcpy(&div0, (char const *)pm.ptr() + 0x820, sizeof(div0) );
+                  unsigned long div1 ;
+                  memcpy(&div1, (char const *)pm.ptr() + 0x824, sizeof(div1) );
+                  printf( "divisors: 0x%08lx, 0x%08lx\n", div0, div1 );
+                  nonStandard = true ;
+               }
+            }
+            else
+               perror( "TIOCGSERIAL2" );
+         }
+         else
+            perror( "TIOCSSERIAL" );
+      }
+      else
+         perror( "TIOCGSERIAL" );
+   } // non-standard serial
 
    //
    // Note that this doesn't appear to work!
@@ -94,6 +137,15 @@ static void setRaw( int fd,
    newState.c_iflag &= ~(IXON | IXOFF | IXANY|INLCR|ICRNL|IUCLC);   //no software flow control
    newState.c_oflag &= ~OPOST;                      //raw output
    tcsetattr( fd, TCSANOW, &newState );
+
+   if( nonStandard ){
+      physMem_t pm( 0x01c20000, 0x1000, O_RDWR );
+      unsigned long div0 ;
+      memcpy(&div0, (char const *)pm.ptr() + 0x820, sizeof(div0) );
+      unsigned long div1 ;
+      memcpy(&div1, (char const *)pm.ptr() + 0x824, sizeof(div1) );
+      printf( "divisors now: 0x%08lx, 0x%08lx\n", div0, div1 );
+   }
 }
 
 static void showStatus( int fd )
