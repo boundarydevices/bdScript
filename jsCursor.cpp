@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
+ * Revision 1.3  2008-06-25 01:19:38  ericn
+ * add real mouse support (Davinci only)
+ *
  * Revision 1.2  2008-06-24 23:32:27  ericn
  * [jsCursor] Add support for Davinci HW cursor
  *
@@ -33,7 +36,173 @@
 #include <linux/sm501-int.h>
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
 #include "davCursor.h"
+#include "inputPoll.h"
+#include "jsGlobals.h"
+#include "box.h"
+// #define DEBUGPRINT
+#include "debugPrint.h"
+#include <vector>
+#include "zOrder.h"
+#include "jsTouch.h"
+#include <assert.h>
+
 static davCursor_t *cursor_ = 0 ;
+
+class jsMouse_t : public inputPoll_t {
+public:
+   jsMouse_t( void );
+   ~jsMouse_t( void );
+
+   virtual void onData( struct input_event const &event );
+   void press(void);
+   void release(void);
+
+   box_t       *curBox_ ;
+   bool         down_ ;
+   unsigned     x_ ;
+   unsigned     y_ ;
+};
+
+jsMouse_t::jsMouse_t( void )
+   : inputPoll_t( pollHandlers_, "/dev/input/event0" )
+   , curBox_( 0 )
+   , down_( false )
+{
+   if( !isOpen() ){
+      perror( "/dev/input/event0" );
+      return ;
+   }
+   printf( "%s\n", __PRETTY_FUNCTION__ );
+   assert( cursor_ );
+   
+   fbDevice_t &fb = getFB();
+   cursor_->setPos(fb.getWidth()/2_, fb.setWidth()/2);
+}
+
+jsMouse_t::~jsMouse_t( void )
+{
+   printf( "%s\n", __PRETTY_FUNCTION__ );
+}
+
+#define LMOUSEBUTTON 0x110
+#define RMOUSEBUTTON 0x111
+
+#define BIG   5
+#define SMALL 3
+
+void jsMouse_t::onData( struct input_event const &event )
+{
+   assert( cursor_ );
+
+   cursor_->getPos(x_,y_);
+
+   switch( event.type ){
+      case EV_SYN:
+         cursor_->setPos(x_,y_);
+         if( down_ ){
+            press();
+         }
+         break;
+      case EV_REL: {
+         fbDevice_t &fb = getFB();
+         int value = (int)event.value ;
+         int pos = (int)( (REL_X == event.code) ? x_ : y_ );
+         int max = (int)( (REL_X == event.code) ? fb.getWidth() : fb.getHeight() ) - 1 ;
+         pos += value ;
+         if( 0 > pos )
+            pos = 0 ;
+         else if( max < pos ){
+            pos = max ;
+         }
+         if( REL_X == event.code )
+            x_ = pos ;
+         else
+            y_ = pos ;
+         cursor_->setPos(x_,y_);
+         break;
+      }
+      case EV_KEY: {
+         int down = event.value ;
+         int left = ( event.code == LMOUSEBUTTON );
+         if( down ){
+            cursor_->setWidth(SMALL);
+            cursor_->setHeight(SMALL);
+         }
+         else {
+            cursor_->setWidth(BIG);
+            cursor_->setHeight(BIG);
+         }
+
+         if( left && ( down_ != down ) ){
+            if( down ){
+               press();
+            }
+            else {
+               release();
+            }
+            down_ = down ;
+         } // left button state changed
+
+         break;
+      }
+      default:
+         inputPoll_t::onData(event);
+   }
+}
+
+void jsMouse_t::press( void )
+{
+   if( 0 != curBox_ )
+   {
+      if( ( x_ >= curBox_->xLeft_ )
+          &&
+          ( x_ <= curBox_->xRight_ )
+          &&
+          ( y_ >= curBox_->yTop_ )
+          &&
+          ( y_ <= curBox_->yBottom_ ) )
+      {
+         curBox_->onTouchMove_( *curBox_, x_, y_ );
+         debugPrint( "move on box\n" );
+         return ;
+      } // still on this button
+      else
+      {
+         debugPrint( "%s: moveOff %u:%u \n", __PRETTY_FUNCTION__, x_, y_ );
+         curBox_->onTouchMoveOff_( *curBox_, x_, y_ );
+         curBox_ = 0 ;
+         debugPrint( "move off box\n" );
+      } // moved off of the button
+   } // have a box
+   else
+      debugPrint( "No current box\n" );
+
+   std::vector<box_t *> boxes = getZMap().getBoxes( x_, y_ );
+   if( 0 < boxes.size() )
+   {
+      curBox_ = boxes[0];
+      curBox_->onTouch_( *boxes[0], x_, y_ );
+      debugPrint( "new box %p\n", curBox_ );
+   }
+   else
+      debugPrint( "No matching box\n" );
+}
+
+void jsMouse_t::release( void )
+{
+   if( 0 != curBox_ )
+   {
+      curBox_->onRelease_( *curBox_, curBox_->lastTouchX_, curBox_->lastTouchY_ );
+      curBox_ = 0 ;
+   } // touching, move or release box
+   else {
+      debugPrint( "No current box\n" );
+      onRelease();
+   }
+}
+
+static jsMouse_t *mouse_ = 0 ;
+
 #else
 #error Makefile should not build this
 #endif
@@ -139,6 +308,7 @@ jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 JS_ReportError(cx, "create cursor here\n" );
                                 if( 0 == cursor_ ){
                                    cursor_ = new davCursor_t();
+                                   cursor_->setWidth(BIG);
                                 }
 				*rval = JSVAL_TRUE ;
 #else
@@ -236,6 +406,10 @@ jsEnableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
                                 if( 0 == cursor_ )
                                    cursor_ = new davCursor_t();
+                                if( 0 == mouse_ ){
+                                   mouse_ = new jsMouse_t();
+                                   printf( "%s:created mouse\n", __PRETTY_FUNCTION__ );
+                                }
 				*rval = JSVAL_TRUE ;
 #else
 #endif
@@ -268,6 +442,11 @@ jsDisableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
                                 if( 0 != cursor_ ){
                                    delete cursor_ ;
                                    cursor_ = 0 ;
+                                }
+                                if( 0 != mouse_ ){
+                                   delete mouse_ ;
+                                   mouse_ = 0 ;
+                                   printf( "%s:deleted mouse\n", __PRETTY_FUNCTION__ );
                                 }
 
 				*rval = JSVAL_TRUE ;

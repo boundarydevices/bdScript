@@ -1,5 +1,5 @@
 #ifndef __JSTOUCH_H__
-#define __JSTOUCH_H__ "$Id: jsTouch.h,v 1.5 2004-12-28 03:35:09 ericn Exp $"
+#define __JSTOUCH_H__ "$Id: jsTouch.h,v 1.6 2008-06-25 01:19:38 ericn Exp $"
 
 /*
  * jsTouch.h
@@ -22,7 +22,10 @@
  * Change History : 
  *
  * $Log: jsTouch.h,v $
- * Revision 1.5  2004-12-28 03:35:09  ericn
+ * Revision 1.6  2008-06-25 01:19:38  ericn
+ * add real mouse support (Davinci only)
+ *
+ * Revision 1.5  2004/12/28 03:35:09  ericn
  * -added shutdown routine
  *
  * Revision 1.4  2004/11/16 04:06:25  ericn
@@ -45,6 +48,7 @@ bool initJSTouch( JSContext            *cx,
                   JSObject             *glob );
 
 void shutdownTouch( void );
+void onRelease( void );
 
 #endif
 

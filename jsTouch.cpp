@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.29  2008-06-25 01:19:38  ericn
+ * add real mouse support (Davinci only)
+ *
  * Revision 1.28  2007-07-03 18:10:37  ericn
  * -Optional UCB1400 GPIO
  *
@@ -314,6 +317,15 @@ void jsTouchPoll_t :: onRelease( timeval const &tv )
 }
 
 static jsTouchPoll_t *touchPoll_ = 0 ;
+
+void onRelease( void )
+{
+   if( touchPoll_ ){
+      timeval now ;
+      gettimeofday(&now, 0);
+      touchPoll_->onRelease(now);
+   }
+}
 
 static JSBool
 doit( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, 
