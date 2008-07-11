@@ -8,7 +8,7 @@ reverseDec:
 	mov		r2,#0x80000000
 	eor		r0,r0,r2,ASR r1
 	mov		pc,lr
-	
+
 //extern "C" unsigned long uDivRem(unsigned long value,unsigned long divisor,unsigned long * rem);
 //In: r0 - value, r1 - divisor, r2 - @remainder
 //Out: r0 - value/divisor, @r2 - remainder
@@ -57,7 +57,7 @@ uShiftRight:
 	rsb		r1,r1,#32
 	orr		r0,r0,r3,LSL r1
 	mov		pc,lr
-	
+
 //int __umull18(unsigned valueA,unsigned valueB);
 __umull18:
 	umull	r3,r2,r1,r0
