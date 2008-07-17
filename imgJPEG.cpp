@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
- * Revision 1.6  2005-11-05 20:23:43  ericn
+ * Revision 1.7  2008-07-17 20:46:57  ericn
+ * -fix skip_input routine
+ *
+ * Revision 1.6  2005/11/05 20:23:43  ericn
  * -fix compiler warnings
  *
  * Revision 1.5  2004/11/16 07:32:43  tkisky
@@ -79,10 +82,11 @@ static void jpg_skip_input_data( j_decompress_ptr cinfo, long num_bytes )
 {
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    unsigned left = pSrc->length_ - pSrc->numRead_ ;
-   if( left > (unsigned)num_bytes )
+   if( left < (unsigned)num_bytes )
       num_bytes = left ;
    pSrc->numRead_ += num_bytes ;
-//printf( "skip input : %u/%ld\n", pSrc->numRead_, num_bytes );
+   cinfo->src->next_input_byte += (size_t) num_bytes;
+   cinfo->src->bytes_in_buffer -= (size_t) num_bytes;
 }
 
 static boolean jpg_resync_to_restart( j_decompress_ptr cinfo, int desired )
