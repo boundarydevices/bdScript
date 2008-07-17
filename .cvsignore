@@ -90,3 +90,8 @@ saveTail
 tcpEcho
 watchdog
 processWrap
+countColors
+crc32
+flashErase
+uBootParams
+yuvgz
