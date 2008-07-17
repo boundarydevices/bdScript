@@ -95,3 +95,4 @@ crc32
 flashErase
 uBootParams
 yuvgz
+*.diff
