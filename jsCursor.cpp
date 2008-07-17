@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
+ * Revision 1.4  2008-07-17 20:49:50  ericn
+ * -[jsCursor] Fix typos
+ *
  * Revision 1.3  2008-06-25 01:19:38  ericn
  * add real mouse support (Davinci only)
  *
@@ -76,7 +79,7 @@ jsMouse_t::jsMouse_t( void )
    assert( cursor_ );
    
    fbDevice_t &fb = getFB();
-   cursor_->setPos(fb.getWidth()/2_, fb.setWidth()/2);
+   cursor_->setPos(fb.getWidth()/2, fb.getWidth()/2);
 }
 
 jsMouse_t::~jsMouse_t( void )
