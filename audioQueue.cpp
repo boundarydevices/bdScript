@@ -8,7 +8,7 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
- * Revision 1.55  2008-07-17 22:47:03  ericn
+ * Revision 1.56  2008-07-17 22:48:00  ericn
  * [audio] make printf() a debugPrint()
  *
  * Revision 1.54  2008-01-04 23:28:15  ericn
@@ -724,7 +724,7 @@ unsigned wrote = 0 ;
                                  fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
                                  break;
                               } else {
-                                 fprintf( stderr, "Setting rate1 to %d:%m\n", sampleRate );
+                                 debugPrint( "setting rate1 to %d:%m\n", sampleRate );
 			      }
                            }
 
@@ -903,7 +903,7 @@ wrote += numWritten ;
                                     if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
                                        fprintf( stderr, "Error setting sampling rate to %d:%m\n",sampleRate);
 				    else {
-                                       fprintf( stderr, "Setting rate2 to %d:%m\n", sampleRate );
+                                       debugPrint( "Setting rate2 to %d:%m\n", sampleRate );
 				    } 
                                  }
                               }
