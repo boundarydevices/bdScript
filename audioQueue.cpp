@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
+ * Revision 1.55  2008-07-17 22:47:03  ericn
+ * [audio] make printf() a debugPrint()
+ *
  * Revision 1.54  2008-01-04 23:28:15  ericn
  * -more things conditional on JSMPEG
  *
@@ -685,7 +688,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                {
 
 
-                  printf( "playback %u bytes (%lu seconds) from %p here\n", 
+                  debugPrint( "playback %u bytes (%lu seconds) from %p here\n", 
                           item->length_, 
                           headers.lengthSeconds(),
                           item->data_ );
