@@ -166,7 +166,10 @@ else
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mediaQueue.o mpegQueue.o aviHeader.o riffRead.o 
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o 
+ifeq (y,$(KERNEL_FB_SM501))
+   OBJS += mediaQueue.o
+endif
 endif
 
 ifeq (y,$(KERNEL_FB_SM501))
