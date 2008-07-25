@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: mpegDecode.cpp,v $
+ * Revision 1.22  2008-07-25 03:28:27  ericn
+ * Add SM-501 dependency
+ *
  * Revision 1.21  2007-08-23 00:25:50  ericn
  * -add CLOEXEC for file handles
  *
@@ -87,7 +90,9 @@ extern "C" {
 #include <assert.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
 #include <linux/sm501-int.h>
+#endif
 
 #if CONFIG_LIBMPEG2_OLD == 1
    #include "mpeg2dec/video_out.h"
