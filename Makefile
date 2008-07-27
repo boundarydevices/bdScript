@@ -291,6 +291,16 @@ ODOMOBJS = \
 
 ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
 
+CXXFLAGS=
+
+ifeq (y,$(KERNEL_ARCH_PXA))
+        CXXFLAGS += -mcpu=xscale
+endif
+
+ifeq (y,$(KERNEL_ARCH_DAVINCI))
+        CXXFLAGS += -mcpu=arm926ej-s
+endif
+
 #
 # build empty version to avoid configuration
 #
@@ -298,7 +308,7 @@ config.h:
 	echo "#define CONFIG_LIBMPEG2_OLD 1" > $@
 
 %.o : %.cpp config.h
-	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+	$(CC) -ggdb -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(CXXFLAGS) $(IFLAGS) -O2 $<
 
 #jsImage.o : jsImage.cpp Makefile
 #	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -shared -DXP_UNIX=1 $(IFLAGS) -o jsImage.o -O2 $<
