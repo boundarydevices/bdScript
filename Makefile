@@ -122,7 +122,7 @@ ifeq (y, $(CONFIG_MCP_UCB1400_TS))
 OBJS += ucb1x00_pins.o
 endif
 
-ifeq ("y", x$(KERNEL_PXA_GPIO))
+ifeq (y,$(KERNEL_PXA_GPIO))
 OBJS += jsGpio.o
 endif
 
