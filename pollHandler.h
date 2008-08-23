@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.9 2004-04-09 03:14:10 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.10 2008-08-23 22:03:56 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -30,6 +30,9 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
+ * Revision 1.10  2008-08-23 22:03:56  ericn
+ * [cvsignore] Ignore more
+ *
  * Revision 1.9  2004-04-09 03:14:10  ericn
  * -bumped maxHandlers
  *
@@ -128,7 +131,7 @@ public:
 
    unsigned numHandlers( void ) const { return numHandlers_ ; }
    pollHandler_t *operator[]( unsigned idx ) const { return handlers_[idx]; }
-   
+
    bool isDeleted( unsigned idx ) const { return deleted_[idx]; }
 
 protected:

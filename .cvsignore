@@ -97,3 +97,9 @@ uBootParams
 yuvgz
 *.diff
 crc32_native
+calibCoef
+calibQuadrant
+daemonize.x86
+inputCalibrate
+inputTest
+yuvImgFile
