@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: imgGIF.cpp,v $
+ * Revision 1.6  2008-08-23 22:01:30  ericn
+ * [imgGIF] Use different STANDALONE symbol
+ *
  * Revision 1.5  2007-01-11 21:32:14  ericn
  * -prevent compiler warning about signed/unsigned chars
  *
@@ -457,7 +460,7 @@ void anigif_t::dispose( struct anigif_t *&ag )
 
 
 
-#ifdef STANDALONE
+#ifdef IMGGIF_STANDALONE
 #include <stdio.h>
 #include "fbDev.h"
 #include <stdlib.h>
