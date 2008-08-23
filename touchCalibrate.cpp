@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.3  2008-08-23 22:00:26  ericn
+ * [touch calibration] Use calibrateQuadrant algorithm
+ *
  * Revision 1.2  2006-08-29 01:07:59  ericn
  * -clamp to screen bounds
  *
@@ -23,6 +26,7 @@
 #include "flashVar.h"
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 static touchCalibration_t *inst_ = 0 ;
 
@@ -37,20 +41,8 @@ void touchCalibration_t::translate
    ( point_t const &input,
      point_t       &translated ) const 
 {
-   if( haveData_ ){
-      fbDevice_t &fb = getFB();
-      long int x = (coef_[0]*input.x + coef_[1]*input.y + coef_[2])/65536 ;
-      if( 0 > x )
-         x = 0 ;
-      if( x >= fb.getWidth() )
-         x = fb.getWidth()-1 ;
-      long int y = (coef_[3]*input.x + coef_[4]*input.y + coef_[5])/65536 ;
-      if( 0 > y )
-         y = 0 ;
-      if( y >= fb.getHeight() )
-         y = fb.getHeight()-1 ;
-      translated.x = x ;
-      translated.y = y ;
+   if( data_ ){
+      data_->translate(input.x,input.y,translated.x, translated.y);
    }
    else
       translated = input ;
@@ -58,32 +50,87 @@ void touchCalibration_t::translate
 
 void touchCalibration_t::setCalibration( char const *data )
 {
-   double a[6];
-   if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf", a, a+1, a+2, a+3, a+4, a+5 ) )
-   {
-      haveData_ = true ;
+   if( data_ ){
+      delete data_ ;
+      data_ = 0 ;
+   }
+   fbDevice_t &fb = getFB();
+   char temp[512];
+   strncpy( temp, data, sizeof(temp)-1 );
+   temp[sizeof(temp)-1] = '\0' ;
 
-      for( unsigned i = 0 ; i < 6 ; i++ )
-         coef_[i] = (long)floor( 65536*a[i] );
+   calibratePoint_t points[5];
+   char *next = strtok( temp, " " );
+   for( unsigned i = 0 ; i < 5 ; i++ ){
+      if( next ){
+         if( parseCalibratePoint( next, points[i] ) ){
+            next = strtok( 0, " " );
+            continue;
+         }
+      }
+         
+      // continue from middle
+      return ;
+   }
+
+   calibrateQuadrant_t *calib = new calibrateQuadrant_t( points, fb.getWidth(), fb.getHeight() );
+   if( calib->isValid() ){
+      data_ = calib ;
    }
    else
-      fprintf( stderr, "Invalid calibration settings\n" );
+      delete calib ;
 }
 
 static char const calibrateVar[] = {
    "tsCalibrate"
 };
 
+static char const tsTypeFile[] = {
+   "/proc/tstype"
+};
+
 touchCalibration_t::touchCalibration_t( void )
-   : haveData_( false )
+   : data_( 0 )
 {
    char const *flashVar = readFlashVar( calibrateVar );
+   printf( "%s: flashVar == %s\n", __PRETTY_FUNCTION__, flashVar );
    if( flashVar )
    {
       setCalibration( flashVar );
    }
-   else
-      fprintf( stderr, "No touch screen settings, using raw input\n" );
+   else {
+      unsigned wires = 0 ;
+      FILE *fIn = fopen( tsTypeFile, "rt" );
+      if( fIn ){
+         char inbuf[80];
+         if( 0 != fgets( inbuf,sizeof(inbuf),fIn ) ){
+            unsigned wires = inbuf[0]-'0' ;
+            if( (4 == wires) || (5 == wires) ){
+            }
+            else {
+               fprintf( stderr, "Unknown touch type <%s>\n", inbuf );
+               wires = 0 ;
+            }
+         }
+         fclose( fIn );
+      }
+      else {
+         fprintf( stderr, "%s: No touch screen wire count, default to 4\n", tsTypeFile );
+         wires = 4 ;
+      }
+      if( wires ){
+               char inbuf[80];
+               fbDevice_t &fb = getFB();
+               snprintf(inbuf,sizeof(inbuf), "t%ux%u-%uwa", fb.getWidth(), fb.getHeight(), wires );
+               flashVar = readFlashVar(inbuf);
+               if( flashVar ){
+                  setCalibration( flashVar );
+               }
+               else
+                  fprintf( stderr, "%s: no touch screen settings\n", inbuf );
+   
+      }
+   }
 }
 
 touchCalibration_t::~touchCalibration_t( void )

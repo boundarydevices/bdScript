@@ -1,5 +1,5 @@
 #ifndef __TOUCHCALIBRATE_H__
-#define __TOUCHCALIBRATE_H__ "$Id: touchCalibrate.h,v 1.1 2006-08-28 18:24:43 ericn Exp $"
+#define __TOUCHCALIBRATE_H__ "$Id: touchCalibrate.h,v 1.2 2008-08-23 22:00:26 ericn Exp $"
 
 /*
  * touchCalibrate.h
@@ -17,6 +17,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.h,v $
+ * Revision 1.2  2008-08-23 22:00:26  ericn
+ * [touch calibration] Use calibrateQuadrant algorithm
+ *
  * Revision 1.1  2006-08-28 18:24:43  ericn
  * -Initial import
  *
@@ -26,6 +29,7 @@
  */
 
 #include "fbDev.h"
+#include "calibQuadrant.h"
 
 class touchCalibration_t {
 public:
@@ -34,15 +38,14 @@ public:
    void translate( point_t const &input,
                    point_t       &translated ) const ;
 
-   bool haveCalibration( void ) const { return haveData_ ; }
+   bool haveCalibration( void ) const { return 0 != data_ ; }
 
    void setCalibration( char const *data );
 
 private:
    touchCalibration_t( void );
    ~touchCalibration_t( void );
-   bool  haveData_ ;
-   long  coef_[6];     // 24.8
+   calibrateQuadrant_t *data_ ;
 };
 
 

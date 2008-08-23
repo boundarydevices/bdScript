@@ -23,6 +23,8 @@ OBJS = \
        bitmap.o \
        blockSig.o \
        box.o \
+       calibCoef.o \
+       calibQuadrant.o \
        ccActiveURL.o \
        ccDiskCache.o \
        ccWorker.o \
@@ -90,6 +92,7 @@ OBJS = \
        palette.o \
        parsedFlash.o \
        parsedURL.o \
+       physMem.o \
        ping.o \
        pngToPS.o \
        pollHandler.o \
@@ -783,6 +786,10 @@ inputPoll: inputPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o inputPoll -DINPUT_STANDALONE=1 -Xlinker -Map -Xlinker inputPoll.map inputPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lsupc++
 	$(STRIP) $@
 
+inputCalibrate: inputCalibrate.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -DINPUT_STANDALONE=1 -Xlinker -Map -Xlinker $@.map $@.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
 serialPoll: serialPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o serialPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker serialPoll.map serialPoll.cpp pollHandler.o $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
@@ -797,6 +804,10 @@ bltTest: bltTest.cpp $(LIB)
 
 touchPoll: touchPoll.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o touchPoll -DSTANDALONE=1 -Xlinker -Map -Xlinker touchPoll.map touchPoll.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
+	$(STRIP) $@
+
+inputTest: inputTest.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -DSTANDALONE=1 -Xlinker -Map -Xlinker $@.map $@.cpp $(LIBS) -lCurlCache -lpthread -lstdc++
 	$(STRIP) $@
 
 touchSignal: touchSignal.cpp $(LIB)
@@ -889,7 +900,7 @@ progFlash.o: progFlash.cpp
 imgFileMain.o: imgFile.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o
+IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o fbMem.o
 imgFile: $(IMGFILEOBJS) Makefile 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
