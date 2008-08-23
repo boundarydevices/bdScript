@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
+ * Revision 1.6  2008-08-23 22:02:32  ericn
+ * [gen-timer] use /dev/gen-timer, not /dev/timer
+ *
  * Revision 1.5  2008-01-04 23:30:17  ericn
  * -check KERNEL_BD_GENTIMER
  *
@@ -159,7 +162,7 @@ void timerPollHandler_t :: remove( pollTimer_t &pt )
 pollHandler_t &getTimerPoll( pollHandlerSet_t &set )
 {
    if( 0 == timer_ ) {
-      int fd = open( "/dev/timer", O_RDONLY|O_NONBLOCK );
+      int fd = open( "/dev/gen-timer", O_RDONLY|O_NONBLOCK );
       if (fd >= 0) timer_ = new timerPollHandler_t( fd,set );
       else printf("!!!!!device /dev/timer not found\n");
    }
