@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.4  2008-08-28 21:14:39  ericn
+ * [touchCalibrate] Fix wire count declaration
+ *
  * Revision 1.3  2008-08-23 22:00:26  ericn
  * [touch calibration] Use calibrateQuadrant algorithm
  *
@@ -68,7 +71,6 @@ void touchCalibration_t::setCalibration( char const *data )
             continue;
          }
       }
-         
       // continue from middle
       return ;
    }
@@ -93,7 +95,6 @@ touchCalibration_t::touchCalibration_t( void )
    : data_( 0 )
 {
    char const *flashVar = readFlashVar( calibrateVar );
-   printf( "%s: flashVar == %s\n", __PRETTY_FUNCTION__, flashVar );
    if( flashVar )
    {
       setCalibration( flashVar );
@@ -104,7 +105,7 @@ touchCalibration_t::touchCalibration_t( void )
       if( fIn ){
          char inbuf[80];
          if( 0 != fgets( inbuf,sizeof(inbuf),fIn ) ){
-            unsigned wires = inbuf[0]-'0' ;
+            wires = inbuf[0]-'0' ;
             if( (4 == wires) || (5 == wires) ){
             }
             else {
@@ -128,7 +129,6 @@ touchCalibration_t::touchCalibration_t( void )
                }
                else
                   fprintf( stderr, "%s: no touch screen settings\n", inbuf );
-   
       }
    }
 }
