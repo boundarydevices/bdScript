@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
+ * Revision 1.15  2008-08-30 16:35:54  ericn
+ * [flashVar] Use /proc/mtd to look for flashVar partition (name of 'params')
+ *
  * Revision 1.14  2007-07-16 18:36:15  ericn
  * -don't re-write duplicate variables
  *
@@ -75,14 +78,34 @@
 //#define DEBUGPRINT
 #include "debugPrint.h"
 
-static char const deviceName_[] = {
-   "/dev/mtd2"
-};
 char const * GetFlashDev()
 {
-   char const *devName = getenv( "FLASHVARDEV" );
-   if( 0 == devName ) devName = deviceName_;
-   return devName;
+   static char __devName[80] = { "" };
+   if( !__devName[0] ){
+      char const *envName = getenv( "FLASHVARDEV" );
+      if( 0 == envName ){
+         FILE *fProc = fopen( "/proc/mtd", "rw" );
+         if( fProc ){
+            char buf[80];
+            while( fgets(buf,sizeof(buf),fProc) ){
+               char *name = strchr(buf,'"');
+               if( name ){
+                  name++ ;
+                  if( 0 == strncasecmp("params",name,6) ){
+                     char const n = buf[3];
+                     snprintf(__devName,sizeof(__devName),"/dev/mtd%c", n );
+                     break;
+                  }
+               }
+            }
+            fclose( fProc );
+         }
+      }
+      else
+         strcpy(__devName, envName );
+   }
+   printf( "------> mtd device %s\n", __devName );
+   return __devName ;
 }
 
 unsigned int IsDevice(char const* devName)
