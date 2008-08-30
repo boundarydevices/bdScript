@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: inputCalibrate.cpp,v $
+ * Revision 1.2  2008-08-30 18:53:24  ericn
+ * [inputCalibrate] Fix wire count declaration
+ *
  * Revision 1.1  2008-08-23 22:04:48  ericn
  * [import]
  *
@@ -640,8 +643,9 @@ static char const tsTypeFileName[] = {
    if( fWires ){
       char cWires[256];
       if( fgets(cWires,sizeof(cWires)-1,fWires) ){
-         unsigned wires = cWires[0]-'0' ;
+         wires = cWires[0]-'0' ;
          if( (4 == wires) || (5 == wires) ){
+		 printf( "%u-wire resistive touch screen", wires );
          }
          else
             fprintf( stderr, "%s: Invalid data <%s>\n", tsTypeFileName, cWires );
@@ -672,6 +676,8 @@ static char const tsTypeFileName[] = {
             printf( "---------------> saving flash variable %s==%s\n", flashVariable, flashData );
             writeFlashVar( flashVariable, flashData );
    }
+   else
+	   fprintf( stderr, "Invalid wire count\n" );
    return 0 ;
 }
 
