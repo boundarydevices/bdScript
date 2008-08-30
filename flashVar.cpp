@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
+ * Revision 1.16  2008-08-30 18:40:11  ericn
+ * [flashVar] Get rid of debug printf
+ *
  * Revision 1.15  2008-08-30 16:35:54  ericn
  * [flashVar] Use /proc/mtd to look for flashVar partition (name of 'params')
  *
@@ -104,7 +107,6 @@ char const * GetFlashDev()
       else
          strcpy(__devName, envName );
    }
-   printf( "------> mtd device %s\n", __devName );
    return __devName ;
 }
 
