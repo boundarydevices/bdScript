@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: flashErase.cpp,v $
+ * Revision 1.2  2008-09-04 22:40:03  ericn
+ * [flashErase] Allow named partitions to be resolved and used (e.g. flashErase -n kernel)
+ *
  * Revision 1.1  2008-04-01 18:58:55  ericn
  * -Initial import
  *
@@ -74,10 +77,62 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
-
-int main( int argc, char const * const argv[] )
+static void parseArgs( int &argc, char **&argv )
 {
+   for( int arg = 1 ; arg < argc -1 ; arg++ ){
+      char const *param = argv[arg];
+      if( '-' == *param ){
+         if( 'n' == tolower(param[1]) ){
+            char *partName = argv[arg+1];
+            unsigned partNameLen = strlen(partName);
+            FILE *fIn = fopen( "/proc/mtd", "rt" );
+            if( fIn ){
+               bool found = false ;
+               char inBuf[80];
+               while( !found && fgets(inBuf,sizeof(inBuf),fIn) ){
+                  printf( "%s", inBuf );
+                  fflush(stdout);
+                  unsigned len = strlen(inBuf);
+                  if( len > partNameLen+2 ){
+                     found = (0==strncasecmp(partName,inBuf+len-partNameLen-2,partNameLen));
+                  }
+               }
+               if( found ){
+                  printf( "found mtd partition <%s>\n", partName );
+                  char *end = strchr( inBuf,':' );
+                  if( end ){
+                     *end = 0 ;
+                     char temp[80];
+                     snprintf( temp, sizeof(temp), "/dev/%s", inBuf );
+                     argv[arg] = strdup(temp);
+                     for( int fwd = arg+2 ; fwd < argc ; fwd++ ){
+                        argv[fwd-1] = argv[fwd];
+                     }
+                     argc-- ;
+                     arg-- ;
+                  } else {
+                     fprintf( stderr, "Invalid MTD partition %s\n", inBuf );
+                     exit(1);
+                  }
+               } else {
+                  fprintf( stderr, "Invalid flash partition %s\n", partName );
+                  exit(1);
+               }
+               fclose( fIn );
+            } else {
+               perror( "/proc/mtd" );
+               exit(1);
+            }
+         } // name command
+      }
+   }
+}
+
+int main( int argc, char **argv )
+{
+   parseArgs(argc,argv);
    if( 1 < argc ){
       char const *devName = argv[1];
       int fd = open( devName, O_RDWR );
@@ -111,7 +166,7 @@ int main( int argc, char const * const argv[] )
          fprintf( stderr, "%s: %m\n", devName );
    }
    else
-      fprintf( stderr, "Usage: %s /dev/mtd/3\n", argv[0] );
+      fprintf( stderr, "Usage: %s /dev/mtd3 || -n partname\n", argv[0] );
 
    return 0 ;
 }
