@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.102  2008-09-09 17:42:10  ericn
+ * [audio] Don't pre-open audioOutPoll
+ *
  * Revision 1.101  2008-06-24 23:33:00  ericn
  * [jsCursor] Add support for Davinci HW cursor
  *
@@ -768,7 +771,7 @@ int prMain(int argc, char **argv, bool )
                   //
 //                  audioQueue_t &audioOut = 
                   (void)getAudioQueue(); 
-                  audioOutPoll_t::get(pollHandlers_);
+//                  audioOutPoll_t::get(pollHandlers_);
 #else
 #endif
 
