@@ -103,3 +103,5 @@ daemonize.x86
 inputCalibrate
 inputTest
 yuvImgFile
+*.bin
+makeFlash gpio-trig mtdInfo totalflash
