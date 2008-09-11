@@ -264,7 +264,7 @@ else
    LIB = ./libCurlCache.a
 endif
 
-ifneq (y,TSINPUTAPI)
+ifneq (y,KERNEL_INPUT_TOUCHSCREEN)
    TSINPUTFLAG=0
 else
    TSINPUTFLAG=1
