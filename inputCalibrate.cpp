@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: inputCalibrate.cpp,v $
+ * Revision 1.3  2008-09-11 00:27:27  ericn
+ * [inputCalibrate] Remove use of wire count for calibration settings
+ *
  * Revision 1.2  2008-08-30 18:53:24  ericn
  * [inputCalibrate] Fix wire count declaration
  *
@@ -634,50 +637,21 @@ int main( void )
       }
    }
 
-static char const tsTypeFileName[] = {
-   "/proc/tstype"
-};
-
-   unsigned wires = 0 ;
-   FILE *fWires = fopen( tsTypeFileName, "rt" );
-   if( fWires ){
-      char cWires[256];
-      if( fgets(cWires,sizeof(cWires)-1,fWires) ){
-         wires = cWires[0]-'0' ;
-         if( (4 == wires) || (5 == wires) ){
-		 printf( "%u-wire resistive touch screen", wires );
-         }
-         else
-            fprintf( stderr, "%s: Invalid data <%s>\n", tsTypeFileName, cWires );
-      }
-      else
-         fprintf( stderr, "%s: No data\n", tsTypeFileName );
-      fclose( fWires );
+   char flashVariable[80];
+   snprintf( flashVariable, sizeof(flashVariable), "t%ux%u", fb.getWidth(), fb.getHeight() );
+   
+   char flashData[512];
+   char *nextOut = flashData ;
+   for( unsigned i = 0 ; i < DIM(pointData); i++ ){
+       nextOut += snprintf( nextOut, flashData+sizeof(flashData)-nextOut-1, 
+                            "%u:%u.%d.%d ", 
+                            pointData[i].x_,
+                            pointData[i].y_,
+                            pointData[i].median_i_,
+                            pointData[i].median_j_ );
    }
-   else {
-      perror( tsTypeFileName );
-      wires = 4 ;
-   }
-
-   if( wires ){
-            char flashVariable[80];
-            snprintf( flashVariable, sizeof(flashVariable), "t%ux%u-%uwa", fb.getWidth(), fb.getHeight(), wires );
-            
-            char flashData[512];
-            char *nextOut = flashData ;
-            for( unsigned i = 0 ; i < DIM(pointData); i++ ){
-               nextOut += snprintf( nextOut, flashData+sizeof(flashData)-nextOut-1, 
-                                    "%u:%u.%d.%d ", 
-                                    pointData[i].x_,
-                                    pointData[i].y_,
-                                    pointData[i].median_i_,
-                                    pointData[i].median_j_ );
-            }
-            printf( "---------------> saving flash variable %s==%s\n", flashVariable, flashData );
-            writeFlashVar( flashVariable, flashData );
-   }
-   else
-	   fprintf( stderr, "Invalid wire count\n" );
+   printf( "---------------> saving flash variable %s==%s\n", flashVariable, flashData );
+   writeFlashVar( flashVariable, flashData );
    return 0 ;
 }
 
