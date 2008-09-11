@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
+ * Revision 1.15  2008-09-11 00:26:51  ericn
+ * -[touchPoll] Implement new test program
+ *
  * Revision 1.14  2006-12-01 18:25:32  tkisky
  * -change default touchscreen device name
  *
@@ -64,6 +67,7 @@
 #include <ctype.h>
 #include "setSerial.h"
 #include "pollTimer.h"
+#include "config.h"
 
 // #define DEBUGPRINT
 #include "debugPrint.h"
@@ -79,6 +83,14 @@ static rollingMedian_t medianY_( MEDIANRANGE );
 static rollingMean_t meanX_( MEANRANGE );
 static rollingMean_t meanY_( MEANRANGE );
 
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+#include <linux/input.h>
+#define MAX_EVENTS_PER_READ 16
+#define HAVE_X (1<<ABS_X)
+#define HAVE_Y (1<<ABS_Y)
+#define ISDOWN (1<<ABS_Z)
+#define WASDOWN (1<<ABS_RUDDER)
+#else
 struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
 	unsigned short pressure;
 	unsigned short x;
@@ -86,6 +98,7 @@ struct ts_event  {   /* Used in UCB1x00 style touchscreens (the default) */
 	unsigned short pad;
 	struct timeval stamp;
 };
+#endif
 
 static char const *getTouchDev( char const *devName )
 {
@@ -93,7 +106,11 @@ static char const *getTouchDev( char const *devName )
    if( 0 != envDev )
       devName = envDev ;
    if( 0 == devName )
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+      devName = "/dev/input/event0" ;
+#else
       devName = "/dev/touch_ucb1x00" ;
+#endif
    return devName ;
 }
 
@@ -202,12 +219,15 @@ touchPoll_t :: ~touchPoll_t( void )
 {
    if( isOpen() )
    {
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+#else
       ts_event event ;
       int numRead ;
    
       while( sizeof( event ) == ( numRead = read( fd_, &event, sizeof( event ) ) ) )
          ; // purge queue
       close();
+#endif
    }
 
    if( timer_ ){
@@ -237,8 +257,80 @@ static bool wasDown = false ;
 
 void touchPoll_t :: onDataAvail( void )
 {
-   debugPrint( "onDataAvail() %s\n", isSerial_ ? "serial" : "ucb1x00" );
+   debugPrint( "onDataAvail() %s\n", 
+               isSerial_ 
+                  ? "serial" 
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+                  : "input" );
+#else
+                  : "ucb1x00" );
+#endif
+
    if( !isSerial_ ){
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+	struct input_event events[MAX_EVENTS_PER_READ];
+	do {
+		int bytesRead = read( fd_, events, sizeof(events) );
+		if( 0 < bytesRead ){
+		    int itemsRead = bytesRead / sizeof(events[0]);
+		    unsigned leftover = bytesRead % sizeof(events[0]);
+		    if( leftover ){
+			    unsigned left = sizeof(events[0])-leftover ;
+			    bytesRead = read( fd_, ((char *)events)+bytesRead, left );
+			    if( bytesRead == (int)left ){
+				    itemsRead++ ;
+			    }
+		    } // try to read tail-end
+                    
+                    debugPrint( "%u input events read\n", itemsRead );
+		    for( int i = 0 ; i < itemsRead ; i++ ){
+                        struct input_event &event = events[i];
+                        if( EV_ABS == event.type ){
+                           if( ABS_X == event.code ){
+                              iVal_ = event.value ;
+                              mask_ |= HAVE_X ;
+                           } else if( ABS_Y == event.code ){
+                              jVal_ = event.value ;
+                              mask_ |= HAVE_Y ;
+                           } else if( ABS_PRESSURE == event.code ){
+                              if(0 != event.value)
+                                 mask_ |= ISDOWN ;
+                              else
+                                 mask_ &= ~ISDOWN ;
+                           }
+                        } else if( EV_SYN == event.type ){
+                           bool isDown = 0 != (mask_ & ISDOWN);
+                           bool wasDown = 0 != (mask_ & WASDOWN);
+                           if( (isDown != wasDown) && (!isDown) ){
+                              if( isDown )
+                                 mask_ |= WASDOWN ;
+                              else
+                                 mask_ &= ~WASDOWN ;
+         
+                              struct timeval stamp ;
+                              gettimeofday( &stamp, 0 );
+                              onRelease( stamp );
+                              mask_ &= ~(HAVE_X|HAVE_Y); // no meaning on release
+                           } else if( (HAVE_X|HAVE_Y) == (mask_ & (HAVE_X|HAVE_Y) ) ){
+                              medianX_.feed( iVal_ );
+                              medianY_.feed( jVal_ );
+   
+                              unsigned short x, y ;
+                              if( medianX_.read(x) && medianY_.read(y) ){
+                                 struct timeval stamp ;
+                                 gettimeofday( &stamp, 0 );
+                                 onTouch(x,y,1,stamp);
+                                 mask_ |= WASDOWN ;
+                              }
+                              mask_ &= ~(HAVE_X|HAVE_Y); iVal_ = jVal_ = 0 ;
+                           }
+   		        }
+                    } // for each input event
+		}
+		else
+			break ;
+	} while( 1 );
+#else
       ts_event nextEvent ;
       ts_event event ;
       unsigned count = 0 ;
@@ -307,11 +399,14 @@ debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
             meanX_.reset(); meanY_.reset();
          }
       }
+#endif
    }
    else {
       if( timer_ )
          timer_->clear();
 
+#ifdef KERNEL_INPUT_TOUCHSCREEN
+#else
       ts_event event ;
       char     inBuf[512];
       int      numRead ;
@@ -395,6 +490,7 @@ debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
       }
       if( wasDown && ( 0 != timer_ ) )
          timer_->set( 100 );
+#endif
    }
 }
 
