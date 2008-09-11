@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.5  2008-09-11 00:28:16  ericn
+ * Remove use of wire count for calibration settings
+ *
  * Revision 1.4  2008-08-28 21:14:39  ericn
  * [touchCalibrate] Fix wire count declaration
  *
@@ -83,10 +86,6 @@ void touchCalibration_t::setCalibration( char const *data )
       delete calib ;
 }
 
-static char const calibrateVar[] = {
-   "tsCalibrate"
-};
-
 static char const tsTypeFile[] = {
    "/proc/tstype"
 };
@@ -94,43 +93,15 @@ static char const tsTypeFile[] = {
 touchCalibration_t::touchCalibration_t( void )
    : data_( 0 )
 {
-   char const *flashVar = readFlashVar( calibrateVar );
-   if( flashVar )
-   {
-      setCalibration( flashVar );
-   }
-   else {
-      unsigned wires = 0 ;
-      FILE *fIn = fopen( tsTypeFile, "rt" );
-      if( fIn ){
-         char inbuf[80];
-         if( 0 != fgets( inbuf,sizeof(inbuf),fIn ) ){
-            wires = inbuf[0]-'0' ;
-            if( (4 == wires) || (5 == wires) ){
-            }
-            else {
-               fprintf( stderr, "Unknown touch type <%s>\n", inbuf );
-               wires = 0 ;
-            }
-         }
-         fclose( fIn );
+      char inbuf[80];
+      fbDevice_t &fb = getFB();
+      snprintf(inbuf,sizeof(inbuf), "t%ux%u", fb.getWidth(), fb.getHeight() );
+      char const *flashVar = readFlashVar(inbuf);
+      if( flashVar ){
+         setCalibration( flashVar );
       }
-      else {
-         fprintf( stderr, "%s: No touch screen wire count, default to 4\n", tsTypeFile );
-         wires = 4 ;
-      }
-      if( wires ){
-               char inbuf[80];
-               fbDevice_t &fb = getFB();
-               snprintf(inbuf,sizeof(inbuf), "t%ux%u-%uwa", fb.getWidth(), fb.getHeight(), wires );
-               flashVar = readFlashVar(inbuf);
-               if( flashVar ){
-                  setCalibration( flashVar );
-               }
-               else
-                  fprintf( stderr, "%s: no touch screen settings\n", inbuf );
-      }
-   }
+      else
+         fprintf( stderr, "%s: no touch screen settings\n", inbuf );
 }
 
 touchCalibration_t::~touchCalibration_t( void )
