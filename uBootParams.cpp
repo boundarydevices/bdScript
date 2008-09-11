@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: uBootParams.cpp,v $
+ * Revision 1.2  2008-09-11 00:28:43  ericn
+ * allow output file
+ *
  * Revision 1.1  2008-06-25 22:07:24  ericn
  * -Import
  *
@@ -23,8 +26,11 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
+#ifdef __arm__
 #include <mtd/mtd-user.h>
+#endif
 #include <assert.h>
+#include "hexDump.h"
 
 uBootParams_t::uBootParams_t( char const *fileName )
    : worked_( false )
@@ -46,7 +52,7 @@ uBootParams_t::uBootParams_t( char const *fileName )
       return ;
    }
    
-   dataBuf_ = new char [eof];
+   dataBuf_ = new char [eof+1];
    long int start = lseek( fdDev, 0, SEEK_SET );
    int numRead = read( fdDev, dataBuf_, eof );
    if( numRead != eof ){
@@ -55,7 +61,9 @@ uBootParams_t::uBootParams_t( char const *fileName )
       close( fdDev );
       return ;
    }
+   dataBuf_[eof] = '\0' ;
 
+#ifdef __arm__
    uLong crc ; memcpy(&crc,dataBuf_,sizeof(crc));
    char const *nextIn = dataBuf_ + sizeof(crc);
    uLong computed = crc32( 0, (Bytef *)nextIn, eof-sizeof(crc) );
@@ -81,12 +89,6 @@ uBootParams_t::uBootParams_t( char const *fileName )
                nextIn++ ;
             }
             if( (nextIn < dataEnd) && ('\0' == c) ){
-   #if 0
-               fwrite( nameStart, 1, nameEnd-nameStart, stdout );
-               fputc(':',stdout);
-               fwrite( valueStart, 1, nextIn-valueStart, stdout );
-               fputc('\n',stdout );
-   #endif
                nextIn++ ;
                *(char *)nameEnd = 0 ;
                listItem_t *item = new listItem_t ;
@@ -108,15 +110,66 @@ uBootParams_t::uBootParams_t( char const *fileName )
          }
       }
    } else if( (0xffffffff == crc) && ('\xff' == *nextIn) ){
-      memset( dataBuf_, 0, dataMax_ );
+      memset( dataBuf_, 0, dataMax_ 
+#ifndef __arm__
+              + sizeof(crc)
+#endif
+              );
       worked_ = true ;
    }
    else {
       fprintf( stderr, "U-Boot crc mismatch: read 0x%08lx, computed 0x%08lx\n", crc, computed );
    }
+#else
+   worked_ = true ;
+   char * const dataEnd = dataBuf_+eof ;
+   char *nextIn = dataBuf_ ;
+   while( (nextIn < dataEnd) && *nextIn ){
+      char const *nameStart = nextIn ;
+      char c ;
+      char const *nameEnd = 0 ;
+      while( (nextIn < dataEnd) && ('\n' != (c=*nextIn)) ){
+         if( '=' == c ){
+            nameEnd = nextIn++ ;
+            break;
+         }
+         else
+            nextIn++ ;
+      }
+      if( nameEnd ){
+         char const *valueStart = nextIn ;
+         while( (nextIn < dataEnd) && ('\n' != (c=*nextIn)) ){
+            nextIn++ ;
+         }
+         if( (nextIn < dataEnd) && ('\n' == c) ){
+            *nextIn++ = '\0' ;
+            *(char *)nameEnd = 0 ;
+            listItem_t *item = new listItem_t ;
+            item->next_ = head_ ;
+            item->name_ = nameStart ;
+            item->value_ = valueStart ;
+            head_ = item ;
+         }
+         else {
+            fprintf( stderr, "unexpected end-of-data\n" );
+            worked_ = false ;
+            break;
+         }
+      }
+      else {
+         fprintf( stderr, "unexpected end-of-name\n" );
+         worked_ = false ;
+         break;
+      }
+   }
+#endif
 
    if( worked_ ){
-      dataMax_ = eof ;
+      dataMax_ = eof 
+#ifndef __arm__
+              + sizeof(uLong)
+#endif
+      ;
       dataLen_ = nextIn-dataBuf_ ;
    }
    close( fdDev );
@@ -205,7 +258,13 @@ static bool isDevice(char const* devName)
 bool uBootParams_t::save( char const *fileName )
 {
    bool worked = false ;
-   int fd = open( fileName, O_WRONLY );
+   int mode = 
+#ifdef __arm__
+               O_WRONLY ;
+#else
+               O_WRONLY | O_CREAT ;
+#endif
+   int fd = open( fileName, mode );
    if( 0 <= fd )
    {
       char *const writeable = new char [dataMax_];
@@ -214,6 +273,7 @@ bool uBootParams_t::save( char const *fileName )
       char *nextOut = writeable + sizeof(crc);
       listItem_t *item = head_ ;
       while( item ){
+         printf( "%s==%s\n", item->name_, item->value_ );
          unsigned len = strlen(item->name_);
          memcpy(nextOut,item->name_,len);
          nextOut += len ;
@@ -223,10 +283,17 @@ bool uBootParams_t::save( char const *fileName )
          nextOut += len + 1 ; // skip NULL
          item = item->next_ ;
       }
-      assert(nextOut < writeable+dataMax_);
+      if( nextOut > writeable+dataMax_){
+         fprintf( stderr, "EOF error: %p > %p(%u)\n", nextOut, writeable+dataMax_, dataMax_);
+         hexDumper_t dumper(writeable,nextOut-writeable,(unsigned long)writeable);
+         while( dumper.nextLine() )
+            printf( "%s\n", dumper.getLine() );
+         assert(nextOut <= writeable+dataMax_);
+      }
       crc = crc32( 0, (Bytef *)writeable+sizeof(crc), dataMax_-sizeof(crc));
       memcpy(writeable,&crc,sizeof(crc));
 
+#ifdef __arm__
       bool bDevice = isDevice(fileName);
       if (bDevice) {
          mtd_info_t meminfo;
@@ -257,8 +324,14 @@ bool uBootParams_t::save( char const *fileName )
          else
             perror( "MEMGETINFO" );
       } else {
-            fprintf( stderr, "save to file here\n" );
-      }
+#endif
+         int numWritten = write( fd, writeable, dataMax_ );
+         worked = (numWritten == dataMax_);
+         if( !worked )
+            perror( fileName );
+#ifdef __arm__
+      } // not device on ARM
+#endif
       delete [] writeable ;
       close( fd );
    }
@@ -286,6 +359,7 @@ int main( int argc, char const * const argv[] ){
          if( 2 == argc ){
             dump( params );
          }
+#ifdef __arm__
          else if( 3 == argc ){
             char const *value = params.find(argv[2]);
             if( value )
@@ -306,12 +380,28 @@ int main( int argc, char const * const argv[] ){
          }
          else
             fprintf( stderr, "Usage: %s /dev/mtdX [name [value]]\n", argv[0] );
+#else
+         else if( 3 == argc ){
+            dump( params );
+            if( params.save(argv[2]) ){
+               printf( "saved to %s\n", argv[2] );
+            }
+            else
+               printf( "error saving to %s\n", argv[2] );
+         }
+         else
+            fprintf( stderr, "Usage: %s inputFile [outputFile]\n", argv[0] );
+#endif
       }
       else
          fprintf( stderr, "Error parsing variables from %s\n", argv[1] );
    }
    else
+#ifdef __arm__
       fprintf( stderr, "Usage: %s /dev/mtdX [name [value]]\n", argv[0] );
+#else
+      fprintf( stderr, "Usage: %s inputFile [outputFile]\n", argv[0] );
+#endif
 
    return 0 ;
 }
