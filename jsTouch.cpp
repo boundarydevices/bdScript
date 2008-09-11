@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.30  2008-09-11 00:27:55  ericn
+ * [jsTouch] Remove use of wire count for calibration settings
+ *
  * Revision 1.29  2008-06-25 01:19:38  ericn
  * add real mouse support (Davinci only)
  *
@@ -117,10 +120,12 @@
 #include "zOrder.h"
 #include "jsGlobals.h"
 #include "touchPoll.h"
+// #define DEBUGPRINT
 #include "debugPrint.h"
 #include "flashVar.h"
 #include "ucb1x00_pins.h"
 #include <math.h>
+#include "touchCalibrate.h"
 
 #include "config.h"
 #ifdef CONFIG_MCP_UCB1400_TS
@@ -138,8 +143,6 @@ public:
    virtual void onRelease( timeval const &tv );
    void translate( int &x, int &y ) const ;
 
-   void setCooked( char const *data );
-
 // protected:
    box_t    *curBox_ ;
    bool      wasDown_ ;
@@ -152,7 +155,6 @@ public:
    jsval     onMoveObject_ ;
    jsval     onMoveCode_ ;
    bool      raw_ ;
-   long      coef_[6];     // 24.8
    unsigned  numTouches_ ;
    int       lastX_[4];
    int       lasyY_[4];
@@ -177,43 +179,29 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
    , xSum_( 0 )
    , ySum_( 0 )
 {
-   memset( coef_, 0, sizeof( coef_ ) );
-   static char const calibrateVar[] = {
-      "tsCalibrate"
-   };
-
-   char const *flashVar = readFlashVar( calibrateVar );
+   char temp[80];
+   fbDevice_t &fb = getFB();
+   snprintf( temp, sizeof(temp), "t%ux%u", fb.getWidth(), fb.getHeight() );
+   char const *flashVar = readFlashVar( temp );
+   debugPrint( "calibrate var:<%s> == %s\n", temp, flashVar );
    if( flashVar )
    {
-      debugPrint( "<%s>\n", flashVar );
-      setCooked( flashVar );
+      raw_ = false ;
    }
    else
       fprintf( stderr, "No touch screen settings, using raw input\n" );
-}
-
-void jsTouchPoll_t :: setCooked( char const *data )
-{
-   double a[6];
-   if( 6 == sscanf( data, "%lf,%lf,%lf,%lf,%lf,%lf", a, a+1, a+2, a+3, a+4, a+5 ) )
-   {
-      raw_ = false ;
-
-      for( unsigned i = 0 ; i < 6 ; i++ )
-         coef_[i] = (long)floor( 65536*a[i] );
-   }
-   else
-      fprintf( stderr, "Invalid calibration settings\n" );
 }
 
 void jsTouchPoll_t :: translate( int &x, int &y ) const 
 {
    if( !raw_ )
    {
-      int const yIn = y ;
-      int const xIn = x ;
-      x = (coef_[0]*xIn + coef_[1]*yIn + coef_[2])/65536 ;
-      y = (coef_[3]*xIn + coef_[4]*yIn + coef_[5])/65536 ;
+      point_t in ; in.x = x ; in.y = y ;
+      point_t out = in ;
+
+      touchCalibration_t::get().translate(in,out);
+      x = out.x ;
+      y = out.y ;
    }
 }
 
@@ -413,22 +401,6 @@ jsSetRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 }
 
 static JSBool
-jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_VOID ;
-   if( ( 1 == argc )
-       &&
-       JSVAL_IS_STRING( argv[0] ) )
-   {
-      touchPoll_->setCooked( JS_GetStringBytes( JSVAL_TO_STRING( argv[0] ) ) ) ;
-   }
-   else
-      JS_ReportError( cx, "Usage: touchScreen.setCooked( { scale:{ x:#, y:# }, origin:{ x:#, y:# }, range:{ x:#, y:# }, swapXY=bool } )" );
-
-   return JS_TRUE ;
-}
-
-static JSBool
 jsTouchTime( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = INT_TO_JSVAL( (touchTime_.tv_sec*1000)+(touchTime_.tv_usec / 1000) );
@@ -531,7 +503,6 @@ static JSFunctionSpec touchMethods_[] = {
     {"getY",         jsGetTouchY,           0 },
     {"isRaw",        jsIsRaw,               0 },
     {"setRaw",       jsSetRaw,              0 },
-    {"setCooked",    jsSetCooked,           0 },
     {"touchTime",    jsTouchTime,           0 },
     {"releaseTime",  jsReleaseTime,         0 },
 #ifdef CONFIG_MCP_UCB1400_TS
