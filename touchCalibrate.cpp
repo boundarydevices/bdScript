@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.6  2008-09-21 21:59:07  ericn
+ * [touchCalibrate] Use tWxH.dat if calibration not in flash
+ *
  * Revision 1.5  2008-09-11 00:28:16  ericn
  * Remove use of wire count for calibration settings
  *
@@ -86,10 +89,6 @@ void touchCalibration_t::setCalibration( char const *data )
       delete calib ;
 }
 
-static char const tsTypeFile[] = {
-   "/proc/tstype"
-};
-
 touchCalibration_t::touchCalibration_t( void )
    : data_( 0 )
 {
@@ -99,9 +98,27 @@ touchCalibration_t::touchCalibration_t( void )
       char const *flashVar = readFlashVar(inbuf);
       if( flashVar ){
          setCalibration( flashVar );
+         return ;
       }
-      else
-         fprintf( stderr, "%s: no touch screen settings\n", inbuf );
+      else {
+         strcat(inbuf, ".dat");
+         FILE *fIn = fopen(inbuf, "r");
+         if( fIn ){
+            bool haveData = false ;
+            char tmp[512];
+            if(fgets(tmp,sizeof(tmp),fIn)){
+               setCalibration(tmp);
+               haveData = true ;
+            }
+            fclose(fIn);
+            if(haveData)
+               return ;
+         }
+         else
+            perror(inbuf);
+      }
+      
+      fprintf( stderr, "%s: no touch screen settings\n", inbuf );
 }
 
 touchCalibration_t::~touchCalibration_t( void )
