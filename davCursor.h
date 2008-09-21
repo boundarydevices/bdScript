@@ -1,5 +1,5 @@
 #ifndef __DAVCURSOR_H__
-#define __DAVCURSOR_H__ "$Id: davCursor.h,v 1.1 2008-06-24 23:32:48 ericn Exp $"
+#define __DAVCURSOR_H__ "$Id: davCursor.h,v 1.2 2008-09-21 21:56:25 ericn Exp $"
 
 /*
  * davCursor.h
@@ -17,6 +17,9 @@
  * Change History : 
  *
  * $Log: davCursor.h,v $
+ * Revision 1.2  2008-09-21 21:56:25  ericn
+ * [davCursor] No copy constructor
+ *
  * Revision 1.1  2008-06-24 23:32:48  ericn
  * [jsCursor] Add support for Davinci HW cursor
  *
@@ -54,6 +57,7 @@ public:
 	static void destroy();
 
 private:
+        davCursor_t( davCursor_t const & );
 	int const fdMem_ ;
 	void 	 *mem_ ;
 	unsigned *reg_rectcur_ ;	// 0x01c72610
