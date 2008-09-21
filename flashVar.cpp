@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: flashVar.cpp,v $
+ * Revision 1.17  2008-09-21 21:55:08  ericn
+ * [flashVar] return success/fail status from writeFlashVar
+ *
  * Revision 1.16  2008-08-30 18:40:11  ericn
  * [flashVar] Get rid of debug printf
  *
@@ -422,9 +425,10 @@ void writeEntries(int fd, entry_t* pe,int cnt,int totalExpected)
 //
 // writes the specified flash variable with the specified value
 //
-void writeFlashVar( char const *name,
+bool writeFlashVar( char const *name,
                     char const *value )
 {
+   bool worked = false ;
    readVars_t rv ;
    char const *devName = GetFlashDev();
    debugPrint( "opening flash device %s\n", devName );
@@ -602,7 +606,8 @@ printf( "saving %u bytes\n", uniqueSize );
                            {
                               if( offset == (unsigned)lseek( fd, offset, SEEK_SET ) )
                               {
-				writeEntries(fd, entries,numUnique,uniqueSize);
+			         writeEntries(fd, entries,numUnique,uniqueSize);
+                                 worked = true ;
                               }
                               else
                                  perror( "lseek3" );
@@ -617,6 +622,7 @@ printf( "saving %u bytes\n", uniqueSize );
                         perror( "MEMGETINFO" );
 		  } else {
 			writeEntries(fd, entries,numUnique,uniqueSize);
+                        worked = true ;
 		  }
       
                   close( fd );
@@ -633,6 +639,7 @@ printf( "saving %u bytes\n", uniqueSize );
             fprintf( stderr, "Error counting entries: why is size so big?\n" );
       }
    }
+   return worked ;
 }
 
 #ifdef STANDALONE
