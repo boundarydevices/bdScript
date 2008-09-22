@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.31  2008-09-22 17:25:18  ericn
+ * [jsTouch] Use inputTouch, not ucb1x00
+ *
  * Revision 1.30  2008-09-11 00:27:55  ericn
  * [jsTouch] Remove use of wire count for calibration settings
  *
@@ -119,29 +122,29 @@
 #include "codeQueue.h"
 #include "zOrder.h"
 #include "jsGlobals.h"
-#include "touchPoll.h"
-// #define DEBUGPRINT
+#include "inputTouch.h"
+#include "inputDevs.h"
+#define DEBUGPRINT
 #include "debugPrint.h"
 #include "flashVar.h"
 #include "ucb1x00_pins.h"
 #include <math.h>
-#include "touchCalibrate.h"
 
 #include "config.h"
 #ifdef CONFIG_MCP_UCB1400_TS
 #include "linux/ucb1x00-adc.h"
 #endif
 
-class jsTouchPoll_t : public touchPoll_t {
+class jsTouchPoll_t : public inputTouchScreen_t {
 public:
-   jsTouchPoll_t( void );
+   jsTouchPoll_t( char const *devName );
+   virtual ~jsTouchPoll_t( void );
 
-   ~jsTouchPoll_t( void );
+   virtual void onTouch( unsigned x, unsigned y );
+   virtual void onRelease( void );
 
-   virtual void onTouch( int x, int y, unsigned pressure, timeval const &tv );
-   virtual void onMove( int x, int y, unsigned pressure, timeval const &tv );
-   virtual void onRelease( timeval const &tv );
-   void translate( int &x, int &y ) const ;
+   void onMove( int x, int y );
+//   void translate( unsigned &x, unsigned &y ) const ;
 
 // protected:
    box_t    *curBox_ ;
@@ -154,7 +157,6 @@ public:
    jsval     onReleaseCode_ ;
    jsval     onMoveObject_ ;
    jsval     onMoveCode_ ;
-   bool      raw_ ;
    unsigned  numTouches_ ;
    int       lastX_[4];
    int       lasyY_[4];
@@ -162,8 +164,8 @@ public:
    int       ySum_ ;
 };
 
-jsTouchPoll_t :: jsTouchPoll_t( void )
-   : touchPoll_t( pollHandlers_ )
+jsTouchPoll_t :: jsTouchPoll_t( char const *devName )
+   : inputTouchScreen_t( pollHandlers_, devName )
    , curBox_( 0 )
    , wasDown_( true )
    , prevX_( -1 )
@@ -174,35 +176,11 @@ jsTouchPoll_t :: jsTouchPoll_t( void )
    , onReleaseCode_( JSVAL_VOID )
    , onMoveObject_( JSVAL_VOID )
    , onMoveCode_( JSVAL_VOID )
-   , raw_( true )
    , numTouches_( 0 )
    , xSum_( 0 )
    , ySum_( 0 )
 {
-   char temp[80];
-   fbDevice_t &fb = getFB();
-   snprintf( temp, sizeof(temp), "t%ux%u", fb.getWidth(), fb.getHeight() );
-   char const *flashVar = readFlashVar( temp );
-   debugPrint( "calibrate var:<%s> == %s\n", temp, flashVar );
-   if( flashVar )
-   {
-      raw_ = false ;
-   }
-   else
-      fprintf( stderr, "No touch screen settings, using raw input\n" );
-}
-
-void jsTouchPoll_t :: translate( int &x, int &y ) const 
-{
-   if( !raw_ )
-   {
-      point_t in ; in.x = x ; in.y = y ;
-      point_t out = in ;
-
-      touchCalibration_t::get().translate(in,out);
-      x = out.x ;
-      y = out.y ;
-   }
+   printf( "touch screen %s %s\n", devName, isOpen() ? "open" : "error opening" );
 }
 
 jsTouchPoll_t :: ~jsTouchPoll_t( void )
@@ -212,10 +190,10 @@ jsTouchPoll_t :: ~jsTouchPoll_t( void )
 static timeval touchTime_ = { 0 };
 static timeval releaseTime_ = { 0 };
 
-void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &tv )
+void jsTouchPoll_t :: onTouch( unsigned x, unsigned y )
 {
    debugPrint( "raw: %d/%d\n", x, y );
-   translate( x, y );
+//   translate( x, y );
    debugPrint( "cooked: %d/%d\n", x, y );
 
    prevX_ = x ; // set here so code has access to it
@@ -223,11 +201,11 @@ void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &t
 
    if( 0 != curBox_ )
    {
-      onMove( x, y, pressure, tv );
+      onMove( x, y );
    } // already touching, move or release
    else
    {
-      touchTime_ = tv ;
+      gettimeofday(&touchTime_, 0);
       std::vector<box_t *> boxes = getZMap().getBoxes( x, y );
       if( 0 < boxes.size() )
       {
@@ -251,7 +229,7 @@ void jsTouchPoll_t :: onTouch( int x, int y, unsigned pressure, timeval const &t
    wasDown_ = true ;
 }
 
-void jsTouchPoll_t :: onMove( int x, int y, unsigned pressure, timeval const &tv )
+void jsTouchPoll_t :: onMove( int x, int y )
 {
    if( 0 != curBox_ )
    {
@@ -291,11 +269,12 @@ void jsTouchPoll_t :: onMove( int x, int y, unsigned pressure, timeval const &tv
    } // no boxes... look for global handler
 }
 
-void jsTouchPoll_t :: onRelease( timeval const &tv )
+void jsTouchPoll_t :: onRelease()
 {
+   debugPrint( "%s\n", __PRETTY_FUNCTION__);
    if( 0 != curBox_ )
    {
-      releaseTime_ = tv ;
+      gettimeofday(&releaseTime_,0);
       curBox_->onRelease_( *curBox_, prevX_, prevY_ );
       curBox_ = 0 ;
    } // touching, move or release box
@@ -309,9 +288,7 @@ static jsTouchPoll_t *touchPoll_ = 0 ;
 void onRelease( void )
 {
    if( touchPoll_ ){
-      timeval now ;
-      gettimeofday(&now, 0);
-      touchPoll_->onRelease(now);
+      touchPoll_->onRelease();
    }
 }
 
@@ -387,7 +364,7 @@ jsGetTouchY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
 static JSBool
 jsIsRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = touchPoll_->raw_ ? JSVAL_TRUE : JSVAL_FALSE ;
+   *rval = touchPoll_->isRaw() ? JSVAL_TRUE : JSVAL_FALSE ;
    
    return JS_TRUE ;
 }
@@ -395,7 +372,6 @@ jsIsRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 static JSBool
 jsSetRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   touchPoll_->raw_ = true ;
    *rval = JSVAL_VOID ;
    return JS_TRUE ;
 }
@@ -412,21 +388,6 @@ static JSBool
 jsReleaseTime( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = INT_TO_JSVAL( (releaseTime_.tv_sec*1000)+(releaseTime_.tv_usec / 1000) );
-
-   return JS_TRUE ;
-}
-
-static JSBool
-jsDump( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   if( touchPoll_ ){
-      touchPoll_->dump();
-      *rval = JSVAL_TRUE ;
-   }
-   else {
-      *rval = JSVAL_FALSE ;
-      JS_ReportError( cx, "No touch screen object\n" );
-   }
 
    return JS_TRUE ;
 }
@@ -509,7 +470,6 @@ static JSFunctionSpec touchMethods_[] = {
     {"getPin",       jsGetPin,              0 },
     {"setPin",       jsSetPin,              0 },
 #endif
-    {"dump",         jsDump,                0 },
     {0}
 };
 
@@ -574,14 +534,25 @@ bool initJSTouch( JSContext *cx,
                                JSPROP_ENUMERATE
                                |JSPROP_PERMANENT
                                |JSPROP_READONLY );
-            touchPoll_ = new jsTouchPoll_t ;
-            JS_AddRoot( cx, &touchPoll_->onTouchCode_ );
-            JS_AddRoot( cx, &touchPoll_->onMoveCode_ );
-            JS_AddRoot( cx, &touchPoll_->onReleaseCode_ );
-            JS_AddRoot( cx, &touchPoll_->onTouchObject_ );
-            JS_AddRoot( cx, &touchPoll_->onReleaseObject_ );
-            JS_AddRoot( cx, &touchPoll_->onMoveObject_ );
-            return true ;
+            inputDevs_t devs ;
+
+            for( unsigned i = 0 ; i < devs.count(); i++ ){
+               inputDevs_t::type_e type ;
+               unsigned evIdx ;
+               devs.getInfo(i,type,evIdx);
+               if( inputDevs_t::TOUCHSCREEN == type ){
+                  char devName[512];
+                  snprintf( devName, sizeof(devName),"/dev/input/event%u", evIdx );
+                  touchPoll_ = new jsTouchPoll_t( devName );
+                  JS_AddRoot( cx, &touchPoll_->onTouchCode_ );
+                  JS_AddRoot( cx, &touchPoll_->onMoveCode_ );
+                  JS_AddRoot( cx, &touchPoll_->onReleaseCode_ );
+                  JS_AddRoot( cx, &touchPoll_->onTouchObject_ );
+                  JS_AddRoot( cx, &touchPoll_->onReleaseObject_ );
+                  JS_AddRoot( cx, &touchPoll_->onMoveObject_ );
+                  return true ;
+               }
+            }
          }
          else
             JS_ReportError( cx, "defining touch screen" );
