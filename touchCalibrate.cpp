@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.7  2008-09-22 17:24:41  ericn
+ * [touchCalibrate] Look in /mmc/ for touch calibration file
+ *
  * Revision 1.6  2008-09-21 21:59:07  ericn
  * [touchCalibrate] Use tWxH.dat if calibration not in flash
  *
@@ -101,8 +104,9 @@ touchCalibration_t::touchCalibration_t( void )
          return ;
       }
       else {
-         strcat(inbuf, ".dat");
-         FILE *fIn = fopen(inbuf, "r");
+         char calPath[512];
+         snprintf( calPath, sizeof(calPath), "/mmc/%s.dat", inbuf );
+         FILE *fIn = fopen(calPath, "r");
          if( fIn ){
             bool haveData = false ;
             char tmp[512];
@@ -115,7 +119,7 @@ touchCalibration_t::touchCalibration_t( void )
                return ;
          }
          else
-            perror(inbuf);
+            perror(calPath);
       }
       
       fprintf( stderr, "%s: no touch screen settings\n", inbuf );
