@@ -106,3 +106,4 @@ yuvImgFile
 *.bin
 makeFlash gpio-trig mtdInfo totalflash
 physMem
+bltTest inputDevs
