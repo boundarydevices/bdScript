@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.cpp,v $
+ * Revision 1.8  2008-09-22 18:36:49  ericn
+ * [davinci] Add some coexistence stuff for davinci_code
+ *
  * Revision 1.7  2008-09-22 17:24:41  ericn
  * [touchCalibrate] Look in /mmc/ for touch calibration file
  *
@@ -39,6 +42,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#ifdef __DAVINCIFB__
+#include "fbDevices.h"
+#else
+#include "fbDev.h"
+#endif
 
 static touchCalibration_t *inst_ = 0 ;
 
@@ -66,7 +74,6 @@ void touchCalibration_t::setCalibration( char const *data )
       delete data_ ;
       data_ = 0 ;
    }
-   fbDevice_t &fb = getFB();
    char temp[512];
    strncpy( temp, data, sizeof(temp)-1 );
    temp[sizeof(temp)-1] = '\0' ;
@@ -84,7 +91,7 @@ void touchCalibration_t::setCalibration( char const *data )
       return ;
    }
 
-   calibrateQuadrant_t *calib = new calibrateQuadrant_t( points, fb.getWidth(), fb.getHeight() );
+   calibrateQuadrant_t *calib = new calibrateQuadrant_t( points, SCREENWIDTH(), SCREENHEIGHT() );
    if( calib->isValid() ){
       data_ = calib ;
    }
@@ -96,8 +103,7 @@ touchCalibration_t::touchCalibration_t( void )
    : data_( 0 )
 {
       char inbuf[80];
-      fbDevice_t &fb = getFB();
-      snprintf(inbuf,sizeof(inbuf), "t%ux%u", fb.getWidth(), fb.getHeight() );
+      snprintf(inbuf,sizeof(inbuf), "t%ux%u", SCREENWIDTH(), SCREENHEIGHT() );
       char const *flashVar = readFlashVar(inbuf);
       if( flashVar ){
          setCalibration( flashVar );

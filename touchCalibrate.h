@@ -1,5 +1,5 @@
 #ifndef __TOUCHCALIBRATE_H__
-#define __TOUCHCALIBRATE_H__ "$Id: touchCalibrate.h,v 1.2 2008-08-23 22:00:26 ericn Exp $"
+#define __TOUCHCALIBRATE_H__ "$Id: touchCalibrate.h,v 1.3 2008-09-22 18:36:49 ericn Exp $"
 
 /*
  * touchCalibrate.h
@@ -17,6 +17,9 @@
  * Change History : 
  *
  * $Log: touchCalibrate.h,v $
+ * Revision 1.3  2008-09-22 18:36:49  ericn
+ * [davinci] Add some coexistence stuff for davinci_code
+ *
  * Revision 1.2  2008-08-23 22:00:26  ericn
  * [touch calibration] Use calibrateQuadrant algorithm
  *
@@ -28,7 +31,12 @@
  * Copyright Boundary Devices, Inc. 2006
  */
 
+#ifdef __DAVINCIFB__
+#include "geometry.h"
+#else
 #include "fbDev.h"
+#endif
+
 #include "calibQuadrant.h"
 
 class touchCalibration_t {

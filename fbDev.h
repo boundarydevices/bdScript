@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.26 2007-08-08 17:11:54 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.27 2008-09-22 18:36:49 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,6 +13,9 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
+ * Revision 1.27  2008-09-22 18:36:49  ericn
+ * [davinci] Add some coexistence stuff for davinci_code
+ *
  * Revision 1.26  2007-08-08 17:11:54  ericn
  * -[sm501] /dev/fb0 not /dev/fb/0
  *
@@ -103,8 +106,8 @@
 #include "config.h"
 
 struct point_t {
-   unsigned x ;
-   unsigned y ;
+   int x ;
+   int y ;
 };
 
 struct rectangle_t {
@@ -298,6 +301,8 @@ private:
 
 fbDevice_t &getFB( char const *devName = "/dev/fb0" );
 
+#define SCREENWIDTH() getFB().getWidth()
+#define SCREENHEIGHT() getFB().getHeight()
 
 unsigned short fbDevice_t :: get16( unsigned long rgb )
 { 

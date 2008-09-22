@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: calibQuadrant.cpp,v $
+ * Revision 1.2  2008-09-22 18:36:49  ericn
+ * [davinci] Add some coexistence stuff for davinci_code
+ *
  * Revision 1.1  2008-08-23 22:00:26  ericn
  * [touch calibration] Use calibrateQuadrant algorithm
  *
@@ -89,7 +92,7 @@ calibrateQuadrant_t::~calibrateQuadrant_t( void )
 }
 
 
-bool calibrateQuadrant_t::translate( int i, int j, unsigned &x, unsigned &y )
+bool calibrateQuadrant_t::translate( int i, int j, int &x, int &y )
 {
    unsigned tmpx, tmpy ;
    if( coef_[global]->translate(i, j, tmpx, tmpy) ){
@@ -123,7 +126,8 @@ bool calibrateQuadrant_t::translate( int i, int j, unsigned &x, unsigned &y )
             q = qbottom ;
       } 
 
-      if( coef_[q]->translate(i,j,x,y) ){
+      if( coef_[q]->translate(i,j,tmpx,tmpy) ){
+         x = tmpx ; y = tmpy ;
          return true ;
       }
       else
@@ -132,10 +136,15 @@ bool calibrateQuadrant_t::translate( int i, int j, unsigned &x, unsigned &y )
    return false ;
 }
 
-bool calibrateQuadrant_t::translate_force( unsigned const q, int i, int j, unsigned &x, unsigned &y )
+bool calibrateQuadrant_t::translate_force( unsigned const q, int i, int j, int &x, int &y )
 {
-   if( (q < NUM_CALIBRATIONS) && isValid() && (0 != coef_[q]) )
-      return coef_[q]->translate(i,j,x,y);
+   if( (q < NUM_CALIBRATIONS) && isValid() && (0 != coef_[q]) ){
+      unsigned tmpx, tmpy ;
+      if( coef_[q]->translate(i,j,tmpx,tmpy) ){
+         x=tmpx ; y=tmpy ;
+         return true ;
+      }
+   }
 
    return false ;
 }

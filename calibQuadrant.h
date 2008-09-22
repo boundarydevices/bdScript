@@ -1,5 +1,5 @@
 #ifndef __CALIBQUADRANT_H__
-#define __CALIBQUADRANT_H__ "$Id: calibQuadrant.h,v 1.1 2008-08-23 22:00:26 ericn Exp $"
+#define __CALIBQUADRANT_H__ "$Id: calibQuadrant.h,v 1.2 2008-09-22 18:36:49 ericn Exp $"
 
 /*
  * calibQuadrant.h
@@ -30,6 +30,9 @@
  * Change History : 
  *
  * $Log: calibQuadrant.h,v $
+ * Revision 1.2  2008-09-22 18:36:49  ericn
+ * [davinci] Add some coexistence stuff for davinci_code
+ *
  * Revision 1.1  2008-08-23 22:00:26  ericn
  * [touch calibration] Use calibrateQuadrant algorithm
  *
@@ -48,7 +51,7 @@ public:
 
    inline bool isValid( void ) const { return isValid_ ; }
 
-   bool translate( int i, int j, unsigned &x, unsigned &y );
+   bool translate( int i, int j, int &x, int &y );
 
    enum {
       global  = 0,
@@ -60,7 +63,7 @@ public:
    };
 
    // for testing purposes, you can see the output of various quadrants
-   bool translate_force( unsigned const q, int i, int j, unsigned &x, unsigned &y );
+   bool translate_force( unsigned const q, int i, int j, int &x, int &y );
 
 private:
    bool                     isValid_ ;
