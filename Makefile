@@ -137,7 +137,9 @@ endif
 
 ifeq (y,$(KERNEL_INPUT))
 OBJS += inputPoll.o \
-        jsInput.o
+        jsInput.o \
+        inputDevs.o \
+        inputTouch.o 
 endif
 
 KERNEL_FB ?= y
@@ -160,7 +162,6 @@ OBJS += \
        madDecode.o \
        madHeaders.o \
        touchCalibrate.o \
-       touchPoll.o \
        touchSignal.o \
        zOrder.o \
 
