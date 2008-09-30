@@ -91,8 +91,8 @@ debugPrint( "%s: released\n", __PRETTY_FUNCTION__ );
             point_t raw ; raw.x = i_ ; raw.y = j_ ;
             point_t cooked ;
             touchCalibration_t::get().translate(raw,cooked);
-            unsigned const fbw = SCREENWIDTH();
-            unsigned const fbh = SCREENHEIGHT();
+            int const fbw = SCREENWIDTH();
+            int const fbh = SCREENHEIGHT();
 
             i_ = cooked.x ; if( 0 > i_ ) i_ = 0 ; if( i_ >= fbw ) i_ = fbw-1 ;
             j_ = cooked.y ; if( 0 > j_ ) j_ = 0 ; if( j_ >= fbh ) j_ = fbh-1 ;
