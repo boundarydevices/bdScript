@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.103  2008-09-30 23:21:07  ericn
+ * remove unused variable
+ *
  * Revision 1.102  2008-09-09 17:42:10  ericn
  * [audio] Don't pre-open audioOutPoll
  *
@@ -498,7 +501,6 @@ static bool mainLoop( pollHandlerSet_t &polls,
    if( !( gotoCalled_ || execCalled_ || exitRequested_ ) )
    {
       static unsigned iterations = 0 ;
-      bool prevActive = false ;
       bool active = polls.poll( 5000 );
       if( active ){
          iterations++ ;
