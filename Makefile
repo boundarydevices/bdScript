@@ -35,7 +35,6 @@ OBJS = \
        dirByATime.o \
        dither.o \
        dnsPoll.o \
-       dspOutSignal.o \
        dumpCPP.o \
        fbDev.o \
        ftObjs.o \
@@ -106,9 +105,7 @@ OBJS = \
        screenImage.o \
        semClasses.o \
        serialPoll.o \
-       serialSignal.o \
        setSerial.o \
-       sniffWLAN.o \
        tcpPoll.o \
        trace.o \
        ttyPoll.o \
@@ -162,7 +159,6 @@ OBJS += \
        madDecode.o \
        madHeaders.o \
        touchCalibrate.o \
-       touchSignal.o \
        zOrder.o \
 
 HARDWARE_TYPE += -DKERNEL_FB=1
@@ -295,7 +291,7 @@ ODOMOBJS = \
 
 ODOMLIB = $(INSTALL_ROOT)/lib/libOdometer.a
 
-CXXFLAGS=
+CXXFLAGS=-Werror -fno-strict-aliasing
 
 ifeq (y,$(KERNEL_ARCH_PXA))
         CXXFLAGS += -mcpu=xscale
