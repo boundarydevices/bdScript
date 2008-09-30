@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jpegToYUV.cpp,v $
+ * Revision 1.2  2008-09-30 23:32:40  ericn
+ * remove unused variable (fb)
+ *
  * Revision 1.1  2008-06-08 19:52:13  ericn
  * add jpeg->YUV support
  *
@@ -135,7 +138,6 @@ bool jpegToYUV( void const    *inData,     // input
                                                    row_stride, 1);
    jpeg_start_decompress(&cinfo);
 
-   fbDevice_t &fb = getFB();
    unsigned char * const pixMap = new unsigned char[ cinfo.output_height*cinfo.output_width*2 ];
    unsigned char *yuvOut = pixMap ;
    
