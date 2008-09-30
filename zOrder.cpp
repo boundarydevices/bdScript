@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: zOrder.cpp,v $
+ * Revision 1.5  2008-09-30 23:19:31  ericn
+ * get SCREENWIDTH/SCREENHEIGHT from fbDev.h
+ *
  * Revision 1.4  2008-04-01 18:53:31  ericn
  * -update for Davinci
  *
@@ -28,12 +31,8 @@
 #include "zOrder.h"
 #ifdef __DAVINCIFB__
 #include "fbDevices.h"
-#define SCREENWIDTH() getFbDevs().osd0().width()
-#define SCREENHEIGHT() getFbDevs().osd0().height()
 #else
 #include "fbDev.h"
-#define SCREENWIDTH() getFB().getWidth()
-#define SCREENHEIGHT() getFB().getHeight()
 #endif
 #include <assert.h>
 #include <stdio.h>
