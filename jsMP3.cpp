@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsMP3.cpp,v $
+ * Revision 1.29  2008-09-30 23:20:13  ericn
+ * bypass 'type-punned' warning
+ *
  * Revision 1.28  2008-06-11 18:13:04  ericn
  * -[jsMP3] add method mp3Close()
  *
@@ -504,7 +507,7 @@ static void waveFileOnComplete( jsCurlRequest_t &req, void const *data, unsigned
    
          if( ( 0 < sampleRate ) && ( bytesPerSecond > sampleRate ) )
          {
-            unsigned short const *const words = (unsigned short const *)longs ;
+            unsigned short const *const words = (unsigned short const *)(&longs[0]);
             unsigned short const numChannels = words[11];
             if( ( WAVE_FORMAT_PCM == words[10] ) 
                 && 
