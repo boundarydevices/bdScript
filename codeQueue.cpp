@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: codeQueue.cpp,v $
+ * Revision 1.24  2008-09-30 23:22:40  ericn
+ * stop using offsetof so compiler stays happy
+ *
  * Revision 1.23  2006-12-01 18:33:33  tkisky
  * -include assert.h
  *
@@ -214,8 +217,10 @@ bool queueCallback( callback_t callback,
    {
       for( list_head *next = filters_.next ; next != &filters_ ; next = next->next )
       {
-         char *address = (char *)next - offsetof(codeFilter_t,chain_);
-         codeFilter_t *filter = (codeFilter_t *)address ;
+         codeFilter_t *filter = (codeFilter_t *)next ;
+         unsigned offset = ((char *)&filter->chain_) - (char *)filter ;
+         char *address = (char *)next - offset ;
+         filter = (codeFilter_t *)address ;
          if( filter->isHandled( callback, cbData ) )
          {
             if( filter->isDone() )
