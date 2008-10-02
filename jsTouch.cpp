@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.32  2008-10-02 23:19:08  ericn
+ * [jsTouch] Updated to call inputTouchScreen_t::onRelease() to reset median filters
+ *
  * Revision 1.31  2008-09-22 17:25:18  ericn
  * [jsTouch] Use inputTouch, not ucb1x00
  *
@@ -124,7 +127,7 @@
 #include "jsGlobals.h"
 #include "inputTouch.h"
 #include "inputDevs.h"
-#define DEBUGPRINT
+// #define DEBUGPRINT
 #include "debugPrint.h"
 #include "flashVar.h"
 #include "ucb1x00_pins.h"
@@ -281,6 +284,7 @@ void jsTouchPoll_t :: onRelease()
    else if( JSVAL_VOID != onReleaseCode_ )
       executeCode( JSVAL_TO_OBJECT( onReleaseObject_ ), onReleaseCode_, "onRelease" );
    wasDown_ = false ;
+   inputTouchScreen_t::onRelease();
 }
 
 static jsTouchPoll_t *touchPoll_ = 0 ;
