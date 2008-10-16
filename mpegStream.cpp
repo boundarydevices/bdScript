@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: mpegStream.cpp,v $
+ * Revision 1.8  2008-10-16 00:10:57  ericn
+ * [mpegStream test prog] Display pts
+ *
  * Revision 1.7  2006-09-17 15:54:32  ericn
  * -use unbuffered I/O for stream
  *
@@ -184,7 +187,7 @@ int main( int argc, char const * const argv[] )
          while( stream.getFrame( frame, frameLen, pts, streamId, type, codecId ) )
          {
             adler = adler32( adler, frame, frameLen );
-            printf( "%d/%u/%08lX/%08lx\n", type, frameLen, adler32( 0, frame, frameLen ), adler );
+            printf( "%d/%u/0x%016llx/%08lX/%08lx\n", type, frameLen, pts, adler32( 0, frame, frameLen ), adler );
             bool isVideo = ( CODEC_TYPE_VIDEO == type );
             ++frameCounts[isVideo];
             byteCounts[isVideo] += frameLen ;
