@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: imgJPEG.cpp,v $
+ * Revision 1.8  2008-10-16 00:10:11  ericn
+ * [imgJPEG test prog] Display to default FB
+ *
  * Revision 1.7  2008-07-17 20:46:57  ericn
  * -fix skip_input routine
  *
@@ -219,6 +222,7 @@ bool imageJPEG( void const    *inData,     // input
 
 #include "hexDump.h"
 #include "memFile.h"
+#include "fbDev.h"
 
 int main( int argc, char const * const argv[] )
 {
@@ -238,6 +242,7 @@ int main( int argc, char const * const argv[] )
          {
 
             printf( "image: %u x %u pixels\n", width, height );
+            getFB().render( 0, 0, width, height, (unsigned short *)pixData, (unsigned char *)0 );
             unsigned long size = (unsigned long)width * height * 2 ;
             hexDumper_t dump( pixData, size );
             while( dump.nextLine() )
