@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: odomGraphics.cpp,v $
+ * Revision 1.6  2008-10-16 00:10:31  ericn
+ * [odomGraphics] Fix compiler warning
+ *
  * Revision 1.5  2007-08-19 19:18:26  ericn
  * -[cleanup] remove unused (and obsolete) header
  *
@@ -222,7 +225,7 @@ printf( "   comma1 at %u\n", rightEdge );
 printf( "   comma2 at %u\n", rightEdge );
          }
          rightEdge -= digitWidth ;
-         if( dollarWidth <= rightEdge ){
+         if( dollarWidth <= (unsigned)rightEdge ){
             positions[j] = rightEdge ;
          }
          else
