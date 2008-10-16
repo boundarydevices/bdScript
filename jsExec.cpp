@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.104  2008-10-16 00:09:25  ericn
+ * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
+ *
  * Revision 1.103  2008-09-30 23:21:07  ericn
  * remove unused variable
  *
@@ -1062,14 +1065,7 @@ int main( int argc, char *argv[] )
          sigaction(SIGSEGV, &sa, NULL);
       }
 
-      char const *fbDevice = getenv("FRAMEBUFFER");
-      if( 0 == fbDevice )
-#ifdef KERNEL_FB
-         fbDevice = "/dev/fb0" ;
-#else
-         fbDevice = "/dev/lcd" ;
-#endif      
-      getFB( fbDevice );
+      getFB();
    
       for( unsigned i = 0 ; i < dim( requiredEnvVars ); i++ )
       {

@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.27 2008-09-22 18:36:49 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.28 2008-10-16 00:09:38 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,6 +13,9 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
+ * Revision 1.28  2008-10-16 00:09:38  ericn
+ * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
+ *
  * Revision 1.27  2008-09-22 18:36:49  ericn
  * [davinci] Add some coexistence stuff for davinci_code
  *
@@ -299,7 +302,7 @@ private:
    friend class flashThread_t ;
 };
 
-fbDevice_t &getFB( char const *devName = "/dev/fb0" );
+fbDevice_t &getFB( char const *devName = 0 );
 
 #define SCREENWIDTH() getFB().getWidth()
 #define SCREENHEIGHT() getFB().getHeight()

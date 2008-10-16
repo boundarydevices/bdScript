@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.36  2008-10-16 00:09:32  ericn
+ * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
+ *
  * Revision 1.35  2008-01-04 23:28:39  ericn
  * -more things conditional on KERNEL_FB_SM501
  *
@@ -131,6 +134,7 @@
 #define irqreturn_t int
 #include <assert.h>
 #include "tickMs.h"
+#include <stdlib.h>
 
 #ifdef KERNEL_FB_SM501
 #include <linux/sm501-int.h>
@@ -1490,8 +1494,15 @@ static fbDevice_t *dev_ = 0 ;
 
 fbDevice_t &getFB( char const *devName )
 {
-   if( 0 == dev_ )
+   if( 0 == dev_ ){
+      if( 0 == devName ){
+         printf( "Unspecified FB: use environment\n" );
+         devName = getenv("FBDEV");
+         if( 0 == devName )
+            devName = "/dev/fb0" ;
+      }
       dev_ = new fbDevice_t( devName );
+   }
    return *dev_ ;
 }
 
