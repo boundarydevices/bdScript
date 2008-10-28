@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
+ * Revision 1.57  2008-10-28 18:00:40  ericn
+ * [audioQueue] Force reset of sample rate
+ *
  * Revision 1.56  2008-07-17 22:48:00  ericn
  * [audio] make printf() a debugPrint()
  *
@@ -834,6 +837,7 @@ wrote += numWritten ;
                _playing = false ;
 
                closeWriteFd();
+               lastSampleRate = -1 ;
             }
             else
                perror( "audioWriteFd" );
@@ -1009,6 +1013,7 @@ wrote += numWritten ;
                   perror( "GETOSPACE" );
 
                closeWriteFd();
+               lastSampleRate = -1 ;
             }
             else
                perror( "audioWriteFd" );
@@ -1118,7 +1123,7 @@ wrote += numWritten ;
                }
 
                closeWriteFd();
-
+               lastSampleRate = -1 ;
             }
             else
                perror( "audioWriteFd" );
@@ -1419,6 +1424,7 @@ printf( "allocate frames: %u x %u\n", width, height );
                }
                
                closeWriteFd();
+               lastSampleRate = -1 ;
 
                mpegDemux_t::bulkInfo_t::clear( bi );
 
