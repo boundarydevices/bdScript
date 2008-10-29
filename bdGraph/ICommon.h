@@ -46,6 +46,7 @@ public:
 
 interface ImagePosition
 {
+	virtual ~ImagePosition(){}
 	virtual void Release() =0;
 	virtual void AddRef() =0;
 	virtual void GetRow() =0;
@@ -62,6 +63,7 @@ interface ImagePosition
 
 interface ImageData
 {
+	virtual ~ImageData(){}
 	virtual void Release() =0;
 	virtual void AddRef() =0;
 	virtual int GetRow(ImagePosition* pSample,int colorIndex,int parm) =0;
@@ -74,6 +76,7 @@ interface ImageData
 
 interface IFileData
 {
+	virtual ~IFileData(){}
 	virtual BOOL GetData(const BYTE** ppBuffer,DWORD* bytesRead,DWORD maxNeeded=0) =0;
 	virtual void Reset() =0;
 	virtual void ResetBounds(int backup,int length) =0;

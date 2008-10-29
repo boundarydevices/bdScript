@@ -32,7 +32,7 @@ public:
 		DWORD srcLeft,const DWORD srcTop,DWORD srcWidth,const DWORD srcHeight,
 		DWORD picLeft, DWORD picTop, DWORD picWidth, DWORD picHeight,
 		BYTE* inDibBits=NULL,DWORD inDibWidth=0);
-	~Scale();
+	virtual ~Scale();
 private:
     volatile ULONG	  m_cRef;             // Object reference count
 
