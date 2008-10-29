@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
+ * Revision 1.6  2008-10-29 15:30:36  ericn
+ * [sm501 cursor] Added full mouse cursor support on SM-501
+ *
  * Revision 1.5  2008-09-22 17:25:54  ericn
  * [cursor] Conditionally enable cursor (if mouse attached)
  *
@@ -37,23 +40,30 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #define irqreturn_t int
-#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
-#error got here
-#include <linux/sm501-int.h>
-#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
-#include "davCursor.h"
-#include "inputPoll.h"
-#include "jsGlobals.h"
-#include "box.h"
-// #define DEBUGPRINT
+
 #include "debugPrint.h"
 #include <vector>
 #include "zOrder.h"
 #include "jsTouch.h"
 #include <assert.h>
 #include "inputDevs.h"
+#include "inputPoll.h"
+#include "jsGlobals.h"
+#include "box.h"
 
-static davCursor_t *cursor_ = 0 ;
+#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
+   #include <linux/sm501-int.h>
+   #include "sm501Cursor.h"
+   static sm501Cursor_t *cursor_ = 0 ;
+#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+   #error got here
+   #include "davCursor.h"
+   static davCursor_t *cursor_ = 0 ;
+#elif defined(KERNEL_FB_PXA) && (KERNEL_FB_PXA == 1)
+#error got here
+#else
+#error Makefile should not build this
+#endif
 
 class jsMouse_t : public inputPoll_t {
 public:
@@ -84,6 +94,7 @@ jsMouse_t::jsMouse_t( char const *devName )
    
    fbDevice_t &fb = getFB();
    cursor_->setPos(fb.getWidth()/2, fb.getWidth()/2);
+   cursor_->activate();
 }
 
 jsMouse_t::~jsMouse_t( void )
@@ -131,6 +142,7 @@ void jsMouse_t::onData( struct input_event const &event )
       case EV_KEY: {
          int down = event.value ;
          int left = ( event.code == LMOUSEBUTTON );
+#if defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
          if( down ){
             cursor_->setWidth(SMALL);
             cursor_->setHeight(SMALL);
@@ -139,6 +151,7 @@ void jsMouse_t::onData( struct input_event const &event )
             cursor_->setWidth(BIG);
             cursor_->setHeight(BIG);
          }
+#endif
 
          if( left && ( down_ != down ) ){
             if( down ){
@@ -210,10 +223,6 @@ void jsMouse_t::release( void )
 
 static jsMouse_t *mouse_ = 0 ;
 
-#else
-#error Makefile should not build this
-#endif
-
 static JSBool
 jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -265,52 +274,16 @@ jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 			if ( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
 			{
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
-				unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
-				dither_t dither( pixData, bmWidth, bmHeight );
+                                if( 0 == cursor_ ){
+                                   unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
+                                   image_t img(pixData, bmWidth, bmHeight, alpha);
+                                   cursor_ = new sm501Cursor_t( img );
+   
+                                   *rval = JSVAL_TRUE ;
+                                }
+                                else
+                                   JS_ReportError(cx, "Mouse already defined" );
 
-				unsigned sm501_cursorWidth = 64 ;
-				unsigned sm501_cursorHeight = 64 ;
-				//
-				// SM-501 cursor is 64x64 pixels, each of 
-				// which is two bits long:
-				//	00	- transparent
-				//	01	- color 0 (black)
-				//	02 	- color 1 (white)
-				unsigned cursorBytes = sm501_cursorWidth*sm501_cursorHeight*2/8 ; 
-				fbDevice_t &fb = getFB();
-				unsigned long *cursorLongs = (unsigned long *)fb.getRow(fb.getHeight());
-				memset( cursorLongs, 0, cursorBytes );
-
-				// cursor is right after panel display area
-				unsigned const height = bmHeight > sm501_cursorHeight ? sm501_cursorHeight : bmHeight ;
-				unsigned const width =  bmWidth > sm501_cursorWidth ? sm501_cursorWidth : bmWidth ;
-
-				for( unsigned y = 0 ; y < height ; y++ ){
-					unsigned long accum = 0 ;
-					unsigned long shift = 0 ;
-					unsigned char whichLong = 0 ;
-
-					for( unsigned x = 0 ; x < width ; x++ ){
-						unsigned char value ;
-						if( alpha && alpha[x] ){
-							value = 2-dither.isBlack(x,y);
-						}
-						else
-							value = 0 ;
-						accum |= value<<shift ;
-						shift += 2 ;
-						if( 32 <= shift ){
-							cursorLongs[whichLong++] = accum ;
-							accum = 0 ;
-							shift = 0 ;
-						}
-					}
-					cursorLongs[whichLong] = accum ;
-					cursorLongs += (sm501_cursorWidth/2/8);
-					alpha += bmWidth ;
-				}
-
-				*rval = JSVAL_TRUE ;
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
 JS_ReportError(cx, "create cursor here\n" );
                                 if( 0 == cursor_ ){
@@ -351,7 +324,6 @@ jsSetCursorLocation( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 		    (y < fb.getHeight()) )
 		{
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
-#error got here
 			unsigned long reg = SMIPCURSOR_LOC ;
 			int res = ioctl( fb.getFd(), SM501_READREG, &reg );
 			if( 0 == res ){
@@ -391,49 +363,31 @@ else
 static JSBool
 jsEnableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-	*rval = JSVAL_FALSE ;
-#if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
-#error got here
-	fbDevice_t &fb = getFB();
-	unsigned long reg = SMIPCURSOR_ADDR ;
-	int res = ioctl( fb.getFd(), SM501_READREG, &reg );
-	if( 0 == res ){
-		struct reg_and_value rv ;
-		rv.reg_ = SMIPCURSOR_ADDR ;
-		rv.value_ = reg | 0x80000000 ;
-		res = ioctl( fb.getFd(), SM501_WRITEREG, &rv );
-		if( 0 == res ){
-			*rval = true ;
-		}
-		else
-                        JS_ReportError( cx, "saving SM-501 CURSORADDR\n" );
-
-	}
-	else
-		JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
-	
-#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
-      if( (0 == cursor_) && (0==mouse_) ){
-         inputDevs_t inputDevs ;
-         for( unsigned i = 0 ; i < inputDevs.count(); i++ ){
-            unsigned evIdx ;
-            inputDevs_t::type_e type ;
-            inputDevs.getInfo(i,type,evIdx);
-
-            if(inputDevs_t::MOUSE == type){
+   *rval = JSVAL_FALSE ;
+#if defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+            if( 0 == cursor_ )
                cursor_ = new davCursor_t();
-               char devName[512];
-               snprintf( devName, sizeof(devName), "/dev/input/event%u", evIdx );
-               mouse_ = new jsMouse_t(devName);
-               printf( "%s:created mouse\n", __PRETTY_FUNCTION__ );
-               *rval = JSVAL_TRUE ;
-               break;
-            }
+#endif
+   if( (0==mouse_) && (0 != cursor_) ){
+      inputDevs_t inputDevs ;
+      for( unsigned i = 0 ; i < inputDevs.count(); i++ ){
+         unsigned evIdx ;
+         inputDevs_t::type_e type ;
+         inputDevs.getInfo(i,type,evIdx);
+   
+         if(inputDevs_t::MOUSE == type){
+            char devName[512];
+            snprintf( devName, sizeof(devName), "/dev/input/event%u", evIdx );
+            mouse_ = new jsMouse_t(devName);
+            printf( "%s:created mouse\n", __PRETTY_FUNCTION__ );
+            *rval = JSVAL_TRUE ;
+            break;
          }
       }
-#else
-#endif
-	return JS_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "Error: mouse already defined or cursor is undefined\n" );
+   return JS_TRUE ;
 }
 
 static JSBool
@@ -441,7 +395,6 @@ jsDisableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 {
 	*rval = JSVAL_FALSE ;
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
-#error got here
 	fbDevice_t &fb = getFB();
 	unsigned long reg = SMIPCURSOR_ADDR ;
 	int res = ioctl( fb.getFd(), SM501_READREG, &reg );
