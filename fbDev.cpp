@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.37  2008-10-29 15:28:36  ericn
+ * -get rid of unused static functions sm501_fb() and writeReg()
+ *
  * Revision 1.36  2008-10-16 00:09:32  ericn
  * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
  *
@@ -490,27 +493,6 @@ void fbDevice_t :: setPixel( unsigned x, unsigned y, unsigned short rgb )
 #endif
    }
 }
-
-#ifdef KERNEL_FB_SM501
-static unsigned long sm501_fb( fbDevice_t &fb )
-{
-   unsigned long reg = 0x8000c ;
-   int res = ioctl( fb.getFd(), SM501_READREG, &reg );
-   if( 0 != res )
-      perror( "READREG" );
-   return reg ;
-}
-
-static void writeReg( int fd, unsigned long reg, unsigned long value )
-{
-   reg_and_value rv ;
-   rv.reg_ = reg ;
-   rv.value_ = value ; // disable
-   int res = ioctl( fd, SM501_WRITEREG, &rv );
-   if( res )
-      perror( "SM501_WRITEREG" );
-}
-#endif
 
 fbDevice_t :: fbDevice_t( char const *name )
    : fd_( open( name, O_RDWR ) )
