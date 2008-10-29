@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: vsyncSignal.cpp,v $
+ * Revision 1.4  2008-10-29 15:27:46  ericn
+ * -prevent compiler warnings
+ *
  * Revision 1.3  2007-08-23 00:25:52  ericn
  * -add CLOEXEC for file handles
  *
@@ -61,7 +64,7 @@ vsyncSignal_t::~vsyncSignal_t( void )
 void vsyncSignal_t::enable()
 {
    if( isOpen() ){
-      int flags = flags = fcntl( fd_, F_GETFL, 0 );
+      int flags = fcntl( fd_, F_GETFL, 0 );
       fcntl( fd_, F_SETFL, flags | O_NONBLOCK | FASYNC );
    }
 }
@@ -69,7 +72,7 @@ void vsyncSignal_t::enable()
 void vsyncSignal_t::disable()
 {
    if( isOpen() ){
-      int flags = flags = fcntl( fd_, F_GETFL, 0 );
+      int flags = fcntl( fd_, F_GETFL, 0 );
       fcntl( fd_, F_SETFL, flags & ~FASYNC );
    }
 }

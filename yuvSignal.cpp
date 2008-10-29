@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: yuvSignal.cpp,v $
+ * Revision 1.5  2008-10-29 15:27:46  ericn
+ * -prevent compiler warnings
+ *
  * Revision 1.4  2007-08-23 00:25:54  ericn
  * -add CLOEXEC for file handles
  *
@@ -65,7 +68,7 @@ yuvSignal_t::~yuvSignal_t( void )
 void yuvSignal_t::enable()
 {
    if( isOpen() ){
-      int flags = flags = fcntl( fd_, F_GETFL, 0 );
+      int flags = fcntl( fd_, F_GETFL, 0 );
       fcntl( fd_, F_SETFL, flags | O_NONBLOCK | FASYNC );
    }
 }
@@ -73,7 +76,7 @@ void yuvSignal_t::enable()
 void yuvSignal_t::disable()
 {
    if( isOpen() ){
-      int flags = flags = fcntl( fd_, F_GETFL, 0 );
+      int flags = fcntl( fd_, F_GETFL, 0 );
       fcntl( fd_, F_SETFL, flags & ~FASYNC );
    }
 }

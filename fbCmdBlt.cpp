@@ -8,7 +8,13 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.cpp,v $
- * Revision 1.4  2006-12-13 21:31:32  ericn
+ * Revision 1.6  2008-10-29 15:27:46  ericn
+ * -prevent compiler warnings
+ *
+ * Revision 1.5  2002-12-15 05:38:48  ericn
+ * -added swapSource() method
+ *
+ * Revision 1.4  2006/12/13 21:31:32  ericn
  * -allow re-targeting RAM
  *
  * Revision 1.2  2006/10/16 22:37:17  ericn
@@ -158,6 +164,7 @@ unsigned fbBlt_t::getDestX( void ) const
 
 void fbBlt_t::setDestX( unsigned destx )
 {
+//   unsigned const oldDest = cmdMem_[BLTREG(SMIDRAW_2D_Destination)] >> 16 ;
    cmdMem_[BLTREG(SMIDRAW_2D_Destination)] &= 0x0000FFFF ;
    cmdMem_[BLTREG(SMIDRAW_2D_Destination)] |= (destx << 16 );
 }
@@ -175,6 +182,17 @@ unsigned fbBlt_t::getWidth( void ) const
    return cmdMem_[BLTREG(SMIDRAW_2D_Clip_BR)] & 0xFFFF ;
 }
 
+void fbBlt_t::swapSource( fbImage_t const &src, unsigned srcy )
+{
+   unsigned long regVal ;
+   regVal = cmdMem_[BLTREG(SMIDRAW_2D_Dimension)] & 0x0000FFFF ;
+   cmdMem_[BLTREG(SMIDRAW_2D_Dimension)]    = regVal | (src.width()<<16) ;
+   regVal = cmdMem_[BLTREG(SMIDRAW_2D_Pitch)] & 0xFFFF0000 ;
+   cmdMem_[BLTREG(SMIDRAW_2D_Pitch)]        = regVal | src.stride();
+   regVal = cmdMem_[BLTREG(SMIDRAW_2D_Window_Width)] & 0xFFFF0000 ;
+   cmdMem_[BLTREG(SMIDRAW_2D_Window_Width)] = regVal | src.stride();
+   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = src.ramOffset() + srcy*src.stride()*2;
+}
 
 int fbBlt( unsigned long    destRamOffs,
            unsigned         destx,
