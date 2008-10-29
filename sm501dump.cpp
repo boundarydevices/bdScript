@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: sm501dump.cpp,v $
+ * Revision 1.3  2008-10-29 15:29:23  ericn
+ * -allow override using FBDEV environment variable
+ *
  * Revision 1.2  2007-08-08 17:11:58  ericn
  * -[sm501] /dev/fb0 not /dev/fb/0
  *
@@ -30,13 +33,18 @@
 #include <string.h>
 #include "hexDump.h"
 
+static char const *devName = "/dev/fb0" ;
+
+
 int main( int argc, char const * const argv[] )
 {
 	if( 1 < argc ){
 		unsigned long offset = strtoul(argv[1], 0, 0 );
       if( 0 == ( offset & 3 ) )
       {
-   		int const fbDev = open( "/dev/fb0", O_RDWR );
+                if( getenv( "FBDEV" ) )
+                   devName = getenv( "FBDEV" );
+		int const fbDev = open( devName, O_RDWR );
    		if( 0 <= fbDev ) {
             struct fb_fix_screeninfo fixed_info;
             int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
@@ -69,7 +77,7 @@ int main( int argc, char const * const argv[] )
    			close( fbDev );
    		}
    		else
-   			perror( "/dev/fb0" );
+   			perror( devName );
    		printf( "\n" );
       }
       else

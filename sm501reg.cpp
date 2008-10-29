@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: sm501reg.cpp,v $
+ * Revision 1.5  2008-10-29 15:29:23  ericn
+ * -allow override using FBDEV environment variable
+ *
  * Revision 1.4  2007-08-08 17:12:01  ericn
  * -[sm501] /dev/fb0 not /dev/fb/0
  *
@@ -32,12 +35,16 @@
 #define irqreturn_t int
 #include <linux/sm501-int.h>
 
+static char const *devName = "/dev/fb0" ;
+
 int main( int argc, char const * const argv[] )
 {
 	if( 1 < argc ){
 		unsigned long reg = strtoul(argv[1], 0, 0 );
 		printf( "register[0x%08lx] == ", reg );
-		int const fbDev = open( "/dev/fb0", O_RDWR );
+                if( getenv( "FBDEV" ) )
+                   devName = getenv( "FBDEV" );
+		int const fbDev = open( devName, O_RDWR );
 		if( 0 <= fbDev ) {
 			int res = ioctl( fbDev, SM501_READREG, &reg );
 			if( 0 == res ){
@@ -60,7 +67,7 @@ int main( int argc, char const * const argv[] )
 			close( fbDev );
 		}
 		else
-			perror( "/dev/fb0" );
+			perror( devName );
 		printf( "\n" );
 	}
 	else
