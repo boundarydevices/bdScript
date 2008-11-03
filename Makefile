@@ -101,6 +101,7 @@ OBJS = \
        relativeURL.o \
        rollingMean.o \
        rollingMedian.o \
+       rotateBlt.o \
        rtSignal.o \
        screenImage.o \
        semClasses.o \
