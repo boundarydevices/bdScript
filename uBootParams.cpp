@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: uBootParams.cpp,v $
+ * Revision 1.3  2008-11-12 16:36:15  ericn
+ * [uBootParams] Allow multi-sector environment
+ *
  * Revision 1.2  2008-09-11 00:28:43  ericn
  * allow output file
  *
@@ -51,7 +54,7 @@ uBootParams_t::uBootParams_t( char const *fileName )
       close( fdDev );
       return ;
    }
-   
+
    dataBuf_ = new char [eof+1];
    long int start = lseek( fdDev, 0, SEEK_SET );
    int numRead = read( fdDev, dataBuf_, eof );
@@ -299,24 +302,37 @@ bool uBootParams_t::save( char const *fileName )
          mtd_info_t meminfo;
          if( 0 == ioctl( fd, MEMGETINFO, (unsigned long)&meminfo) )
          {
-            if( meminfo.erasesize == dataMax_ )
+            if( (meminfo.erasesize <= dataMax_) 
+                && 
+                (0 == (dataMax_%meminfo.erasesize)) )
             {
                erase_info_t erase;
                erase.start = 0 ;
                erase.length = meminfo.erasesize;
-               if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
-               {
+               worked = true ;
+               while( worked && (erase.start < dataMax_) ){
+                  if( 0 == ioctl( fd, MEMERASE, (unsigned long)&erase) )
+                  {
+                     erase.start += meminfo.erasesize ;
+                  }
+                  else {
+                     fprintf( stderr, "erase error %m\n" );
+                     worked = false ;
+                  }
+               }
+
+               if( worked ){
                   if( 0 == (unsigned)lseek( fd, 0, SEEK_SET ) )
                   {
                      unsigned numWritten = write( fd, writeable, dataMax_ );
-
+   
                      worked = (numWritten == dataMax_ );
                   }
-                  else
+                  else {
+                     worked = false ;
                      perror( "lseek3" );
+                  }
                }
-               else
-                  fprintf( stderr, "erase error %m\n" );
             }
             else
                fprintf( stderr, "erase size mismatch: rv %u, mi %u\n", dataMax_, meminfo.erasesize );

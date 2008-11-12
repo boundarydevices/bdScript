@@ -1,5 +1,5 @@
 #ifndef __UBOOTPARAMS_H__
-#define __UBOOTPARAMS_H__ "$Id: uBootParams.h,v 1.1 2008-06-25 22:07:24 ericn Exp $"
+#define __UBOOTPARAMS_H__ "$Id: uBootParams.h,v 1.2 2008-11-12 16:36:15 ericn Exp $"
 
 /*
  * uBootParams.h
@@ -12,6 +12,9 @@
  * Change History : 
  *
  * $Log: uBootParams.h,v $
+ * Revision 1.2  2008-11-12 16:36:15  ericn
+ * [uBootParams] Allow multi-sector environment
+ *
  * Revision 1.1  2008-06-25 22:07:24  ericn
  * -Import
  *
@@ -36,6 +39,7 @@ public:
    // returns true if it wrote the params to the specified file or device
    bool save( char const *fileName );
 
+   inline unsigned getSize() const { return dataMax_ ; }
 private:
    friend class uBootParamIter_t ;
    typedef struct _listItem {
