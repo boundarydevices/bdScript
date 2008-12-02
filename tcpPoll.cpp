@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: tcpPoll.cpp,v $
+ * Revision 1.4  2008-12-02 00:21:25  ericn
+ * allow port override in test prog
+ *
  * Revision 1.3  2004-12-18 18:29:18  ericn
  * -added dns support
  *
@@ -256,7 +259,7 @@ void tcpHandler_t :: checkStatus( void )
    }
 }
 
-#ifdef __MODULETEST__
+#ifdef __TCPPOLL_MODULETEST__
 #include <termios.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -353,10 +356,11 @@ void myTTY_t :: onLineIn( void )
    if( *sIn )
    {
       unsigned const len = strlen( sIn );
-      printf( "--> %s..", sIn );
-      int numWritten = write( handler_.getFd(), sIn, len )
-                     + write( handler_.getFd(), "\r\n", 2 );
+      printf( "--> <%s>..", sIn );
+      ((char *)sIn)[len] = '\n' ;
+      int numWritten = write( handler_.getFd(), sIn, len+1 );
       printf( "%d bytes\n", numWritten );
+      ((char *)sIn)[len] = '\0' ;
    }
    else
    {
@@ -412,7 +416,11 @@ int main( int argc, char const * const argv[] )
    printf( "Hello, %s\n", argv[0] );
    if( 1 < argc )
    {
-      unsigned short port = htons( 80 );
+      unsigned short port = 80 ;
+      if( 3 < argc )
+         port = strtoul(argv[3],0,0);
+
+      port = htons( port );
       if( 2 < argc )
          port = htons( (unsigned short)strtoul( argv[2], 0, 0 ) );
       
