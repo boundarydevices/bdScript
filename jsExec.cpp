@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.105  2008-12-02 00:22:20  ericn
+ * use exec, not system to launch another program
+ *
  * Revision 1.104  2008-10-16 00:09:25  ericn
  * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
  *
@@ -1137,8 +1140,13 @@ int main( int argc, char *argv[] )
          }
          else if( execCalled_ )
          {
-            system( execCmd_.c_str() );
-            execv( argv[0], argv ); // start next
+            char **cmdline = new char *[execCmdArgs_.size()+1];
+            char **nextCmd = cmdline ;
+            for( unsigned i = 0 ; i < execCmdArgs_.size(); i++ ){
+               *nextCmd++ = (char *)execCmdArgs_[i].c_str();
+            }
+            *nextCmd = 0 ;
+            execvp( cmdline[0], cmdline ); // launch program
          }
          else
          {

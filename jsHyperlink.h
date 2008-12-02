@@ -1,5 +1,5 @@
 #ifndef __JSHYPERLINK_H__
-#define __JSHYPERLINK_H__ "$Id: jsHyperlink.h,v 1.3 2003-02-27 03:50:58 ericn Exp $"
+#define __JSHYPERLINK_H__ "$Id: jsHyperlink.h,v 1.4 2008-12-02 00:22:47 ericn Exp $"
 
 /*
  * jsHyperlink.h
@@ -25,6 +25,9 @@
  * Change History : 
  *
  * $Log: jsHyperlink.h,v $
+ * Revision 1.4  2008-12-02 00:22:47  ericn
+ * use exec, not system to launch another program
+ *
  * Revision 1.3  2003-02-27 03:50:58  ericn
  * -added exec routine
  *
@@ -41,11 +44,13 @@
 
 #include "js/jsapi.h"
 #include <string>
+#include <vector>
 
 extern bool volatile gotoCalled_ ;
 extern std::string   gotoURL_ ;
 extern bool volatile execCalled_ ;
 extern std::string   execCmd_ ;
+extern std::vector<std::string> execCmdArgs_ ;
 
 bool initJSHyperlink( JSContext *cx, JSObject *glob );
 
