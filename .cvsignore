@@ -1,1 +1,112 @@
+*.map fbDev curlGet curlCache dirTest urlTest testJS tsTest mp3Play childProcess testEvents mp3Echo jsExec
+build ftRender tsThread madHeaders madTest imgJPEG imgPNG ccDiskCache ccWorker ccActiveURL hexDump semClasses popen
+parsedURL recordTest ftDump
+*.lst *.out bc
+ffPlay ffFormat ffFrames testffFormat dlopen cbmGraph cbmStat cbmReset cbmImage
+md5
+testquickcam
+mpeg2mp3
+jpegview
+backtrace
+ffTest videoQueue mpDemux mpDecode madDecode pcapTest sniffWLAN monitorWLAN ping
+avSendTo
+*.sym openFds readCIS
+barcodePoll pollHandlerTest touchPoll udpSpewTo udpRecvAll
+flashThread progFlash reboot pollTimerTest ttyPoll
+udpPoll timerTest unpacked
+urlPoll flashVar mkFlash
+tcpPoll tcpPollServer
+dumpCPP palette serialPoll
+starImage starGraph
+config.mk
+config.h
+mpegDecode testYUV *.prestrip
+mpegDecodeMain
+udpEcho udpSendTo httpPoll dnsPoll pwd rollingMedian
+adler32 mpegFile mpegPlay readBlocks
+pixmanTest
+.process
+imgFile
+fbSet
+
+odomTTY
+odomVQ
+mpegSendUDP
+mpegQueue
+mpegStream
+mpegRxUDP
+touchSignal
+sm501reg
+logTraces
+multiSignal
+setBaud
+aniGIF
+serialTouch
+ucb1x00_pins
+pxaregs
+serialCounts
+cmdListOutput
+ttySignal
+cylinderShadow
+imgToPNG
+moveable
+slotWheel
+tradeShow
+setVolume
+udpRx
+tradeShowAux
+bmpToPNG
+ffmpeg_test
+xvidToZip
+i2cread
+i2cwrite
+i2cwriteread
+*.zip
+imgMonoToPCL
+\*.pcl
+*.pcl
+*.pdf
+inputPoll
+daemonize
+fbAccel
+fbMem
+odomValue2
+sm501cmdlist
+sm501dump
+sm501mem
+sm501poke
+test
+vsync
+
+yuvToRGB
+pxamem
+odomGraphics
+mplayerTest
+fbImage
+onGP
+fakeSASI
+miniterm
+saveTail
+tcpEcho
+watchdog
+processWrap
+countColors
+crc32
+flashErase
+uBootParams
+yuvgz
+*.diff
+crc32_native
+calibCoef
+calibQuadrant
+daemonize.x86
+inputCalibrate
+inputTest
+yuvImgFile
+*.bin
+makeFlash gpio-trig mtdInfo totalflash
+physMem
+bltTest inputDevs
+sender
+receiver
 rotateBlt
