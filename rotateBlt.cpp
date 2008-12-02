@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: rotateBlt.cpp,v $
+ * Revision 1.2  2008-12-02 00:23:15  ericn
+ * prevent compiler warning signed/unsigned
+ *
  * Revision 1.1  2008-11-03 16:40:43  ericn
  * Added rotateBlt module
  *
@@ -19,6 +22,7 @@
 
 // #define DEBUGPRINT
 #include "debugPrint.h"
+#include <stdio.h>
 
 void bltNormalized( rotation_e, 
                     void const *src, unsigned srcStride,
@@ -54,6 +58,12 @@ void rotateBlt( rotation_e  rotation,
    int w = inputWidth ;  // move to signed integer field
    int h = inputHeight ; //         "
 
+printf( "rotation %d, bpp %u, %ux%u\n"
+	"src %u:%u (%ux%u) -> %p\n"
+	"dst %u:%u (%ux%u) -> %p\n",
+	rotation, bytesPerPixel, inputWidth, inputHeight,
+	srcX, srcY, srcW, srcH, src,
+	dstX, dstY, dstW, dstH, dst );
    //
    // adjust zeros (source affects dest)
    //
@@ -76,10 +86,10 @@ void rotateBlt( rotation_e  rotation,
       dstY = 0 ;
    }
 
-   if( (srcX >= srcW)
-     ||(srcY >= srcH)
-     ||(dstX >= dstW)
-     ||(dstY >= dstH)
+   if( ((unsigned)srcX >= srcW)
+     ||((unsigned)srcY >= srcH)
+     ||((unsigned)dstX >= dstW)
+     ||((unsigned)dstY >= dstH)
      ||(0 >= w)
      ||(0 >= h))
       return ;
@@ -87,13 +97,13 @@ void rotateBlt( rotation_e  rotation,
    //
    // clamp right-hand edges
    //
-   if( srcX+w > srcW )
+   if( (unsigned)srcX+w > srcW )
       w = srcW-srcX ;
-   if( srcY+h > srcH )
+   if( (unsigned)srcY+h > srcH )
       h = srcH-srcY ;
-   if( dstX+w > dstW )
+   if( (unsigned)dstX+w > dstW )
       w = dstW-dstX ;
-   if( dstY+h > dstH )
+   if( (unsigned)dstY+h > dstH )
       h = dstH-dstY ;
    
    if((0==w)||(0==h))
