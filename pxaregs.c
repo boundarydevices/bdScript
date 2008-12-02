@@ -4,7 +4,7 @@
  * (c) Copyright 2002 by M&N Logistik-Lösungen Online GmbH
  * set under the GPLv2
  *
- * $Id: pxaregs.c,v 1.5 2008-06-06 21:45:12 ericn Exp $
+ * $Id: pxaregs.c,v 1.6 2008-12-02 00:21:49 ericn Exp $
  *
  * Please send patches to h.schurig, working at mn-logistik.de
  * - added fix from Bernhard Nemec
@@ -1923,6 +1923,10 @@ static struct reg_info regs[] = {
 { "UARTD_SPR",			0x0C00271C, 0, 0xffffffff, 'x', "UART D SPR" },
 
 #endif
+{ "OVL1C1",			0x44000050, 0, 0xffffffff, 'x', "OVL1C1" },
+{ "OVL1C2",			0x44000060, 0, 0xffffffff, 'x', "OVL1C2" },
+{ "OVL2C1",			0x44000070, 0, 0xffffffff, 'x', "OVL2C1" },
+{ "OVL2C2",			0x44000080, 0, 0xffffffff, 'x', "OVL2C2" },
 
 };
 
@@ -2078,12 +2082,12 @@ static void setreg(char *name, u32 val)
    for (i=0; i<n; i++) {
       if (strcmp(regs[i].name, name)==0) {
          found = i;
-         //printf("Matched %s with %s, count=%d\n", regs[i].name, name, count);
+         printf("Matched %s with %s, count=%d\n", regs[i].name, name, count);
          count++;
       }
    }
    if (count!=1) {
-      printf("No or more than one matching register found\n");
+      printf("No or more than one (%u) matching register found\n", count);
       exit(1);
    }
 
