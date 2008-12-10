@@ -110,3 +110,4 @@ bltTest inputDevs
 sender
 receiver
 rotateBlt
+udpSendRecv
