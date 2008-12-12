@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.106  2008-12-12 01:24:47  ericn
+ * added pipeProcess class
+ *
  * Revision 1.105  2008-12-02 00:22:20  ericn
  * use exec, not system to launch another program
  *
@@ -389,6 +392,7 @@
 #endif
 
 #include "jsPing.h"
+#include "jsPipeProcess.h"
 #include "jsProcess.h"
 #include "jsDir.h"
 #include "jsUDP.h"
@@ -737,6 +741,7 @@ int prMain(int argc, char **argv, bool )
 #endif
 
                   initPing( cx, glob );
+                  initJSPipeProcess( cx, glob );
                   initJSProcess( cx, glob );
                   initJSDir( cx, glob );
                   initJSUDP( cx, glob );

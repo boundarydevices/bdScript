@@ -69,6 +69,7 @@ OBJS = \
        jsMonWLAN.o \
        jsTouch.o \
        jsPing.o \
+       jsPipeProcess.o \
        jsPopen.o \
        jsProcess.o \
        jsScreen.o \
@@ -93,6 +94,7 @@ OBJS = \
        parsedURL.o \
        physMem.o \
        ping.o \
+       pipeProcess.o \
        pngToPS.o \
        pollHandler.o \
        pollTimer.o \
