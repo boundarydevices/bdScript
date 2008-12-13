@@ -1,5 +1,5 @@
 #ifndef __INPUTMOUSE_H__
-#define __INPUTMOUSE_H__ "$Id: inputMouse.h,v 1.1 2008-09-22 19:07:52 ericn Exp $"
+#define __INPUTMOUSE_H__ "$Id: inputMouse.h,v 1.2 2008-12-13 17:31:19 ericn Exp $"
 
 /*
  * inputMouse.h
@@ -10,7 +10,6 @@
  */
 #include "inputPoll.h"
 #include "fbDev.h"
-#include "flashplayer.h"
 
 class inputMouse_t : public inputPoll_t {
 public:
@@ -18,8 +17,6 @@ public:
    inputMouse_t( pollHandlerSet_t &set,
                  char const       *devName );
    virtual ~inputMouse_t( void ){}
-
-   inline void attach( FlashPlayer *player ){ player_ = player ; }
 
    // called with calibrated point
    virtual void onTouch( void );
@@ -29,7 +26,6 @@ public:
    virtual void onData( struct input_event const &event );
 
 protected:
-   FlashPlayer    *player_ ;
    int             x_ ;
    int             y_;
    bool            isDown_ ;
