@@ -971,6 +971,10 @@ parsedURL: parsedURL.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -DSTANDALONE $(IFLAGS) -DMODULETEST=1 -fno-rtti -o parsedURL -Xlinker -Map -Xlinker parsedURL.map parsedURL.cpp $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
 	$(STRIP) $@
 
+tcpPipe: tcpPipe.cpp Makefile
+	$(CC) -o $@ $< -lsupc++ 
+	$(STRIP) $@
+
 #
 # This will need additional setup for location of gcc static lib (for udivsi3)
 #
