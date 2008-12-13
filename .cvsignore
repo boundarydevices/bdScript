@@ -112,3 +112,4 @@ receiver
 rotateBlt
 udpSendRecv
 tcpPipe
+mouseIdle
