@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsFlash.cpp,v $
+ * Revision 1.9  2008-12-17 01:37:07  ericn
+ * [flash] Made flashMovie::stop() somewhat synchronous
+ *
  * Revision 1.8  2007-07-29 18:43:09  ericn
  * -Allow subset of flash movie
  *
@@ -132,7 +135,7 @@ struct flashPrivate_t {
 
    bool worked( void ) const { return flashData_->worked() && thread_->isAlive(); }
    inline void start( void ){ if( thread_ ) thread_->start(); }
-   inline void stop( void ){ if( thread_ ) thread_->stop(); }
+   void stop( void );
    inline void pause( void ){ if( thread_ ) thread_->pause(); }
 
    FlashInfo const &getFlashInfo( void ) const { return flashData_->flashInfo(); }
@@ -197,6 +200,23 @@ flashPrivate_t :: ~flashPrivate_t( void )
 
    delete flashData_ ;
    getCurlCache().closeHandle( cacheHandle_ );
+}
+
+void flashPrivate_t::stop( void ){ 
+   if( thread_ && thread_->isAlive() ){
+      pollfd pfd ;
+      pfd.fd = thread_->eventReadFd();
+      pfd.events = POLLIN|POLLERR ;
+      int numReady ; 
+      while( 0 < (numReady = ::poll(&pfd, 1, 0)) ){
+         flashThread_t::event_e events[8];
+         read(thread_->eventReadFd(),events,sizeof(events));
+      }
+      thread_->stop(); 
+      pfd.fd = thread_->eventReadFd();
+      pfd.events = POLLIN|POLLERR ;
+      ::poll(&pfd, 1, 1000);
+   }
 }
 
 static JSBool
