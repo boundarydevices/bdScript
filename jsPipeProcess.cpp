@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsPipeProcess.cpp,v $
+ * Revision 1.2  2008-12-28 19:54:53  ericn
+ * [jsPipeProcess] Only call onExit once, watch for deletes in handlers
+ *
  * Revision 1.1  2008-12-12 01:24:47  ericn
  * added pipeProcess class
  *
@@ -120,7 +123,10 @@ jsPipeProcess_t::jsPipeProcess_t(
 jsPipeProcess_t::~jsPipeProcess_t( void )
 {
    shutdown();
-   JS_RemoveRoot( execContext_, &object_ );
+   if( object_ ){
+      JS_RemoveRoot( execContext_, &object_ );
+      object_ = 0 ;
+   }
 }
 
 void jsPipeProcess_t::dataAvail( int which )
@@ -150,19 +156,22 @@ void jsPipeProcess_t::shutdown()
          delete handlers[i];
          handlers[i] = 0 ;
       }
+      else
+         debugPrint( "%s: handler %d is gone\n", __PRETTY_FUNCTION__, i );
    }
    pipeProcess_t::shutdown();
 
    checkAlive();
 
-   JS_RemoveRoot( execContext_, &object_ );
-   object_ = 0 ;
+   if( object_ ){
+      JS_RemoveRoot( execContext_, &object_ );
+      object_ = 0 ;
+   }
 }
 
 void jsPipeProcess_t::handleIt( jsval handler, int which )
 {
    if( JSVAL_NULL != handler ){
-      debugPrint( "have handler\n" );
       jsval params[2] = {
          INT_TO_JSVAL(which),
          0
@@ -184,14 +193,18 @@ void jsPipeProcess_t::checkAlive()
    if( !signalledExit_ ){
       if( !isAlive() ){
          signalledExit_ = true ;
-         if( JSVAL_NULL != onExit )
+         if( JSVAL_NULL != onExit ){
             executeCode( object_, onExit, __PRETTY_FUNCTION__, 0, 0 );
+            onExit = JSVAL_NULL ;
+         }
          else
             debugPrint( "No pipeProcess exit handler\n" );
       }
       else
          debugPrint( "Pid %d is still alive\n", pid() );
    }
+   else
+      debugPrint( "%s: already exited\n", __func__ );
 }
 
 void jsPipeProcess_t::error( int which )
@@ -199,9 +212,13 @@ void jsPipeProcess_t::error( int which )
    debugPrint( "%s: %d\n", __PRETTY_FUNCTION__, which );
    if( handlers[which] ){
       handleIt( onError, which );
-      handlers[which]->close();
-      delete handlers[which];
-      handlers[which] = 0 ;
+      if( handlers[which] ){
+         handlers[which]->close();
+         if( handlers[which] ){
+            delete handlers[which];
+            handlers[which] = 0 ;
+         }
+      }
       checkAlive();
    }
    else
@@ -213,9 +230,13 @@ void jsPipeProcess_t::HUP( int which )
    debugPrint( "%s: %d\n", __PRETTY_FUNCTION__, which );
    if( handlers[which] ){
       handleIt( onClose, which );
-      handlers[which]->close();
-      delete handlers[which];
-      handlers[which] = 0 ;
+      if( handlers[which] ){
+         handlers[which]->close();
+         if( handlers[which] ){
+            delete handlers[which];
+            handlers[which] = 0 ;
+         }
+      }
       checkAlive();
    }
    else
@@ -255,7 +276,7 @@ jsval jsPipeProcess_t::write(JSContext *cx, JSObject *obj, uintN argc, jsval *ar
                totalWritten += numWritten ;
             }
             else {
-               JS_ReportError( cx, "pipeProcess::write(): %m\n" );
+               JS_ReportError( cx, "pipeProcess::write() to fd %d: %m\n", handlers[0]->getFd() );
                failed = true ;
                break;
             }
@@ -375,6 +396,20 @@ jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+static JSBool
+jsIsAlive( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   jsPipeProcess_t *proc = (jsPipeProcess_t *)JS_GetInstancePrivate( cx, obj, &jsPipeProcessClass_, NULL );
+   if( proc ){
+      if( proc->isAlive() )
+         *rval = JSVAL_TRUE ;
+   }
+   else
+      JS_ReportError( cx, "pipeProcess::write() on closed device\n" );
+   return JS_TRUE ;
+}
+
 static void jsPipeProcFinalize(JSContext *cx, JSObject *obj)
 {
    jsPipeProcess_t *proc = (jsPipeProcess_t *)JS_GetInstancePrivate( cx, obj, &jsPipeProcessClass_, NULL );
@@ -392,6 +427,7 @@ static JSFunctionSpec pipeProcessMethods_[] = {
    { "write",           jsWrite,     0,0,0 },
    { "close",           jsClose,     0,0,0 },
    { "read",            jsRead,      0,0,0 },
+   { "isAlive",         jsIsAlive,   0,0,0 },
     {0}
 };
 
