@@ -18,6 +18,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+// #define DEBUGPRINT
+#include "debugPrint.h"
+
 pipeProcess_t::pipeProcess_t
    ( char const *args[] )
    : progName_( strdup( args[0] ) )
@@ -83,17 +86,22 @@ bail:
 
 void pipeProcess_t::shutdown( void )
 {
-   for( int i = 0 ; i < 3 ; i++ )
-      if( 0 <= fds_[i] )
+   for( int i = 0 ; i < 3 ; i++ ){
+      if( 0 <= fds_[i] ){
          close( fds_[i] );
+         fds_[i] = -1 ;
+      }
+   }
    if( 0 < childPid_ ){
       kill(childPid_,SIGTERM);
+      childPid_ = -1 ;
    }
+   debugPrint( "~%s\n", __PRETTY_FUNCTION__ );
 }
 
 bool pipeProcess_t::isAlive(void) const 
 {
-   int rval = kill(childPid_,SIGCONT);
+   int rval = (0 < childPid_) ? kill(childPid_,SIGCONT) : -1 ;
    return ( 0 == rval );
 }
 
