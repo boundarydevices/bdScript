@@ -1,5 +1,5 @@
 #ifndef __POLLHANDLER_H__
-#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.10 2008-08-23 22:03:56 ericn Exp $"
+#define __POLLHANDLER_H__ "$Id: pollHandler.h,v 1.11 2008-12-29 17:22:00 ericn Exp $"
 
 /*
  * pollHandler.h
@@ -30,6 +30,9 @@
  * Change History : 
  *
  * $Log: pollHandler.h,v $
+ * Revision 1.11  2008-12-29 17:22:00  ericn
+ * [pollHandler] Better cleanup and testing of deleted handlers
+ *
  * Revision 1.10  2008-08-23 22:03:56  ericn
  * [cvsignore] Ignore more
  *
@@ -85,7 +88,7 @@ public:
    short getMask( void ) const { return mask_ ; }
    int   getFd( void ) const { return fd_ ; }
    bool  isOpen( void ) const { return 0 <= fd_ ; }
-   void  close( void ){ ::close( fd_ ); fd_ = -1 ; }
+   void  close( void ){ ::close( fd_ ); setMask(0); fd_ = -1 ; }
 
 protected:
    int               fd_ ;

@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: pollHandler.cpp,v $
+ * Revision 1.5  2008-12-29 17:22:00  ericn
+ * [pollHandler] Better cleanup and testing of deleted handlers
+ *
  * Revision 1.4  2004-03-27 20:24:14  ericn
  * -DEBUGPRINT
  *
@@ -98,6 +101,7 @@ void pollHandlerSet_t :: add( pollHandler_t &handler )
       
       handlers_[numHandlers_]   = &handler ;
       fds_[numHandlers_].events = handler.getMask();
+      fds_[numHandlers_].revents = 0 ;
       fds_[numHandlers_].fd     = handler.getFd();
       deleted_[numHandlers_]    = false ;
       ++numHandlers_ ;
@@ -162,18 +166,24 @@ debugPrint( "[%u].fd_ = %d, .mask_ = %x, .events = %x, signals = %x\n", i, fds_[
          if( signals )
          {
             pollHandler_t *handler = handlers_[i];
-
-            if( signals & POLLIN )
-               handler->onDataAvail();
-
-            if( signals & POLLOUT )
-               handler->onWriteSpace();
-            
-            if( signals & POLLERR )
-               handler->onError();
-            
-            if( signals & POLLHUP )
-               handler->onHUP();
+            bool volatile *deleted = deleted_+i ;
+            if( handler && ! *deleted ){
+               if( signals & POLLIN )
+                  if( !*deleted )
+                     handler->onDataAvail();
+   
+               if( signals & POLLOUT )
+                  if( !*deleted )
+                     handler->onWriteSpace();
+               
+               if( signals & POLLERR )
+                  if( !*deleted )
+                     handler->onError();
+               
+               if( signals & POLLHUP )
+                  if( !*deleted )
+                     handler->onHUP();
+            }           
          }
       }
       inPollLoop_ = false ;
