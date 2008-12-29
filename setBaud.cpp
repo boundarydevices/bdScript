@@ -122,6 +122,15 @@ static void setRaw( int fd,
    {
       newState.c_cflag |= PARENB | PARODD ;
    }
+   else if( 'S' == parity )
+   {
+      newState.c_cflag |= PARENB | IGNPAR | CMSPAR ;
+      newState.c_cflag &= ~PARODD ;
+   }
+   else if( 'M' == parity )
+   {
+      newState.c_cflag |= PARENB | IGNPAR | CMSPAR | PARODD ;
+   }
    else {
    } // no parity... already set
 
