@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: pollTimer.cpp,v $
+ * Revision 1.7  2008-12-29 17:22:54  ericn
+ * [pollTimer] Prevent inheritance of of file handle
+ *
  * Revision 1.6  2008-08-23 22:02:32  ericn
  * [gen-timer] use /dev/gen-timer, not /dev/timer
  *
@@ -54,6 +57,7 @@ public:
       , head_( 0 )
    {
       setMask( POLLIN );
+      fcntl( fd, F_SETFD, FD_CLOEXEC );
       set.add( *this );
    }
 
