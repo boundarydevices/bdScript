@@ -1,5 +1,5 @@
 #ifndef __INPUTTOUCH_H__
-#define __INPUTTOUCH_H__ "$Id: inputTouch.h,v 1.1 2008-09-22 19:07:52 ericn Exp $"
+#define __INPUTTOUCH_H__ "$Id: inputTouch.h,v 1.2 2008-12-29 17:49:48 ericn Exp $"
 
 /*
  * inputTouch.h
@@ -38,6 +38,9 @@ public:
    virtual void onData( struct input_event const &event );
 
    inline bool isRaw(void) const { return raw_ ; }
+
+   void setCooked(void);
+   void setRaw(void);
 
 protected:
    rollingMedian_t medianX_ ;

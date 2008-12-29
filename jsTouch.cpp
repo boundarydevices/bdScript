@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.33  2008-12-29 17:49:48  ericn
+ * [touch] Added setRaw(), setCooked() methods
+ *
  * Revision 1.32  2008-10-02 23:19:08  ericn
  * [jsTouch] Updated to call inputTouchScreen_t::onRelease() to reset median filters
  *
@@ -132,6 +135,7 @@
 #include "flashVar.h"
 #include "ucb1x00_pins.h"
 #include <math.h>
+#include "touchCalibrate.h"
 
 #include "config.h"
 #ifdef CONFIG_MCP_UCB1400_TS
@@ -343,11 +347,41 @@ jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return doit( cx, obj, argc, argv, rval, touchPoll_->onMoveCode_, touchPoll_->onMoveObject_ );
 }
 
+static JSBool
+jsSetCooked( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_VOID ;
+   if( ( 1 == argc )
+       &&
+       JSVAL_IS_STRING( argv[0] ) )
+   {
+      touchCalibration_t &cal = touchCalibration_t::get();
+      cal.setCalibration( JS_GetStringBytes( JSVAL_TO_STRING( argv[0] ) ) );
+      if( touchPoll_ )
+         touchPoll_->setCooked();
+   }
+   else
+      JS_ReportError( cx, "Usage: touchScreen.setCooked( { scale:{ x:#, y:# }, origin:{ x:#, y:# }, range:{ x:#, y:# }, swapXY=bool } )" );
+
+   return JS_TRUE ;
+}
+
+static JSBool
+jsSetRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_VOID ;
+   if( touchPoll_ )
+      touchPoll_->setRaw();
+
+   return JS_TRUE ;
+}
 
 static JSFunctionSpec touch_functions[] = {
     {"onTouch",         jsOnTouch,        1 },
     {"onRelease",       jsOnRelease,      1 },
     {"onMove",          jsOnMove,         1 },
+    {"setCooked",       jsSetCooked,      0 },
+    {"setRaw",       	jsSetRaw,      	  0 },
     {0}
 };
 
@@ -370,13 +404,6 @@ jsIsRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = touchPoll_->isRaw() ? JSVAL_TRUE : JSVAL_FALSE ;
    
-   return JS_TRUE ;
-}
-
-static JSBool
-jsSetRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
-{
-   *rval = JSVAL_VOID ;
    return JS_TRUE ;
 }
 

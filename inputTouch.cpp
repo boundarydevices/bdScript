@@ -31,7 +31,7 @@ inputTouchScreen_t::inputTouchScreen_t
    , exitMS_( 0 )
    , lastTouch_( tickMs() )
 {
-   raw_ = !touchCalibration_t::get().haveCalibration();
+   setCooked();
    char const *envExitMs = getenv("TSEXITMS");
    if( envExitMs ){
       printf( "Exit after %sms of touch\n", envExitMs );
@@ -117,3 +117,22 @@ debugPrint( "%s: touch %d:%d\n", __PRETTY_FUNCTION__, x, y );
             event.value );
    }
 }
+
+void inputTouchScreen_t::setCooked(void)
+{
+   raw_ = !touchCalibration_t::get().haveCalibration();
+   medianX_.reset();
+   medianY_.reset();
+   prevX_ = 0 ;
+   prevY_ = 0 ;
+}
+
+void inputTouchScreen_t::setRaw(void)
+{
+   raw_ = true ;
+   medianX_.reset();
+   medianY_.reset();
+   prevX_ = 0 ;
+   prevY_ = 0 ;
+}
+
