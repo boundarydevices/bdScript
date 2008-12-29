@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.107  2008-12-29 17:23:19  ericn
+ * [jsExec] Add getPid() method
+ *
  * Revision 1.106  2008-12-12 01:24:47  ericn
  * added pipeProcess class
  *
@@ -637,6 +640,13 @@ jsWdEnable( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsGetPid( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = INT_TO_JSVAL(getpid());
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
@@ -644,6 +654,7 @@ static JSFunctionSpec shell_functions[] = {
     {"pollStat",        jsPollStat,       0},
     {"waitFor",         jsWaitFor,        0},
     {"wdEnable",        jsWdEnable,       0},
+    {"getPid",          jsGetPid,         0},
     {0}
 };
 
