@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include "hexDump.h"
 
 #define MAX_INVERT_BITS    128
 #define INVERT_BYTES       (MAX_INVERT_BITS/8)
@@ -27,6 +26,22 @@ static inline void clearBit(unsigned char *bytes,unsigned bit)
 	bytes[(bit/8)] &= ~(1<<(bit&7));
 }
 
+static inline bool isSet(unsigned char const *bytes,unsigned bit)
+{
+	return (0 != (bytes[(bit/8)] & (1<<(bit&7))));
+}
+
+static void showInverted(unsigned char const *bytes)
+{
+   for( unsigned i = 0 ; i < MAX_INVERT_BITS ; i++ )
+   {
+      if(isSet(bytes,i)){
+         printf( "%u ", i );
+      }
+   }
+   printf( "\n" );
+}
+
 int main( int argc, char const * const argv[] )
 {
 	if( 2 <= argc ){
@@ -35,10 +50,7 @@ int main( int argc, char const * const argv[] )
                         static unsigned char invertBytes[INVERT_BYTES];
 			int rval = ioctl(fd,GPIO_GET_INVERT,invertBytes);
 			if( 0 == rval ){
-				hexDumper_t dump(invertBytes,sizeof(invertBytes));
-				while( dump.nextLine() ){
-					printf( "%s\n", dump.getLine() );
-				}
+                                printf( "old: " ); showInverted(invertBytes);
 				for( int arg = 2 ; arg < argc ; arg++ ){
 					char const *pin = argv[arg];
 					int clear = 0 ;
@@ -59,15 +71,12 @@ int main( int argc, char const * const argv[] )
 					}
 				}
 				if( 2 < argc ){
-					hexDumper_t dump2(invertBytes,sizeof(invertBytes));
-					while( dump2.nextLine() ){
-						printf( "%s\n", dump2.getLine() );
-					}
                                         rval = ioctl(fd,GPIO_SET_INVERT,invertBytes);
 					if( rval ){
 						perror( "GPIO_SET_INVERT" );
 						return -1 ;
 					}
+                                        printf( "new: " ); showInverted(invertBytes);
 				} // set pin invert bits
 			}
 			else
