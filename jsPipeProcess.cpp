@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsPipeProcess.cpp,v $
+ * Revision 1.3  2009-02-09 18:52:43  ericn
+ * move destruction to Finalize routine
+ *
  * Revision 1.2  2008-12-28 19:54:53  ericn
  * [jsPipeProcess] Only call onExit once, watch for deletes in handlers
  *
@@ -387,8 +390,6 @@ jsClose( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    jsPipeProcess_t *proc = (jsPipeProcess_t *)JS_GetInstancePrivate( cx, obj, &jsPipeProcessClass_, NULL );
    if( proc ){
       proc->shutdown();
-      JS_SetPrivate( cx, obj, 0 );
-      delete proc ;
       *rval = JSVAL_TRUE ;
    }
    else
@@ -420,6 +421,8 @@ static void jsPipeProcFinalize(JSContext *cx, JSObject *obj)
       };
       jsval rval ;
       jsClose( cx, obj, 0, args, &rval );
+      JS_SetPrivate( cx, obj, 0 );
+      delete proc ;
    } // have button data
 }
 
