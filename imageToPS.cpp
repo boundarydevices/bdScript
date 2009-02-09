@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: imageToPS.cpp,v $
+ * Revision 1.4  2009-02-09 18:53:05  ericn
+ * add newline to gsave command
+ *
  * Revision 1.3  2006-12-13 21:28:13  ericn
  * -add newline to output
  *
@@ -25,7 +28,7 @@
 #include "ascii85.h"
 
 static char const preambleFormat[] = {
-   "gsave"
+   "gsave\n"
    "/pstr %u string def\n"                // bytes/line
    "/inputf\n"
      "currentfile\n"
