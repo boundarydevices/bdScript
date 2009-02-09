@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+typedef unsigned short __u16 ;
+typedef unsigned char  __u8 ;
+typedef long int       __s32 ;
 #include "i2c-dev.h"
 #include <ctype.h>
 #include <sys/mman.h>
