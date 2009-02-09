@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: calibQuadrant.cpp,v $
+ * Revision 1.3  2009-02-09 18:53:55  ericn
+ * allow negative point values
+ *
  * Revision 1.2  2008-09-22 18:36:49  ericn
  * [davinci] Add some coexistence stuff for davinci_code
  *
@@ -79,6 +82,14 @@ calibrateQuadrant_t::calibrateQuadrant_t
       coef_[i] = new  calibrateCoefficients_t(points,width,height);
       if( !coef_[i]->isValid() ){
          fprintf( stderr, "Triangle %u has co-linear points\n", i );
+         fprintf( stderr, "%u:%u\t%u:%u\t%u:%u\n"
+                  , points[0].x, points[0].y
+                  , points[1].x, points[1].y
+                  , points[2].x, points[2].y );
+         fprintf( stderr, "%d:%d\t%d:%d\t%d:%d\n"
+                  , points[0].i, points[0].j
+                  , points[1].i, points[1].j
+                  , points[2].i, points[2].j );
       }
    }
    isValid_ = true ;
@@ -187,7 +198,7 @@ int main( int argc, char const * const argv[] )
          {
             int i, j ;
             if( 2 == sscanf( inBuf, "%d.%d", &i, &j ) ){
-               unsigned x, y ;
+               int x, y ;
                if( calibration.translate(i,j,x,y) ){
                   printf( "%d.%d == %u:%u\n", i, j, x, y );
 #ifdef __arm__
