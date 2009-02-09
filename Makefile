@@ -364,6 +364,12 @@ jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
+inputDevs: inputDevs.cpp $(LIB) Makefile $(LIBRARYREFS)
+	$(CC) $(HARDWARE_TYPE) -DINPUTDEVS_STANDALONE -D_REENTRANT=1 -ggdb -o $@ $< $(LIBS) -lCurlCache -lstdc++ 
+	$(NM) --demangle $@ | sort >$@.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
 test: test.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o test test.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
@@ -900,7 +906,7 @@ progFlash.o: progFlash.cpp
 imgFileMain.o: imgFile.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o fbMem.o
+IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o
 imgFile: $(IMGFILEOBJS) Makefile 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
