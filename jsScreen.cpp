@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
+ * Revision 1.19  2009-02-09 18:49:55  ericn
+ * handle negative coordinates in screen.rect()
+ *
  * Revision 1.18  2007-10-01 20:17:02  ericn
  * -[screen] fix usage message for screen.buttonize
  *
@@ -332,10 +335,10 @@ jsRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
       unsigned char const red   = (unsigned char)( color >> 16 );
       unsigned char const green = (unsigned char)( color >> 8 );
       unsigned char const blue  = (unsigned char)( color );
-      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
-      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
-      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
-      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      short x1 = (short)JSVAL_TO_INT( argv[0] );	if( x1 < 0 ) x1 = 0 ;
+      short y1 = (short)JSVAL_TO_INT( argv[1] );        if( y1 < 0 ) y1 = 0 ;
+      short x2 = (short)JSVAL_TO_INT( argv[2] );        if( x2 < 0 ) x2 = 0 ;
+      short y2 = (short)JSVAL_TO_INT( argv[3] );        if( y2 < 0 ) y2 = 0 ;
       getFB().rect( x1, y1, x2, y2, red, green, blue );
    }
    else
