@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsTouch.cpp,v $
+ * Revision 1.34  2009-02-09 18:48:11  ericn
+ * check for NULL touch screen device
+ *
  * Revision 1.33  2008-12-29 17:49:48  ericn
  * [touch] Added setRaw(), setCooked() methods
  *
@@ -332,19 +335,25 @@ doit( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
 static JSBool
 jsOnTouch( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   return doit( cx, obj, argc, argv, rval, touchPoll_->onTouchCode_, touchPoll_->onTouchObject_ );
+   if( touchPoll_ )
+      return doit( cx, obj, argc, argv, rval, touchPoll_->onTouchCode_, touchPoll_->onTouchObject_ );
+   return JS_TRUE ;
 }
 
 static JSBool
 jsOnRelease( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   return doit( cx, obj, argc, argv, rval, touchPoll_->onReleaseCode_, touchPoll_->onReleaseObject_ );
+   if( touchPoll_ )
+      return doit( cx, obj, argc, argv, rval, touchPoll_->onReleaseCode_, touchPoll_->onReleaseObject_ );
+   return JS_TRUE ;
 }
 
 static JSBool
 jsOnMove( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   return doit( cx, obj, argc, argv, rval, touchPoll_->onMoveCode_, touchPoll_->onMoveObject_ );
+   if( touchPoll_ )
+      return doit( cx, obj, argc, argv, rval, touchPoll_->onMoveCode_, touchPoll_->onMoveObject_ );
+   return JS_TRUE ;
 }
 
 static JSBool
@@ -388,21 +397,21 @@ static JSFunctionSpec touch_functions[] = {
 static JSBool
 jsGetTouchX( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = INT_TO_JSVAL( touchPoll_->prevX_ );
+   *rval = INT_TO_JSVAL( touchPoll_ ? touchPoll_->prevX_ : 0 );
    return JS_TRUE ;
 }
 
 static JSBool
 jsGetTouchY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = INT_TO_JSVAL( touchPoll_->prevY_ );
+   *rval = INT_TO_JSVAL( touchPoll_ ? touchPoll_->prevY_ : 0 );
    return JS_TRUE ;
 }
 
 static JSBool
 jsIsRaw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
-   *rval = touchPoll_->isRaw() ? JSVAL_TRUE : JSVAL_FALSE ;
+   *rval = touchPoll_ && touchPoll_->isRaw() ? JSVAL_TRUE : JSVAL_FALSE ;
    
    return JS_TRUE ;
 }
