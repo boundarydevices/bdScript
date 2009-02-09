@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
+ * Revision 1.7  2009-02-09 18:50:33  ericn
+ * added imageToPS routine
+ *
  * Revision 1.6  2004-04-23 04:23:27  ericn
  * -removed comment blocks
  *
@@ -48,6 +51,8 @@
 #include "stringList.h"
 #include "jsGlobals.h"
 #include "codeQueue.h"
+#include "imageToPS.h"
+#include "imageInfo.h"
 
 static JSObject *fileProto = NULL ;
 
@@ -682,6 +687,97 @@ static JSBool jsFileWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
    return JS_TRUE ;
 }
 
+static bool image_ps_output( char const *outData,
+                             unsigned    outLength,
+                             void       *opaque )
+{
+   filePollHandler_t * const handler = (filePollHandler_t *)opaque ;
+   if( handler && handler->isOpen() ){
+      int const numWritten = write( handler->getFd(), outData, outLength );
+      if( numWritten == (int)outLength ){
+         return true ;
+      }
+      else
+         fprintf( stderr, "%s: write error %d: %m\n", __func__, numWritten );
+   }
+   else
+      fprintf( stderr, "%s: file not open\n", __func__ );
+   return false ;
+}
+
+static JSBool
+jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   static char const usage[] = {
+      "Usage: file.imageToPS( { image: data, x:0, y:0, w:10, h:10 } ) );\n" 
+   };
+
+   *rval = JSVAL_FALSE ;
+   filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+   if( handler && handler->isOpen() )
+   {
+      JSObject *paramObj ;
+      if( ( 1 == argc ) 
+          && 
+          JSVAL_IS_OBJECT(argv[0])
+          &&
+          ( 0 != ( paramObj = JSVAL_TO_OBJECT(argv[0]) ) ) )
+      {
+         JSString *sImageData ;
+         unsigned x, y ;
+         jsval val ;
+         if( JS_GetProperty( cx, paramObj, "x", &val ) 
+             && 
+             ( x = JSVAL_TO_INT(val), JSVAL_IS_INT( val ) )
+             &&
+             JS_GetProperty( cx, paramObj, "y", &val ) 
+             && 
+             ( y = JSVAL_TO_INT(val), JSVAL_IS_INT( val ) )
+             &&
+             JS_GetProperty( cx, paramObj, "image", &val ) 
+             && 
+             JSVAL_IS_STRING( val )
+             &&
+             ( 0 != ( sImageData = JSVAL_TO_STRING( val ) ) ) )
+         {
+            char const *const cImage = JS_GetStringBytes( sImageData );
+            unsigned const    imageLen = JS_GetStringLength( sImageData );
+            imageInfo_t imInfo ;
+            if( getImageInfo( cImage, imageLen, imInfo ) ){
+               unsigned w = imInfo.width_ ;
+               unsigned h = imInfo.height_ ;
+               if( JS_GetProperty( cx, paramObj, "w", &val ) && JSVAL_IS_INT( val ) )
+                  w = JSVAL_TO_INT( val );
+               if( JS_GetProperty( cx, paramObj, "h", &val ) && JSVAL_IS_INT( val ) )
+                  h = JSVAL_TO_INT( val );
+
+               rectangle_t r ;
+               r.xLeft_ = x ;
+               r.yTop_ = y ;
+               r.width_ = w ;
+               r.height_ = h ;
+
+               if( imageToPS( cImage, imageLen,
+                              r, image_ps_output, handler ) ){
+                  *rval = JSVAL_TRUE ;
+               }
+               else
+                  JS_ReportError( cx, "imageToPS: write cancelled\n" );
+            }
+            else
+               JS_ReportError( cx, "imageToPS: Invalid or unsupported image\n" );
+         }
+         else
+            JS_ReportError( cx, usage );
+      }
+      else
+         JS_ReportError( cx, usage );
+   }
+   else
+      JS_ReportError( cx, "Invalid usblp object\n" );
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec fileMethods_[] = {
     {"isOpen",    jsFileIsOpen,   0 },
     {"close",     jsFileClose,    0 },
@@ -689,6 +785,7 @@ static JSFunctionSpec fileMethods_[] = {
     {"onLineIn",  jsFileOnLineIn, 0 },
     {"read",      jsFileRead,     0 },
     {"write",     jsFileWrite,    0 },
+    {"imageToPS", jsImageToPS,    0 },
     {0}
 };
 
