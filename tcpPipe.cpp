@@ -22,6 +22,9 @@
  * Change History : 
  *
  * $Log: tcpPipe.cpp,v $
+ * Revision 1.2  2009-02-09 18:14:07  ericn
+ * handle close more gracefully
+ *
  * Revision 1.1  2008-12-13 00:31:25  ericn
  * added tcpPipe utility program
  *
@@ -227,8 +230,11 @@ if( ( prev0 != fds_[0].revents )
                      }
                      else if( 0 > numRead )
                         errMsg( "read(stdin):%m" );
-                     else
+                     else{
                         errMsg( "read(stdin):0 bytes:%m" );
+                        fds_[FDSTDIN].events &= ~POLLIN ;
+                        bail = true ;
+                     }
                   }
                } // while( connected )
 
