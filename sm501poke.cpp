@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: sm501poke.cpp,v $
+ * Revision 1.3  2009-02-10 00:29:01  ericn
+ * allow other fb devs (use FBDEV environment variable)
+ *
  * Revision 1.2  2007-08-08 17:12:00  ericn
  * -[sm501] /dev/fb0 not /dev/fb/0
  *
@@ -30,13 +33,19 @@
 #include <sys/mman.h>
 #include <string.h>
 
+static char const *devName = "/dev/fb0" ;
+
 int main( int argc, char const * const argv[] )
 {
 	if( 1 < argc ){
 		unsigned long offset = strtoul(argv[1], 0, 0 );
       if( 0 == ( offset & 3 ) )
       {
-   		int const fbDev = open( "/dev/fb0", O_RDWR );
+                if( getenv( "FBDEV" ) ){
+                   devName = getenv( "FBDEV" );
+		   printf( "opening device %s\n", devName );
+		}
+		int const fbDev = open( devName, O_RDWR );
    		if( 0 <= fbDev ) {
             struct fb_fix_screeninfo fixed_info;
             int err = ioctl( fbDev, FBIOGET_FSCREENINFO, &fixed_info);
