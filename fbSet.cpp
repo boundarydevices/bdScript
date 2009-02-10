@@ -20,7 +20,7 @@
 
 int main( int argc, char const * const argv[] )
 {
-   if( 3 == argc )
+   if( 2 <= argc )
    {
       int const fd = open( argv[1], O_RDWR );
       if( 0 <= fd )
@@ -88,23 +88,25 @@ int main( int argc, char const * const argv[] )
                printf( "%u x %u --> %u bytes\n",
                        variable_info.xres, variable_info.yres, fixed_info.smem_len );
 
-               unsigned long rgb = strtoul( argv[2], 0, 0 );
-               void *mem = mmap( 0, fixed_info.smem_len, PROT_WRITE|PROT_WRITE,
-                                 MAP_SHARED, fd, 0 );
-               if( MAP_FAILED != mem )
-               {
-                  unsigned char red   = (unsigned char)(rgb>>16);
-                  unsigned char green = (unsigned char)(rgb>>8);
-                  unsigned char blue  = (unsigned char)(rgb);
-                  unsigned short rgb16 = ((unsigned short)(red>>(8-variable_info.red.length)) << 11)       // 5 bits of red
-                                       | ((unsigned short)(green>>(8-variable_info.green.length)) << 5)    // 6 bits of green
-                                       | ((unsigned short)(blue>>(8-variable_info.blue.length)));          // 5 bits of blue
-                  unsigned long doubled = ( ((unsigned long)rgb16) << 16 )
-                                        | rgb16 ;
-                  memset( mem, doubled, fixed_info.smem_len );
-               }
-               else
-                  perror( "mmap fb" );
+	       if( 2 < argc ){
+		       unsigned long rgb = strtoul( argv[2], 0, 0 );
+		       void *mem = mmap( 0, fixed_info.smem_len, PROT_WRITE|PROT_WRITE,
+					 MAP_SHARED, fd, 0 );
+		       if( MAP_FAILED != mem )
+		       {
+			  unsigned char red   = (unsigned char)(rgb>>16);
+			  unsigned char green = (unsigned char)(rgb>>8);
+			  unsigned char blue  = (unsigned char)(rgb);
+			  unsigned short rgb16 = ((unsigned short)(red>>(8-variable_info.red.length)) << 11)       // 5 bits of red
+					       | ((unsigned short)(green>>(8-variable_info.green.length)) << 5)    // 6 bits of green
+					       | ((unsigned short)(blue>>(8-variable_info.blue.length)));          // 5 bits of blue
+			  unsigned long doubled = ( ((unsigned long)rgb16) << 16 )
+						| rgb16 ;
+			  memset( mem, doubled, fixed_info.smem_len );
+		       }
+		       else
+			  perror( "mmap fb" );
+	       }
             }
             else
                perror( "VSCREENINFO" );
