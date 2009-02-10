@@ -31,6 +31,7 @@ OBJS = \
        childProcess.o \
        codeQueue.o \
        curlGet.o \
+       cursorFile.o \
        ddtoul.o \
        dirByATime.o \
        dither.o \
@@ -139,6 +140,7 @@ ifeq (y,$(KERNEL_INPUT))
 OBJS += inputPoll.o \
         jsInput.o \
         inputDevs.o \
+        inputMouse.o \
         inputTouch.o 
 endif
 
@@ -167,6 +169,8 @@ OBJS += \
 HARDWARE_TYPE += -DKERNEL_FB=1
 else
 endif
+
+OBJS += pxaCursor.o
 
 ifeq (y,$(CONFIG_JSMPEG))
    OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o 
@@ -906,12 +910,48 @@ progFlash.o: progFlash.cpp
 imgFileMain.o: imgFile.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o
+cursorFileMain.o: cursorFile.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+loadCursorMain.o: loadCursor.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+pxaCursorTestMain.o: pxaCursorTest.cpp
+	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
+
+IMGFILEOBJS = imgFileMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o fbMem.o
 imgFile: $(IMGFILEOBJS) Makefile 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
       -Xlinker imgFile.map \
       $(IMGFILEOBJS) \
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
+CURSORFILEOBJS = cursorFileMain.o image.o memFile.o imgGIF.o imgJPEG.o imgPNG.o inputDevs.o
+cursorFile: $(CURSORFILEOBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker imgFile.map \
+      $(CURSORFILEOBJS) \
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
+LOADCURSOROBJS = loadCursorMain.o cursorFile.o
+loadCursor: $(LOADCURSOROBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker imgFile.map \
+      $(LOADCURSOROBJS) \
+      $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
+	$(STRIP) $@
+
+PXACURSORTESTOBJS = pxaCursorTestMain.o inputDevs.o inputMouse.o inputPoll.o cursorFile.o pxaCursor.o
+pxaCursorTest: $(PXACURSORTESTOBJS) Makefile 
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
+      -o $@ -D__STANDALONE__ -Xlinker -Map \
+      -Xlinker pxaCursorTest.map \
+      $(PXACURSORTESTOBJS) \
       $(LIBS) -lCurlCache -ljpeg -lungif -lpng -lz -lstdc++ 
 	$(STRIP) $@
 
