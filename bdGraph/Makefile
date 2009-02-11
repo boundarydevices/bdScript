@@ -21,6 +21,7 @@ FLOAT_TYPE=-msoft-float
 
 
 CC=$(ARM_GCC)
+CXX=g++
 LIB = libbdGraph.a
 
 ifndef INSTALL_ROOT
@@ -75,7 +76,7 @@ $(LIB): Makefile $(OBJS)
 	$(AR) r $(LIB) $(OBJS)
 
 buildSinTable: buildSinTable.cpp fft.h
-	gcc -DX86 buildSinTable.cpp -o $@ -fno-exceptions -lm
+	$(CXX) -DX86 buildSinTable.cpp -o $@ -fno-exceptions -lm
 
 sinTable8.c : buildSinTable
 	./buildSinTable
