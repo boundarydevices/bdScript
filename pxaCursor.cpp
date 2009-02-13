@@ -21,7 +21,7 @@
 
 static pxaCursor_t *instance_ = 0 ;
 
-pxaCursor_t::pxaCursor_t(unsigned int lmode)
+pxaCursor_t::pxaCursor_t(unsigned int lmode) : cursor(lmode)
 {
 	const char *cursorDev = getenv("CURSORDEV");
 
@@ -34,9 +34,6 @@ pxaCursor_t::pxaCursor_t(unsigned int lmode)
 		printf("Hardware cursor device does not exist\n");
 		exit(-1);
 	}
-
-	cursor.mode = lmode;
-	printf("%d\n", modes[lmode].xres);
 }
 
 pxaCursor_t::~pxaCursor_t()
@@ -59,8 +56,8 @@ void pxaCursor_t::setImage(image_t const &img)
 		ioctl(fd_hc, PXA27X_16_BIT_COLOR, &ci16);
 	}
 
-	if(cursor.cursor_size > write(fd_hc, cursor.cursor_data,
-					cursor.cursor_size)) {
+	if(cursor.getCursorSize() > write(fd_hc, cursor.cursor_data,
+					cursor.getCursorSize())) {
 		printf("Unable to write complete cursor image\n");
 		exit(-1);
 	}
@@ -68,7 +65,7 @@ void pxaCursor_t::setImage(image_t const &img)
 
 void pxaCursor_t::setMode(unsigned lmode)
 {
-	cursor.mode = lmode;
+	cursor.setMode(lmode);
 }
 
 void pxaCursor_t::setPos(unsigned x, unsigned y)
@@ -76,7 +73,7 @@ void pxaCursor_t::setPos(unsigned x, unsigned y)
 	struct cursorfb_info loc;
 	loc.x_loc = x;
 	loc.y_loc = y;
-	loc.mode = cursor.mode;
+	loc.mode = cursor.getMode();
 	ioctl(fd_hc, PXA27X_CURSOR_SETLOC, &loc);
 }
 
