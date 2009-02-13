@@ -16,13 +16,16 @@ pxaCursorTest_t::pxaCursorTest_t(pollHandlerSet_t &set,
 {
 	image_t image;
 	fbDevice_t &fb = getFB();
+	unsigned oldx = 0, oldy = 0;
 
 	maxx = fb.getWidth() - 1;
 	maxy = fb.getHeight() - 1;
 	imageFromFile(cursorImg, image);
 	pcursor.setImage(image);
 
-	pcursor.getPos(curx, cury);
+	pcursor.getPos(oldx, oldy);
+	curx = oldx;
+	cury = oldy;
 
 	onMove();
 }
@@ -42,8 +45,11 @@ void pxaCursorTest_t::enforceBounds()
 
 void pxaCursorTest_t::onMove( void )
 {
+	unsigned newx, newy;
 	enforceBounds();
-	pcursor.setPos(curx, cury);
+	newx = curx;
+	newy = cury;
+	pcursor.setPos(newx, newy);
 }
 
 void pxaCursorTest_t::onData( struct input_event const &event )
@@ -81,6 +87,7 @@ int main(int argc, char const * const argv[])
 		if(inputDevs_t::MOUSE == type){
 			char devName[512];
 			pollHandlerSet_t handlers ;
+			int mode = DEFAULT_CURSOR_MODE;
 			snprintf(devName, sizeof(devName),
 				"/dev/input/event%u", evIdx);
 
@@ -90,8 +97,11 @@ int main(int argc, char const * const argv[])
 				exit(-1);
 			}
 
+			if(3 <= argc)
+				mode = strtoul(argv[2], 0, 0);
+
 			pxaCursorTest_t mouse(handlers, devName,
-					DEFAULT_CURSOR_MODE, argv[1]);
+					mode, argv[1]);
 
 			while(true)
 				handlers.poll(-1);

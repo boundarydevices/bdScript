@@ -31,13 +31,13 @@ public:
 
 protected:
 	pxaCursor_t pcursor;
-	unsigned maxx;
-	unsigned minx;
-	unsigned maxy;
-	unsigned miny;
+	int maxx;
+	int minx;
+	int maxy;
+	int miny;
 
-	unsigned curx;
-	unsigned cury;
+	int curx;
+	int cury;
 };
 
 #endif
