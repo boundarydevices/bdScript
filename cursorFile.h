@@ -38,24 +38,30 @@
 
 class cursor_t {
 public:
-   unsigned char *cursor_data;
-   unsigned short *colors;
-   unsigned int mode;
-   unsigned short width;
-   unsigned short height;
-   unsigned short cursor_size;
-
    cursor_t(unsigned int lmode = 0);
 
    ~cursor_t();
 
    bool cursorFromFile(image_t const &image);
 
+   unsigned char *getCursorData();
+
+   void setMode(unsigned lmode);
+
+   unsigned getMode();
+
+   unsigned short getCursorSize();
 private:
    void update_colors(unsigned short* &colors_count, unsigned short &c_idx,
                       unsigned short &c_size, unsigned short pc);
 
    void find_4colors(unsigned short *colors_count, unsigned short &c_idx);
+   unsigned char *cursor_data;
+   unsigned short *colors;
+   unsigned int mode;
+   unsigned short width;
+   unsigned short height;
+   unsigned short cursor_size;
 };
 
 

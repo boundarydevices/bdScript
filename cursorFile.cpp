@@ -21,13 +21,47 @@
 // #define DEBUGPRINT
 #include "debugPrint.h"
 
+static struct cursorfb_mode modes[] = {
+	{32, 32, 2, 2, 3},   /* 2 color and transparency */
+	{32, 32, 2, 3, 4},   /* 3 color and transparency */
+	{32, 32, 2, 4, -1},   /* 4 color */
+	{64, 64, 2, 2, 3},   /* 2 color and transparency */
+	{64, 64, 2, 3, 4},   /* 3 color and transparency */
+	{64, 64, 2, 4, -1},   /* 4 color */
+	{128, 128, 1, 2, -1}, /* 2 color */
+	{128, 128, 1, 1, 1}  /* 1 color and transparency */
+};
+
 cursor_t::cursor_t(unsigned int lmode) : cursor_data(0),
 					colors(0),
 					mode(lmode)
 {
 	height = modes[mode].yres;
 	width = modes[mode].xres;
-	cursor_size = width * height;
+	cursor_size = (height * width * modes[mode].bpp)/8;
+}
+
+unsigned char *cursor_t::getCursorData()
+{
+	return cursor_data;
+}
+
+void cursor_t::setMode(unsigned lmode)
+{
+	mode = lmode;
+	height = modes[mode].yres;
+	width = modes[mode].xres;
+	cursor_size = (height * width * modes[mode].bpp)/8;
+}
+
+unsigned cursor_t::getMode()
+{
+	return mode;
+}
+
+unsigned short cursor_t::getCursorSize()
+{
+	return cursor_size;
 }
 
 cursor_t::~cursor_t()
@@ -110,10 +144,6 @@ void cursor_t::find_4colors(unsigned short *colors_count,
 		colors[idx] = max_colors[idx];
 }
 
-int trans[] = { 2, 2, 0, 0, 3, 3, 0, 1 };
-int num_colors[] = { 2, 2, 4, 4, 3, 3, 2, 1};
-
-//#define SET_COLOR(ROW,PIXEL,BPP,COLOR) ROW[PIXEL/(8/BPP)]|=(COLOR<<((((8/BPP)-1)-(PIXEL%(8/BPP)))*BPP))
 #define SET_COLOR(ROW,PIXEL,BPP,COLOR) ROW[PIXEL/(8/BPP)]|=(COLOR<<((PIXEL%(8/BPP))*BPP))
 
 bool cursor_t::cursorFromFile(image_t const &image)
@@ -150,8 +180,8 @@ bool cursor_t::cursorFromFile(image_t const &image)
 	for(row = 0; row < height; row++) {
 		unsigned char *row_data = cursor_data + (row * col_bytes);
 		for(column = 0; column < width; column++) {
-			if(alp && alp[row * height + column] <= 128)
-				SET_COLOR(row_data,column,modes[mode].bpp,trans[mode]);
+			if(alp && alp[row * height + column] <= 128 && modes[mode].transparency != -1)
+				SET_COLOR(row_data,column,modes[mode].bpp,modes[mode].transparency);
 			else
 				update_colors(colors_count, c_idx, cc_size, pm[row*height+column]);
 		}
@@ -166,7 +196,7 @@ bool cursor_t::cursorFromFile(image_t const &image)
 			unsigned short idx = 0;
 			unsigned short chosen = 0;
 			unsigned short min = 65535;
-			for(idx = 0; idx < num_colors[mode]; idx++) {
+			for(idx = 0; idx < modes[mode].color_count; idx++) {
 				unsigned short diff = (unsigned short)
 						abs(pm[row*height+column]
 							- colors[idx]);
@@ -189,16 +219,17 @@ bool cursor_t::cursorFromFile(image_t const &image)
 int main(int argc, char const * const argv[])
 {
 	if(2 <= argc) {
-		cursor_t cursor;
 		image_t        image;
+		int            mode;
 
-		cursor.mode = DEFAULT_CURSOR_MODE;
+		mode = DEFAULT_CURSOR_MODE;
 		if( 3 <= argc )
-			cursor.mode = strtoul( argv[2], 0, 0 );
+			mode = strtoul( argv[2], 0, 0 );
 
 		if(imageFromFile(argv[1], image))
 			perror(argv[1]);
 
+		cursor_t cursor(mode);
 		if(cursor.cursorFromFile(image))
 			perror(argv[1]);
 
@@ -210,7 +241,7 @@ int main(int argc, char const * const argv[])
 				return -1;
 			}
 
-			if(cursor.cursor_size > write(fd, cursor.cursor_data, cursor.cursor_size)) {
+			if(cursor.getCursorSize() > write(fd, cursor.getCursorData(), cursor.getCursorSize())) {
 				printf("Unable to write complete cursor image\n");
 				return -1;
 			}
