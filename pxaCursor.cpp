@@ -21,10 +21,15 @@
 
 static pxaCursor_t *instance_ = 0 ;
 
-pxaCursor_t::pxaCursor_t(unsigned int lmode) : cursor(lmode)
+pxaCursor_t::pxaCursor_t(unsigned int lmode) : cursor(lmode),
+						mode(lmode)
 {
 	const char *cursorDev = getenv("CURSORDEV");
 
+	/*
+ 	 * Set mode in pxa registers
+ 	 */
+	setMode(lmode);
 	if(0 == cursorDev)
 		cursorDev = "/dev/fb_cursor";
 
@@ -50,13 +55,17 @@ void pxaCursor_t::setImage(image_t const &img)
 
 	struct color16_info ci16;
 
+	unsigned short *colors = cursor.getCursorColors();
+
+	unsigned char *cursor_data = cursor.getCursorData();
+
 	for(int idx = 0; idx < 4; idx++) {
-		ci16.color = cursor.colors[idx];
+		ci16.color = colors[idx];
 		ci16.color_idx = idx;
 		ioctl(fd_hc, PXA27X_16_BIT_COLOR, &ci16);
 	}
 
-	if(cursor.getCursorSize() > write(fd_hc, cursor.cursor_data,
+	if(cursor.getCursorSize() > write(fd_hc, cursor_data,
 					cursor.getCursorSize())) {
 		printf("Unable to write complete cursor image\n");
 		exit(-1);
@@ -65,7 +74,20 @@ void pxaCursor_t::setImage(image_t const &img)
 
 void pxaCursor_t::setMode(unsigned lmode)
 {
+	unsigned x, y;
+	getPos(x, y);
 	cursor.setMode(lmode);
+	/*
+ 	 * Since we done have an explicit IOCTL to
+ 	 * set cursor mode we make use of setloc
+ 	 * IOCTL to set the mode
+ 	 */
+	setPos(x, y);
+}
+
+unsigned int pxaCursor_t::getMode()
+{
+	return mode;
 }
 
 void pxaCursor_t::setPos(unsigned x, unsigned y)
@@ -90,6 +112,11 @@ void pxaCursor_t::getPos(unsigned &x, unsigned &y)
 
 void pxaCursor_t::activate()
 {
+	/*
+ 	 * In case if activate is called before
+ 	 * setMode is called
+ 	 */
+	setMode(mode);
 	ioctl(fd_hc, PXA27X_CURSOR_ACTIVATE);
 }
 

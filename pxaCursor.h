@@ -22,6 +22,7 @@ public:
         void setImage(image_t const &img);
 
 	void setMode(unsigned int lmode);
+	unsigned int getMode();
 
 	void setPos(unsigned x, unsigned y);
 	void getPos(unsigned &x, unsigned &y);
@@ -37,6 +38,7 @@ private:
 
 	cursor_t cursor;
 	int fd_hc; /* holds the file descriptor for hardware cursor */
+	unsigned int mode;
 };
 
 #endif
