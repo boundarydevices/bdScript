@@ -1,5 +1,5 @@
 #ifndef __IMAGE_H__
-#define __IMAGE_H__ "$Id: image.h,v 1.4 2006-10-25 23:28:04 ericn Exp $"
+#define __IMAGE_H__ "$Id: image.h,v 1.5 2009-02-16 22:17:30 valli Exp $"
 
 /*
  * image.h
@@ -16,6 +16,9 @@
  * Change History : 
  *
  * $Log: image.h,v $
+ * Revision 1.5  2009-02-16 22:17:30  valli
+ * modified disown code to reset alpha_ member variable too along with pixData_
+ *
  * Revision 1.4  2006-10-25 23:28:04  ericn
  * -add typeName() utility routine
  *
@@ -63,7 +66,7 @@ public:
    void unload( void );
    
    // or this if you have control
-   inline void disown( void ){ pixData_ = 0 ; }
+   inline void disown( void ){ pixData_ = 0 ; alpha_ = 0;}
 
    void const    *pixData_ ;
    unsigned short width_ ;
