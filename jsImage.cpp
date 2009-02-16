@@ -9,6 +9,11 @@
  * Change History : 
  *
  * $Log: jsImage.cpp,v $
+ * Revision 1.39  2009-02-16 23:04:09  valli
+ * defined jsImageBox function.
+ * added method to set alpha. modified methods that modify pixel data (jsSetPixel,
+ * jsImageRect, and jsImageLine).
+ *
  * Revision 1.38  2007-07-03 18:07:14  ericn
  * -added parameter for Scale16::scale
  *
@@ -526,6 +531,63 @@ jsGetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
    return JS_TRUE ;
 }
 
+/*
+ * sets alpha for all pixels in the rect defined by x1, y1 and x2, y2
+ * not including the pixels in column x2 and row y2.
+ */
+static JSBool
+setAlpha(JSContext *cx, JSObject *obj,  unsigned short x1, unsigned short y1,
+         unsigned short x2, unsigned short y2, unsigned char alp, jsval *rval)
+{
+   unsigned char *alpha = 0;
+   jsval alphaVal, widthVal, heightVal;
+   int width, height;
+   JSString *sAlpha;
+
+   *rval = JSVAL_FALSE;
+
+   if(JS_GetProperty(cx, obj, "width", &widthVal)
+      &&
+      JS_GetProperty(cx, obj, "height", &heightVal))
+   {
+      width = JSVAL_TO_INT(widthVal);
+      height = JSVAL_TO_INT(heightVal);
+   }
+   else
+      return JSVAL_FALSE;
+
+   if(JS_GetProperty(cx, obj, "alpha", &alphaVal)
+      &&
+      JSVAL_IS_STRING(alphaVal)
+      &&
+      (0 != (sAlpha = JSVAL_TO_STRING(alphaVal))))
+   {
+      alpha = (unsigned char *)JS_GetStringBytes( sAlpha );
+   } // have alpha channel... use it
+   else
+      return JSVAL_FALSE;
+
+   /* this is possible if passed value is a -ve value */
+   if(x1 > width)
+      x1 = width;
+   if(x2 > width)
+      x2 = width;
+   /* this is possible if passed value is a -ve value */
+   if(y1 > width)
+      y1 = width;
+   if(y2 > width)
+      y2 = width;
+
+
+   for(int ridx = y1; ridx < y2; ridx++) {
+      unsigned char *row_data = alpha + (ridx * width);
+      for(int cidx = x1; cidx < x2; cidx++) {
+         row_data[cidx] = alp;
+      }
+   }
+   return JS_TRUE ;
+}
+
 static JSBool
 jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
@@ -562,6 +624,7 @@ jsSetPixel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
             if( ( x < (unsigned)width ) && ( y < (unsigned)height ) )
             {
                pixMap[(y*width)+x] = rgb16 ;
+               setAlpha(cx, obj, x, y, x+1, y+1, 255, rval); //make the drawn rect opaque
             }
             else
                JS_ReportError( cx, "Invalid position: %u x %u, image dim %u x %u\n", x, y, width, height );
@@ -619,6 +682,7 @@ jsImageRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
             getFB().rect( x1, y1, x2, y2, red, green, blue, pixMap, width, height );
+            setAlpha(cx, obj, x1, y1, x2, y2, 255, rval); //make the drawn rect opaque
          }
          else
             JS_ReportError( cx, "Invalid width or height" );
@@ -630,6 +694,43 @@ jsImageRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
       JS_ReportError( cx, "Usage: image.rect( x1, y1, x2, y2 [,color=0] );" );
 
    return JS_TRUE ;
+}
+
+static JSBool
+jsImageResetAlpha( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   unsigned char alp = 0;
+   unsigned short startx = 0, starty = 0, endx = 0, endy = 0;
+
+   *rval = JSVAL_FALSE ;
+   for(uint idx = 0; idx < argc; idx++)
+      if(!JSVAL_IS_INT(argv[idx]))
+         return JSVAL_FALSE;
+
+   switch(argc)
+   {
+      case 0:
+         alp = 0;
+         break;
+      case 1:
+         alp = (unsigned char) JSVAL_TO_INT(argv[0]);
+         break;
+      case 4:
+         startx = (unsigned short)JSVAL_TO_INT(argv[0]);
+         starty = (unsigned short)JSVAL_TO_INT(argv[1]);
+         endx = (unsigned short)JSVAL_TO_INT(argv[2]);
+         endy = (unsigned short)JSVAL_TO_INT(argv[3]);
+         break;
+      case 5:
+         alp = (unsigned char) JSVAL_TO_INT(argv[0]);
+         startx = (unsigned short)JSVAL_TO_INT(argv[1]);
+         starty = (unsigned short)JSVAL_TO_INT(argv[2]);
+         endx = (unsigned short)JSVAL_TO_INT(argv[3]);
+         endy = (unsigned short)JSVAL_TO_INT(argv[4]);
+         break;
+   }
+
+   return setAlpha(cx, obj, startx, starty, endx, endy, alp, rval);
 }
 
 static JSBool
@@ -671,9 +772,11 @@ jsImageLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
          unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
             getFB().line( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height );
+            setAlpha(cx, obj, x1, y1, x2+penWidth, y2+penWidth, 255, rval);
          }
          else
             JS_ReportError( cx, "Invalid width or height" );
@@ -691,6 +794,59 @@ static JSBool
 jsImageBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    *rval = JSVAL_FALSE ;
+   if( ( 4 <= argc ) 
+       &&
+       ( 6 >= argc )
+       &&
+       JSVAL_IS_INT( argv[0] )
+       &&
+       JSVAL_IS_INT( argv[1] )
+       &&
+       JSVAL_IS_INT( argv[2] )
+       &&
+       JSVAL_IS_INT( argv[3] ) )
+   {
+      unsigned char const penWidth = ( 5 <= argc ) ? (unsigned char)JSVAL_TO_INT( argv[4] ) : 1 ;
+      unsigned long const color = ( 6 <= argc ) ? JSVAL_TO_INT( argv[5] ) : 0 ;
+      unsigned char const red   = (unsigned char)( color >> 16 );
+      unsigned char const green = (unsigned char)( color >> 8 );
+      unsigned char const blue  = (unsigned char)( color );
+      unsigned short x1 = (unsigned short)JSVAL_TO_INT( argv[0] );
+      unsigned short y1 = (unsigned short)JSVAL_TO_INT( argv[1] );
+      unsigned short x2 = (unsigned short)JSVAL_TO_INT( argv[2] );
+      unsigned short y2 = (unsigned short)JSVAL_TO_INT( argv[3] );
+      jsval widthVal, heightVal, dataVal ;
+      if( JS_GetProperty( cx, obj, "width", &widthVal )
+          &&
+          JS_GetProperty( cx, obj, "height", &heightVal )
+          &&
+          JS_GetProperty( cx, obj, "pixBuf", &dataVal )
+          &&
+          JSVAL_IS_STRING( dataVal ) )
+      {
+         int const width  = JSVAL_TO_INT( widthVal );
+         int const height = JSVAL_TO_INT( heightVal );
+         JSString *pixStr = JSVAL_TO_STRING( dataVal );
+         unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+
+         if( JS_GetStringLength( pixStr ) == pixBytes )
+         {
+            getFB().box( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height );
+            setAlpha(cx, obj, x1, y1, x2, y1+penWidth, 255, rval);
+            setAlpha(cx, obj, x1, y1, x1+penWidth, y2, 255, rval);
+            setAlpha(cx, obj, x2, y1, x2+penWidth, y2+penWidth, 255, rval);
+            setAlpha(cx, obj, x1, y2, x2+penWidth, y2+penWidth, 255, rval);
+         }
+         else
+            JS_ReportError( cx, "Invalid width or height" );
+      }
+      else
+         JS_ReportError( cx, "Invalid image" );
+   }
+   else
+      JS_ReportError( cx, "Usage: image.line( x1, y1, x2, y2 [penWidth=1,[,color=0]] );" );
+
    return JS_TRUE ;
 }
 
@@ -704,6 +860,7 @@ static JSFunctionSpec imageMethods_[] = {
     {"rect",         jsImageRect,           6,0,0 },
     {"line",         jsImageLine,           6,0,0 },
     {"box",          jsImageBox,            6,0,0 },
+    {"setAlpha",     jsImageResetAlpha,     6,0,0 },
     {0}
 };
 
