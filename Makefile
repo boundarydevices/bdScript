@@ -170,13 +170,14 @@ HARDWARE_TYPE += -DKERNEL_FB=1
 else
 endif
 
-OBJS += pxaCursor.o
-
 ifeq (y,$(CONFIG_JSMPEG))
    OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o 
+endif
 ifeq (y,$(KERNEL_FB_SM501))
    OBJS += mediaQueue.o sm501Cursor.o 
 endif
+ifeq (y,$(KERNEL_FB_PXA_HARDWARE_CURSOR))
+   OBJS += pxaCursor.o 
 endif
 
 ifeq (y,$(KERNEL_FB_SM501))
@@ -200,11 +201,15 @@ SM501OBJS = asyncScreenObj.o \
             sm501alpha.o \
             vsyncSignal.o \
             yuvSignal.o
-OBJS += jsCursor.o
+OBJS += jsMouse.o jsCursor.o
 else
         ifeq (y,$(KERNEL_FB_DAVINCI))
-        OBJS += jsCursor.o davCursor.o 
+        OBJS += jsMouse.o jsCursor.o davCursor.o
         endif
+endif
+
+ifeq (y,$(KERNEL_FB_PXA_HARDWARE_CURSOR))
+OBJS += jsMouse.o jsCursor.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))

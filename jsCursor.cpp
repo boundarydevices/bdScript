@@ -9,6 +9,12 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
+ * Revision 1.7  2009-02-16 23:08:27  valli
+ * added support for pxaCursor to jsCursor.
+ * moved mouse support code to a separate source file, separated code to
+ * activate mouse from the jsEnableCursor code.
+ * jsEnableCursor code would activate only the cursor.
+ *
  * Revision 1.6  2008-10-29 15:30:36  ericn
  * [sm501 cursor] Added full mouse cursor support on SM-501
  *
@@ -35,7 +41,6 @@
 #include "jsImage.h"
 #include "js/jscntxt.h"
 #include "dither.h"
-#include "fbDev.h"
 #include <string.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
@@ -46,182 +51,26 @@
 #include "zOrder.h"
 #include "jsTouch.h"
 #include <assert.h>
-#include "inputDevs.h"
-#include "inputPoll.h"
 #include "jsGlobals.h"
 #include "box.h"
 
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
    #include <linux/sm501-int.h>
    #include "sm501Cursor.h"
-   static sm501Cursor_t *cursor_ = 0 ;
+   sm501Cursor_t *cursor_ = 0 ;
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
    #error got here
    #include "davCursor.h"
-   static davCursor_t *cursor_ = 0 ;
-#elif defined(KERNEL_FB_PXA) && (KERNEL_FB_PXA == 1)
-#error got here
+   davCursor_t *cursor_ = 0 ;
+#elif defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)
+   #include "pxaCursor.h"
+   pxaCursor_t *cursor_ = 0;
 #else
 #error Makefile should not build this
 #endif
 
-class jsMouse_t : public inputPoll_t {
-public:
-   jsMouse_t( char const *devName );
-   ~jsMouse_t( void );
-
-   virtual void onData( struct input_event const &event );
-   void press(void);
-   void release(void);
-
-   box_t       *curBox_ ;
-   bool         down_ ;
-   unsigned     x_ ;
-   unsigned     y_ ;
-};
-
-jsMouse_t::jsMouse_t( char const *devName )
-   : inputPoll_t( pollHandlers_, devName )
-   , curBox_( 0 )
-   , down_( false )
-{
-   if( !isOpen() ){
-      perror( devName );
-      return ;
-   }
-   printf( "%s\n", __PRETTY_FUNCTION__ );
-   assert( cursor_ );
-   
-   fbDevice_t &fb = getFB();
-   cursor_->setPos(fb.getWidth()/2, fb.getWidth()/2);
-   cursor_->activate();
-}
-
-jsMouse_t::~jsMouse_t( void )
-{
-   printf( "%s\n", __PRETTY_FUNCTION__ );
-}
-
-#define LMOUSEBUTTON 0x110
-#define RMOUSEBUTTON 0x111
-
 #define BIG   5
 #define SMALL 3
-
-void jsMouse_t::onData( struct input_event const &event )
-{
-   assert( cursor_ );
-
-   cursor_->getPos(x_,y_);
-
-   switch( event.type ){
-      case EV_SYN:
-         cursor_->setPos(x_,y_);
-         if( down_ ){
-            press();
-         }
-         break;
-      case EV_REL: {
-         fbDevice_t &fb = getFB();
-         int value = (int)event.value ;
-         int pos = (int)( (REL_X == event.code) ? x_ : y_ );
-         int max = (int)( (REL_X == event.code) ? fb.getWidth() : fb.getHeight() ) - 1 ;
-         pos += value ;
-         if( 0 > pos )
-            pos = 0 ;
-         else if( max < pos ){
-            pos = max ;
-         }
-         if( REL_X == event.code )
-            x_ = pos ;
-         else
-            y_ = pos ;
-         cursor_->setPos(x_,y_);
-         break;
-      }
-      case EV_KEY: {
-         int down = event.value ;
-         int left = ( event.code == LMOUSEBUTTON );
-#if defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
-         if( down ){
-            cursor_->setWidth(SMALL);
-            cursor_->setHeight(SMALL);
-         }
-         else {
-            cursor_->setWidth(BIG);
-            cursor_->setHeight(BIG);
-         }
-#endif
-
-         if( left && ( down_ != down ) ){
-            if( down ){
-               press();
-            }
-            else {
-               release();
-            }
-            down_ = down ;
-         } // left button state changed
-
-         break;
-      }
-      default:
-         inputPoll_t::onData(event);
-   }
-}
-
-void jsMouse_t::press( void )
-{
-   if( 0 != curBox_ )
-   {
-      if( ( x_ >= curBox_->xLeft_ )
-          &&
-          ( x_ <= curBox_->xRight_ )
-          &&
-          ( y_ >= curBox_->yTop_ )
-          &&
-          ( y_ <= curBox_->yBottom_ ) )
-      {
-         curBox_->onTouchMove_( *curBox_, x_, y_ );
-         debugPrint( "move on box\n" );
-         return ;
-      } // still on this button
-      else
-      {
-         debugPrint( "%s: moveOff %u:%u \n", __PRETTY_FUNCTION__, x_, y_ );
-         curBox_->onTouchMoveOff_( *curBox_, x_, y_ );
-         curBox_ = 0 ;
-         debugPrint( "move off box\n" );
-      } // moved off of the button
-   } // have a box
-   else
-      debugPrint( "No current box\n" );
-
-   std::vector<box_t *> boxes = getZMap().getBoxes( x_, y_ );
-   if( 0 < boxes.size() )
-   {
-      curBox_ = boxes[0];
-      curBox_->onTouch_( *boxes[0], x_, y_ );
-      debugPrint( "new box %p\n", curBox_ );
-   }
-   else
-      debugPrint( "No matching box\n" );
-}
-
-void jsMouse_t::release( void )
-{
-   if( 0 != curBox_ )
-   {
-      curBox_->onRelease_( *curBox_, curBox_->lastTouchX_, curBox_->lastTouchY_ );
-      curBox_ = 0 ;
-   } // touching, move or release box
-   else {
-      debugPrint( "No current box\n" );
-      onRelease();
-   }
-}
-
-static jsMouse_t *mouse_ = 0 ;
 
 static JSBool
 jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -229,7 +78,7 @@ jsSetCursorImage( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 	*rval = JSVAL_FALSE ;
 
 	JSObject *rhObj ;
-	if ( ( 1 == argc )
+	if ( ( 1 <= argc )
 	     &&
 	     JSVAL_IS_OBJECT( argv[0] ) 
 	     &&
@@ -291,6 +140,28 @@ JS_ReportError(cx, "create cursor here\n" );
                                    cursor_->setWidth(BIG);
                                 }
 				*rval = JSVAL_TRUE ;
+#elif defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)
+				int mode = 0;
+				if(argc == 2 && JSVAL_IS_INT(argv[1])) {
+					mode = JSVAL_TO_INT(argv[1]);
+				}
+                                if(0 == cursor_) {
+                                   unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
+                                   image_t img(pixData, bmWidth, bmHeight, alpha);
+                                   cursor_ = new pxaCursor_t(mode);
+                                   cursor_->setImage(img);
+				   img.disown();
+
+                                   *rval = JSVAL_TRUE;
+                                }
+                                else { /* update with new image */
+                                   unsigned short const *pixData = (unsigned short const *)JS_GetStringBytes( sPixMap );
+                                   image_t img(pixData, bmWidth, bmHeight, alpha);
+                                   cursor_->setImage(img);
+				   img.disown();
+
+                                   *rval = JSVAL_TRUE;
+				}
 #else
 #endif
 			}
@@ -341,14 +212,13 @@ jsSetCursorLocation( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 			}
 			else
 				JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
-#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+#else
 if( cursor_ ){
    cursor_->setPos( x, y );
 }
 else
    JS_ReportError(cx, "set cursor location to %u, %u (no cursor)\n", x, y );
 				*rval = JSVAL_TRUE ;
-#else
 #endif
 
 		}
@@ -368,25 +238,9 @@ jsEnableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
             if( 0 == cursor_ )
                cursor_ = new davCursor_t();
 #endif
-   if( (0==mouse_) && (0 != cursor_) ){
-      inputDevs_t inputDevs ;
-      for( unsigned i = 0 ; i < inputDevs.count(); i++ ){
-         unsigned evIdx ;
-         inputDevs_t::type_e type ;
-         inputDevs.getInfo(i,type,evIdx);
-   
-         if(inputDevs_t::MOUSE == type){
-            char devName[512];
-            snprintf( devName, sizeof(devName), "/dev/input/event%u", evIdx );
-            mouse_ = new jsMouse_t(devName);
-            printf( "%s:created mouse\n", __PRETTY_FUNCTION__ );
-            *rval = JSVAL_TRUE ;
-            break;
-         }
-      }
-   }
-   else
-      JS_ReportError( cx, "Error: mouse already defined or cursor is undefined\n" );
+   assert(cursor_);
+   cursor_->activate();
+   *rval = JSVAL_TRUE;
    return JS_TRUE ;
 }
 
@@ -412,19 +266,13 @@ jsDisableCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
 	}
 	else
 		JS_ReportError( cx, "reading SM-501 CURSORADDR\n" );
-#elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
+#else
                                 if( 0 != cursor_ ){
                                    delete cursor_ ;
                                    cursor_ = 0 ;
                                 }
-                                if( 0 != mouse_ ){
-                                   delete mouse_ ;
-                                   mouse_ = 0 ;
-                                   printf( "%s:deleted mouse\n", __PRETTY_FUNCTION__ );
-                                }
 
 				*rval = JSVAL_TRUE ;
-#else
 #endif
 	
 	return JS_TRUE ;
@@ -444,6 +292,21 @@ jsDontTrackCursor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
 	return JS_TRUE ;
 }
 
+#if defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)
+static JSBool
+jsSetMode( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+	if(JSVAL_IS_INT(argv[0])) {
+		int mode = JSVAL_TO_INT(argv[0]);
+		if(cursor_ == 0) {
+			cursor_ = new pxaCursor_t();
+		}
+		cursor_->setMode(mode);
+	}
+        return JS_TRUE ;
+}
+#endif
+
 static JSFunctionSpec _functions[] = {
     {"setCursorImage",		jsSetCursorImage,	0 },
     {"setCursorLocation",	jsSetCursorLocation,	0 },
@@ -451,6 +314,9 @@ static JSFunctionSpec _functions[] = {
     {"disableCursor",		jsDisableCursor,	0 },
     {"trackCursor",		jsTrackCursor,		0 },
     {"dontTrackCursor",		jsDontTrackCursor,	0 },
+#if defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)
+    {"setCursorMode",		jsSetMode,		0 },
+#endif
     {0}
 };
 

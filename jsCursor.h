@@ -1,5 +1,5 @@
 #ifndef __JSCURSOR_H__
-#define __JSCURSOR_H__ "$Id: jsCursor.h,v 1.3 2008-06-24 23:32:27 ericn Exp $"
+#define __JSCURSOR_H__ "$Id: jsCursor.h,v 1.4 2009-02-16 23:08:27 valli Exp $"
 
 /*
  * jsCursor.h
@@ -15,6 +15,12 @@
  * Change History : 
  *
  * $Log: jsCursor.h,v $
+ * Revision 1.4  2009-02-16 23:08:27  valli
+ * added support for pxaCursor to jsCursor.
+ * moved mouse support code to a separate source file, separated code to
+ * activate mouse from the jsEnableCursor code.
+ * jsEnableCursor code would activate only the cursor.
+ *
  * Revision 1.3  2008-06-24 23:32:27  ericn
  * [jsCursor] Add support for Davinci HW cursor
  *
@@ -29,15 +35,9 @@
  * Copyright Boundary Devices, Inc. 2007
  */
 
-#if (defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)) \
-    || \
-    (defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1))
-
-	#include "js/jsapi.h"
+#include "js/jsapi.h"
+#include "fbDev.h"
 	
-	bool initJSCursor( JSContext *cx, JSObject *glob );
-	
-#endif
-
+bool initJSCursor( JSContext *cx, JSObject *glob );
 #endif
 

@@ -9,6 +9,12 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.108  2009-02-16 23:08:27  valli
+ * added support for pxaCursor to jsCursor.
+ * moved mouse support code to a separate source file, separated code to
+ * activate mouse from the jsEnableCursor code.
+ * jsEnableCursor code would activate only the cursor.
+ *
  * Revision 1.107  2008-12-29 17:23:19  ericn
  * [jsExec] Add getPid() method
  *
@@ -456,11 +462,8 @@
 #include "jsStarUSB.h"
 #endif
 
-#if (defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)) \
-    || \
-    (defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1))
 #include "jsCursor.h"
-#endif
+#include "jsMouse.h"
 
 static JSBool
 global_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
@@ -774,11 +777,8 @@ int prMain(int argc, char **argv, bool )
                   initJSCairo( cx, glob );
 #endif                  
 
-#if (defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)) \
-    || \
-    (defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1))
                   initJSCursor( cx, glob );
-#endif
+                  initJSMouse( cx, glob );
 
 #ifdef CONFIG_JSMP3
                   initJSMP3( cx, glob );
