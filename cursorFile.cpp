@@ -46,6 +46,11 @@ unsigned char *cursor_t::getCursorData()
 	return cursor_data;
 }
 
+unsigned short *cursor_t::getCursorColors()
+{
+	return colors;
+}
+
 void cursor_t::setMode(unsigned lmode)
 {
 	mode = lmode;

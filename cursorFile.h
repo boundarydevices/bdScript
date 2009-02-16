@@ -46,6 +46,8 @@ public:
 
    unsigned char *getCursorData();
 
+   unsigned short *getCursorColors();
+
    void setMode(unsigned lmode);
 
    unsigned getMode();
