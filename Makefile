@@ -31,7 +31,6 @@ OBJS = \
        childProcess.o \
        codeQueue.o \
        curlGet.o \
-       cursorFile.o \
        ddtoul.o \
        dirByATime.o \
        dither.o \
@@ -177,8 +176,10 @@ ifeq (y,$(KERNEL_FB_SM501))
    OBJS += mediaQueue.o sm501Cursor.o 
 endif
 ifeq (y,$(KERNEL_FB_PXA_HARDWARE_CURSOR))
-   OBJS += pxaCursor.o 
+   OBJS += pxaCursor.o cursorFile.o
 endif
+
+OBJS += jsMouse.o jsCursor.o
 
 ifeq (y,$(KERNEL_FB_SM501))
 OBJS += fbMem.o yuyv.o
@@ -201,15 +202,10 @@ SM501OBJS = asyncScreenObj.o \
             sm501alpha.o \
             vsyncSignal.o \
             yuvSignal.o
-OBJS += jsMouse.o jsCursor.o
 else
         ifeq (y,$(KERNEL_FB_DAVINCI))
-        OBJS += jsMouse.o jsCursor.o davCursor.o
+        OBJS += davCursor.o
         endif
-endif
-
-ifeq (y,$(KERNEL_FB_PXA_HARDWARE_CURSOR))
-OBJS += jsMouse.o jsCursor.o
 endif
 
 ifeq (y,$(CONFIG_JSSTARUSB))

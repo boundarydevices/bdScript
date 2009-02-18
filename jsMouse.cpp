@@ -23,7 +23,6 @@
    #include "sm501Cursor.h"
    extern sm501Cursor_t *cursor_;
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
-   #error got here
    #include "davCursor.h"
    extern davCursor_t *cursor_;
 #elif defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)

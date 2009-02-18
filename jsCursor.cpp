@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsCursor.cpp,v $
+ * Revision 1.8  2009-02-18 18:30:55  valli
+ * fixed broken davinci build because of pxacursor changes
+ *
  * Revision 1.7  2009-02-16 23:08:27  valli
  * added support for pxaCursor to jsCursor.
  * moved mouse support code to a separate source file, separated code to
@@ -59,7 +62,6 @@
    #include "sm501Cursor.h"
    sm501Cursor_t *cursor_ = 0 ;
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
-   #error got here
    #include "davCursor.h"
    davCursor_t *cursor_ = 0 ;
 #elif defined(KERNEL_FB_PXA_HARDWARE_CURSOR) && (KERNEL_FB_PXA_HARDWARE_CURSOR == 1)
