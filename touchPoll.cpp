@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: touchPoll.cpp,v $
+ * Revision 1.16  2009-02-18 19:11:41  ericn
+ * initial import
+ *
  * Revision 1.15  2008-09-11 00:26:51  ericn
  * -[touchPoll] Implement new test program
  *
@@ -83,7 +86,7 @@ static rollingMedian_t medianY_( MEDIANRANGE );
 static rollingMean_t meanX_( MEANRANGE );
 static rollingMean_t meanY_( MEANRANGE );
 
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
 #include <linux/input.h>
 #define MAX_EVENTS_PER_READ 16
 #define HAVE_X (1<<ABS_X)
@@ -106,7 +109,7 @@ static char const *getTouchDev( char const *devName )
    if( 0 != envDev )
       devName = envDev ;
    if( 0 == devName )
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
       devName = "/dev/input/event0" ;
 #else
       devName = "/dev/touch_ucb1x00" ;
@@ -219,7 +222,7 @@ touchPoll_t :: ~touchPoll_t( void )
 {
    if( isOpen() )
    {
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
 #else
       ts_event event ;
       int numRead ;
@@ -260,14 +263,14 @@ void touchPoll_t :: onDataAvail( void )
    debugPrint( "onDataAvail() %s\n", 
                isSerial_ 
                   ? "serial" 
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
                   : "input" );
 #else
                   : "ucb1x00" );
 #endif
 
    if( !isSerial_ ){
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
 	struct input_event events[MAX_EVENTS_PER_READ];
 	do {
 		int bytesRead = read( fd_, events, sizeof(events) );
@@ -405,7 +408,7 @@ debugPrint( "sample: %u/%u\n", nextEvent.x, nextEvent.y );
       if( timer_ )
          timer_->clear();
 
-#ifdef KERNEL_INPUT_TOUCHSCREEN
+#ifdef KERNEL_INPUT_TOUCHSCREENx
 #else
       ts_event event ;
       char     inBuf[512];

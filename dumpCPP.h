@@ -1,5 +1,5 @@
 #ifndef __DUMPCPP_H__
-#define __DUMPCPP_H__ "$Id: dumpCPP.h,v 1.1 2004-04-07 12:45:21 ericn Exp $"
+#define __DUMPCPP_H__ "$Id: dumpCPP.h,v 1.2 2009-02-18 19:11:41 ericn Exp $"
 
 /*
  * dumpCPP.h
@@ -12,6 +12,9 @@
  * Change History : 
  *
  * $Log: dumpCPP.h,v $
+ * Revision 1.2  2009-02-18 19:11:41  ericn
+ * initial import
+ *
  * Revision 1.1  2004-04-07 12:45:21  ericn
  * -Initial import
  *
@@ -39,7 +42,7 @@ public:
 private:
    void const     *data_ ;
    unsigned long   bytesLeft_ ;
-   char            lineBuf_[ 81 ];
+   char            lineBuf_[ 128 ];
 };
 
 
