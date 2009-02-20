@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.109  2009-02-20 18:12:04  ericn
+ * [toInt64] Added method toInt64()
+ *
  * Revision 1.108  2009-02-16 23:08:27  valli
  * added support for pxaCursor to jsCursor.
  * moved mouse support code to a separate source file, separated code to
@@ -650,6 +653,39 @@ jsGetPid( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsToInt64( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = JSVAL_FALSE ;
+   JSString *sArg ;
+   if( (1 == argc) 
+       && 
+       JSVAL_IS_STRING(argv[0]) 
+       &&
+       ( 0 != ( sArg = JSVAL_TO_STRING( argv[0] ) ) ) 
+       &&
+       ( 8 >= JS_GetStringLength(sArg) ) )
+   {
+      unsigned long long i64 = 0ULL ;
+      unsigned char const *bytes = (unsigned char *)JS_GetStringBytes(sArg);
+      unsigned n = JS_GetStringLength(sArg);
+      while( n-- ){
+         i64 <<= 8 ;
+         i64 += *bytes++ ;
+      }
+      char temp[80];
+      int len = snprintf(temp,sizeof(temp),"%llu", i64);
+      JSString *rvalString = JS_NewStringCopyN( cx, temp, len );
+      if( rvalString ){
+         memcpy(JS_GetStringBytes(rvalString),temp,len);
+         *rval = STRING_TO_JSVAL(rvalString);
+      }
+   }
+   else
+      JS_ReportError(cx,"Usage: toIt64(string)\n");
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
@@ -658,6 +694,7 @@ static JSFunctionSpec shell_functions[] = {
     {"waitFor",         jsWaitFor,        0},
     {"wdEnable",        jsWdEnable,       0},
     {"getPid",          jsGetPid,         0},
+    {"toInt64",         jsToInt64,        0},
     {0}
 };
 
