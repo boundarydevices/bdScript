@@ -30,6 +30,11 @@ pxaCursorTest_t::pxaCursorTest_t(pollHandlerSet_t &set,
 	onMove();
 }
 
+pxaCursorTest_t::~pxaCursorTest_t()
+{
+	pcursor.deactivate();
+}
+
 void pxaCursorTest_t::enforceBounds()
 {
 	if(curx < minx)
@@ -75,6 +80,7 @@ void pxaCursorTest_t::onData( struct input_event const &event )
 			break;
 	}
 }
+
 int main(int argc, char const * const argv[])
 {
 	inputDevs_t inputDevs ;

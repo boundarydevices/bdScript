@@ -20,7 +20,7 @@ public:
 			unsigned          mode,
 			char const       *cursorImg);
 
-	virtual ~pxaCursorTest_t(){}
+	virtual ~pxaCursorTest_t();
 
 	// called with calibrated point
 	virtual void onMove();
