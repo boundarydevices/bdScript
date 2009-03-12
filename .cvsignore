@@ -113,3 +113,4 @@ rotateBlt
 udpSendRecv
 tcpPipe
 mouseIdle
+cameraFormats cameraToYUV evread evkey i2c-reg i2c_edid i2c_edid2 opencv_edge opencv_test pollTimer ubVar usblpPoll vidctrl
