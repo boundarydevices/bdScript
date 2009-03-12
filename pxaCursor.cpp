@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 	bool disable = false;
 
 	if(argc == 1) { /* print usage */
-		printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h]", argv[0]);
+		printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h] [-d]", argv[0]);
 		return -1;
 	}
 
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
 			y = atoi(optarg);
 			break;
 		case 'h':
-			printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h]", argv[0]);
+			printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h] [-d]", argv[0]);
 			break;
 		case 'd':
 			disable = true;
