@@ -21,6 +21,7 @@
 
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
    #include "sm501Cursor.h"
+   #include <linux/sm501-int.h>
    extern sm501Cursor_t *cursor_;
 #elif defined(KERNEL_FB_DAVINCI) && (KERNEL_FB_DAVINCI == 1)
    #include "davCursor.h"
