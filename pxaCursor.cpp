@@ -147,6 +147,18 @@ void pxaCursor_t::destroy()
 #include <stdlib.h>
 #include "imgFile.h"
 
+static void print_usage(char *prog_name)
+{
+	printf("Usage: %s <-i img-file-name> [-m cursor-mode|help] [-x x-pos] [-y y-pos] [-h] <-d>\n\
+	where\n\
+		-i	-	cursor image file, necessary to enable cursor\n\
+		-m	-	cursor mode number, or help to display supported modes (default mode 0)\n\
+		-x	-	cursor x position (default 0)\n\
+		-y	-	cursor y position (default 0)\n\
+		-h	-	displays this usage\n\
+		-d	-	disable cursor\n", prog_name);
+}
+
 int main(int argc, char **argv)
 {
 	int opt;
@@ -157,17 +169,29 @@ int main(int argc, char **argv)
 	bool disable = false;
 
 	if(argc == 1) { /* print usage */
-		printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h] [-d]", argv[0]);
+		print_usage(argv[0]);
 		return -1;
 	}
 
 	while ((opt = getopt(argc, argv, "i:m:x:y:hd")) != -1) {
 		switch (opt) {
 		case 'i':
-			img_file = (char *) calloc(strlen(optarg), 1);
+			img_file = (char *) calloc(strlen(optarg)+1, 1);
 			memcpy(img_file, optarg, strlen(optarg));
 			break;
 		case 'm':
+			if(strcmp(optarg, "help") == 0) {
+				printf("Supported modes:\n\
+	0 - 32x32 2 Color and Transparency Mode\n\
+	1 - 32x32 3 Color and transparency Mode\n\
+	2 - 32x32 4 Color Mode\n\
+	3 - 64x64 2 Color and Transparency Mode\n\
+	4 - 64x64 3 Color and transparency Mode\n\
+	5 - 64x64 4 Color Mode\n\
+	6 - 128x128 2 Color Mode\n\
+	7 - 128x128 1 Color and Transparency Mode\n");
+				return 0;
+			}
 			mode = atoi(optarg);
 			break;
 		case 'x':
@@ -177,14 +201,15 @@ int main(int argc, char **argv)
 			y = atoi(optarg);
 			break;
 		case 'h':
-			printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h] [-d]", argv[0]);
-			break;
+			print_usage(argv[0]);
+			return 0;
 		case 'd':
 			disable = true;
 			break;
 		default:
 			/* ignore non-options */
-			break;
+			print_usage(argv[0]);
+			return -1;
 		}
 	}
 
@@ -198,6 +223,7 @@ int main(int argc, char **argv)
 	if(img_file == NULL) { /* cannot enable cursor without an image */
 		pcursor.deactivate();
 		printf("Cursor cannot be enabled without an image.\n");
+		print_usage(argv[0]);
 		return -1;
 	}
 
@@ -212,9 +238,12 @@ int main(int argc, char **argv)
 		y = maxy;
 
 	image_t image;
-	imageFromFile(img_file, image);
-	pcursor.setImage(image);
-	pcursor.setPos(x,y);
+	if(imageFromFile(img_file, image)) {
+		pcursor.setImage(image);
+		pcursor.setPos(x,y);
+	}
+	else
+		printf("unable to load image file %s %d\n", img_file, strlen(img_file));
 
 	return 0;
 }
