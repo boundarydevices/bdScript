@@ -30,9 +30,10 @@ public:
 	void activate(void);
 	void deactivate(void);
 
+	void leave_cursor_atexit(void);
+
 	static pxaCursor_t *get(void);
 	static void destroy();
-
 private:
         pxaCursor_t(pxaCursor_t const &);
 

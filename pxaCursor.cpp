@@ -43,7 +43,6 @@ pxaCursor_t::pxaCursor_t(unsigned int lmode) : cursor(lmode),
 
 pxaCursor_t::~pxaCursor_t()
 {
-        deactivate();
 	close(fd_hc);
 	if( this == instance_ )
 		instance_ = 0 ;
@@ -125,6 +124,11 @@ void pxaCursor_t::deactivate(void)
 	ioctl(fd_hc, PXA27X_CURSOR_DEACTIVATE);
 }
 
+void pxaCursor_t::leave_cursor_atexit(void)
+{
+	ioctl(fd_hc, PXA27X_DONT_REMOVE_CURSOR_ATEXIT);
+}
+
 pxaCursor_t *pxaCursor_t::get(void)
 {
 	return instance_ ;
@@ -137,3 +141,81 @@ void pxaCursor_t::destroy()
 }
 
 
+#ifdef STANDALONE
+#include <stdio.h>
+#include "fbDev.h"
+#include <stdlib.h>
+#include "imgFile.h"
+
+int main(int argc, char **argv)
+{
+	int opt;
+	char *img_file = NULL;
+	int mode = 0;
+	int x = 0;
+	int y = 0;
+	bool disable = false;
+
+	if(argc == 1) { /* print usage */
+		printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h]", argv[0]);
+		return -1;
+	}
+
+	while ((opt = getopt(argc, argv, "i:m:x:y:hd")) != -1) {
+		switch (opt) {
+		case 'i':
+			img_file = (char *) calloc(strlen(optarg), 1);
+			memcpy(img_file, optarg, strlen(optarg));
+			break;
+		case 'm':
+			mode = atoi(optarg);
+			break;
+		case 'x':
+			x = atoi(optarg);
+			break;
+		case 'y':
+			y = atoi(optarg);
+			break;
+		case 'h':
+			printf("Usage: %s [-i img-file-name] [-m cursor-mode] [-x x-pos] [-y y-pos] [-h]", argv[0]);
+			break;
+		case 'd':
+			disable = true;
+			break;
+		default:
+			/* ignore non-options */
+			break;
+		}
+	}
+
+	pxaCursor_t pcursor(mode);
+
+	if(disable) {
+		pcursor.deactivate();
+		return 0;
+	}
+
+	if(img_file == NULL) { /* cannot enable cursor without an image */
+		pcursor.deactivate();
+		printf("Cursor cannot be enabled without an image.\n");
+		return -1;
+	}
+
+	pcursor.leave_cursor_atexit();
+	fbDevice_t &fb = getFB();
+	int maxx = fb.getWidth() - 1;
+	int maxy = fb.getHeight() - 1;
+
+	if(x > maxx)
+		x = maxx;
+	if(y > maxy)
+		y = maxy;
+
+	image_t image;
+	imageFromFile(img_file, image);
+	pcursor.setImage(image);
+	pcursor.setPos(x,y);
+
+	return 0;
+}
+#endif
