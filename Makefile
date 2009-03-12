@@ -959,8 +959,8 @@ pxaCursorTest: $(PXACURSORTESTOBJS) Makefile
 fbImageMain.o: fbImage.cpp
 	$(CC) -o $@ -fno-rtti -Wall -Wno-invalid-offsetof -DSTANDALONE=1 $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $<
 
-IMGFILEOBJS = fbImageMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o img4444.o sm501alpha.o
-fbImage: $(IMGFILEOBJS) Makefile 
+FBIMGOBJS = fbImageMain.o image.o memFile.o fbDev.o imgGIF.o imgJPEG.o imgPNG.o img4444.o sm501alpha.o
+fbImage: $(FBIMGOBJS) Makefile 
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti \
       -o $@ -D__STANDALONE__ -Xlinker -Map \
       -Xlinker fbImage.map \
