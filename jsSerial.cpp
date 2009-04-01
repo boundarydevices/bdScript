@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsSerial.cpp,v $
+ * Revision 1.5  2009-04-01 15:41:09  ericn
+ * [serial port] Allow mark and space parity
+ *
  * Revision 1.4  2006-12-13 21:25:22  ericn
  * -added setRTS() routine
  *
@@ -364,6 +367,17 @@ jsSetParity( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          else if( 'O' == cParity )
          {
             termState.c_cflag |= PARENB | PARODD ;
+            foundParity = true ;
+         }
+         else if( 'M' == cParity )
+         {
+            termState.c_cflag |= PARENB | IGNPAR | CMSPAR | PARODD ;
+            foundParity = true ;
+         }
+         else if( 'S' == cParity )
+         {
+            termState.c_cflag |= PARENB | IGNPAR | CMSPAR ;
+            termState.c_cflag &= ~PARODD ;
             foundParity = true ;
          }
          else
