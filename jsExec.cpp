@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.110  2009-04-01 15:40:41  ericn
+ * [jsExec] Allow local paths without file:// on the command line
+ *
  * Revision 1.109  2009-02-20 18:12:04  ericn
  * [toInt64] Added method toInt64()
  *
@@ -890,10 +893,19 @@ int prMain(int argc, char **argv, bool )
                         }
                         else
                         { // limit scope of urlFile
-                           urlFile_t f( argv[1] );
+			   char urlPath[PATH_MAX];
+			   if( 0 == strchr(argv[1],':') ){
+				   strcpy(urlPath,"file://");
+				   strcat(urlPath,argv[1]);
+				   printf( "full url: %s\n", urlPath );
+			   } else {
+				   strcpy(urlPath,argv[1]);
+			   }
+                           urlFile_t f( urlPath );
                            if( f.isOpen() )
                            {
                               script= JS_CompileScript( cx, glob, (char const *)f.getData(), f.getSize(), argv[1], 1 );
+			      pushURL( urlPath );
                            }
                            else 
                               fprintf( stderr, "Error opening url %s\n", argv[1] );
@@ -909,8 +921,6 @@ int prMain(int argc, char **argv, bool )
                            }
                            JS_DefineProperty( cx, glob, "argc", INT_TO_JSVAL( argc-2 ), 0, 0, JSPROP_ENUMERATE );
    
-                           pushURL( argv[1] );
-                           
                            jsval rval;
                            JSBool exec ;
                            {
