@@ -18,6 +18,7 @@
 #include <assert.h>
 #include "inputDevs.h"
 #include "jsGlobals.h"
+#include "codeQueue.h"
 
 #if defined(KERNEL_FB_SM501) && (KERNEL_FB_SM501 == 1)
    #include "sm501Cursor.h"
@@ -33,10 +34,13 @@
 #error Makefile should not build this
 #endif
 
+static jsval onWheelCode_ = JSVAL_VOID ;
+
 jsMouse_t::jsMouse_t( char const *devName )
    : inputPoll_t( pollHandlers_, devName )
    , curBox_( 0 )
    , down_( false )
+   , wheel_( 0 )
 {
    if( !isOpen() ){
       perror( devName );
@@ -73,23 +77,41 @@ void jsMouse_t::onData( struct input_event const &event )
          if( down_ ){
             press();
          }
+         if( 0 != wheel_ ){
+            printf( "wheel motion: %d\n", wheel_ );
+            if( JSVAL_VOID != onWheelCode_ ){
+               jsval args[2] = {
+                  INT_TO_JSVAL(wheel_)
+               ,  JSVAL_NULL
+               };
+               printf( "call handler here\n" );
+               executeCode(JS_GetGlobalObject(execContext_),onWheelCode_, __func__, 1,args);
+            } else
+               printf( "No wheel handler\n" );
+            wheel_ = 0 ;
+         }
          break;
       case EV_REL: {
-         fbDevice_t &fb = getFB();
-         int value = (int)event.value ;
-         int pos = (int)( (REL_X == event.code) ? x_ : y_ );
-         int max = (int)( (REL_X == event.code) ? fb.getWidth() : fb.getHeight() ) - 1 ;
-         pos += value ;
-         if( 0 > pos )
-            pos = 0 ;
-         else if( max < pos ){
-            pos = max ;
-         }
-         if( REL_X == event.code )
-            x_ = pos ;
-         else
-            y_ = pos ;
-         cursor_->setPos(x_,y_);
+         if( (REL_X==event.code) || (REL_Y==event.code) ){
+                 fbDevice_t &fb = getFB();
+                 int value = (int)event.value ;
+                 int pos = (int)( (REL_X == event.code) ? x_ : y_ );
+                 int max = (int)( (REL_X == event.code) ? fb.getWidth() : fb.getHeight() ) - 1 ;
+                 pos += value ;
+                 if( 0 > pos )
+                    pos = 0 ;
+                 else if( max < pos ){
+                    pos = max ;
+                 }
+                 if( REL_X == event.code )
+                    x_ = pos ;
+                 else
+                    y_ = pos ;
+                 cursor_->setPos(x_,y_);
+         } else if(REL_WHEEL==event.code){
+                 wheel_ += (int)event.value ;
+         } else 
+                 printf( "Unknown rel value, code 0x%x, value 0x%x\n", event.code, event.value );
          break;
       }
       case EV_KEY: {
@@ -241,9 +263,27 @@ jsDisableMouse( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 	return JS_TRUE ;
 }
 
+static JSBool
+jsOnWheel( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( (1 == argc) && (JSTYPE_FUNCTION == JS_TypeOfValue(cx, argv[0]))){
+      if( JSVAL_VOID != onWheelCode_ ){
+         JS_RemoveRoot( cx, &onWheelCode_ );
+      }
+      onWheelCode_ = argv[0];
+      JS_AddRoot( cx, &onWheelCode_ );
+      *rval = JSVAL_TRUE ;
+   } else
+      JS_ReportError(cx,"Usage: onWheel(function);\n" );
+
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec _functions[] = {
     {"enableMouse",		jsEnableMouse, 		0},
     {"disableMouse",		jsDisableMouse,		0},
+    {"onWheel",		        jsOnWheel,		0},
     {0}
 };
 

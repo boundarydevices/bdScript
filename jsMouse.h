@@ -31,6 +31,7 @@ public:
    bool         down_ ;
    unsigned     x_ ;
    unsigned     y_ ;
+   int          wheel_ ;
 };
 
 bool initJSMouse( JSContext *cx, JSObject *glob );
