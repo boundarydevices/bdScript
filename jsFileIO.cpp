@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
+ * Revision 1.8  2009-04-16 21:02:28  ericn
+ * [pxa gpio] Added file.pulse() method to support PXA GPIO outputs
+ *
  * Revision 1.7  2009-02-09 18:50:33  ericn
  * added imageToPS routine
  *
@@ -51,8 +54,12 @@
 #include "stringList.h"
 #include "jsGlobals.h"
 #include "codeQueue.h"
+<<<<<<< jsFileIO.cpp
+#include "config.h"
+=======
 #include "imageToPS.h"
 #include "imageInfo.h"
+>>>>>>> 1.7
 
 static JSObject *fileProto = NULL ;
 
@@ -687,6 +694,46 @@ static JSBool jsFileWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
    return JS_TRUE ;
 }
 
+<<<<<<< jsFileIO.cpp
+#ifdef KERNEL_PXA_GPIO
+#define BASE_MAGIC 250
+#define PULSELOW(duration)	((duration)&0x7fffffff)
+#define PULSEHIGH(duration)	(0x80000000|((duration)&0x7fffffff))
+#define GPIO_PULSE _IOW(BASE_MAGIC, 0x06, unsigned long)
+
+static JSBool jsFilePulse( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE ;
+   if( ( 2 == argc ) 
+       && 
+       JSVAL_IS_INT( argv[0] ) 
+       &&
+       JSVAL_IS_INT( argv[1] ) )
+   {
+      filePollHandler_t * const handler = (filePollHandler_t *)JS_GetInstancePrivate( cx, obj, &jsFileClass_, NULL );
+      if( handler && handler->isOpen() )
+      {
+	 unsigned long high = (0 != JSVAL_TO_INT(argv[0]));
+  	 unsigned long param = (high << 31) | (JSVAL_TO_INT(argv[1])&0x7fffffff);
+	 int result = ioctl(handler->getFd(), GPIO_PULSE, &param);
+	 if( 0 == result )
+                 *rval = JSVAL_TRUE ;
+	 else
+                 JS_ReportError(cx, "pulse: %m\n" );
+         
+      }
+      else
+         JS_ReportError( cx, "file is uninitialized\n" );
+   }
+   else
+      JS_ReportError( cx, "Usage: file.pulse( 0|1, duration(jiffies) );" );
+
+   return JS_TRUE ;
+}
+#else
+#endif
+
+=======
 static bool image_ps_output( char const *outData,
                              unsigned    outLength,
                              void       *opaque )
@@ -778,6 +825,7 @@ jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
+>>>>>>> 1.7
 static JSFunctionSpec fileMethods_[] = {
     {"isOpen",    jsFileIsOpen,   0 },
     {"close",     jsFileClose,    0 },
@@ -785,7 +833,13 @@ static JSFunctionSpec fileMethods_[] = {
     {"onLineIn",  jsFileOnLineIn, 0 },
     {"read",      jsFileRead,     0 },
     {"write",     jsFileWrite,    0 },
+<<<<<<< jsFileIO.cpp
+#ifdef KERNEL_PXA_GPIO
+    {"pulse",     jsFilePulse,    0 },
+#endif
+=======
     {"imageToPS", jsImageToPS,    0 },
+>>>>>>> 1.7
     {0}
 };
 

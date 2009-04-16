@@ -1,5 +1,5 @@
 #ifndef __JSFILEIO_H__
-#define __JSFILEIO_H__ "$Id: jsFileIO.h,v 1.4 2004-04-20 15:18:08 ericn Exp $"
+#define __JSFILEIO_H__ "$Id: jsFileIO.h,v 1.5 2009-04-16 21:02:28 ericn Exp $"
 
 /*
  * jsFileIO.h
@@ -29,6 +29,8 @@
  *    path       - readonly data member (string)
  *    mode       - readonly data member (string)
  *    close()    - close and invalidate file handle
+ *    pulse(dir,duration)	- special purpose routine for GPIO pin (pulse to specified direction for
+ *				  'duration' jiffies)
  *
  *    --- if read permission
  *
@@ -42,6 +44,9 @@
  * Change History : 
  *
  * $Log: jsFileIO.h,v $
+ * Revision 1.5  2009-04-16 21:02:28  ericn
+ * [pxa gpio] Added file.pulse() method to support PXA GPIO outputs
+ *
  * Revision 1.4  2004-04-20 15:18:08  ericn
  * -Added file class (for devices)
  *
