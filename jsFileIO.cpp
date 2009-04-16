@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
+ * Revision 1.9  2009-04-16 21:06:57  ericn
+ * [pxa-gpio] Fix merge problem
+ *
  * Revision 1.8  2009-04-16 21:02:28  ericn
  * [pxa gpio] Added file.pulse() method to support PXA GPIO outputs
  *
@@ -54,12 +57,9 @@
 #include "stringList.h"
 #include "jsGlobals.h"
 #include "codeQueue.h"
-<<<<<<< jsFileIO.cpp
 #include "config.h"
-=======
 #include "imageToPS.h"
 #include "imageInfo.h"
->>>>>>> 1.7
 
 static JSObject *fileProto = NULL ;
 
@@ -694,7 +694,6 @@ static JSBool jsFileWrite( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
    return JS_TRUE ;
 }
 
-<<<<<<< jsFileIO.cpp
 #ifdef KERNEL_PXA_GPIO
 #define BASE_MAGIC 250
 #define PULSELOW(duration)	((duration)&0x7fffffff)
@@ -733,7 +732,6 @@ static JSBool jsFilePulse( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
 #else
 #endif
 
-=======
 static bool image_ps_output( char const *outData,
                              unsigned    outLength,
                              void       *opaque )
@@ -825,7 +823,6 @@ jsImageToPS( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
    return JS_TRUE ;
 }
 
->>>>>>> 1.7
 static JSFunctionSpec fileMethods_[] = {
     {"isOpen",    jsFileIsOpen,   0 },
     {"close",     jsFileClose,    0 },
@@ -833,13 +830,10 @@ static JSFunctionSpec fileMethods_[] = {
     {"onLineIn",  jsFileOnLineIn, 0 },
     {"read",      jsFileRead,     0 },
     {"write",     jsFileWrite,    0 },
-<<<<<<< jsFileIO.cpp
 #ifdef KERNEL_PXA_GPIO
     {"pulse",     jsFilePulse,    0 },
 #endif
-=======
     {"imageToPS", jsImageToPS,    0 },
->>>>>>> 1.7
     {0}
 };
 
