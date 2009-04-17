@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: circularLog.cpp,v $
+ * Revision 1.2  2009-04-17 00:00:03  ericn
+ * [circularLog] Close stdin on read() == 0
+ *
  * Revision 1.1  2009-04-02 20:32:53  ericn
  * [circularLog] Added module and test program
  *
@@ -169,14 +172,22 @@ void passthruHandler_t::onDataAvail( void )
    {
 	   int numWritten = ::write(fdWriteTo_,inBuf,numRead);
    }
+   if( 0 == numRead ){
+	   setMask(0);
+	   close();
+   }
 }
 
 void passthruHandler_t::onError( void )
 {
+	setMask(0);
+	close();
 }
 
 void passthruHandler_t::onHUP( void )
 {
+	setMask(0);
+	close();
 }
 
 int main( int argc, char const **argv )
@@ -208,6 +219,8 @@ int main( int argc, char const **argv )
 			while( childOut.isOpen() && !die ){
 				if( !handlers.poll(500) ){
 				}
+				if( !childIn.isOpen() )
+					handlers.removeMe(childIn);
 			}
 			
 			if( childOut.isOpen() ){
