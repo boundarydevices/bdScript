@@ -8,6 +8,11 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
+ * Revision 1.27  2009-05-12 21:46:52  valli
+ *
+ * updated jsButton to clear audioQueue before playing either pressSnd or
+ * releaseSnd.
+ *
  * Revision 1.26  2006-06-10 16:28:43  ericn
  * -allow predecoded release sounds
  *
@@ -325,6 +330,8 @@ static void buttonTouch( box_t         &box,
       else
       {
          audioQueue_t &q = getAudioQueue();
+         unsigned int numCancelled = 0;
+         q.clear(numCancelled);
          if( !button->touchSoundDecoded_ )
             q.queuePlayback( button->jsObj_, button->touchSoundData_, button->touchSoundLength_ );
          else
@@ -403,6 +410,8 @@ static void buttonRelease( box_t         &box,
       else
       {
          audioQueue_t &q = getAudioQueue();
+         unsigned int numCancelled = 0;
+         q.clear(numCancelled);
          if( !button->releaseSoundDecoded_ )
             q.queuePlayback( button->jsObj_, button->releaseSoundData_, button->releaseSoundLength_ );
          else

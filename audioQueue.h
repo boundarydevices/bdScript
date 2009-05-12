@@ -1,5 +1,5 @@
 #ifndef __AUDIOQUEUE_H__
-#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.18 2006-12-01 18:29:54 tkisky Exp $"
+#define __AUDIOQUEUE_H__ "$Id: audioQueue.h,v 1.20 2009-05-12 21:46:52 valli Exp $"
 
 /*
  * audioQueue.h
@@ -16,7 +16,15 @@
  * Change History : 
  *
  * $Log: audioQueue.h,v $
- * Revision 1.18  2006-12-01 18:29:54  tkisky
+ * Revision 1.20  2009-05-12 21:46:52  valli
+ *
+ * updated jsButton to clear audioQueue before playing either pressSnd or
+ * releaseSnd.
+ *
+ * Revision 1.19  2006-02-13 21:52:28  ericn
+ * -remove audio interject support
+ *
+ * Revision 1.18  2006/12/01 18:29:54  tkisky
  * -added DEFAULT_PLAYBACK_SPEED
  *
  * Revision 1.17  2006/09/23 22:16:55  ericn
@@ -105,6 +113,7 @@ public:
 
    struct item_t {
       itemType_e           type_ ;
+      unsigned int        item_id;
       JSObject            *obj_ ;
       unsigned char const *data_ ;
       unsigned             length_ ;
@@ -168,11 +177,6 @@ public:
                        waveHeader_t const  &data,
                        jsval                onComplete = JSVAL_VOID,
                        jsval                onCancel = JSVAL_VOID );
-
-   //
-   // Interject a sound-effect
-   //
-   bool interject( waveHeader_t const &data );
 
    //
    // queue a record buffer

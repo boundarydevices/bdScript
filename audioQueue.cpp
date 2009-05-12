@@ -8,6 +8,11 @@
  * Change History : 
  *
  * $Log: audioQueue.cpp,v $
+ * Revision 1.58  2009-05-12 21:46:52  valli
+ *
+ * updated jsButton to clear audioQueue before playing either pressSnd or
+ * releaseSnd.
+ *
  * Revision 1.57  2008-10-28 18:00:40  ericn
  * [audioQueue] Force reset of sample rate
  *
@@ -233,6 +238,10 @@ static int readFdRefs_ = 0 ;
 static int writeFd_ = -1 ;
 static int writeFdRefs_ = 0 ;
 
+static int nextItemID = 0;
+static int volatile playingItemID = -1;
+static int volatile cancelledItemID = -1;
+
 int openReadFd( void )
 {
    mutexLock_t lock( openMutex_ );
@@ -444,7 +453,7 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    unsigned char *fbStart = (unsigned char *)fb.getRow(params.y_) 
                             + params.x_ * 2 ;
 
-   while( !_cancel && frames.pull( entry ) )
+   while( (cancelledItemID != playingItemID) && frames.pull( entry ) )
    {
       unsigned char *fbMem = fbStart ;
       unsigned char const *dataMem = entry->data_ ;
@@ -486,7 +495,7 @@ printf( "queue size: %u x %u, %u, %u\n",
 printf( "%u bytes/frame\n", bytesPerFrame );
       
       videoQueue_t :: entry_t *entry ;
-      while( !_cancel && frames.pull( entry ) )
+      while( (cancelledItemID != playingItemID) && frames.pull( entry ) )
       {
          unsigned char const *dataMem = entry->data_ ;
          write( fdYUV, dataMem, bytesPerFrame );
@@ -510,7 +519,7 @@ void audioQueue_t::GetAudioSamples(const int readFd,waveHeader_t* header)
 	unsigned long const maxSamples = header->numSamples_ ;
 	unsigned long bytesLeft = maxSamples * sizeof( header->samples_[0] );
 	unsigned const maxRead = readFragSize_ ;
-	while( !( _cancel || shutdown_ ) && ( 0 < bytesLeft ) ) {
+	while( !( (cancelledItemID == playingItemID) || shutdown_ ) && ( 0 < bytesLeft ) ) {
 		int const readSize = ( bytesLeft > maxRead ) ? maxRead : bytesLeft ;
 		int numRead = read( readFd, nextSample, readSize );
 		if( 0 < numRead ) {
@@ -554,7 +563,7 @@ void audioQueue_t::GetAudioSamples2(const int readFd,waveHeader_t* header)
 
 	memset(outSamples,0,MAX_ADD_SIZE*sizeof(*outSamples));
 
-	while ( !( _cancel || shutdown_ ) && (outSampleCnt < outSampleCntMax) ) {
+	while ( !( (cancelledItemID == playingItemID) || shutdown_ ) && (outSampleCnt < outSampleCntMax) ) {
 		int numRead = 0;
 //		printf("readPos:%i outSampleCnt:%i, max:%i\r\n",readPos,outSampleCnt,outSampleCntMax);
 		while ((((writePos-readPos)& (blkSize-1))+numRead)<n) {
@@ -669,6 +678,7 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
       audioQueue_t :: item_t *item ;
       if( queue->pull( item ) )
       {
+         playingItemID = item->item_id;
          if( audioQueue_t :: mp3Play_ == item->type_ )
          {
             gettimeofday( &lastPlayStart_, 0 );
@@ -684,7 +694,6 @@ debugPrint( "audioThread %p (id %x)\n", &arg, pthread_self() );
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
 #endif
                unsigned long numWritten = 0 ;
-               _playing = true ;
 
                madHeaders_t headers( item->data_, item->length_ );
                if( headers.worked() )
@@ -788,7 +797,7 @@ wrote += numWritten ;
                         else
                            break;
                      }
-                  } while( !( eof || _cancel || queue->shutdown_ ) );
+                  } while( !( eof || (cancelledItemID == playingItemID) || queue->shutdown_ ) );
 
                   if( eof )
                   {
@@ -817,13 +826,7 @@ wrote += numWritten ;
                
                if( !queue->shutdown_ )
                {
-                  if( _cancel )
-                  {
-                     _cancel = false ;
-//                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) ) 
-//                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
-                  }
-                  else
+                  if(cancelledItemID != playingItemID)
                   {
                      if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) ) 
                         fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
@@ -834,8 +837,6 @@ wrote += numWritten ;
                   queueCallback( audioCallback, item );
                }
                
-               _playing = false ;
-
                closeWriteFd();
                lastSampleRate = -1 ;
             }
@@ -858,7 +859,6 @@ wrote += numWritten ;
                if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
 #endif
-               _playing = true ;
                
                audio_buf_info ai ;
                if( 0 == ioctl( writeFd, SNDCTL_DSP_GETOSPACE, &ai) ) 
@@ -871,7 +871,7 @@ wrote += numWritten ;
                   bool firstFrame = true ;
 
                   unsigned char state = DEVICEEMPTY ;
-                  while( !( _cancel || queue->shutdown_ )
+                  while( !( (cancelledItemID == playingItemID) || queue->shutdown_ )
                          &&
                          ( state != MP3DONE ) )
                   {
@@ -996,13 +996,9 @@ wrote += numWritten ;
                   if( samples )
                      delete [] samples ;
 
-                  _playing = false ;
-
                   if( !queue->shutdown_ )
                   {
-                     if( _cancel )
-                        _cancel = false ;
-                     else
+                     if(cancelledItemID != playingItemID)
                         item->isComplete_ = true ;
 
                      if( item->callback_ )
@@ -1031,7 +1027,6 @@ wrote += numWritten ;
                if( 0 != ioctl( writeFd, SNDCTL_DSP_CHANNELS, &channels ) )
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
 #endif
-               _playing = true ;
 
                audioQueue_t :: waveHeader_t const &header = *( audioQueue_t :: waveHeader_t const * )item->data_ ;
                bool eof = false ;
@@ -1053,7 +1048,7 @@ wrote += numWritten ;
                {
                   unsigned short const *nextIn = header.samples_ ;
                   unsigned i ;
-                  for( i = 0 ; !( _cancel || queue->shutdown_ )
+                  for( i = 0 ; !( (cancelledItemID == playingItemID) || queue->shutdown_ )
                                &&
                                ( i < header.numSamples_ ) ; i++ )
                   {
@@ -1077,7 +1072,7 @@ wrote += numWritten ;
                   }
                   eof = ( i == header.numSamples_ )
                         &&
-                        ( !_cancel )
+                        (cancelledItemID != playingItemID)
                         &&
                         ( !queue->shutdown_ );
 
@@ -1094,24 +1089,16 @@ wrote += numWritten ;
                   int const numWritten = write( writeFd, header.samples_, outSize );
                   eof = ( numWritten == outSize )
                         &&
-                        ( !_cancel )
+                        (cancelledItemID != playingItemID)
                         &&
                         ( !queue->shutdown_ );
                } // stereo, we can write directly
 
                gettimeofday( &lastPlayEnd_, 0 );
 
-               _playing = false ;
-
                if( !queue->shutdown_ )
                {
-                  if( _cancel )
-                  {
-                     _cancel = false ;
-                     if( 0 != ioctl( writeFd, SNDCTL_DSP_RESET, 0 ) )
-                        fprintf( stderr, ":ioctl(SNDCTL_DSP_RESET):%m" );
-                  }
-                  else
+                  if(cancelledItemID != playingItemID)
                   {
                      if( 0 != ioctl( writeFd, SNDCTL_DSP_POST, 0 ) )
                         fprintf( stderr, ":ioctl(SNDCTL_DSP_POST):%m" );
@@ -1158,9 +1145,7 @@ wrote += numWritten ;
 
                if( !queue->shutdown_ )
                {
-                  if( _cancel )
-                     _cancel = false ;
-                  else
+                  if(cancelledItemID != playingItemID)
                      item->isComplete_ = true ;
                   queueCallback( audioCallback, item );
                }
@@ -1185,7 +1170,6 @@ wrote += numWritten ;
                   fprintf( stderr, ":ioctl(SNDCTL_DSP_CHANNELS):%m\n" );
 #endif
 printf( "MPEG playback here at x:%u, y:%u, w:%u, h:%u\n", item->xPos_, item->yPos_, item->width_, item->height_ );
-               _playing = true ;
                
                mpegDemux_t demuxer( item->data_, item->length_ );
 
@@ -1256,7 +1240,7 @@ printf( "allocate frames: %u x %u\n", width, height );
                         pthread_t        videoThread = 0 ;
                         videoParams_t    videoParams = { vFrames, item->xPos_, item->yPos_, item->width_, item->height_ };
 
-                        while( !( _cancel || queue->shutdown_ ) 
+                        while( !((cancelledItemID == playingItemID) || queue->shutdown_ ) 
                                && 
                                ( MP3DONE != state ) )
                         {
@@ -1430,9 +1414,7 @@ printf( "allocate frames: %u x %u\n", width, height );
 
                if( !queue->shutdown_ )
                {
-                  if( _cancel )
-                     _cancel = false ;
-                  else
+                  if(cancelledItemID != playingItemID)
                      item->isComplete_ = true ;
                   queueCallback( audioCallback, item );
                }
@@ -1554,6 +1536,7 @@ bool audioQueue_t :: queuePlayback
      jsval                onCancel )
 {
    item_t *item = new item_t ;
+   item->item_id = nextItemID++;
    item->type_       = mp3Play_ ;
    item->obj_        = mp3Obj ;
    item->data_       = data ;
@@ -1574,6 +1557,7 @@ bool audioQueue_t :: queuePlayback
      void (*callback)( void *param ) )
 {
    item_t *item = new item_t ;
+   item->item_id = nextItemID++;
    item->type_       = mp3Raw_ ;
    item->obj_        = 0 ;
    item->data_       = data ;
@@ -1598,6 +1582,7 @@ bool audioQueue_t :: queueMPEG
      unsigned             height )
 {
    item_t *item = new item_t ;
+   item->item_id = nextItemID++;
    item->type_       = mpegPlay_ ;
    item->obj_        = mpegObj ;
    item->data_       = data ;
@@ -1622,6 +1607,7 @@ bool audioQueue_t :: queuePlayback
      jsval                onCancel )
 {
    item_t *item = new item_t ;
+   item->item_id = nextItemID++;
    item->type_       = wavPlay_ ;
    item->obj_        = obj ;
    item->data_       = (unsigned char const *)&data ;
@@ -1642,6 +1628,7 @@ bool audioQueue_t :: queueRecord
      jsval                onCancel )
 {
    item_t *item = new item_t ;
+   item->item_id = nextItemID++;
    item->type_       = wavRecord_ ;
    item->obj_        = obj ;
    item->data_       = (unsigned char const *)&data ;
@@ -1677,11 +1664,8 @@ bool audioQueue_t :: clear( unsigned &numCancelled )
       //
       // tell player to cancel at next frame
       //
-      if( _playing || _recording )
-      {
-         _cancel = true ;
-         ++numCancelled ;
-      }
+      cancelledItemID = playingItemID;
+      ++numCancelled ;
    } // limit scope of lock
       
 //   ioctl( readFd_, SNDCTL_DSP_SYNC, 0 );
@@ -1697,7 +1681,7 @@ bool audioQueue_t :: stopRecording( void )
    //
    if( _recording )
    {
-      _cancel = true ;
+      cancelledItemID = playingItemID;
       return true ;
    }
    else
