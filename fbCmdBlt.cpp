@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.cpp,v $
+ * Revision 1.7  2009-05-14 16:26:18  ericn
+ * [multi-display SM-501] Add frame-buffer offsets
+ *
  * Revision 1.6  2008-10-29 15:27:46  ericn
  * -prevent compiler warnings
  *
@@ -117,7 +120,7 @@ void fbBlt_t::set(
    cmdMem_[BLTREG(SMIDRAW_2D_Stretch_Format)] = ( cmdMem_[BLTREG(SMIDRAW_2D_Stretch_Format)] & 0xFFFFF000 )
                                                   | h ;
    cmdMem_[BLTREG(SMIDRAW_2D_Window_Width)] = ( destw << 16 ) | srcImg.stride();
-   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = srcImg.ramOffset() + srcy*srcImg.stride()*2;
+   cmdMem_[BLTREG(SMIDRAW_2D_Source_Base)]  = srcImg.ramOffset() + getFB().fb0_offset() + srcy*srcImg.stride()*2;
    cmdMem_[BLTREG(SMIDRAW_2D_Destination_Base)] = destRamOffs ;
 }
 

@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.28 2008-10-16 00:09:38 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.29 2009-05-14 16:26:18 ericn Exp $"
 
 /*
  * fbDev.h
@@ -13,6 +13,9 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
+ * Revision 1.29  2009-05-14 16:26:18  ericn
+ * [multi-display SM-501] Add frame-buffer offsets
+ *
  * Revision 1.28  2008-10-16 00:09:38  ericn
  * [getFB()] Allow fbDev.cpp to read environment variable FBDEV to determine default FB
  *
@@ -286,6 +289,10 @@ public:
    unsigned long   pageSize( void ) const { return width_*height_*sizeof(unsigned short); }
 
    unsigned long   fbOffset( void *pixAddr ) const { return (unsigned long)pixAddr - (unsigned long)mem_ ; }
+
+#ifdef KERNEL_FB_SM501
+   unsigned long fb0_offset( void ) const ;
+#endif
 
 private:
    fbDevice_t( fbDevice_t const &rhs ); // no copies

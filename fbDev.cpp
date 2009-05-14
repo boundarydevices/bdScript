@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.38  2009-05-14 16:26:18  ericn
+ * [multi-display SM-501] Add frame-buffer offsets
+ *
  * Revision 1.37  2008-10-29 15:28:36  ericn
  * -get rid of unused static functions sm501_fb() and writeReg()
  *
@@ -151,6 +154,9 @@ static unsigned short gTable[64];
 static unsigned short bTable[32];
 static unsigned char *lcdRAM_ = 0 ;
 
+#ifdef KERNEL_FB_SM501
+static unsigned long fb0_offset_ = 0 ;
+#endif
 
 #if 0
 // 0  1  2  3  4    5  6  7  8  9 10    11 12 13 14 15
@@ -526,6 +532,7 @@ fbDevice_t :: fbDevice_t( char const *name )
          debugPrint( "mmio_len   %lu\n", fixed_info.mmio_len );
          debugPrint( "accel      %lu\n", fixed_info.accel );
 #endif
+         fb0_offset_ = fixed_info.smem_start & 0x7fffff ; 
          struct fb_var_screeninfo variable_info;
 
          err = ioctl( fd_, FBIOGET_VSCREENINFO, &variable_info );
@@ -1472,13 +1479,20 @@ fbDevice_t :: ~fbDevice_t( void )
    }
 }
 
+#ifdef KERNEL_FB_SM501
+unsigned long fbDevice_t::fb0_offset( void ) const 
+{
+   return fb0_offset_ ;
+}
+#endif
+
 static fbDevice_t *dev_ = 0 ;
 
 fbDevice_t &getFB( char const *devName )
 {
    if( 0 == dev_ ){
       if( 0 == devName ){
-         printf( "Unspecified FB: use environment\n" );
+         debugPrint( "Unspecified FB: use environment\n" );
          devName = getenv("FBDEV");
          if( 0 == devName )
             devName = "/dev/fb0" ;

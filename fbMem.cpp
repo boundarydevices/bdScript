@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: fbMem.cpp,v $
+ * Revision 1.6  2009-05-14 16:26:18  ericn
+ * [multi-display SM-501] Add frame-buffer offsets
+ *
  * Revision 1.5  2007-08-23 00:28:19  ericn
  * -map memory separately from fb0
  *
@@ -46,6 +49,7 @@
 static fbMemory_t *instance_ = 0 ;
 static unsigned long numAlloc_ = 0 ;
 static unsigned long numFree_ = 0 ;
+static unsigned long fb0_offset ;
 
 fbMemory_t &fbMemory_t::get( void )
 {
@@ -63,7 +67,6 @@ void fbMemory_t::destroy( void )
    }
 }
 
-
 unsigned fbMemory_t::alloc( unsigned size )
 {
    unsigned const inSize = size ;
@@ -76,7 +79,6 @@ unsigned fbMemory_t::alloc( unsigned size )
    }
    
    fprintf( stderr, "SM501_ALLOC error, %u bytes\n", size );
-   exit(0);
 
    return 0;
 }
@@ -102,6 +104,13 @@ fbMemory_t::fbMemory_t( void )
          perror( "mmap sm501mem" );
          memBase_ = 0 ;
       }
+      int rval = ioctl(fd_,SM501_BASEADDR,&fb0_offset);
+      if( 0 != rval ){
+         perror( "SM501_BASEADDR" );
+         munmap(memBase_,SM501_FBMAX);
+         memBase_ = 0 ;
+      }
+      debugPrint( "fbMemory_t::memBase_ == %p, fb0_offs %lu\n", memBase_, fb0_offset );
    }
    else
       perror( "/dev/" SM501MEM_CLASS );
@@ -110,6 +119,10 @@ fbMemory_t::fbMemory_t( void )
 
 fbMemory_t::~fbMemory_t( void )
 {
+   if( memBase_ ){
+         munmap(memBase_,SM501_FBMAX);
+         memBase_ = 0 ;
+   }
    if( 0 <= fd_ ){
       debugPrint( "closing fd %d\n", fd_ );
       close( fd_ );
@@ -201,7 +214,7 @@ fbPtr_t :: fbPtr_t( unsigned size )
 {
    unsigned offs = fbMemory_t::get().alloc(size);
    if( offs ){
-      void *ptr = offs ? (char *)fbMemory_t::get().memBase_ + offs
+      void *ptr = offs ? (char *)fbMemory_t::get().memBase_ + offs + fb0_offset
                        : 0 ;
       inst_ = new fbPtrImpl_t( offs, ptr, size );
 debugPrint( "new instance %p\n", inst_ );
@@ -250,6 +263,13 @@ bool fbPtr_t :: validate( void ) const {
 
 int main( void )
 {
+   fbPtr_t myPtr(0x1000);
+   if( myPtr.getPtr() ){
+      printf( "allocated a page: %p\n", myPtr.getPtr() );
+   } else {
+      fprintf( stderr, "error allocating a page\n");
+      return -1 ;
+   }
    long long start, end ;
 
    {
@@ -262,14 +282,15 @@ int main( void )
          unsigned alloc = 0 ;
          start = tickMs();
          while(1){
-            unsigned const allocSize = ( iteration & 7 ) + 1 ;
+            unsigned const allocSize = ( iteration & 7 ) + 4096 ;
             fbPtr_t ptr( allocSize );
             if( 0 == ptr.getPtr() ){
                fprintf( stderr, "Alloc error on iteration %u\n", iteration );
                break ;
             }
       
-      //      printf( "Alloc: %x/%p\n", ptr.getOffs(), ptr.getPtr() );
+            printf( "Alloc: %x/%p\n", ptr.getOffs(), ptr.getPtr() );
+            memset(ptr.getPtr(),iteration,allocSize);
             allocations.push_back(ptr);
             alloc += allocSize ;
             iteration++ ;
