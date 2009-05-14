@@ -86,7 +86,6 @@ sm501Cursor_t::sm501Cursor_t
                           shift = 0 ;
                   }
           }
-          cursorLongs[whichLong] = accum ;
           cursorLongs += (sm501_cursorWidth/2/8);
           alpha += img.width_ ;
    }
