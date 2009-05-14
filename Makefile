@@ -364,7 +364,7 @@ testJS: testJS.cpp $(LIB) Makefile
 
 jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -ggdb -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -g -ggdb -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	$(NM) --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -412,6 +412,16 @@ tradeShow: tradeShow.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o $@ tradeShow.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
 	$(NM) --demangle $@ | sort >$@.map
+	cp $@ $@.prestrip
+	$(STRIP) $@
+
+lotteryMain.o: lottery.cpp
+	$(CC) -fno-rtti -Wall $(HARDWARE_TYPE) $(KERNEL_VER) -D_REENTRANT=1 -DMODULETEST -DTSINPUTAPI=$(TSINPUTFLAG) -c -DXP_UNIX=1 $(IFLAGS) -O2 $< -o $@
+
+lottery: lotteryMain.o $(LIB) Makefile $(ODOMLIB) $(SM501LIB) $(LIBRARYREFS)
+	echo $(KERNEL_BOARDTYPE)
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o lottery lotteryMain.o $(LIBS) -lOdometer -lSM501 -lCurlCache -lSM501 -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(NM) --demangle lottery | sort >lottery.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
 
@@ -601,6 +611,11 @@ setBaud: setBaud.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o setBaud setBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
 	$(NM) setBaud >setBaud.map
 	$(STRIP) setBaud
+
+testBaud: testBaud.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o testBaud testBaud.cpp $(LIBS) -lCurlCache -lstdc++ 
+	$(NM) testBaud >testBaud.map
+	$(STRIP) testBaud
 
 miniterm: miniterm.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -O2 -o miniterm miniterm.cpp $(LIBS) -lCurlCache -lstdc++ 
@@ -1016,6 +1031,10 @@ imgMonoToPCL: imgMonoToPCL.cpp Makefile
 
 parsedURL: parsedURL.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -DSTANDALONE $(IFLAGS) -DMODULETEST=1 -fno-rtti -o parsedURL -Xlinker -Map -Xlinker parsedURL.map parsedURL.cpp $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
+	$(STRIP) $@
+
+circularLog: circularLog.cpp Makefile
+	$(CC) $(HARDWARE_TYPE) -DSTANDALONE_CIRCULARLOG $(IFLAGS) -DMODULETEST=1 -fno-rtti -o $@ -Xlinker -Map -Xlinker $@.map $< $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
 	$(STRIP) $@
 
 tcpPipe: tcpPipe.cpp Makefile
