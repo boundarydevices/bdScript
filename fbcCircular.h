@@ -1,5 +1,5 @@
 #ifndef __FBCCIRCULAR_H__
-#define __FBCCIRCULAR_H__ "$Id: fbcCircular.h,v 1.2 2006-10-19 03:09:52 ericn Exp $"
+#define __FBCCIRCULAR_H__ "$Id: fbcCircular.h,v 1.4 2009-05-14 16:27:05 ericn Exp $"
 
 /*
  * fbcCircular.h
@@ -17,7 +17,13 @@
  * Change History : 
  *
  * $Log: fbcCircular.h,v $
- * Revision 1.2  2006-10-19 03:09:52  ericn
+ * Revision 1.4  2009-05-14 16:27:05  ericn
+ * [fbcCircular] Add convenience getter method
+ *
+ * Revision 1.3  2002-12-15 05:42:14  ericn
+ * -added swapSource(), setDestX() methods
+ *
+ * Revision 1.2  2006/10/19 03:09:52  ericn
  * -two hidden objects are equal
  *
  * Revision 1.1  2006/10/16 22:45:36  ericn
@@ -61,6 +67,11 @@ public:
    void hide( void );
 
    inline unsigned getDestX( void ) const { return blt1_->getDestX(); }
+   void setDestX( unsigned destX );
+
+   void swapSource( fbImage_t const &src );
+
+   unsigned getHeight(void) const { return imgHeight_ ; }
 
    void dump( void );
 
@@ -90,11 +101,11 @@ public:
 
 private:
    unsigned const   ramOffs_ ;
-   unsigned const   destx_ ;
+   unsigned         destx_ ;
    unsigned const   desty_ ;
    unsigned const   destw_ ;
    unsigned const   desth_ ;
-   fbImage_t const &srcImg_ ;
+   fbImage_t        srcImg_ ;
    unsigned const   height_ ;
    unsigned const   imgHeight_ ;
    unsigned const   endPoint_ ; // display > this requires two blts
