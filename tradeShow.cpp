@@ -11,6 +11,9 @@
  * Change History : 
  *
  * $Log: tradeShow.cpp,v $
+ * Revision 1.4  2009-05-14 16:25:41  ericn
+ * [trivial] Add include file to match latest glibc
+ *
  * Revision 1.3  2006-12-13 21:22:07  ericn
  * -add text messages
  *
@@ -33,6 +36,7 @@
 #include "fbCmdBlt.h"
 #include "dictionary.h"
 #include <string>
+#include <assert.h>
 
 typedef dictionary_t<std::string> stringDictionary_t ;
 
