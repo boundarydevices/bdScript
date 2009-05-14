@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsExec.cpp,v $
+ * Revision 1.111  2009-05-14 20:35:01  ericn
+ * [nanosleep] Re-issue nanosleep on interupt
+ *
  * Revision 1.110  2009-04-01 15:40:41  ericn
  * [jsExec] Allow local paths without file:// on the command line
  *
@@ -350,6 +353,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/errno.h>
 
 #include "config.h"
 /* include the JS engine API header */
@@ -428,7 +432,9 @@
    #define CONFIG_JSMP3 1
    #define CONFIG_JSFLASH 1
    #ifdef KERNEL_FB_SM501YUV 
-      #define CONFIG_JSMPEG 1
+      #ifndef CONFIG_JSMPEG
+         #define CONFIG_JSMPEG 1
+      #endif
    #endif
 #else
    #undef CONFIG_JSMP3
@@ -590,7 +596,10 @@ jsNanosleep( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
 //      JS_ReportError( cx, "nanosleep %f : %u.%lu seconds\n", seconds, tv.tv_sec, tv.tv_nsec );
 
-      nanosleep( &tv, 0 );
+      int rv ; 
+      do {
+	  rv = nanosleep( &tv, 0 );
+      } while( (-1 == rv) && (EINTR==errno) );
 
       *rval = JSVAL_TRUE ;
    }
