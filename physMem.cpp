@@ -7,6 +7,9 @@
  * Change History : 
  *
  * $Log: physMem.cpp,v $
+ * Revision 1.2  2009-05-14 16:28:16  ericn
+ * [physMem] Ensure munmap in destructor
+ *
  * Revision 1.1  2008-06-25 01:20:47  ericn
  * -import
  *
@@ -17,6 +20,7 @@
 
 #include "physMem.h"
 #include <sys/mman.h>
+#include <unistd.h>
 
 #define MAP_SHIFT 12
 #define MAP_SIZE (1<<MAP_SHIFT)
@@ -26,6 +30,7 @@ physMem_t::physMem_t( unsigned long physAddr, unsigned long size, unsigned long 
    : fd_( open( "/dev/mem", mode ) )
    , map_(0)
    , mem_(0)
+   , mapSize_(0)
 {
    if( !worked() )
       return ;
@@ -42,10 +47,19 @@ physMem_t::physMem_t( unsigned long physAddr, unsigned long size, unsigned long 
       return ;
    }
    mem_ = (unsigned char *)map_ + (physAddr & MAP_MASK);
+   mapSize_ = mapSize ;
 }
 
 physMem_t::~physMem_t( void )
 {
+      if( mem_ ){
+         munmap(mem_, mapSize_);
+         mem_ = 0 ;
+      }
+      if( 0 <= fd_ ){
+         close(fd_);
+         fd_ = -1 ;
+      }
 }
 
 #ifdef STANDALONE
