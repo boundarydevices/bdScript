@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: jsFileIO.cpp,v $
+ * Revision 1.10  2009-05-14 16:29:26  ericn
+ * [jsGPIO] Add better error message for pulse() method
+ *
  * Revision 1.9  2009-04-16 21:06:57  ericn
  * [pxa-gpio] Fix merge problem
  *
@@ -718,7 +721,7 @@ static JSBool jsFilePulse( JSContext *cx, JSObject *obj, uintN argc, jsval *argv
 	 if( 0 == result )
                  *rval = JSVAL_TRUE ;
 	 else
-                 JS_ReportError(cx, "pulse: %m\n" );
+                 JS_ReportError(cx, "pulse: %d: %d(%s)\n", result, errno, strerror(errno) );
          
       }
       else
