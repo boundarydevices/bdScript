@@ -9,6 +9,9 @@
  * Change History : 
  *
  * $Log: sm501alpha.cpp,v $
+ * Revision 1.6  2009-05-14 16:28:53  ericn
+ * [sm501 alpha] Updated to allow partial display plane for alpha layer
+ *
  * Revision 1.5  2007-08-23 00:34:38  ericn
  * -fix devname, add CLOEXEC, test by writing data to alpha layer
  *
@@ -43,9 +46,14 @@
 
 static sm501alpha_t *inst = 0 ;
 
-sm501alpha_t &sm501alpha_t::get( mode_t mode ){
+sm501alpha_t &sm501alpha_t::get( 
+	mode_t mode,
+	unsigned x, 
+	unsigned y,
+	unsigned w,
+	unsigned h ){
    if( 0 == inst )
-      inst = new sm501alpha_t(mode);
+      inst = new sm501alpha_t(mode, x, y, w, h);
 
    assert( mode == inst->getMode() );
 
@@ -87,22 +95,39 @@ void sm501alpha_t::clear
    }
 }
 
-sm501alpha_t::sm501alpha_t( mode_t mode )
+sm501alpha_t::sm501alpha_t( 
+	mode_t mode,
+	unsigned x, 
+	unsigned y,
+	unsigned w,
+	unsigned h )
    : mode_( mode )
    , fd_( open( "/dev/" SM501ALPHA_CLASS, O_RDWR ) )
-   , pos_( makeRect(0,0,getFB().getWidth(), getFB().getHeight()) )
+   , pos_( makeRect(0,0,0,0) )
    , ram_( 0 )
    , ramOffs_( 0 )
 {
    if( isOpen() ){
       fcntl( fd_, F_SETFD, FD_CLOEXEC);
+      fbDevice_t &fb = getFB();
+
+      if( 0 == w ){
+              w = fb.getWidth();
+	      if( 0 != x )
+		      w	-= x ;
+      }
+      if( 0 == h ){
+              h = fb.getHeight();
+	      if( 0 != y )
+		      h	-= y ;
+      }
 
       struct sm501_alphaPlane_t plane ;
 
-      plane.xLeft_  = pos_.xLeft_ ;
-      plane.yTop_   = pos_.yTop_ ;
-      plane.width_  = pos_.width_ ;
-      plane.height_ = pos_.height_ ;
+      plane.xLeft_  = pos_.xLeft_   = x ;
+      plane.yTop_   = pos_.yTop_    = y ;
+      plane.width_  = pos_.width_   = w ;
+      plane.height_ = pos_.height_  = h ;
       plane.mode_   = mode ;
       plane.planeOffset_ = 0 ;
 

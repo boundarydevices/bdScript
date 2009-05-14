@@ -1,5 +1,5 @@
 #ifndef __SM501ALPHA_H__
-#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.4 2007-01-21 21:37:55 ericn Exp $"
+#define __SM501ALPHA_H__ "$Id: sm501alpha.h,v 1.5 2009-05-14 16:28:53 ericn Exp $"
 
 /*
  * sm501alpha.h
@@ -17,6 +17,9 @@
  * Change History : 
  *
  * $Log: sm501alpha.h,v $
+ * Revision 1.5  2009-05-14 16:28:53  ericn
+ * [sm501 alpha] Updated to allow partial display plane for alpha layer
+ *
  * Revision 1.4  2007-01-21 21:37:55  ericn
  * -add text output for rgba4444
  *
@@ -43,7 +46,12 @@ public:
       rgba4444 = 3
    };
 
-   static sm501alpha_t &get( mode_t mode ); // get singleton
+   // get singleton
+   static sm501alpha_t &get( mode_t mode, 
+			     unsigned x=0, 	// default to full-screen 
+			     unsigned y=0, 
+			     unsigned w=0, 	// or rest-of-the screen
+			     unsigned h=0 );
    
 
    // -------------- valid in either mode
@@ -86,10 +94,10 @@ public:
    unsigned short *getRow( unsigned y );
 
 private:
-   sm501alpha_t( mode_t mode ); // only access through 
+   sm501alpha_t( mode_t mode, unsigned x, unsigned y, unsigned w, unsigned h ); // only access through 
    mode_t     const  mode_ ;
    int               fd_ ;
-   rectangle_t const pos_ ;
+   rectangle_t 	     pos_ ;
    unsigned char    *ram_ ;
    unsigned          ramOffs_ ;
 };
