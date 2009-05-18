@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.39  2009-05-18 21:18:05  ericn
+ * [fbDev] Make fb0_offset reference conditional on SM-501 driver
+ *
  * Revision 1.38  2009-05-14 16:26:18  ericn
  * [multi-display SM-501] Add frame-buffer offsets
  *
@@ -532,7 +535,9 @@ fbDevice_t :: fbDevice_t( char const *name )
          debugPrint( "mmio_len   %lu\n", fixed_info.mmio_len );
          debugPrint( "accel      %lu\n", fixed_info.accel );
 #endif
+#ifdef KERNEL_FB_SM501
          fb0_offset_ = fixed_info.smem_start & 0x7fffff ; 
+#endif
          struct fb_var_screeninfo variable_info;
 
          err = ioctl( fd_, FBIOGET_VSCREENINFO, &variable_info );
