@@ -1,5 +1,5 @@
 #ifndef __FBDEV_H__
-#define __FBDEV_H__ "$Id: fbDev.h,v 1.29 2009-05-14 16:26:18 ericn Exp $"
+#define __FBDEV_H__ "$Id: fbDev.h,v 1.30 2009-06-03 21:26:00 tkisky Exp $"
 
 /*
  * fbDev.h
@@ -13,6 +13,9 @@
  * Change History : 
  *
  * $Log: fbDev.h,v $
+ * Revision 1.30  2009-06-03 21:26:00  tkisky
+ * -add screen.release function
+ *
  * Revision 1.29  2009-05-14 16:26:18  ericn
  * [multi-display SM-501] Add frame-buffer offsets
  *
@@ -166,6 +169,7 @@ public:
    static unsigned char getRed( unsigned short screenRGB );
    static unsigned char getGreen( unsigned short screenRGB );
    static unsigned char getBlue( unsigned short screenRGB );
+   static void releaseFB();
 
    void clear( void ); // clear to default background color (Black for color displays, off for mono)
    void clear( unsigned char red, unsigned char green, unsigned char blue );

@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.40  2009-06-03 21:26:00  tkisky
+ * -add screen.release function
+ *
  * Revision 1.39  2009-05-18 21:18:05  ericn
  * [fbDev] Make fb0_offset reference conditional on SM-501 driver
  *
@@ -1492,6 +1495,12 @@ unsigned long fbDevice_t::fb0_offset( void ) const
 #endif
 
 static fbDevice_t *dev_ = 0 ;
+void fbDevice_t::releaseFB()
+{
+	fbDevice_t *fb = dev_;
+	dev_ = NULL;
+	delete fb;
+}
 
 fbDevice_t &getFB( char const *devName )
 {

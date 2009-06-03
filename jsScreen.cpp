@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
+ * Revision 1.20  2009-06-03 21:26:00  tkisky
+ * -add screen.release function
+ *
  * Revision 1.19  2009-02-09 18:49:55  ericn
  * handle negative coordinates in screen.rect()
  *
@@ -494,6 +497,13 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
    return JS_TRUE;
 }
 
+static JSBool jsReleaseFB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   fbDevice_t::releaseFB();
+   *rval = JSVAL_TRUE ;
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec screen_methods[] = {
    { "clear",        jsClearScreen,      0,0,0 },
    { "getPixel",     jsGetPixel,         0,0,0 },
@@ -506,6 +516,7 @@ static JSFunctionSpec screen_methods[] = {
 #ifdef KERNEL_FB
    { "buttonize",    jsButtonize,        0,0,0 },
 #endif 
+   { "release",      jsReleaseFB,        0,0,0 },
    { 0 }
 };
 
