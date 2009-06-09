@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsScreen.cpp,v $
+ * Revision 1.21  2009-06-09 02:52:23  tkisky
+ * fix munmap size
+ *
  * Revision 1.20  2009-06-03 21:26:00  tkisky
  * -add screen.release function
  *
@@ -466,6 +469,23 @@ static JSPropertySpec screenProperties_[] = {
 };
 
 
+static void set_width_height_properties(JSContext *cx, JSObject *obj)
+{
+	fbDevice_t &fb = getFB();
+	      
+	JS_DefineProperty( cx, obj, "width",
+			INT_TO_JSVAL( fb.getWidth() ),
+			0, 0, 
+			JSPROP_ENUMERATE
+			|JSPROP_PERMANENT
+			|JSPROP_READONLY );
+	JS_DefineProperty( cx, obj, "height", 
+			INT_TO_JSVAL( fb.getHeight() ),
+			0, 0, 
+			JSPROP_ENUMERATE
+			|JSPROP_PERMANENT
+			|JSPROP_READONLY );
+}
 //
 // constructor for the screen object
 //
@@ -475,20 +495,7 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 
    if( obj )
    {
-      fbDevice_t &fb = getFB();
-      
-      JS_DefineProperty( cx, obj, "width",
-                         INT_TO_JSVAL( fb.getWidth() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
-      JS_DefineProperty( cx, obj, "height", 
-                         INT_TO_JSVAL( fb.getHeight() ),
-                         0, 0, 
-                         JSPROP_ENUMERATE
-                         |JSPROP_PERMANENT
-                         |JSPROP_READONLY );
+      set_width_height_properties(cx, obj);
       *rval = OBJECT_TO_JSVAL(obj);
    }
    else
@@ -499,6 +506,7 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 
 static JSBool jsReleaseFB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
+   set_width_height_properties(cx, obj);
    fbDevice_t::releaseFB();
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;
@@ -538,20 +546,7 @@ bool initJSScreen( JSContext *cx, JSObject *glob )
                             JSPROP_ENUMERATE
                             |JSPROP_PERMANENT
                             |JSPROP_READONLY );
-         fbDevice_t &fb = getFB();
-
-         JS_DefineProperty( cx, obj, "width",
-                            INT_TO_JSVAL( fb.getWidth() ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
-         JS_DefineProperty( cx, obj, "height", 
-                            INT_TO_JSVAL( fb.getHeight() ),
-                            0, 0, 
-                            JSPROP_ENUMERATE
-                            |JSPROP_PERMANENT
-                            |JSPROP_READONLY );
+         set_width_height_properties(cx, obj);
          return true ;
       }
    }

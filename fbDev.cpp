@@ -8,6 +8,9 @@
  * Change History :
  *
  * $Log: fbDev.cpp,v $
+ * Revision 1.41  2009-06-09 02:52:22  tkisky
+ * fix munmap size
+ *
  * Revision 1.40  2009-06-03 21:26:00  tkisky
  * -add screen.release function
  *
@@ -620,6 +623,7 @@ fbDevice_t :: fbDevice_t( char const *name )
 
                mem_ = mmap( 0, memSize_, PROT_WRITE|PROT_WRITE,
                             MAP_SHARED, fd_, 0 );
+               if (0) printf("mem_=%p memSize_=%lu width_=%u height_=%u\n", mem_, memSize_, width_, height_);
                if( MAP_FAILED != mem_ )
                {
 //                  memset( mem_, 0, fixed_info.smem_len );
@@ -709,6 +713,10 @@ void fbDevice_t :: render
      int imageDisplayHeight
    )
 {
+   if (0) printf("xPos=%i,yPos=%i,w=%i,h=%i,imagexPos=%i,imageyPos=%i,imageDisplayWidth=%i,imageDisplayHeight=%i\n",
+        		xPos, yPos, w, h, imagexPos, imageyPos, imageDisplayWidth, imageDisplayHeight);
+   if (0) printf("src pixels=%p, dest getRow(0)=%p\n", pixels, getRow(0));
+
    if (xPos<0)
    {
       imagexPos -= xPos;      //increase offset
@@ -1472,7 +1480,7 @@ fbDevice_t :: ~fbDevice_t( void )
    if( 0 <= fd_ )
    {
 #ifdef KERNEL_FB
-      if( 0 != munmap( mem_, 2*memSize_ ) )
+      if( 0 != munmap( mem_, memSize_ ) )
       perror("munmap: fb");
 #else 
       delete [] (unsigned char *)mem_ ;

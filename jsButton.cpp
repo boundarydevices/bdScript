@@ -8,6 +8,9 @@
  * Change History : 
  *
  * $Log: jsButton.cpp,v $
+ * Revision 1.28  2009-06-09 02:52:23  tkisky
+ * fix munmap size
+ *
  * Revision 1.27  2009-05-12 21:46:52  valli
  *
  * updated jsButton to clear audioQueue before playing either pressSnd or
@@ -137,6 +140,8 @@ typedef struct buttonData_t {
    unsigned char   borderWidth_ ;
    void const     *fontData_ ;
    unsigned long   fontSize_ ;
+   unsigned long   getX;
+   unsigned long   getY;
 
    bool            touchSoundDecoded_ ;
    unsigned char  *touchSoundData_ ;
@@ -227,6 +232,8 @@ static void doit( box_t         &box,
    assert( button->box_ == &box );
    assert( JS_GetPrivate( button->cx_, button->jsObj_ ) == button );
 
+   button->getX = x;
+   button->getY = y;
    defHandler( box, x, y );
    
    jsval jsv ;
@@ -781,10 +788,34 @@ jsButtonDeactivate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
    return JS_TRUE ;
 }
 
+static JSBool jsGetX( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE;
+   buttonData_t *const button = (buttonData_t *)JS_GetInstancePrivate( cx, obj, &jsButtonClass_, NULL );
+   if (button) {
+      *rval = INT_TO_JSVAL(button->getX);
+   } else
+      JS_ReportError( cx, "Invalid button data" );
+   return JS_TRUE ;
+}
+
+static JSBool jsGetY( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+{
+   *rval = JSVAL_FALSE;
+   buttonData_t *const button = (buttonData_t *)JS_GetInstancePrivate( cx, obj, &jsButtonClass_, NULL );
+   if (button) {
+      *rval = INT_TO_JSVAL(button->getY);
+   } else
+      JS_ReportError( cx, "Invalid button data" );
+   return JS_TRUE ;
+}
+
 static JSFunctionSpec buttonMethods_[] = {
     {"changeText", jsButtonChangeText, 0 },
     {"draw",       jsButtonDraw, 0 },
     {"deactivate", jsButtonDeactivate, 0 },
+    {"getX",	jsGetX, 0 },
+    {"getY",	jsGetY, 0 },
     {0}
 };
 
