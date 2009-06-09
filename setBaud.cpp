@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <termios.h>
+#define __u32 unsigned
 #include <sys/ioctl.h>
 #include <signal.h>
 #include <sys/poll.h>
@@ -195,6 +196,28 @@ static char const spewOutput[] = {
    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890\r\n"
 };
 
+static void showCounts(int fd)
+{
+	struct serial_icounter_struct  icount ;
+	int rval = ioctl(fd,TIOCGICOUNT,&icount);
+	if( 0 == rval ){
+		printf( "TIOCGICOUNT worked\n" );
+		printf( "CTS:	%d\n", icount.cts );
+		printf( "DSR:	%d\n", icount.dsr );
+		printf( "RNG:	%d\n", icount.rng );
+		printf( "DCD:	%d\n", icount.dcd );
+		printf( "rx:	%d\n", icount.rx );
+		printf( "tx:	%d\n", icount.tx );
+		printf( "FE:	%d\n", icount.frame );
+		printf( "OVR:	%d\n", icount.overrun );
+		printf( "PE:	%d\n", icount.parity );
+		printf( "BRK:	%d\n", icount.brk );
+		printf( "bufo:	%d\n", icount.buf_overrun );
+	}
+	else
+		perror("TIOCGICOUNT");
+}
+
 int main( int argc, char const * const argv[] )
 {
    if( 2 < argc )
@@ -250,6 +273,11 @@ int main( int argc, char const * const argv[] )
                            printf( "%c", c );
                         else
                            printf( "<%02x>", (unsigned char)c );
+			if( (1 == i) && ('\n' == c) ){ // <Ctrl-P>
+				printf( "<ctrl-p>\n" );
+				showCounts(fdSerial);
+				fflush(stdout);
+			}
                      }
                      fflush(stdout);
                   }
