@@ -1,0 +1,7 @@
+buildSinTable
+fftTest
+fftTest-x86
+libbdGraph.a
+sin2Table8.c
+sinTable8.c
+sinTable8r.c
