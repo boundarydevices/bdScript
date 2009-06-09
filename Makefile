@@ -1130,7 +1130,7 @@ install-bin: all
 
 install: install-bin install-headers
 all: curlGet dirTest urlTest jsExec ftRender ftDump madHeaders bc cbmGraph \
-        cbmStat jpegview flashVar daemonize $(ODOMLIB) $(SM501LIB)
+        cbmStat jpegview flashVar daemonize
 
 clean:
 	rm -f *.o *.a *.map *.lst *.sym *.prestrip bc curlGet dirTest \
