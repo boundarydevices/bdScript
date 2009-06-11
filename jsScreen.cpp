@@ -78,6 +78,7 @@
 
 #include "jsScreen.h"
 #include "fbDev.h"
+#include "zOrder.h"
 #include <string.h>
 #include "js/jsstddef.h"
 #include "js/jscntxt.h"
@@ -305,7 +306,7 @@ jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
          if (y < 0)
         	 y = 0;
          int orig_x = x;
-         printf("x=%x, y=%x, endx=%x, endY=%x 1stpix=%x\n", x, y, endX, endY, fb.getPixel(x, y));
+//	 printf("x=%x, y=%x, endx=%x, endY=%x 1stpix=%x\n", x, y, endX, endY, fb.getPixel(x, y));
          for (; y < endY ; y++ ) {
                for (int x = orig_x; x < endX ; x++ ) {
                      fb.setPixel(x, y, ~fb.getPixel(x, y));
@@ -505,6 +506,7 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 static JSBool jsReleaseFB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    set_width_height_properties(cx, obj);
+   release_ZMap();
    fbDevice_t::releaseFB();
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;

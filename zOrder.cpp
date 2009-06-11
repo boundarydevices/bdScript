@@ -168,7 +168,14 @@ zOrderMapStack_t &getZMap()
       mapStack_ = new zOrderMapStack_t ;
    return *mapStack_ ;
 }
-
+void release_ZMap()
+{
+	zOrderMapStack_t *m = mapStack_;
+	if (m) {
+		mapStack_ = NULL;
+		delete m;
+	}
+}
 
 void dumpZMap( zOrderMap_t const &map )
 {
