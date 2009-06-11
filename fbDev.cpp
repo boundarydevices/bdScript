@@ -386,13 +386,14 @@ void fbDevice_t :: clear( void )
 void fbDevice_t :: clear( unsigned char red, unsigned char green, unsigned char blue )
 {
 #if defined( KERNEL_FB_SM501 )
-   rect( 0, 0, getWidth()-1, getHeight()-1, red, green, blue, (unsigned short *)getMem(), getWidth(), getHeight() );
+   rect( 0, 0, getWidth()-1, getHeight()-1, red, green, blue, (unsigned char *)getMem(), getWidth(), getHeight(), getStride());
 #elif defined( KERNEL_FB )
-   unsigned short color16 = get16( red, green, blue );
-   unsigned short *start = (unsigned short *)getMem();
-   unsigned short *end   = start + getHeight() * getWidth();
-   while( start < end )
-      *start++ = color16 ;
+   unsigned color16 = get16( red, green, blue );
+   unsigned *start = (unsigned *)getMem();
+   unsigned cnt = (getHeight() * getStride()) >> 2;
+   color16 |= (color16 << 16);
+   while (cnt--)
+	   *start++ = color16;
 #else
    unsigned char const value = ( 0 == color16 ) ? 0xFF : 0 ;
    memset( getMem(), value, pageSize() );
@@ -619,6 +620,7 @@ fbDevice_t :: fbDevice_t( char const *name )
             {
                width_   = variable_info.xres ;
                height_  = variable_info.yres ;
+               stride   = fixed_info.line_length;
                memSize_ = fixed_info.smem_len ;
 
                mem_ = mmap( 0, memSize_, PROT_WRITE|PROT_WRITE,
@@ -644,6 +646,7 @@ fbDevice_t :: fbDevice_t( char const *name )
          if( 0 == strcmp( "/dev/lcd", name ) )
          {
             width_ = 122 ;
+            stride = 122;
             height_ = 32 ;
             unsigned const bits = width_*height_ ;
             memSize_ = (bits+7)/8 ;
@@ -667,8 +670,9 @@ fbDevice_t :: fbDevice_t( char const *name )
       debugPrint( "simulating fbDevice" );
       width_ = 320 ;
       height_ = 240 ;
-      memSize_ = width_ * height_ * sizeof( unsigned short );
-      mem_  = new unsigned short[ width_ * height_ * 2 ];
+      stride = width_ * sizeof(unsigned short);
+      memSize_ = stride * height_ ;
+      mem_  = new unsigned short[width_ * height_];
    }
 }
 
@@ -754,7 +758,7 @@ void fbDevice_t :: render
       unsigned char *const bits = (unsigned char *)getMem();
       do
       {
-         unsigned offs       = yPos*getWidth()+xPos ;
+         unsigned offs       = yPos * getWidth() + xPos ;
          unsigned byteOffs   = offs/8 ;
          unsigned char mask  = 1 << (offs&7);
          for( unsigned x = 0 ; x < minWidth ; x++ )
@@ -1037,20 +1041,28 @@ void fbDevice_t :: rect
    ( unsigned short x1, unsigned short y1,
      unsigned short x2, unsigned short y2,
      unsigned char red, unsigned char green, unsigned char blue,
-     unsigned short *imageMem,
+     unsigned char *imageMem,
      unsigned short  imageWidth,
-     unsigned short  imageHeight )
+     unsigned short  imageHeight,
+     unsigned short  imageStride)
 {
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )
       swap( y1, y2 );
-   if( 0 == imageMem )
-      imageMem = (unsigned short*)getMem();
-   if( 0 == imageWidth )
+   if( 0 == imageMem ) {
+      imageMem = (unsigned char*)getMem();
+      if (imageWidth || imageHeight || imageStride) {
+         printf("%s:If no memory pointer, must use display settings\n", __func__);
+      }
       imageWidth = getWidth();
-   if( 0 == imageHeight )
       imageHeight = getHeight();
+      imageStride = getStride();
+   } else {
+      if (!(imageWidth || imageHeight || imageStride)) {
+         printf("%s:If memory pointer, cannot provide defaults\n", __func__);
+      }
+   }
 
    if( ( x1 < imageWidth ) && ( y1 < imageHeight ) )
    {
@@ -1062,18 +1074,18 @@ void fbDevice_t :: rect
          y2 = imageHeight - 1 ;
 
 #if defined( KERNEL_FB )
-      unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
-      unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
+      unsigned char *row = imageMem + (y1 * imageStride) + (x1 << 1);
+      unsigned char *endRow = row + ((y2 - y1) * imageStride);
       while( row <= endRow )
       {
-         unsigned short *next = row ;
+         unsigned short *next = (unsigned short *)row ;
          unsigned short * const endLine = next + w ;
          while( next < endLine )
             *next++ = rgb ;
-         row += imageWidth ;
+         row += imageStride;
       }
 #else
-      if( imageMem == (unsigned short*)getMem() )
+      if( imageMem == (unsigned char*)getMem() )
       {
          for( unsigned y = y1 ; y <= y2 ; y++ )
          {
@@ -1086,11 +1098,11 @@ void fbDevice_t :: rect
       }
       else
       {
-         unsigned short *row = imageMem+( y1*imageWidth ) + x1 ;
-         unsigned short *endRow = row + ( y2 - y1 ) * imageWidth ;
+         unsigned char *row = imageMem +(y1 * imageStride) + (x1 << 1);
+         unsigned char *endRow = row + ((y2 - y1) * imageStride);
          while( row <= endRow )
          {
-            unsigned short *next = row ;
+            unsigned short *next = (unsigned short *)row ;
             unsigned short * const endLine = next + w ;
             while( next < endLine )
                *next++ = rgb ;
@@ -1106,27 +1118,35 @@ void fbDevice_t :: line
      unsigned short x2, unsigned short y2,
      unsigned char penWidth,
      unsigned char red, unsigned char green, unsigned char blue,
-     unsigned short *imageMem,
+     unsigned char *imageMem,
      unsigned short  imageWidth,
-     unsigned short  imageHeight )
+     unsigned short  imageHeight,
+     unsigned short  imageStride)
 {
    if( 0 < penWidth )
    {
-      if( 0 == imageMem )
-         imageMem = (unsigned short*)getMem();
-      if( 0 == imageWidth )
+      if( 0 == imageMem ) {
+         imageMem = (unsigned char*)getMem();
+         if (imageWidth || imageHeight || imageStride) {
+              printf("%s:If no memory pointer, must use display settings\n", __func__);
+         }
          imageWidth = getWidth();
-      if( 0 == imageHeight )
          imageHeight = getHeight();
+         imageStride = getStride();
+      } else {
+         if (!(imageWidth || imageHeight || imageStride)) {
+            printf("%s:If memory pointer, cannot provide defaults\n", __func__);
+         }
+      }
       if( y1 == y2 )
       {
          if( y1 < imageHeight  )
-            rect( x1, y1, x2, y1+penWidth-1, red, green, blue, imageMem, imageWidth, imageHeight );
+            rect( x1, y1, x2, y1+penWidth-1, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
       } // horizontal
       else if( x1 == x2 )
       {
          if( x1 < imageWidth )
-            rect( x1, y1, x1+penWidth-1, y2, red, green, blue, imageMem, imageWidth, imageHeight );
+            rect( x1, y1, x1+penWidth-1, y2, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
       } // vertical
       else
          fprintf( stderr, "diagonal lines %u/%u/%u/%u not (yet) supported\n", x1, y1, x2, y2 );
@@ -1139,35 +1159,43 @@ void fbDevice_t :: box
      unsigned short x2, unsigned short y2,
      unsigned char penWidth,
      unsigned char red, unsigned char green, unsigned char blue,
-     unsigned short *imageMem,
+     unsigned char *imageMem,
      unsigned short  imageWidth,
-     unsigned short  imageHeight )
+     unsigned short  imageHeight,
+     unsigned short  imageStride)
 {
    if( x1 > x2 )
       swap( x1, x2 );
    if( y1 > y2 )
       swap( y1, y2 );
 
-   if( 0 == imageMem )
-      imageMem = (unsigned short*)getMem();
-   if( 0 == imageWidth )
+   if( 0 == imageMem ) {
+      imageMem = (unsigned char*)getMem();
+      if (imageWidth || imageHeight || imageStride) {
+         printf("%s:If no memory pointer, must use display settings\n", __func__);
+      }
       imageWidth = getWidth();
-   if( 0 == imageHeight )
       imageHeight = getHeight();
+      imageStride = getStride();
+   } else {
+      if (!(imageWidth || imageHeight || imageStride)) {
+         printf("%s:If memory pointer, cannot provide defaults\n", __func__);
+      }
+   }
 
    if( ( y1 < imageHeight )
        &&
        ( x1 < imageWidth ) )
    {
       // draw vertical lines
-      line( x1, y1, x1, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
+      line( x1, y1, x1, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
       x2 = x2 - penWidth + 1 ;
-      line( x2, y1, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
+      line( x2, y1, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
 
       // horizontal lines
-      line( x1, y1, x2, y1, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
+      line( x1, y1, x2, y1, penWidth, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
       y2 = y2 - penWidth + 1 ;
-      line( x1, y2, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight );
+      line( x1, y2, x2, y2, penWidth, red, green, blue, imageMem, imageWidth, imageHeight, imageStride);
    } // something is visible
 }
 
@@ -1269,9 +1297,10 @@ void fbDevice_t :: antialias
      unsigned char        red, 
      unsigned char        green, 
      unsigned char        blue,
-     unsigned short      *imageMem,
+     unsigned char      *imageMem,
      unsigned short       imageWidth,
-     unsigned short       imageHeight )
+     unsigned short       imageHeight,
+     unsigned short	  imageStride)
 {
    unsigned height = yBottom-yTop+1 ;
    if( height > bmpHeight )
@@ -1289,7 +1318,7 @@ void fbDevice_t :: antialias
          unsigned char const *alphaCol = bmp + (row*bmpWidth);
 
 #ifdef KERNEL_FB
-         unsigned short      *screenPix = imageMem+ (imageWidth*yTop++) + xLeft ;
+         unsigned short      *screenPix = (unsigned short *)(imageMem + (imageStride * yTop++) + (xLeft << 1));
 
          unsigned short screenCol = xLeft ;
          for( unsigned col = 0 ; col < width ; col++, screenCol++, screenPix++, alphaCol++ )
@@ -1439,7 +1468,7 @@ debugPrint( "inStride: %u\n"
       unsigned char inMask = '\x80'  ;
       unsigned char const *nextIn = inRow ;
       unsigned char in = *nextIn++ ;
-      unsigned outOffs = y*getWidth()+xStart ;
+      unsigned outOffs = y * getWidth() + xStart;
       unsigned char outMask = 1 << ( outOffs & 7 );
       unsigned outByte = outOffs/8 ;
       unsigned char *nextOut = outStart+outByte ;
@@ -1564,6 +1593,7 @@ int main( int argc, char const * const argv[] )
    
                   *mem++ = color ; // ( color >> 8 ) | ( ( color & 0xFF ) << 8 );
                }
+               mem += (fb.getStride() >> 1) - fb.getWidth();
             }
          } // shades of gray white
          else
@@ -1579,6 +1609,7 @@ int main( int argc, char const * const argv[] )
                   {
                      *mem++ = (unsigned short)colorVal ;
                   }
+                  mem += (fb.getStride() >> 1) - fb.getWidth();
                }
             } // valid number
             else

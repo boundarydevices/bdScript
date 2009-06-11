@@ -449,7 +449,7 @@ printf( "play video at %u:%u, w:%u, h:%u\n", params.x_, params.y_, params.width_
    fbDevice_t    &fb = getFB();
    videoQueue_t :: entry_t *entry ;
 //   frames.setStart( tickMs() );
-   unsigned const fbStride  = 2*fb.getWidth();
+   unsigned const fbStride  = fb.getStride();
    unsigned char *fbStart = (unsigned char *)fb.getRow(params.y_) 
                             + params.x_ * 2 ;
 

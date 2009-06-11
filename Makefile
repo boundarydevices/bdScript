@@ -165,8 +165,9 @@ OBJS += \
        touchCalibrate.o \
        zOrder.o \
 
-HARDWARE_TYPE += -DKERNEL_FB=1
+HARDWARE_TYPE += -DKERNEL_FB=1 $(CFLAGS)
 else
+HARDWARE_TYPE += $(CFLAGS)
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))

@@ -677,11 +677,11 @@ jsImageRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          int const width  = JSVAL_TO_INT( widthVal );
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
-         unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
          unsigned const pixBytes = width * height * sizeof( pixMap[0] );
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
-            getFB().rect( x1, y1, x2, y2, red, green, blue, pixMap, width, height );
+            getFB().rect( x1, y1, x2, y2, red, green, blue, pixMap, width, height, width << 1);
             setAlpha(cx, obj, x1, y1, x2, y2, 255, rval); //make the drawn rect opaque
          }
          else
@@ -770,12 +770,12 @@ jsImageLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          int const width  = JSVAL_TO_INT( widthVal );
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
-         unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
          unsigned const pixBytes = width * height * sizeof( pixMap[0] );
 
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
-            getFB().line( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height );
+            getFB().line( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height, width << 1);
             setAlpha(cx, obj, x1, y1, x2+penWidth, y2+penWidth, 255, rval);
          }
          else
@@ -827,12 +827,12 @@ jsImageBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          int const width  = JSVAL_TO_INT( widthVal );
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
-         unsigned short *const pixMap = (unsigned short *)JS_GetStringBytes( pixStr );
+         unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
          unsigned const pixBytes = width * height * sizeof( pixMap[0] );
 
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
-            getFB().box( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height );
+            getFB().box( x1, y1, x2, y2, penWidth, red, green, blue, pixMap, width, height, width << 1);
             setAlpha(cx, obj, x1, y1, x2, y1+penWidth, 255, rval);
             setAlpha(cx, obj, x1, y1, x1+penWidth, y2, 255, rval);
             setAlpha(cx, obj, x2, y1, x2+penWidth, y2+penWidth, 255, rval);
