@@ -148,3 +148,4 @@ open
 pxaYUV
 autobaud
 cameraToYUV
+*.x86
