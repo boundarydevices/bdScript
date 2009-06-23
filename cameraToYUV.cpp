@@ -313,8 +313,6 @@ int main( int argc, char const * const argv[] )
 		}
 	}
 
-return 0 ;
-
 	unsigned const numBuffers = 8 ;
 	v4l2_requestbuffers rb ;
 	memset(&rb,0,sizeof(rb));
