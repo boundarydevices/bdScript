@@ -179,3 +179,33 @@ bool jpegToYUV( void const    *inData,     // input
 
    return true ;
 }
+
+#ifdef STANDALONE_JPEG_TO_YUV
+#include "pxaYUV.h"
+#include "memFile.h"
+
+int main( int argc, char const * const argv[] )
+{
+   printf( "Hello, %s\n", argv[0] );
+   if( 2 <= argc ){
+      memFile_t fIn( argv[1] );
+      if( fIn.worked() ){
+         printf( "%s: %lu bytes\n", argv[1], fIn.getLength() );
+         void const *pixData ;
+         unsigned short width, height ;
+
+         if(jpegToYUV(fIn.getData(), fIn.getLength(), pixData, width, height) ){
+            printf( "%s: %ux%u\n", argv[1], width, height );
+            pxaYUV_t yuv(0, 0, width, height);
+            yuv.writeInterleaved( (unsigned char const *)pixData );
+            char inBuf[80];
+            fgets(inBuf,sizeof(inBuf),stdin);
+         }
+      }
+      else
+         perror( argv[1] );
+   }
+   return 0 ;
+}
+
+#endif
