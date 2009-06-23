@@ -104,6 +104,7 @@
 #include "gpioPoll.h"
 #include "fbDev.h"
 #include <errno.h>
+#include <stddef.h>
 #include "imgJPEG.h"
 #include "memFile.h"
 #include "imgFile.h"
