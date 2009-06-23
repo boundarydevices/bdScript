@@ -70,16 +70,18 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
        )
    {
       fbDevice_t &fb = getFB();
-      unsigned short *imageMem = 0 ;
+      unsigned char *imageMem = 0 ;
       unsigned short  imageWidth = 0 ;
       unsigned short  imageHeight = 0 ;
+      unsigned short  imageStride = 0;
 
       if( 3 == argc )
       {
 #ifdef KERNEL_FB
-         imageMem = fb.getRow(0);
+         imageMem = (unsigned char *)fb.getRow(0);
          imageWidth = fb.getWidth();
          imageHeight = fb.getHeight();
+         imageStride = fb.getStride();
 #else
          JS_ReportError( cx, "draw alphaMap onto screen" );
          return JS_TRUE ;
@@ -110,9 +112,10 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
             unsigned       bmHeight   = JSVAL_TO_INT( vHeight );
             if( JS_GetStringLength( sPixMap ) == bmWidth*bmHeight*2 )
             {
-               imageMem = (unsigned short *)JS_GetStringBytes( sPixMap );
+               imageMem = (unsigned char *)JS_GetStringBytes( sPixMap );
                imageWidth  = bmWidth ;
                imageHeight = bmHeight ;
+               imageStride = imageWidth << 1;
             }
             else
                JS_ReportError( cx, "Error getting pixel data" );
@@ -201,7 +204,7 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
                           screenStartX+bmWidth-1,
                           screenStartY+maxHeight-1,
                           red, green, blue,
-                          imageMem, imageWidth, imageHeight );
+                          imageMem, imageWidth, imageHeight, imageStride);
          } // room for something
       }
       else

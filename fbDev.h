@@ -152,6 +152,7 @@ public:
 
    unsigned short getWidth( void ) const { return width_ ; }
    unsigned short getHeight( void ) const { return height_ ; }
+   unsigned short getStride( void ) const { return stride; }
 
    unsigned long getMemSize( void ) const { return memSize_ ; }
 
@@ -217,27 +218,30 @@ public:
    void rect( unsigned short x1, unsigned short y1,
               unsigned short x2, unsigned short y2,
               unsigned char red, unsigned char green, unsigned char blue,
-              unsigned short *imageMem = 0 ,
-              unsigned short  imageWidth = 0,
-              unsigned short  imageHeight = 0 );
+              unsigned char *imageMem = 0,
+              unsigned short imageWidth = 0,
+              unsigned short imageHeight = 0,
+   	      unsigned short imageStride = 0);
    
    // draw a line of specified thickness, points specify top or left of line
    void line( unsigned short x1, unsigned short y1, // only vertical and horizonta supported (for now)
               unsigned short x2, unsigned short y2,
               unsigned char penWidth,
               unsigned char red, unsigned char green, unsigned char blue,
-              unsigned short *imageMem = 0 ,
-              unsigned short  imageWidth = 0,
-              unsigned short  imageHeight = 0 );
+              unsigned char *imageMem = 0,
+              unsigned short imageWidth = 0,
+              unsigned short imageHeight = 0,
+   	      unsigned short imageStride = 0);
    
    // outlined box (4 connecting lines), points specify outside of box
    void box( unsigned short x1, unsigned short y1,
              unsigned short x2, unsigned short y2,
              unsigned char penWidth,
              unsigned char red, unsigned char green, unsigned char blue,
-             unsigned short *imageMem = 0 ,
-             unsigned short  imageWidth = 0,
-             unsigned short  imageHeight = 0 );
+             unsigned char *imageMem = 0,
+             unsigned short imageWidth = 0,
+             unsigned short imageHeight = 0,
+             unsigned short imageStride = 0);
 
 
    // render anti-aliased alphamap in specified color to display with clipping
@@ -262,9 +266,10 @@ public:
                    unsigned char        red, 
                    unsigned char        green, 
                    unsigned char        blue,
-                   unsigned short      *imageMem,
+                   unsigned char       *imageMem,
                    unsigned short       imageWidth,
-                   unsigned short       imageHeight );
+                   unsigned short       imageHeight,
+   		   unsigned short       imageStride);
 
    int getFd() const { return fd_ ; }
 
@@ -278,7 +283,7 @@ public:
                    unsigned short       xRight,
                    unsigned short       yBottom,
                    unsigned char red, unsigned char green, unsigned char blue );
-   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)getMem() + ( y * ( 2*getWidth() ) ) ); }
+   unsigned short *getRow( unsigned y ){ return (unsigned short *)( (char *)getMem() + ( y * stride) ); }
    void render( bitmap_t const &bmp,
                 unsigned        x,
                 unsigned        y,
@@ -307,6 +312,7 @@ private:
    unsigned long  memSize_ ;
    unsigned short width_ ;
    unsigned short height_ ;
+   unsigned short stride;
 
    friend fbDevice_t &getFB( char const *devName );
    friend void *flashThread( void *param );

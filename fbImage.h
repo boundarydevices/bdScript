@@ -55,7 +55,6 @@ public:
    mode_t   mode( void ) const { return mode_ ; }
    unsigned width( void ) const { return w_ ; }
    unsigned height( void ) const { return h_ ; }
-   unsigned stride( void ) const { return stride_ ; }
 
    unsigned ramOffset( void ) const { return ptr_.getOffs(); }
    void    *pixels( void ) const { return ptr_.getPtr(); }
@@ -64,6 +63,7 @@ public:
    inline bool validate( void ) const { return ptr_.validate(); }
 
 private:
+   unsigned stride( void ) const { return stride_ ; }
    mode_t   mode_ ;
    unsigned w_ ;
    unsigned h_ ;

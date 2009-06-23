@@ -377,7 +377,7 @@ jsTextBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
                                      JS_GetStringLength( sText ),
                                      x, y, w, h,
                                      (unsigned char *)JS_GetStringBytes( JSVAL_TO_STRING(dataVal) ),
-                                     bitmap_t::bytesPerRow( JSVAL_TO_INT( widthVal ) ), 
+                                     BYTES_PER_ROW_ALIGN_LONG(JSVAL_TO_INT(widthVal)), 
                                      JSVAL_TO_INT( heightVal ),
                                      rotation ) )
                *rval = JSVAL_TRUE ;

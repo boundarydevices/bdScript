@@ -38,7 +38,7 @@ void imgTo4444( unsigned short const *inPixels,
          unsigned short rgba = (a<<12)|(r<<8)|(g<<4)|b ;
          out4444[x] = rgba ;
       }
-      out4444 += outStride ;
+      out4444 += (outStride >> 1);
    }
 }
                 

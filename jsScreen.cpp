@@ -78,6 +78,7 @@
 
 #include "jsScreen.h"
 #include "fbDev.h"
+#include "zOrder.h"
 #include <string.h>
 #include "js/jsstddef.h"
 #include "js/jscntxt.h"
@@ -291,27 +292,25 @@ jsInvertRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
       int height = JSVAL_TO_INT( argv[3] );
       if( ( 0 < width ) && ( 0 < height ) )
       {
-         int const startX = JSVAL_TO_INT( argv[0] );
-         int const startY = JSVAL_TO_INT( argv[1] );
-
+         int x = JSVAL_TO_INT( argv[0] );
+         int y = JSVAL_TO_INT( argv[1] );
          fbDevice_t &fb = getFB();
-
-         for( unsigned y = 0 ; y < (unsigned)height ; y++ )
-         {
-            int const screenY = startY + y ;
-            if( ( 0 <= screenY ) 
-                &&
-                ( screenY < fb.getHeight() ) )
-            {
-               for( unsigned x = 0 ; x < (unsigned)width ; x++ )
-               {
-                  int const screenX = x + startX ;
-                  if( ( 0 < screenX ) && ( screenX < fb.getWidth() ) )
-                  {
-                     fb.setPixel( screenX, screenY, ~fb.getPixel( screenX, screenY ) );
-                  } // visible column
+         int endX = x + width;
+         int endY = y + height;;
+         if (endX > fb.getWidth())
+        	 endX = fb.getWidth();
+         if (endY > fb.getHeight())
+        	 endY = fb.getHeight();
+         if (x < 0)
+        	 x = 0;
+         if (y < 0)
+        	 y = 0;
+         int orig_x = x;
+//	 printf("x=%x, y=%x, endx=%x, endY=%x 1stpix=%x\n", x, y, endX, endY, fb.getPixel(x, y));
+         for (; y < endY ; y++ ) {
+               for (int x = orig_x; x < endX ; x++ ) {
+                     fb.setPixel(x, y, ~fb.getPixel(x, y));
                } // for each column
-            } // visible row
          } // for each row requested
       }
       else
@@ -507,6 +506,7 @@ static JSBool jsScreen( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, j
 static JSBool jsReleaseFB( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
    set_width_height_properties(cx, obj);
+   release_ZMap();
    fbDevice_t::releaseFB();
    *rval = JSVAL_TRUE ;
    return JS_TRUE ;

@@ -88,9 +88,10 @@ private:
 
    friend zOrderMapStack_t &getZMap();
    friend void dumpZMaps( void );
+   friend void release_ZMap();
 };
 
-
+void release_ZMap();
 zOrderMapStack_t &getZMap();
 #endif
 

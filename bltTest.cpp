@@ -168,7 +168,7 @@ int main( int argc, char const * const argv[] )
     * hand-crafted blt
     *
     */
-   unsigned const stride = 2*fb.getWidth();
+   unsigned const stride = fb.getStride();
    readCount = 0 ; 
    writeCount = 0 ; 
    readTime = 0 ;

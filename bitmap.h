@@ -54,8 +54,8 @@ public:
 
    inline unsigned getWidth( void ) const { return bitWidth_ ; }
    inline unsigned getHeight( void ) const { return bitHeight_ ; }
-   inline static unsigned bytesPerRow( unsigned bitWidth ){ return ((bitWidth+31)/32)*sizeof(long); }
-   inline unsigned bytesPerRow( void ) const { return bitmap_t::bytesPerRow( bitWidth_ ); }
+#define BYTES_PER_ROW_ALIGN_LONG(bitWidth) (((bitWidth + 31) >> 5) << 2)
+   inline unsigned bytesPerRow( void ) const { return bytesPerRow_; }
 
    //
    // copy bits to specified offset

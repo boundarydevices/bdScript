@@ -41,7 +41,7 @@ bitmap_t :: bitmap_t
    : bits_( bits )
    , bitWidth_( bitWidth )
    , bitHeight_( bitHeight )
-   , bytesPerRow_( bytesPerRow(bitWidth) )
+   , bytesPerRow_(BYTES_PER_ROW_ALIGN_LONG(bitWidth))
 {
 }
 

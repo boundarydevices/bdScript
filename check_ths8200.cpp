@@ -12,94 +12,7 @@
 //#include <asm/types.h>
 typedef unsigned short __u16;
 typedef unsigned char __u8;
-#define I2C_RDWR  0x0707  /* Combined R/W transfer (one stop only)*/
-#define I2C_SLAVE 0x0703
-struct i2c_msg {
-	__u16 addr;     /* slave address */
-	__u16 flags;
-#define I2C_M_TEN			0x10    /* we have a ten bit chip address */
-#define I2C_M_RD			0x01
-#define I2C_M_NOSTART		0x4000
-#define I2C_M_REV_DIR_ADDR	0x2000
-#define I2C_M_IGNORE_NAK	0x1000
-#define I2C_M_NO_RD_ACK		0x0800
-#define I2C_M_RECV_LEN		0x0400 /* length will be first received byte */
-	__u16 len;              /* msg length */
-	__u8 *buf;              /* pointer to msg data */
-};
 
-static int const addr = 0x42>>1; /* The I2C address, low 7 bits are the address bits */
-
-#include <linux/i2c-dev.h>
-//typedef signed int s32;
-//typedef unsigned char u8;
-//struct i2c_client;
-//extern s32 i2c_smbus_read_byte_data(struct i2c_client * client, u8 command);
-//#include <linux/device.h>
-//#include <linux/i2c.h>
-
-#define PORTA	0x05
-#define TRISA	0x85
-
-#define PORTC	0x07
-#define TRISC	0x87
-
-#define WPUA	0x95
-
-#define ADRESH	0x1e
-#define ADRESL	0x9e
-
-#define ADCON0	0x1f
-#define ADCON1	0x9f
-
-#define ANSEL	0x91
-
-#define MAX_REG 0x82
-
-static char const usage[] = {
-        "Usage: ths8200_reg register [value]\n"
-        "   register can be either a single register (0xNN) or two registers\n"
-        "   (0xNN+0xNN) MSB-first\n"
-};
-
-static void setByte(int dev, unsigned char reg,unsigned char lsb)
-{
-	__u8 buf[32];
-	buf[0] = reg;
-	buf[1] = lsb;
-	if ( write(dev,buf,2) != 2) {
-		printf("i2c write error(%s), reg=0x%02x\n",strerror(errno),reg);
-		exit(1);
-	}
-}
-
-static unsigned char getByte(int dev, unsigned char reg )
-{
-	__u8 buf[32];
-	buf[0] = reg;
-
-	struct i2c_msg msgs[2];
-	struct i2c_rdwr_ioctl_data msgset;
-
-	msgs[0].addr = addr;
-	msgs[0].flags = 0;
-	msgs[0].len = 1;
-	msgs[0].buf = buf;
-
-	msgs[1].addr = addr;
-	msgs[1].flags = I2C_M_RD;
-	msgs[1].len = 1;
-	msgs[1].buf = &buf[4];
-
-	msgset.msgs = msgs;
-	msgset.nmsgs = 2;
-	if (ioctl(dev,I2C_RDWR,&msgset)<0) {
-		printf("I2C_RDWR(%s), reg=0x%02x addr=0x%02x\n", strerror(errno), reg, addr);
-		exit(-1);
-	} else {
-	}
-        return buf[4];
-}
 
 #include <string.h>
 #include <ctype.h>
@@ -125,22 +38,52 @@ inline unsigned long readLong(physMem_t &pm, unsigned long reg)
 
 #define READLONG(addr)  *((unsigned long *)
 
+char const hexCharSet[] = "0123456789abcdef";
+unsigned getByte(char *readfile, int fdwrite, int reg)
+{
+	int fdread;
+	int rval;
+	int val;
+	char buf[16];
+	buf[0] = hexCharSet[(reg >> 4) & 0xf];
+	buf[1] = hexCharSet[reg & 0xf];
+	buf[2] = 0;
+	if (write(fdwrite, buf, 2) != 2) {
+		printf("error selecting register %02x(%s)\n", reg, strerror(errno));
+		return ~0;
+	}
+	if ((fdread = open(readfile, O_RDONLY)) < 0) {
+		printf("error opening %s(%s)\n", readfile, strerror(errno));
+		return ~0;
+	}
+	rval = read(fdread, buf, 15);
+	close(fdread);
+	if (rval != 3) {
+		printf("error reading register %02x(%s)%i\n", reg, strerror(errno), rval);
+		printf("%s\n", buf);
+		return ~0;
+	}
+	rval = sscanf(buf, "%x", &val);
+	if (rval != 1) {
+		printf("error parsing register %02x(%s)%i\n", reg, strerror(errno), rval);
+		return ~0;
+	}
+	return val;
+}
+
 int main(void)
 {
-   int dev;
+   unsigned long ths_hint, ths_vint;
+   int fdwrite;
    int adapter_nr = 1; /* probably dynamically determined */
-   char filename[20];
-   sprintf(filename,"/dev/i2c-%d",adapter_nr);
-   if ((dev = open(filename,O_RDWR)) < 0) {
+   char filename[80];
+   sprintf(filename,"/sys/class/i2c-adapter/i2c-%d/1-0021/write",adapter_nr);
+   if ((fdwrite = open(filename,O_WRONLY)) < 0) {
       printf("error opening %s(%s)\n",filename,strerror(errno));
       return -1 ;
    }
-   
-   if (ioctl(dev,I2C_SLAVE,addr) < 0) {
-        printf("error setting slave address %i(%s)\n",addr,strerror(errno));
-        return -1 ;
-   }
-      
+   sprintf(filename,"/sys/class/i2c-adapter/i2c-%d/1-0021/read",adapter_nr);
+
    physMem_t venc_regs( VENC_BASE, PAGE_SIZE, O_RDWR );
    if( !venc_regs.worked() ){
       fprintf(stderr, "Error mapping venc regs\n" );
@@ -150,17 +93,16 @@ int main(void)
    unsigned venc_hint = readLong(venc_regs,VENC_HINT);
    unsigned venc_vint = readLong(venc_regs,VENC_VINT);
 
-   unsigned long ths_hint = (((unsigned)getByte(dev,0x34)) << 8 )
-                          | getByte(dev,0x35);
-   unsigned long ths_vint = (((((unsigned)getByte(dev,0x39))>>4)&7) << 8 )
-                          | getByte(dev,0x3a);
+   ths_hint = (getByte(filename, fdwrite, 0x34) << 8) |
+   	getByte(filename, fdwrite, 0x35);
+   ths_vint = (((getByte(filename, fdwrite, 0x39) >> 4) & 7) << 8 ) |
+   	getByte(filename, fdwrite, 0x3a);
 
-   printf( "hint 0x%08lx, vint 0x%08lx\n", venc_hint, venc_vint );
-   printf( "hint 0x%08lx, vint 0x%08lx\n", ths_hint, ths_vint );
+   close(fdwrite);
+   printf( "VENC:\thint 0x%08lx, vint 0x%08lx\n", venc_hint, venc_vint );
+   printf( "THS:\thint 0x%08lx, vint 0x%08lx\n", ths_hint, ths_vint );
    
-   if( (venc_hint != (ths_hint-1))
-       ||
-       (venc_vint != (ths_vint-1)) ){
+   if ((venc_hint != (ths_hint-1)) || (venc_vint != (ths_vint-1)) ){
       fprintf( stderr, "Invalid horizontal or vertical resolutions in THS8200\n" );
       return -1 ;
    }

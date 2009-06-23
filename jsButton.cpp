@@ -320,7 +320,7 @@ static void buttonTouch( box_t         &box,
    assert( 0 != button );
    assert( button->box_ == &box );
 
-   if( 0 != button->img_ )
+   if( 0 != button->touchImg_ )
       display( box.xLeft_, box.yTop_, button->touchImg_, button->touchImgAlpha_, button->touchImgWidth_, button->touchImgHeight_ );
    else if( 0 != button->fontData_ )
       drawButton( *button, true );
