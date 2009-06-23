@@ -87,6 +87,7 @@ OBJS = \
        md5.o \
        memFile.o \
        mpegStream.o \
+       multicastSocket.o \
        multiSignal.o \
        openFds.o \
        palette.o \
@@ -303,6 +304,7 @@ CXXFLAGS=-Werror -fno-strict-aliasing
 
 ifeq (y,$(KERNEL_ARCH_PXA))
         CXXFLAGS += -mcpu=xscale
+       OBJS += pxaYUV.o
 endif
 
 ifeq (y,$(KERNEL_ARCH_DAVINCI))
@@ -782,6 +784,14 @@ logTraces: logTraces.cpp $(LIB)
 
 avSendTo: avSendTo.cpp $(LIB)
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o avSendTo -DSTANDALONE=1 -Xlinker -Map -Xlinker avSendTo.map avSendTo.cpp $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lcrypto -lz -lm -lpthread -lsupc++
+	$(STRIP) $@
+
+avMulticast: avMulticast.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -DSTANDALONE=1 -Xlinker -Map -Xlinker $@.map $< $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lcrypto -lz -lm -lpthread -lsupc++
+	$(STRIP) $@
+
+jpegUdpRx: jpegUdpRx.cpp $(LIB)
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti -o $@ -DSTANDALONE=1 -Xlinker -Map -Xlinker $@.map $< $(LIBS) -lCurlCache -lpng -ljpeg -lungif -lcrypto -lz -lm -lpthread -lsupc++
 	$(STRIP) $@
 
 pollHandlerTest: pollHandler.cpp $(LIB)
