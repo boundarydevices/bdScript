@@ -66,10 +66,11 @@ static void jpg_skip_input_data( j_decompress_ptr cinfo, long num_bytes )
 {
    jpegSrc_t *pSrc = (jpegSrc_t *)cinfo->client_data ;
    unsigned left = pSrc->length_ - pSrc->numRead_ ;
-   if( left > (unsigned)num_bytes )
+   if( left < (unsigned)num_bytes )
       num_bytes = left ;
    pSrc->numRead_ += num_bytes ;
-//printf( "skip input : %u/%ld\n", pSrc->numRead_, num_bytes );
+   cinfo->src->next_input_byte += (size_t) num_bytes;
+   cinfo->src->bytes_in_buffer -= (size_t) num_bytes;
 }
 
 static boolean jpg_resync_to_restart( j_decompress_ptr cinfo, int desired )
