@@ -425,6 +425,7 @@
 #include "jsMD5.h"
 #include <fcntl.h>
 #include "jsUsblp.h"
+#include "jsSHA1.h"
 
 #include "touchPoll.h"
 
@@ -865,6 +866,8 @@ int prMain(int argc, char **argv, bool )
 #endif
 
                   initJSUsbLp( cx, glob );
+
+                  initJSSHA1(cx,glob);
 
                   getCurlCache();
 

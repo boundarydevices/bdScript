@@ -83,6 +83,7 @@ OBJS = \
        jsURL.o \
        jsUsblp.o \
        jsUse.o \
+       jsSHA1.o \
        logTraces.o \
        md5.o \
        memFile.o \
