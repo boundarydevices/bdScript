@@ -412,7 +412,7 @@ jsFontRender( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
                else
                   JS_ReportError( cx, "Error building alpha map string" );
    
-               JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(ftString.getWidth()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
+               JS_DefineProperty( cx, returnObj, "width",    INT_TO_JSVAL(ftString.getWidth()), 0, 0, JSPROP_ENUMERATE );
                JS_DefineProperty( cx, returnObj, "height",   INT_TO_JSVAL(ftString.getHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                JS_DefineProperty( cx, returnObj, "baseline", INT_TO_JSVAL(ftString.getBaseline()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );
                JS_DefineProperty( cx, returnObj, "yAdvance", INT_TO_JSVAL(ftString.getFontHeight()), 0, 0, JSPROP_READONLY|JSPROP_ENUMERATE );

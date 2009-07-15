@@ -45,6 +45,87 @@
 #include "jsAlphaMap.h"
 #include "js/jscntxt.h"
 #include "fbDev.h"
+#include "string.h"
+
+static JSBool
+jsCrop(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, bool isRight)
+{
+   *rval = JSVAL_FALSE;
+
+   if((1 == argc)
+      &&
+      JSVAL_IS_INT(argv[0]))
+   {
+      jsval     vPixMap ;
+      jsval     vWidth ;
+      jsval     vHeight ;
+      JSString *sPixMap ;
+
+      if(JS_GetProperty(cx, obj, "pixBuf", &vPixMap)
+         &&
+         JSVAL_IS_STRING(vPixMap)
+         &&
+         (0 != (sPixMap = JSVAL_TO_STRING(vPixMap)))
+         &&
+         JS_GetProperty(cx, obj, "width", &vWidth)
+         &&
+         JSVAL_IS_INT(vWidth)
+         &&
+         JS_GetProperty(cx, obj, "height", &vHeight)
+         &&
+         JSVAL_IS_INT(vHeight))
+      {
+         unsigned       bmWidth    = JSVAL_TO_INT(vWidth);
+         unsigned const bmHeight   = JSVAL_TO_INT(vHeight);
+         
+         /*
+          * here we modify the in object's pixel data in memory
+          * so we need not write the modified data back to the
+          * object property.
+          */
+         unsigned char *inRow = (unsigned char *)JS_GetStringBytes(sPixMap);
+         unsigned int displayWidth = JSVAL_TO_INT(argv[0]);
+         if(displayWidth >= bmWidth) /* do nothing if display width is greater than image width */
+            return JS_TRUE;
+         /* crop only if display width is less than alphaMap width */
+         unsigned int offset = isRight ? 0 : (bmWidth - displayWidth);
+         if(bmWidth > displayWidth) { //modify pixMap
+             unsigned char *newMapCurPos = inRow;
+             unsigned char *oldMapCurPos = inRow + offset;
+             for(unsigned int idx = 0; idx < bmHeight; idx++) {
+                 memmove(newMapCurPos, oldMapCurPos, displayWidth);
+                 newMapCurPos += displayWidth;
+                 oldMapCurPos += bmWidth;
+             }
+             jsval tempWidth = INT_TO_JSVAL(displayWidth);
+             JSBool ret = JS_SetProperty(cx, obj, "width", &tempWidth);
+             if(ret == JS_FALSE)
+                printf("Property is not set\n");
+         }
+      }
+   }
+   return JS_TRUE;
+}
+
+/*
+ * Takes the display width of the alpha map and crops all the pixels
+ * to the right of the display width
+ */
+static JSBool
+jsCropRight(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   return jsCrop(cx, obj, argc, argv, rval, true);
+}
+
+/*
+ * Takes the display width of the alpha map and crops all the pixels
+ * to the left of the display width
+ */
+static JSBool
+jsCropLeft(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   return jsCrop(cx, obj, argc, argv, rval, false);
+}
 
 static JSBool
 jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
@@ -150,16 +231,16 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
           &&
           JSVAL_IS_INT( vHeight ) )
       {
-         unsigned const bmWidth    = JSVAL_TO_INT( vWidth );
+         unsigned       bmWidth    = JSVAL_TO_INT( vWidth );
          unsigned const bmHeight   = JSVAL_TO_INT( vHeight );
-/*
-         printf( "string gets drawn here\n"
-                 "x        %u\n"
-                 "y        %u\n"
-                 "rgb      0x%06x\n"
-                 "w        %u\n"
-                 "h        %u\n", specX, specY, rgb, bmWidth, bmHeight );
-*/                 
+
+         //printf( "string gets drawn here\n"
+         //        "x        %u\n"
+         //        "y        %u\n"
+         //        "rgb      0x%06x\n"
+         //        "w        %u\n"
+         //        "h        %u\n", specX, specY, rgb, bmWidth, bmHeight );
+                 
          //
          // user specifies position of baseline, adjust to top of bitmap
          //
@@ -190,7 +271,7 @@ jsAlphaMapDraw( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
             //
             // point row at start row/col
             //
-            unsigned char const *inRow = (unsigned char const *)JS_GetStringBytes( sPixMap )
+            unsigned char *inRow = (unsigned char *)JS_GetStringBytes( sPixMap )
                                        + (bmWidth*bmStartY) + bmStartX ;
             unsigned const maxHeight = bmHeight-bmStartY ;
             unsigned const red   = (unsigned char)( rgb >> 16 );
@@ -343,6 +424,8 @@ jsAlphaMapRotate( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
 static JSFunctionSpec alphaMapMethods_[] = {
     {"draw",         jsAlphaMapDraw,           3 },
     {"rotate",       jsAlphaMapRotate,         3 },
+    {"cropright",    jsCropRight,              1 },
+    {"cropleft",     jsCropLeft,              1 },
     {0}
 };
 
@@ -355,9 +438,9 @@ JSClass jsAlphaMapClass_ = {
 };
 
 JSPropertySpec alphaMapProperties_[ALPHAMAP_NUMPROPERTIES+1] = {
-  {"width",         ALPHAMAP_WIDTH,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"height",        ALPHAMAP_HEIGHT,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"pixBuf",        ALPHAMAP_PIXBUF,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
+  {"width",         ALPHAMAP_WIDTH,     JSPROP_ENUMERATE|JSPROP_PERMANENT },
+  {"height",        ALPHAMAP_HEIGHT,    JSPROP_ENUMERATE|JSPROP_PERMANENT },
+  {"pixBuf",        ALPHAMAP_PIXBUF,    JSPROP_ENUMERATE|JSPROP_PERMANENT },
   {0,0,0}
 };
 
