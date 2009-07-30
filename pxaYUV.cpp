@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 #define PXA27X_Y_CLASS "fb_y"
 #define PXA27X_U_CLASS "fb_u"
@@ -55,15 +57,15 @@ pxaYUV_t::pxaYUV_t( unsigned x, unsigned y, unsigned w, unsigned h )
    fd_y = open( "/dev/" PXA27X_Y_CLASS, O_RDWR );
    if(fd_y < 0)
       return ;
-   printf( "opened %s\n", "/dev/" PXA27X_Y_CLASS );
+   debugPrint( "opened %s\n", "/dev/" PXA27X_Y_CLASS );
    fd_u = open( "/dev/" PXA27X_U_CLASS, O_RDWR );
    if(fd_u < 0)
       goto bail ;
-   printf( "opened %s\n", "/dev/" PXA27X_U_CLASS );
+   debugPrint( "opened %s\n", "/dev/" PXA27X_U_CLASS );
    fd_v = open( "/dev/" PXA27X_V_CLASS, O_RDWR );
    if(fd_v < 0)
       goto bail ;
-   printf( "opened %s\n", "/dev/" PXA27X_V_CLASS );
+   debugPrint( "opened %s\n", "/dev/" PXA27X_V_CLASS );
 
    pxa27x_overlay_t pi ;
    pi.for_type = FOR_PLANAR_YUV420;
@@ -75,19 +77,19 @@ pxaYUV_t::pxaYUV_t( unsigned x, unsigned y, unsigned w, unsigned h )
    if(0 != ioctl(fd_y, PXA27X_YUV_SET_DIMENSIONS, &pi))
      goto bail ;
 
-   printf( "set dimensions to %ux%u @%u:%u\n", w, h, x, y );
+   debugPrint( "set dimensions to %ux%u @%u:%u\n", w, h, x, y );
    map_y = mmap(NULL, planar_y_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd_y, 0);
    if(MAP_FAILED==map_y)
       goto bail ;
-   printf( "mapped %s\n", "/dev/" PXA27X_Y_CLASS );
+   debugPrint( "mapped %s\n", "/dev/" PXA27X_Y_CLASS );
    map_u = mmap(NULL, planar_uv_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd_u, 0);
    if(MAP_FAILED==map_u)
       goto bail ;
-   printf( "mapped %s\n", "/dev/" PXA27X_U_CLASS );
+   debugPrint( "mapped %s\n", "/dev/" PXA27X_U_CLASS );
    map_v = mmap(NULL, planar_uv_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd_v, 0);
    if(MAP_FAILED==map_v)
       goto bail ;
-   printf( "mapped %s\n", "/dev/" PXA27X_V_CLASS );
+   debugPrint( "mapped %s\n", "/dev/" PXA27X_V_CLASS );
 
    return ;
 
