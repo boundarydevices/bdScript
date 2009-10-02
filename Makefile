@@ -1049,6 +1049,11 @@ circularLog: circularLog.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -DSTANDALONE_CIRCULARLOG $(IFLAGS) -DMODULETEST=1 -fno-rtti -o $@ -Xlinker -Map -Xlinker $@.map $< $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
 	$(STRIP) $@
 
+cameraToYUV: cameraToYUV.cpp pxaYUV.cpp Makefile
+	echo "Building $@"
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti $< -o $@ pxaYUV.cpp -Xlinker -Map -Xlinker $@.map $(LIBS) -lstdc++ 
+	$(STRIP) $@
+
 tcpPipe: tcpPipe.cpp Makefile
 	$(CC) -o $@ $< -lsupc++ 
 	$(STRIP) $@

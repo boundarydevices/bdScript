@@ -12,6 +12,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/errno.h>
+#include "pxaYUV.h"
+#include <ctype.h>
+// #define DEBUGPRINT
+#include "debugPrint.h"
 
 #define PWC_FPS_SHIFT		16
 #define PWC_FPS_MASK		0x00FF0000
@@ -39,13 +43,13 @@ int printFixed( void const *s, unsigned size )
 	char *const temp = (char *)alloca(size+1);
 	memcpy(temp,s,size);
 	temp[size] = 0 ;
-	printf( "%s", temp );
+	debugPrint( "%s", temp );
 }
 
 #define PRINTFIXED(__s) printFixed((__s),sizeof(__s))
 
 #define PRINTCAP(__name)        if( cap.capabilities & __name ) \
-                                        printf( "\t\t" #__name  "\n" )
+                                        debugPrint( "\t\t" #__name  "\n" )
 static char const *const stdControlTypes[] = {
 	"integer"
 ,	"boolean"
@@ -65,9 +69,9 @@ char const *controlTypeName(unsigned control){
 }
 #define CLEAR(__x) memset(&(__x),0,sizeof(__x))
 
+#ifdef DEBUG
 static void printBuf(v4l2_buffer const &bufinfo)
 {
-	printf( "have bufinfo\n" );
 	printf( "\tbytesused:\t%u\n", bufinfo.bytesused );
 	printf( "\tflags:\t%x\n", bufinfo.flags );
 	printf( "\tfield:\t%d\n", bufinfo.field );
@@ -75,6 +79,7 @@ static void printBuf(v4l2_buffer const &bufinfo)
 	printf( "\tlength:\t%u\n", bufinfo.length );
 	printf( "\tinput:\t%u\n", bufinfo.input );
 }
+#endif
 
 #define PXA27X_Y_CLASS "fb_y"
 #define PXA27X_U_CLASS "fb_u"
@@ -107,27 +112,58 @@ struct map {
     size_t len;
 };
 
-int main( int argc, char const * const argv[] )
+static int destx = 0 ;
+static int desty = 0 ;
+
+static void parseArgs( int &argc, char const **argv )
+{
+	for( unsigned arg = 1 ; arg < argc ; arg++ ){
+		if( '-' == *argv[arg] ){
+			char const *param = argv[arg]+1 ;
+			if( 'x' == tolower(*param) ){
+            			destx = strtoul(param+1,0,0);
+			}
+			else if( 'y' == tolower(*param) ){
+            			desty = strtoul(param+1,0,0);
+			}
+			else
+				printf( "unknown option %s\n", param );
+
+			// pull from argument list
+			for( int j = arg+1 ; j < argc ; j++ ){
+				argv[j-1] = argv[j];
+			}
+			--arg ;
+			--argc ;
+		}
+                else
+                   printf( "not flag: %s\n", argv[arg] );
+	}
+}
+
+int main( int argc, char const **argv )
 {
    int fdCamera = open( "/dev/video0", O_RDONLY );
    if( 0 <= fdCamera )
    {
       signal( SIGINT, ctrlcHandler );
 
-      printf( "camera opened\n" );
-      printf( "inputs\n" );
+      debugPrint( "camera opened\n" );
+      debugPrint( "inputs\n" );
 
       struct v4l2_input input;
       int index;
       
       memset (&input, 0, sizeof (input));
       
+      parseArgs(argc,argv);
+
       while( 1 ){
          if (-1 == ioctl (fdCamera, VIDIOC_ENUMINPUT, &input)) {
                  break;
          }
          
-         printf ("\tinput %d: %s\n", input.index, input.name);
+         debugPrint ("\tinput %d: %s\n", input.index, input.name);
          input.index++ ;
       }
       
@@ -137,7 +173,7 @@ int main( int argc, char const * const argv[] )
            exit (-1);
       }
 
-      printf( "formats:\n" );
+      debugPrint( "formats:\n" );
 
       int yuyvFormatIdx = -1 ;
       struct v4l2_fmtdesc fmt ;
@@ -145,7 +181,7 @@ int main( int argc, char const * const argv[] )
       fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE ;
       while( 1 ){
          if( 0 == ioctl(fdCamera,VIDIOC_ENUM_FMT,&fmt) ){
-            fprintf( stderr, "\tfmt:%d:%s %x(%s)\n", fmt.index, fmt.description, fmt.pixelformat, pixfmt_to_str(fmt.pixelformat));
+            debugPrint( "\tfmt:%d:%s %x(%s)\n", fmt.index, fmt.description, fmt.pixelformat, pixfmt_to_str(fmt.pixelformat));
 	    if(V4L2_PIX_FMT_YUYV == fmt.pixelformat)
 		    yuyvFormatIdx = fmt.index ;
             fmt.index++ ;
@@ -157,12 +193,12 @@ int main( int argc, char const * const argv[] )
       }
       struct v4l2_capability cap ;
       if( 0 == ioctl(fdCamera, VIDIOC_QUERYCAP, &cap ) ){
-	      printf( "have caps:\n" );
-	      printf( "\tdriver:\t" ); PRINTFIXED(cap.driver); printf( "\n" );
-	      printf( "\tcard:\t" ); PRINTFIXED(cap.card); printf( "\n" );
-	      printf( "\tbus:\t" ); PRINTFIXED(cap.bus_info); printf( "\n" );
-	      printf( "\tversion %u (0x%x)\n", cap.version, cap.version );
-	      printf( "\tcapabilities: 0x%x\n", cap.capabilities );
+	      debugPrint( "have caps:\n" );
+	      debugPrint( "\tdriver:\t" ); PRINTFIXED(cap.driver); debugPrint( "\n" );
+	      debugPrint( "\tcard:\t" ); PRINTFIXED(cap.card); debugPrint( "\n" );
+	      debugPrint( "\tbus:\t" ); PRINTFIXED(cap.bus_info); debugPrint( "\n" );
+	      debugPrint( "\tversion %u (0x%x)\n", cap.version, cap.version );
+	      debugPrint( "\tcapabilities: 0x%x\n", cap.capabilities );
               PRINTCAP(V4L2_CAP_VIDEO_CAPTURE);
               PRINTCAP(V4L2_CAP_VIDEO_OUTPUT);
               PRINTCAP(V4L2_CAP_VIDEO_OVERLAY);
@@ -191,31 +227,22 @@ int main( int argc, char const * const argv[] )
 	      else
 		      perror( "VIDIOC_QUERYSTD" );
       }
-      printf( "controls:\n" );
+      debugPrint( "controls:\n" );
       for( unsigned i = V4L2_CID_BASE ; i < V4L2_CID_LASTP1 ; i++ ){
 	      v4l2_queryctrl control ;
 	      memset(&control,0,sizeof(control));
 	      control.id = i ;
 	      if( 0 == ioctl(fdCamera,VIDIOC_QUERYCTRL,&control) ){
-		      printf( "\tcontrol %x:\t", i ); PRINTFIXED(control.name); printf( ", type %s\n", controlTypeName(control.type) );
+		      debugPrint( "\tcontrol %x:\t", i ); PRINTFIXED(control.name); debugPrint( ", type %s\n", controlTypeName(control.type) );
 	      }
       }
-/* Not supported on laptop/Ubuntu
-      struct v4l2_ext_controls ext_controls ;
-      memset(&ext_controls,0,sizeof(ext_controls));
-      ext_controls.ctrl_class = V4L2_CTRL_CLASS_CAMERA ;
-      if( 0 == ioctl(fdCamera,VIDIOC_G_EXT_CTRLS,&ext_controls))
-	      printf( "have extended camera controls\n" );
-      else
-	      printf( "no extended camera controls\n" );
-*/
 	struct v4l2_queryctrl qctrl;
 	memset(&qctrl,0,sizeof(qctrl));
 	qctrl.id = V4L2_CTRL_FLAG_NEXT_CTRL;
 	while (0 == ioctl (fdCamera, VIDIOC_QUERYCTRL, &qctrl)) {
-		printf( "extended control %x:\t", qctrl.id ); 
+		debugPrint( "extended control %x:\t", qctrl.id ); 
 			PRINTFIXED(qctrl.name); 
-			printf( ", type %s\n", controlTypeName(qctrl.type) );
+			debugPrint( ", type %s\n", controlTypeName(qctrl.type) );
 	/* ... */
 		qctrl.id |= V4L2_CTRL_FLAG_NEXT_CTRL;
 	}
@@ -224,27 +251,27 @@ int main( int argc, char const * const argv[] )
 	memset(&cropcap,0,sizeof(cropcap));
 	cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE ;
 	if( 0 == ioctl(fdCamera,VIDIOC_CROPCAP,&cropcap)){
-		printf( "have crop capabilities\n" );
-		printf( "\tbounds %d:%d %dx%d\n", cropcap.bounds.left,cropcap.bounds.top,cropcap.bounds.width,cropcap.bounds.height );
-		printf( "\tdefrect %d:%d %dx%d\n", cropcap.defrect.left,cropcap.defrect.top,cropcap.defrect.width,cropcap.defrect.height );
+		debugPrint( "have crop capabilities\n" );
+		debugPrint( "\tbounds %d:%d %dx%d\n", cropcap.bounds.left,cropcap.bounds.top,cropcap.bounds.width,cropcap.bounds.height );
+		debugPrint( "\tdefrect %d:%d %dx%d\n", cropcap.defrect.left,cropcap.defrect.top,cropcap.defrect.width,cropcap.defrect.height );
 	}
 
         v4l2_streamparm streamp ;
 	memset(&streamp,0,sizeof(streamp));
 	streamp.type = V4L2_BUF_TYPE_VIDEO_CAPTURE ;
         if( 0 == ioctl(fdCamera, VIDIOC_G_PARM, &streamp)){
-		printf( "have stream params\n" );
-		printf( "\tparm.capture:\n" );
-		printf( "\tparm.capture.capability\t0x%08x\n", streamp.parm.capture.capability );
-		printf( "\tparm.capture.capturemode\t0x%08x\n", streamp.parm.capture.capturemode );
-		printf( "\tparm.capture.extendedmode\t0x%08x\n", streamp.parm.capture.extendedmode );
-		printf( "\tparm.capture.readbuffers\t%u\n", streamp.parm.capture.readbuffers );
-		printf( "\tparm.capture.timeperframe\t%u/%u\n"
+		debugPrint( "have stream params\n" );
+		debugPrint( "\tparm.capture:\n" );
+		debugPrint( "\tparm.capture.capability\t0x%08x\n", streamp.parm.capture.capability );
+		debugPrint( "\tparm.capture.capturemode\t0x%08x\n", streamp.parm.capture.capturemode );
+		debugPrint( "\tparm.capture.extendedmode\t0x%08x\n", streamp.parm.capture.extendedmode );
+		debugPrint( "\tparm.capture.readbuffers\t%u\n", streamp.parm.capture.readbuffers );
+		debugPrint( "\tparm.capture.timeperframe\t%u/%u\n"
 				, streamp.parm.capture.timeperframe.numerator
 				, streamp.parm.capture.timeperframe.denominator );
 		streamp.parm.capture.timeperframe.numerator = streamp.parm.capture.timeperframe.denominator = 1 ;
 		if( 0 == ioctl(fdCamera, VIDIOC_S_PARM, &streamp)){
-			printf( "set stream parameters\n" );
+			debugPrint( "set stream parameters\n" );
 		} else
 			fprintf( stderr, "VIDIOC_S_PARAM:%m\n" );
 	}
@@ -257,7 +284,7 @@ int main( int argc, char const * const argv[] )
 		if( 0 > ioctl( fdCamera, VIDIOCGCAP, &vidcap)){
 			perror( "VIDIOCGCAP");
 		}
-		printf( "%ux%u..%ux%u\n", vidcap.minwidth, vidcap.minheight, vidcap.maxwidth, vidcap.maxheight );
+		debugPrint( "%ux%u..%ux%u\n", vidcap.minwidth, vidcap.minheight, vidcap.maxwidth, vidcap.maxheight );
 		yuvWidth = vidcap.maxwidth ;
 		yuvHeight = vidcap.maxheight ;
                 v4l2_format format ;
@@ -272,14 +299,14 @@ int main( int argc, char const * const argv[] )
 		format.fmt.pix.colorspace = V4L2_COLORSPACE_SRGB ;
 
 		if(0 == ioctl(fdCamera,VIDIOC_S_FMT,&format)){
-			printf( "set YUYV capture\n" );
+			debugPrint( "set YUYV capture\n" );
 		}
 		else
 			perror("VIDIOC_S_FMT");
 	
 		if(0 == ioctl(fdCamera,VIDIOC_G_FMT,&format)){
-			printf( "YUYV capture data:\n" );
-			printf( "\t%ux%u.. %ubpl... %ubpp\n", format.fmt.pix.width, format.fmt.pix.height, format.fmt.pix.bytesperline, format.fmt.pix.sizeimage );
+			debugPrint( "YUYV capture data:\n" );
+			debugPrint( "\t%ux%u.. %ubpl... %ubpp\n", format.fmt.pix.width, format.fmt.pix.height, format.fmt.pix.bytesperline, format.fmt.pix.sizeimage );
 		}
 		else
 			perror("VIDIOC_S_FMT");
@@ -290,11 +317,11 @@ int main( int argc, char const * const argv[] )
 	frameSize.pixel_format = V4L2_PIX_FMT_YVU420 ;
 	while(1){
 		if( 0 == ioctl(fdCamera,VIDIOC_ENUM_FRAMESIZES,&frameSize) ){
-			printf( "have frame size %d\n", frameSize.index );
+			debugPrint( "have frame size %d\n", frameSize.index );
 			frameSize.index++ ;
 		}
 		else {
-			printf( "No more frame sizes: %m\n" );
+			debugPrint( "No more frame sizes: %m\n" );
 			break;
 		}
 	}
@@ -304,11 +331,11 @@ int main( int argc, char const * const argv[] )
 	frameIval.pixel_format = V4L2_PIX_FMT_YVU420 ;
 	while(1){
 		if( 0 == ioctl(fdCamera,VIDIOC_ENUM_FRAMESIZES,&frameSize) ){
-			printf( "have frame ival %d\n", frameSize.index );
+			debugPrint( "have frame ival %d\n", frameSize.index );
 			frameSize.index++ ;
 		}
 		else {
-			printf( "No more frame ivals: %m\n" );
+			debugPrint( "No more frame ivals: %m\n" );
 			break;
 		}
 	}
@@ -320,7 +347,9 @@ int main( int argc, char const * const argv[] )
 	rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE ;
 	rb.memory = V4L2_MEMORY_MMAP ;
 	if( 0 == ioctl(fdCamera, VIDIOC_REQBUFS, &rb) ){
+#ifdef DEBUG
 		printf( "have %u bufs (requested %u)\n", rb.count, numBuffers );
+#endif 
 	}
 	else
 		perror( "VIDIOC_REQBUFS" );
@@ -337,7 +366,9 @@ int main( int argc, char const * const argv[] )
 			fprintf( stderr, "VIDIOC_QUERYBUF(%u):%m\n", i );
 			return -1 ;
 		}
+#ifdef DEBUG
 		printBuf(m.buf);
+#endif
                 m.len = m.buf.length ;
                 m.addr = mmap(NULL,m.len, PROT_READ, MAP_SHARED, fdCamera, m.buf.m.offset);
 		if( (0==m.addr) || (MAP_FAILED==m.addr) ){
@@ -355,7 +386,7 @@ int main( int argc, char const * const argv[] )
 		perror("VIDIOC_STREAMON");
 		return -1 ;
 	}
-	printf( "queued %u buffers\n", numBuffers );
+	debugPrint( "queued %u buffers\n", numBuffers );
 
 	if( (0 == yuvWidth) || (0 == yuvHeight) ){
 		printf( "No YUV support, bailing\n" );
@@ -366,78 +397,66 @@ int main( int argc, char const * const argv[] )
 	,	"/dev/fb_u"
 	,	"/dev/fb_v"
 	};
-	int fdYUV[3] = {0};
+        
+	pxaYUV_t *yuv = new pxaYUV_t( destx, desty, yuvWidth, yuvHeight );
 
-	struct pxa27x_overlay_t overlay ;
-	overlay.for_type = FOR_PLANAR_YUV420 ;
-	overlay.offset_x = 0 ;	/* relative to the base plane */
-	overlay.offset_y = 0 ;
-	overlay.width = yuvWidth ;
-	overlay.height = yuvHeight ;
+	printf( "%ux%u @%u:%u\n", yuvWidth, yuvHeight, destx, desty );
+	struct pollfd fds[2];
+	fds[0].fd = fdCamera ;
+	fds[0].events = POLLIN ;
+	fds[1].fd = fileno(stdin);
+	fds[1].events = POLLIN ;
+	fcntl(fileno(stdin), F_SETFL, fcntl(fileno(stdin), F_GETFL) | O_NONBLOCK );
+	fcntl(fdCamera, F_SETFL, fcntl(fdCamera, F_GETFL) | O_NONBLOCK );
 
-	for( int i = 0 ; i < 3 ; i++ ){
-		fdYUV[i] = open( yuvDevs[i], O_RDWR );
-		if( 0 > fdYUV[i] ){
-			perror( yuvDevs[i] );
-			return -1 ;
-		}
-	}
-	printf( "opened yuv devs\n" );
-	if( 0 != ioctl(fdYUV[0],PXA27X_YUV_SET_DIMENSIONS,&overlay)){
-		perror( "PXA27X_YUV_SET_DIMENSIONS" );
-		return -1 ;
-	}
-	printf( "set output dimensions to %ux%u (expected %ux%u)\n", overlay.width, overlay.height, yuvWidth, yuvHeight );
-
-	unsigned yBytesOut = overlay.width*overlay.height ;
-	unsigned uvBytesOut = yBytesOut>>2 ;
-	unsigned const mapBytes[] = {
-		yBytesOut
-	,	uvBytesOut
-	,	uvBytesOut
-	};
-	void *outMaps[3] = { 0 };
-	for( unsigned i = 0 ; i < 3 ; i++ ){
-		unsigned length = mapBytes[i];
-		outMaps[i] = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fdYUV[i], 0);
-		if( !outMaps[i] || (MAP_FAILED == outMaps[i]) ){
-			perror( "mmap" );
-			return -1 ;
-		}
-	}
-	printf( "mapped %u/%u/%u bytes of display memory\n", mapBytes[0],mapBytes[1],mapBytes[2]);
-
-	char inBuf[512];
-	fgets(inBuf,sizeof(inBuf),stdin);
-//	return 0 ;
 	unsigned iterations = 0 ;
-	while(1){
-                struct v4l2_buffer buf ;
-		CLEAR(buf);
-		buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		buf.memory = V4L2_MEMORY_MMAP;
-		if (-1 == ioctl(fdCamera, VIDIOC_DQBUF, &buf)) {
-			switch (errno) {
-				case EAGAIN:
-					printf( "wait...\n" );
-                                        break ;
-                                case EIO:
-				/* Could ignore EIO, see spec. */
-				/* fall through */
-
-				default:
-					perror("VIDIOC_DQBUF");
-					return -1 ;
-			}
-		} else {
-			printBuf(buf);
-			if(0 > ioctl(fdCamera, VIDIOC_QBUF, &buf)){
-				perror("VIDIOC_QBUF");
-				return -1 ;
-			}
+	while(!die){
+		int numready = poll(fds,sizeof(fds)/sizeof(fds[0]),1000);
+		if( 0 < numready ){
+			if( fds[0].revents & POLLIN ){
+				struct v4l2_buffer buf ;
+				CLEAR(buf);
+				buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+				buf.memory = V4L2_MEMORY_MMAP;
+				if (-1 == ioctl(fdCamera, VIDIOC_DQBUF, &buf)) {
+					switch (errno) {
+						case EAGAIN:
+							printf( "wait...\n" );
+							break ;
+						case EIO:
+						/* Could ignore EIO, see spec. */
+						/* fall through */
+		
+						default:
+							perror("VIDIOC_DQBUF");
+							return -1 ;
+					}
+				} else {
+					if( yuv && yuv->isOpen() ){
+						yuv->writeInterleaved( (unsigned char const *)bufferMaps[buf.index].addr );
+					}
+					if(0 > ioctl(fdCamera, VIDIOC_QBUF, &buf)){
+						perror("VIDIOC_QBUF");
+						return -1 ;
+					}
+				}
+			} // camera ready
+			if( fds[1].revents & POLLIN ){
+				char inBuf[80];
+				if( fgets(inBuf,sizeof(inBuf),stdin) ){
+					unsigned len = strlen(inBuf);
+					while( 0 < len-- ){
+						if( iscntrl(inBuf[len]) )
+							inBuf[len] = '\0' ;
+						else
+							break;
+					}
+					if( 'q' == tolower(inBuf[0]) ){
+						break;
+					}
+				}
+			} // stdin ready
 		}
-		if( 10 < ++iterations )
-			break;
 	}
    }
    else
