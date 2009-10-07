@@ -190,7 +190,7 @@ jsTouchPoll_t :: jsTouchPoll_t( char const *devName )
    , xSum_( 0 )
    , ySum_( 0 )
 {
-   printf( "touch screen %s %s\n", devName, isOpen() ? "open" : "error opening" );
+   debugPrint( "touch screen %s %s\n", devName, isOpen() ? "open" : "error opening" );
 }
 
 jsTouchPoll_t :: ~jsTouchPoll_t( void )

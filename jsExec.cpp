@@ -909,7 +909,7 @@ int prMain(int argc, char **argv, bool )
 			   if( 0 == strchr(argv[1],':') ){
 				   strcpy(urlPath,"file://");
 				   strcat(urlPath,argv[1]);
-				   printf( "full url: %s\n", urlPath );
+				   debugPrint( "full url: %s\n", urlPath );
 			   } else {
 				   strcpy(urlPath,argv[1]);
 			   }
