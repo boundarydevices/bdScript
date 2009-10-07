@@ -170,6 +170,7 @@ void jsPipeProcess_t::shutdown()
       JS_RemoveRoot( execContext_, &object_ );
       object_ = 0 ;
    }
+   pipeProcess_t::wait();
 }
 
 void jsPipeProcess_t::handleIt( jsval handler, int which )

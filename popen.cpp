@@ -109,7 +109,7 @@ bool popen_t :: getLine
                break;
             }
          }
-         else
+         else if (numEvents != -1)
          {
             close( fd );
             break;

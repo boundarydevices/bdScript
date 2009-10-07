@@ -678,7 +678,7 @@ jsImageRect( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
-         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+         unsigned const pixBytes = width * height * sizeof( unsigned short );
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
             getFB().rect( x1, y1, x2, y2, red, green, blue, pixMap, width, height, width << 1);
@@ -771,7 +771,7 @@ jsImageLine( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval 
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
-         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+         unsigned const pixBytes = width * height * sizeof( unsigned short );
 
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
@@ -828,7 +828,7 @@ jsImageBox( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
          int const height = JSVAL_TO_INT( heightVal );
          JSString *pixStr = JSVAL_TO_STRING( dataVal );
          unsigned char *const pixMap = (unsigned char *)JS_GetStringBytes( pixStr );
-         unsigned const pixBytes = width * height * sizeof( pixMap[0] );
+         unsigned const pixBytes = width * height * sizeof( unsigned short );
 
          if( JS_GetStringLength( pixStr ) == pixBytes )
          {
@@ -1061,7 +1061,7 @@ static JSBool image( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
                   unsigned short *nextOut = pixMap ;
                   for( unsigned r = 0 ; r < h ; r++ )
                      for( unsigned c = 0 ; c < w ; c++ )
-                        *nextOut++ = rgb32 ;
+                        *nextOut++ = fbDevice_t::get16(rgb32) ;
                   JSString *sPix = JS_NewString( cx, (char *)pixMap, pixBytes );
                   JS_DefineProperty( cx, thisObj, "pixBuf",
                                      STRING_TO_JSVAL( sPix ),
