@@ -529,6 +529,7 @@ static int modeFromString( char const *sMode )
    char const *startMode = sMode ;
    
    bool read = false ; bool write = false ;
+   bool create = false ;
    while( *sMode )
    {
       char const c = tolower( *sMode );
@@ -537,6 +538,7 @@ static int modeFromString( char const *sMode )
       {
          case 'r' :  read = true ; break ;
          case 'w' :  write = true ; break ;
+         case '+' :  create = true ; break ;
          default:
             printf( "unknown mode string char : %c\n", c );
       }
@@ -555,6 +557,9 @@ static int modeFromString( char const *sMode )
    }
    else
       printf( "Invalid mode string %s for file\n", startMode );
+
+   if( create )
+	   mode |= O_CREAT ;
 
    mode |= O_NONBLOCK ;
 
