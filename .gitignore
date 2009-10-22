@@ -247,3 +247,4 @@ yuvToRGB
 yuvgz
 test_alsa
 version.cpp
+cameraRead
