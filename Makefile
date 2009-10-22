@@ -1054,6 +1054,11 @@ cameraToYUV: cameraToYUV.cpp pxaYUV.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti $< -o $@ pxaYUV.cpp -Xlinker -Map -Xlinker $@.map $(LIBS) -lstdc++ 
 	$(STRIP) $@
 
+cameraRead: cameraRead.cpp Makefile
+	echo "Building $@"
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti $< -o $@ -Xlinker -Map -Xlinker $@.map $(LIBS) -lstdc++ 
+	$(STRIP) $@
+
 tcpPipe: tcpPipe.cpp Makefile
 	$(CC) -o $@ $< -lsupc++ 
 	$(STRIP) $@
