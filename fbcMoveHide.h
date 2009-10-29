@@ -1,5 +1,5 @@
 #ifndef __FBCMOVEHIDE_H__
-#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.3 2006-10-25 23:27:41 ericn Exp $"
+#define __FBCMOVEHIDE_H__ "$Id: fbcMoveHide.h,v 1.4 2002-12-15 05:44:21 ericn Exp $"
 
 /*
  * fbcMoveHide.h
@@ -15,7 +15,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.h,v $
- * Revision 1.3  2006-10-25 23:27:41  ericn
+ * Revision 1.4  2002-12-15 05:44:21  ericn
+ * -added swapSource() method
+ *
+ * Revision 1.3  2006/10/25 23:27:41  ericn
  * -two-step move
  *
  * Revision 1.2  2006/10/19 03:10:09  ericn
@@ -69,6 +72,8 @@ public:
    inline void skipHide( void );
    void setX( unsigned x );
    inline unsigned getWidth( void ) const ;
+
+   void swapSource( fbImage_t const &img, unsigned srcy );
 
    void dump( void );
 

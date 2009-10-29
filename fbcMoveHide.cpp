@@ -8,7 +8,10 @@
  * Change History : 
  *
  * $Log: fbcMoveHide.cpp,v $
- * Revision 1.3  2006-12-01 22:49:50  tkisky
+ * Revision 1.4  2002-12-15 05:44:24  ericn
+ * -added swapSource() method
+ *
+ * Revision 1.3  2006/12/01 22:49:50  tkisky
  * -include assert
  *
  * Revision 1.2  2006/10/25 23:27:24  ericn
@@ -113,12 +116,10 @@ void fbcMoveHide_t::executed()
 void fbcMoveHide_t::updateCommandList()
 {
    if( !valueBeingSet() ){
-      int prevState = commandState_.state_ ;
       bool changed = false ;
       if( commandState_ != offScreenState_ )
       {
          assert( unknown_e != offScreenState_.state_ );
-//         printf( "moveHide: state %d->%d\n", commandState_.state_, offScreenState_.state_ );
          if( ( onScreenState_.xPos_ != offScreenState_.xPos_ )
              &&
              ( onScreenState_.state_ == visible_e ) ){
@@ -132,21 +133,15 @@ void fbcMoveHide_t::updateCommandList()
       }
 
       if( onScreenState_== commandState_ ){
-//         if( changed )
-//            printf( "!!! skipped state %d to %d\n", prevState, offScreenState_.state_ );
          jump1_->setLength( skipSize_ );
          action_ = skip ;
       }
       else if( visible_e == commandState_.state_ ){
-//         if( changed )
-//            printf( "   now visible from %d\n", prevState );
          blt_->setDestX( commandState_.xPos_ );
          jump1_->setLength( 0 );
          action_ = blt ;
       }
       else {
-//         if( changed )
-//            printf( "   now hidden from %d\n", prevState );
          clr_->setDestX( commandState_.xPos_ );
          jump1_->setLength( clearSize_ );
          action_ = clear ;
@@ -179,6 +174,14 @@ void fbcMoveHide_t::dump( void ){
            "%5u clears\n"
            "%5u skips\n",
            numBlt_, numClear_, numSkip_ );
+}
+
+void fbcMoveHide_t::swapSource( fbImage_t const &src, unsigned srcy )
+{
+   setValueStart();
+   blt_->swapSource( src, srcy );
+   onScreenState_.state_ = unknown_e ;
+   setValueEnd();
 }
 
 #ifdef MODULETEST
