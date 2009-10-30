@@ -108,9 +108,11 @@ bool pipeProcess_t::isAlive(void) const
 int pipeProcess_t::wait( void )
 {
    int exitStat ;
-   pid_t pid = waitpid(childPid_, &exitStat, 0);
-   if( pid == childPid_ ){
-      childPid_ = 0 ;
+   if( 0 <= childPid_ ){
+      pid_t pid = waitpid(childPid_, &exitStat, 0);
+      if( pid == childPid_ ){
+         childPid_ = 0 ;
+      }
    }
    return exitStat ;
 }
