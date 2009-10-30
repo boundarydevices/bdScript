@@ -34,9 +34,9 @@ inputTouchScreen_t::inputTouchScreen_t
    setCooked();
    char const *envExitMs = getenv("TSEXITMS");
    if( envExitMs ){
-      printf( "Exit after %sms of touch\n", envExitMs );
+      debugMsg( "Exit after %sms of touch\n", envExitMs );
       exitMS_ = strtoul(envExitMs,0,0);
-      printf( "%ums\n", exitMS_ );
+      debugMsg( "%ums\n", exitMS_ );
    }
 }
 
@@ -111,7 +111,7 @@ debugPrint( "%s: touch %d:%d\n", __PRETTY_FUNCTION__, x, y );
          mask_ = 0 ; i_ = j_ = 0 ;
       }
    } else {
-      printf( "type %d, code 0x%x, value %d\n",
+      debugMsg( "type %d, code 0x%x, value %d\n",
             event.type, 
             event.code,
             event.value );
