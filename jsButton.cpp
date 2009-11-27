@@ -112,7 +112,7 @@
 #include "audioOutPoll.h"
 #include "ftObjs.h"
 
-typedef struct buttonData_t {
+struct buttonData_t {
    box_t          *box_ ;
    JSObject       *jsObj_ ;
    JSContext      *cx_ ;

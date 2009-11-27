@@ -99,7 +99,7 @@ static gpioHandler_t *handlers_[2] = {
    0, 0
 };
 
-static JSBool jsSetGpio( int &fd, char* device,JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
+static JSBool jsSetGpio( int &fd, char const* device,JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval )
 {
 
    unsigned state;

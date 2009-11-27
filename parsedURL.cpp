@@ -34,6 +34,7 @@
 #include "parsedURL.h"
 #include "ultoa.h"
 #include <stdio.h>
+#include <string.h>
 
 std::string const protocolHTTP_( "http" );
 std::string const protocolHTTPS_( "https" );

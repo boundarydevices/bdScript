@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include "jsGlobals.h"
 #include "codeQueue.h"
+#include <string.h>
+#include <stdlib.h>
 
 struct jsProcess_t : public childProcess_t {
    jsProcess_t( jsval        obj,
@@ -43,6 +45,10 @@ struct jsProcess_t : public childProcess_t {
 
    jsval                obj_ ;
    char const * const   exe_ ;
+};
+
+static char notstring[] = {
+   "notstring"
 };
 
 jsProcess_t :: jsProcess_t
@@ -61,7 +67,7 @@ jsProcess_t :: jsProcess_t
       if( JSVAL_IS_STRING( args[arg] ) )
          charArgs[arg+1] = JS_GetStringBytes( JSVAL_TO_STRING( args[arg] ) );
       else
-         charArgs[arg+1] = "notstring" ;
+         charArgs[arg+1] = notstring ;
    }
    charArgs[nargs+1] = 0 ; // terminate
 

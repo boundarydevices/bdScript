@@ -79,8 +79,12 @@ public:
         flashThread_t *const parent_ ;
 };
 
+static char emptyString[] = {
+   "" 
+};
+
 flashSoundMixer :: flashSoundMixer( flashThread_t *parent )
-   : SoundMixer( "" )  // keep it happy
+   : SoundMixer( emptyString )  // keep it happy
    , parent_( parent )
 {
 }

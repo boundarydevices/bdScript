@@ -905,6 +905,9 @@ int prMain(int argc, char **argv, bool )
                         }
                         else
                         { // limit scope of urlFile
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
 			   char urlPath[PATH_MAX];
 			   if( 0 == strchr(argv[1],':') ){
 				   strcpy(urlPath,"file://");

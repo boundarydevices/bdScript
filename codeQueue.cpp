@@ -93,6 +93,8 @@
 #include <poll.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define MAXARGS 8
 

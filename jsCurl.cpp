@@ -110,6 +110,7 @@
 #include "codeQueue.h"
 #include "ccActiveURL.h"
 #include <unistd.h>
+#include <string.h>
 
 char const * const initializerProp_ = {
    "initializer"

@@ -50,6 +50,8 @@
 #include <stdio.h>
 #include <math.h>
 #include "debugPrint.h"
+#include <stdlib.h>
+#include <string.h>
 
 static curlQueue_t *requestQueue_ = 0 ;
 

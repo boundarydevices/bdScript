@@ -138,7 +138,7 @@ static void gif2PixMap( ColorMapObject const &map,
          for( int column = 0 ; column < image.ImageDesc.Width ; column++, raster++ )
          {
             unsigned const screenX = left + column ;
-            char const colorIdx = *raster ;
+            unsigned const colorIdx = *raster ;
             pixMap[screenY*width+screenX] = rgb16[colorIdx];
          } // for each column
       }
@@ -156,7 +156,7 @@ static void gif2PixMap( ColorMapObject const &map,
             for( int column = 0 ; column < image.ImageDesc.Width ; column++, raster++ )
             {
                unsigned const screenX = left + column ;
-               char const colorIdx = *raster ;
+               unsigned const colorIdx = *raster ;
                pixMap[screenY*width+screenX] = rgb16[colorIdx];
             }
          } // for each row in this pass

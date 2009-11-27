@@ -58,6 +58,7 @@
 #include "semClasses.h"
 #include "jsGlobals.h"
 #include <sys/ioctl.h>
+#include <string.h>
 
 class jsTcpHandler_t : public pollHandler_t {
 public:

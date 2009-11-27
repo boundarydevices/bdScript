@@ -35,6 +35,8 @@
 #include <termios.h>
 #include "baudRate.h"
 #include "debugPrint.h"
+#include <stdlib.h>
+#include <string.h>
 
 class serialPollTimer_t : public pollTimer_t {
 public:

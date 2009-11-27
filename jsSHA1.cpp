@@ -15,6 +15,7 @@
 #include <string>
 #include <stdio.h>
 #include <openssl/sha.h>
+#include <string.h>
 
 /*
  * takes a string as an argument and returns the sha1sum

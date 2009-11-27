@@ -113,6 +113,7 @@
 #include "macros.h"
 #include "hexDump.h"
 #include "madDecode.h"
+#include <string.h>
 
 // #define DEBUGPRINT
 #include "debugPrint.h"

@@ -742,7 +742,7 @@ ccDiskCache_t &getDiskCache( void )
 {
    if( 0 == diskCache )
    {
-      char *path = getenv( "CURLTMPDIR" );
+      char const *path = getenv( "CURLTMPDIR" );
       if( 0 == path )
          path = "/tmp/curl" ;
       
