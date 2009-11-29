@@ -252,13 +252,12 @@ ifneq (,$(findstring arm, $(CC)))
    STRIP=$(CROSS_COMPILE)strip
    OBJCOPY=$(CROSS_COMPILE)objcopy
    LIBS=-L./ -L$(INSTALL_ROOT)/lib
-   IFLAGS= -I$(CONFIG_KERNELPATH)/include \
-          -I../linux-wlan-ng-0.1.16-pre8/src/include/ \
-          -I$(INSTALL_ROOT)/include \
+   IFLAGS= -I$(INSTALL_ROOT)/include \
           -I$(INSTALL_ROOT)/include/mad \
           -I$(INSTALL_ROOT)/include/nspr \
           -I$(INSTALL_ROOT)/include/freetype2 \
-          -I$(TOOLCHAINROOT)/include 
+          -I$(TOOLCHAINROOT)/include \
+	  -idirafter $(CONFIG_KERNELPATH)/include 
    LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
 #   CC=g++
@@ -347,7 +346,7 @@ dirTest: Makefile dirTest.o
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl -lz
 
 curlGet: curlGet.cpp $(LIB) Makefile
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl -lrt
 
 daemonize: daemonize.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o daemonize -O2 -DSTANDALONE $(IFLAGS) daemonize.cpp $(LIBS) -lCurlCache -lstdc++
@@ -357,7 +356,7 @@ urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
 urlTest: urlTest.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl -lcrypto -ldl -lrt
 
 mp3Play: mp3Play.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
@@ -372,7 +371,7 @@ jsExec: jsExec.o $(LIB) .git Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	./makeVersion >> version.cpp
 	echo -e " \" BOARDTYPE;" >> version.cpp
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o version.o -O2 -DSTANDALONE version.cpp
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -g -ggdb -o jsExec jsExec.o version.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -g -ggdb -o jsExec jsExec.o version.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl -lrt
 	$(NM) --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@

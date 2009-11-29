@@ -152,7 +152,7 @@ debugPrint( "curlReader %p (id %x)\n", &arg, pthread_self() );
                if( 0 == result )
                {
                   if( request.https_ ){
-                     result = curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, FALSE);
+                     result = curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, false);
                      if( 0 == result ){
                         result = curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYHOST, 0);
                      }

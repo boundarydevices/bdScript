@@ -512,7 +512,7 @@ bool queueCurlRequest
             useCache = jsUseCache ;
          } // have optional useCache
 
-         struct HttpPost *postHead = 0 ;
+         struct curl_httppost *postHead = 0 ;
 
          jsval     paramArrVal ;
          JSObject *paramArr ;
@@ -525,7 +525,7 @@ bool queueCurlRequest
             JSIdArray *ida = JS_Enumerate( request.cx_, paramArr );
             if( ida )
             {
-               struct HttpPost* paramTail = NULL;
+               struct curl_httppost* paramTail = NULL;
                
                for( int i = 0 ; i < ida->length ; i++ )
                {
