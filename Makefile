@@ -173,7 +173,7 @@ HARDWARE_TYPE += $(CFLAGS)
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o 
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o yuyv.o
 endif
 ifeq (y,$(KERNEL_FB_SM501))
    OBJS += mediaQueue.o sm501Cursor.o 
@@ -185,7 +185,7 @@ endif
 OBJS += jsMouse.o jsCursor.o
 
 ifeq (y,$(KERNEL_FB_SM501))
-OBJS += fbMem.o yuyv.o
+OBJS += fbMem.o 
 SM501LIB = $(INSTALL_ROOT)/lib/libSM501.a
 SM501OBJS = asyncScreenObj.o \
             cylinderShadow.o \
