@@ -27,6 +27,7 @@
 #include <sys/poll.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 popen_t :: popen_t( char const *cmdLine )
    : fIn_( popen( cmdLine, "r" ) ),

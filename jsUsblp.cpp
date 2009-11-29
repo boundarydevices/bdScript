@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <alloca.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
 #define IOCNR_CLRADLER		        12
 #define IOCNR_GETADLER		        13

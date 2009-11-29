@@ -45,7 +45,7 @@ mplayerWrap_t::mplayerWrap_t
    fds_[0] = fds_[1] = fds_[2] = -1 ;
    char geoParam[80];
    geoParam[0] = '\0' ;
-   char *const args[] = {
+   char const *const args[] = {
       "/bin/mplayer"
    ,  "-quiet"
    ,  "-geometry"

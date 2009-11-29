@@ -224,7 +224,7 @@ void freeTypeFont_t :: dump() const
    }
 }
 
-typedef struct glyphData_t {
+struct glyphData_t {
    FT_Int         kern ;
    FT_Int         glyphBitmap_left ;
    FT_Int         glyphAdvanceX ;

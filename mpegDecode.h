@@ -94,7 +94,7 @@ public:
    void const *gop(void) const ;
 
 private:
-   typedef enum state_e {
+   enum state_e {
       end_e,
       processing_e
    };

@@ -207,6 +207,7 @@
 #include <poll.h>
 #include "tickMs.h"
 #include "config.h"
+#include <string.h>
 
 #if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
 #include "videoQueue.h"

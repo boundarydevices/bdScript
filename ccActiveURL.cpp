@@ -56,6 +56,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdlib.h>
 
 static curlCache_t *cache_ = 0 ;
 

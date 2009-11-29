@@ -149,6 +149,7 @@
 #include "jsBitmap.h"
 #include "imageInfo.h"
 #include "imageToPS.h"
+#include <string.h>
 
 #if CONFIG_JSCAIRO == 1
 #include "jsCairo.h"

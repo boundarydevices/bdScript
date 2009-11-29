@@ -37,7 +37,7 @@
 
 class sniffWLAN_t {
 public:
-   typedef struct ap_t {
+   struct ap_t {
       char           ssid_[32];
       unsigned char  apMac_[6];
       unsigned char  bssid_[6];

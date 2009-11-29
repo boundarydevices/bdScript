@@ -34,6 +34,7 @@
  * Copyright Boundary Devices, Inc. 2002
  */
 
+#include <string.h>
 #include <map>
 #include <string>
 #include "dlList.h"

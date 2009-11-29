@@ -38,8 +38,9 @@
 #include "mad.h"
 #include <stdio.h>
 #include "id3tag.h"
+#include <string.h>
 
-typedef struct stats_t {
+struct stats_t {
   int currentframe;   /* current frame being played */
   int framecount;     /* total frames in the file   */
   int bitrate;        /* average bitrate            */

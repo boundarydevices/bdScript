@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <ctype.h>
+#include <string.h>
 
 #define DEBUGPRINT
 #include "debugPrint.h"
