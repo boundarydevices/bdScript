@@ -115,6 +115,12 @@ jsPipeProcess_t::jsPipeProcess_t(
    , signalledExit_( false )
 {
    JS_AddRoot( execContext_, &object_ );
+   JS_AddRoot( execContext_, &onStdin );
+   JS_AddRoot( execContext_, &onStdout );
+   JS_AddRoot( execContext_, &onStderr );
+   JS_AddRoot( execContext_, &onClose );
+   JS_AddRoot( execContext_, &onError );
+   JS_AddRoot( execContext_, &onExit );
 
    debugPrint( "%s: pid %d, in/out/err: %d/%d/%d\n", args[0], pid(), child_stdin(), child_stdout(), child_stderr() );
 
@@ -128,6 +134,13 @@ jsPipeProcess_t::~jsPipeProcess_t( void )
    shutdown();
    if( object_ ){
       JS_RemoveRoot( execContext_, &object_ );
+      JS_RemoveRoot( execContext_, &object_ );
+      JS_RemoveRoot( execContext_, &onStdin );
+      JS_RemoveRoot( execContext_, &onStdout );
+      JS_RemoveRoot( execContext_, &onStderr );
+      JS_RemoveRoot( execContext_, &onClose );
+      JS_RemoveRoot( execContext_, &onError );
+      JS_RemoveRoot( execContext_, &onExit );
       object_ = 0 ;
    }
 }
