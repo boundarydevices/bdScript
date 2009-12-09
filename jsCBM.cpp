@@ -133,7 +133,6 @@ JSClass jsCBMClass_ = {
 };
 
 static JSPropertySpec cbmProperties_[] = {
-  {"deviceId",        CBM_DEVICEID,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 

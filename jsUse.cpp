@@ -50,8 +50,6 @@ JSClass jsUseClass_ = {
 };
 
 static JSPropertySpec libraryProperties_[] = {
-  {"isLoaded",      LIBRARY_ISLOADED,  JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"source",        LIBRARY_SOURCE,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 

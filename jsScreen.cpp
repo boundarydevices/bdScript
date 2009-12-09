@@ -462,8 +462,6 @@ JSClass jsScreenClass_ = {
 };
 
 static JSPropertySpec screenProperties_[] = {
-  {"width",         SCREEN_WIDTH,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"height",        SCREEN_HEIGHT,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 

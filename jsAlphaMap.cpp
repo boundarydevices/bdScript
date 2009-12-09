@@ -438,9 +438,6 @@ JSClass jsAlphaMapClass_ = {
 };
 
 JSPropertySpec alphaMapProperties_[ALPHAMAP_NUMPROPERTIES+1] = {
-  {"width",         ALPHAMAP_WIDTH,     JSPROP_ENUMERATE|JSPROP_PERMANENT },
-  {"height",        ALPHAMAP_HEIGHT,    JSPROP_ENUMERATE|JSPROP_PERMANENT },
-  {"pixBuf",        ALPHAMAP_PIXBUF,    JSPROP_ENUMERATE|JSPROP_PERMANENT },
   {0,0,0}
 };
 

@@ -138,8 +138,6 @@ JSClass jsCurlClass_ = {
 };
 
 static JSPropertySpec curlFileProperties_[] = {
-  {"isLoaded",       CURLFILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"data",           CURLFILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
