@@ -99,7 +99,6 @@ JSClass jsPrinterClass_ = {
 };
 
 static JSPropertySpec printerProperties_[] = {
-  {"deviceId",        PRINTER_DEVICEID,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 

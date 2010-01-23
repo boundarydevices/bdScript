@@ -30,8 +30,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <ctype.h>
+#include <string.h>
 
-// #define DEBUGPRINT
+#define DEBUGPRINT
 #include "debugPrint.h"
 
 usblpPoll_t::usblpPoll_t
@@ -248,46 +249,34 @@ debugPrint( "No space available\n" );
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "ttyPoll.h"
-#include "memFile.h"
+#include "pollHandler.h"
+#include "setSerial.h"
 
 static bool doExit_ = false ;
 
-class myTTY_t : public ttyPollHandler_t {
+class myTTY_t : public pollHandler_t {
 public:
    myTTY_t( pollHandlerSet_t  &set,
             usblpPoll_t       &lp )
-      : ttyPollHandler_t( set, 0 ), lp_( lp ){}
-   virtual void onLineIn( void );
-   virtual void onCtrlC( void );
+      : pollHandler_t( 0, set ), lp_( lp ){
+      setRaw( 0 );
+      fcntl( getFd(), F_SETFL, fcntl( getFd(), F_GETFL) | O_NONBLOCK );
+      setMask( POLLIN );
+      set.add( *this );
+   }
+   virtual void onDataAvail( void );     // POLLIN
 
    usblpPoll_t &lp_ ;
 };
 
-void myTTY_t :: onLineIn( void )
+void myTTY_t :: onDataAvail( void )
 {
-   printf( "ttyIn: %s\n", getLine() );
-   char const *sIn = getLine();
-   if( *sIn )
-   {
-      unsigned const len = strlen( sIn );
-      debugPrint( "--> %s..", sIn );
-      int numWritten = lp_.write( sIn, len );
-      if( numWritten == len ){
-         numWritten = lp_.write( "\r\n", 2 );
-         if( 2 != numWritten )
-            printf( "%d of 2 bytes\n", numWritten, len );
-      }
-      else {
-         printf( "%d of %d bytes written\n", numWritten, len );
-      }
+   char inBuf[256];
+   int numRead ;
+   while(0 <= (numRead = read(getFd(),inBuf,sizeof(inBuf)))){
+      fwrite( inBuf, 1, numRead, stdout );
+      fflush(stdout);
    }
-}
-
-void myTTY_t :: onCtrlC( void )
-{
-   printf( "<ctrl-C>\n" );
-   doExit_ = true ;
 }
 
 int main( int argc, char const * const argv[] )
@@ -296,26 +285,14 @@ int main( int argc, char const * const argv[] )
    usblpPoll_t lp( handlers, DEFAULT_USBLB_DEV, 16384, 4096 );
    if( lp.isOpen() ){
       myTTY_t tty( handlers, lp );
-   
-      for( int arg = 1 ; arg < argc ; arg++ ){
-         memFile_t fIn( argv[arg] );
-         if( fIn.worked() ){
-            int written = lp.write( fIn.getData(), fIn.getLength() );
-            if( (unsigned)written != fIn.getLength() )
-               printf( "%s: %d of %u bytes written\n", argv[arg], written, fIn.getLength() );
-            else
-               printf( "%s: %d bytes written\n", argv[arg], written );
-         }
-         else
-            perror( argv[arg] );
-      }
 
       while( !doExit_ )
       {
          handlers.poll( -1 );
+         lp.onDataAvail();
       }
    
-      printf( "completed\n" ); fflush( stdout );
+      fprintf( stderr, "completed\n" ); fflush( stdout );
    }
    else
       perror( "usblp0" );

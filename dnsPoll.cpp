@@ -34,7 +34,7 @@
 #include "hexDump.h"
 #include "flashVar.h"
 
-typedef struct dnsMsg_t {
+struct dnsMsg_t {
    unsigned short id_ ;
    unsigned short flags_ ;
    unsigned short numQ_ ;

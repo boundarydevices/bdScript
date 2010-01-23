@@ -112,7 +112,7 @@
 #include "audioOutPoll.h"
 #include "ftObjs.h"
 
-typedef struct buttonData_t {
+struct buttonData_t {
    box_t          *box_ ;
    JSObject       *jsObj_ ;
    JSContext      *cx_ ;
@@ -203,21 +203,6 @@ JSClass jsButtonClass_ = {
 };
 
 static JSPropertySpec buttonProperties_[] = {
-  {"isLoaded",          BUTTON_ISLOADED,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"x",                 BUTTON_X,               JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"y",                 BUTTON_Y,               JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"width",             BUTTON_WIDTH,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"height",            BUTTON_HEIGHT,          JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"image",             BUTTON_IMAGE,           JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"touchImage",        BUTTON_TOUCHIMAGE,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"touchSound",        BUTTON_TOUCHSOUND,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"releaseSound",      BUTTON_RELEASESOUND,    JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onTouch",           BUTTON_TOUCHCODE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onMove",            BUTTON_MOVECODE,        JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onMoveOff",         BUTTON_MOVEOFFCODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onRelease",         BUTTON_RELEASECODE,     JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"font",              BUTTON_FONT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"text",              BUTTON_TEXT,            JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 

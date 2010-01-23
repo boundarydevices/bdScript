@@ -224,7 +224,7 @@ mediaQueue_t::~mediaQueue_t( void )
    
 bool mediaQueue_t::started( void ) const 
 { 
-   return 0 != flags_ & STARTED ; 
+   return 0 != (flags_ & STARTED); 
 }
 
 void mediaQueue_t::lockAndClean( queueHeader_t &qh )

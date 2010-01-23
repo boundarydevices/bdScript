@@ -425,7 +425,8 @@
 #include "jsMD5.h"
 #include <fcntl.h>
 #include "jsUsblp.h"
-
+#include "jsSHA1.h"
+#include "version.h"
 #include "touchPoll.h"
 
 #ifdef KERNEL_SOUND
@@ -698,6 +699,13 @@ jsToInt64( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsVersion( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = STRING_TO_JSVAL(JS_NewStringCopyZ(cx, sourceVersion));
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
@@ -707,6 +715,7 @@ static JSFunctionSpec shell_functions[] = {
     {"wdEnable",        jsWdEnable,       0},
     {"getPid",          jsGetPid,         0},
     {"toInt64",         jsToInt64,        0},
+    {"version",         jsVersion,        0},
     {0}
 };
 
@@ -866,6 +875,8 @@ int prMain(int argc, char **argv, bool )
 
                   initJSUsbLp( cx, glob );
 
+                  initJSSHA1(cx,glob);
+
                   getCurlCache();
 
                   JSObject *sArgv = JS_NewArrayObject( cx, 0, NULL );
@@ -902,11 +913,14 @@ int prMain(int argc, char **argv, bool )
                         }
                         else
                         { // limit scope of urlFile
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
 			   char urlPath[PATH_MAX];
 			   if( 0 == strchr(argv[1],':') ){
 				   strcpy(urlPath,"file://");
 				   strcat(urlPath,argv[1]);
-				   printf( "full url: %s\n", urlPath );
+				   debugPrint( "full url: %s\n", urlPath );
 			   } else {
 				   strcpy(urlPath,argv[1]);
 			   }

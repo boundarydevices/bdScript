@@ -207,6 +207,7 @@
 #include <poll.h>
 #include "tickMs.h"
 #include "config.h"
+#include <string.h>
 
 #if defined(CONFIG_JSMPEG) && (1==CONFIG_JSMPEG)
 #include "videoQueue.h"
@@ -1040,7 +1041,7 @@ wrote += numWritten ;
                   if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &lastSampleRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastSampleRate );
 		  else {
-                     fprintf( stderr, "Setting rate3 to %d:%m\n", lastSampleRate );
+                     debugPrint( "setting rate3 to %d:%m\n", lastSampleRate );
 		  }
                }
 
@@ -1128,7 +1129,7 @@ wrote += numWritten ;
                   if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &lastRecordRate ) )
                      fprintf( stderr, "Error setting sampling rate to %d:%m\n", lastRecordRate );
 		  else {
-                     fprintf( stderr, "Setting rate4 to %d:%m\n", lastRecordRate );
+                     debugPrint( "Setting rate4 to %d:%m\n", lastRecordRate );
 		  }
                }
 
@@ -1276,7 +1277,7 @@ printf( "allocate frames: %u x %u\n", width, height );
                                           if( 0 != ioctl( writeFd, SNDCTL_DSP_SPEED, &sampleRate ) )
                                              fprintf( stderr, "Error setting sampling rate to %d:%m\n", sampleRate );
 					  else {
-                                             fprintf( stderr, "Setting rate5 to %d:%m\n", sampleRate );
+                                             debugPrint( "Setting rate5 to %d:%m\n", sampleRate );
 					  }
                                        }
                                     }
@@ -1468,7 +1469,7 @@ audioQueue_t :: audioQueue_t( void )
       if( 0 != ioctl( readFd, SNDCTL_DSP_SPEED, &speed ) )
          fprintf( stderr, ":ioctl(SNDCTL_DSP_SPEED):%u:%m\n", speed );
       else {
-         fprintf( stderr, "Setting rate6 to %u\n", speed );
+         debugPrint( "Setting rate6 to %u\n", speed );
       }
 
       int recordLevel = 0 ;
@@ -1517,7 +1518,7 @@ audioQueue_t :: audioQueue_t( void )
       threadHandle_ = (void *)tHandle ;
    }
    else
-      fprintf( stderr, "Error %m creating curl-reader thread\n" );
+      fprintf( stderr, "Error %m creating audio reader thread\n" );
 }
 
 audioQueue_t :: ~audioQueue_t( void )

@@ -110,6 +110,7 @@
 #include "codeQueue.h"
 #include "ccActiveURL.h"
 #include <unistd.h>
+#include <string.h>
 
 char const * const initializerProp_ = {
    "initializer"
@@ -137,8 +138,6 @@ JSClass jsCurlClass_ = {
 };
 
 static JSPropertySpec curlFileProperties_[] = {
-  {"isLoaded",       CURLFILE_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"data",           CURLFILE_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
@@ -511,7 +510,7 @@ bool queueCurlRequest
             useCache = jsUseCache ;
          } // have optional useCache
 
-         struct HttpPost *postHead = 0 ;
+         struct curl_httppost *postHead = 0 ;
 
          jsval     paramArrVal ;
          JSObject *paramArr ;
@@ -524,7 +523,7 @@ bool queueCurlRequest
             JSIdArray *ida = JS_Enumerate( request.cx_, paramArr );
             if( ida )
             {
-               struct HttpPost* paramTail = NULL;
+               struct curl_httppost* paramTail = NULL;
                
                for( int i = 0 ; i < ida->length ; i++ )
                {

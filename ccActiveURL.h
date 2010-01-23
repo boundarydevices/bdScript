@@ -83,7 +83,7 @@ public:
              bool                   useCache );       // input
 
    void post( std::string const     &url,             // input
-              struct HttpPost       *postHead,        // input : deallocated by worker thread. trash app-side refs
+              struct curl_httppost       *postHead,        // input : deallocated by worker thread. trash app-side refs
               void                  *opaque,          // input
               curlCallbacks_t const &callbacks );     // input
 

@@ -201,6 +201,7 @@ debugPrint( "[%u].fd_ = %d, .mask_ = %x, .events = %x, signals = %x\n", i, fds_[
                unsigned numToShift = numHandlers_-i-1 ;
                memcpy( handlers_+i, handlers_+i+1, numToShift*sizeof(handlers_[0]) );
                memcpy( fds_+i, fds_+i+1, numToShift*sizeof(fds_[0]) );
+               memcpy( deleted_+i, deleted_+i+1,numToShift*sizeof(deleted_[0]) );
             } // shift everything down
    
             ++numDeleted ;

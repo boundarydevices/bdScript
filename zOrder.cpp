@@ -36,6 +36,7 @@
 #endif
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 zOrderMap_t :: zOrderMap_t( void )    // starts off empty
    : width_( SCREENWIDTH() ),

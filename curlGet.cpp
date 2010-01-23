@@ -80,7 +80,7 @@ bool curlGet( char const *url,
 
       if( 0 == result )
       {
-         curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, FALSE);
+         curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYPEER, false);
          curl_easy_setopt(cHandle, CURLOPT_SSL_VERIFYHOST, 0);
          result = curl_easy_setopt( cHandle, CURLOPT_WRITEFUNCTION, writeData );
          if( 0 == result )

@@ -49,16 +49,16 @@ fbImage_t::fbImage_t(
    : mode_(mode)
    , w_( image.width_ )
    , h_( image.height_ )
-   , stride_(((image.width_ * sizeof(unsigned short)) + 0xf)& ~0xf)
-   , ptr_(h_ * stride_)
+   , stride_( ((image.width_+7)/8)*8 )
+   , ptr_( h_*stride_*sizeof(unsigned short) )
 {
    unsigned short const *inPix = (unsigned short const *)image.pixData_ ;
-   unsigned char *outPix = (unsigned char *)ptr_.getPtr();
+   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
    if( outPix && inPix )
    {
       if( rgb565 == mode ){
          for( unsigned y = 0 ; y < h_ ; y++ ){
-            memcpy( outPix, inPix, w_ * sizeof(unsigned short));
+            memcpy( outPix, inPix, w_*sizeof(*outPix));
             outPix += stride_ ;
             inPix  += w_ ;
          }
@@ -66,7 +66,7 @@ fbImage_t::fbImage_t(
       else {
          imgTo4444( inPix, w_, h_, 
                     (unsigned char *)image.alpha_,
-                    (unsigned short *)outPix, stride_ );
+                    outPix, stride_ );
       }
    }
 }
@@ -80,18 +80,20 @@ fbImage_t::fbImage_t(
    : mode_(rgb565)
    , w_( w )
    , h_( h )
-   , stride_(((w * sizeof(unsigned short)) + 0xf) & ~0xf)
-   , ptr_(h_ * stride_)
+   , stride_( ((w+7)/8)*8 )
+   , ptr_( h_*stride_*sizeof(unsigned short) )
 {
    fbDevice_t &fb = getFB();
-   unsigned char const *inPix = ((unsigned char *)fb.getRow(y)) + (x << 1);
-   unsigned char *outPix = (unsigned char *)ptr_.getPtr();
+   unsigned short const *inPix = ((unsigned short const *)fb.getMem()) 
+                                 + y*fb.getWidth()
+                                 + x ;
+   unsigned short *outPix = (unsigned short *)ptr_.getPtr();
    if( outPix )
    {
       for( y = 0 ; y < h_ ; y++ ){
-         memcpy( outPix, inPix, w_ * sizeof(unsigned short));
+         memcpy( outPix, inPix, w_*sizeof(*outPix));
          outPix += stride_ ;
-         inPix  += fb.getStride();
+         inPix  += fb.getWidth();
       }
    }
 }
@@ -100,7 +102,7 @@ fbImage_t::fbImage_t( fbPtr_t &mem, unsigned w, unsigned h ) // from fb mem
    : mode_(rgb565)
    , w_( w )
    , h_( h )
-   , stride_(((w * sizeof(unsigned short)) + 0xf) & ~0xf)
+   , stride_( ((w+7)/8)*8 )
    , ptr_(mem)
 {
 }
@@ -114,9 +116,9 @@ fbImage_t *fbImage_t::scaleHorizontal( unsigned width ) const
    fbImage_t *newOne = new fbImage_t ;
    newOne->mode_   = mode_ ;
    newOne->w_      = width ;
-   newOne->stride_ = (((width * sizeof(unsigned short)) + 0xf) & ~0xf);
+   newOne->stride_ = ((width+7)/8)*8 ;
    newOne->h_      = h_ ;
-   newOne->ptr_    = fbPtr_t( h_ * newOne->stride_);
+   newOne->ptr_    = fbPtr_t( h_ * newOne->stride_ *sizeof(unsigned short) );
 
    assert( mode_ == rgba4444 );
 
@@ -147,8 +149,8 @@ fbImage_t *fbImage_t::scaleHorizontal( unsigned width ) const
             outPix[x] = inPix[inPix0];
       }
 
-      outPix += (newOne->stride_  >> 1);
-      inPix  += (stride_ >> 1);
+      outPix += newOne->stride_ ;
+      inPix  += stride_ ;
    }
    
    return newOne ;

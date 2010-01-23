@@ -44,6 +44,7 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <assert.h>
+#include <stdlib.h>
 
 typedef dictionary_t<std::string> stringDictionary_t ;
 static stringDictionary_t *srcDict_ ;

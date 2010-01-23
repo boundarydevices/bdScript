@@ -28,6 +28,9 @@
 #include <set>
 #include <execinfo.h>
 #include "hexDump.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 typedef std::map<unsigned long,unsigned long> longByLong_t ;
 static longByLong_t traceAddrs_ ;

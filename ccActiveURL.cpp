@@ -56,6 +56,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdlib.h>
 
 static curlCache_t *cache_ = 0 ;
 
@@ -171,7 +172,7 @@ void curlCache_t :: get
 
 void curlCache_t :: post
    ( std::string const     &url,             // input
-     struct HttpPost       *postHead,        // input : deallocated by worker thread. trash app-side refs
+     struct curl_httppost       *postHead,        // input : deallocated by worker thread. trash app-side refs
      void                  *opaque,          // input
      curlCallbacks_t const &callbacks )      // input
 {
@@ -694,7 +695,7 @@ void curlCacheProgress( void         *opaque,
 }
 
 
-static void printPostParams( struct HttpPost *head )
+static void printPostParams( struct curl_httppost *head )
 {
    while( head )
    {
@@ -780,8 +781,8 @@ int main( void )
                char urlBuf[sizeof(inBuf)];
                strcpy( urlBuf, url );
 
-               struct HttpPost* paramHead = NULL;
-               struct HttpPost* paramTail = NULL;
+               struct curl_httppost* paramHead = NULL;
+               struct curl_httppost* paramTail = NULL;
 
                char *param ;
                while( 0 != ( param = strtok_r( 0, " \t", &inBufPtr ) ) )

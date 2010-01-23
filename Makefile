@@ -83,6 +83,7 @@ OBJS = \
        jsURL.o \
        jsUsblp.o \
        jsUse.o \
+       jsSHA1.o \
        logTraces.o \
        md5.o \
        memFile.o \
@@ -172,7 +173,7 @@ HARDWARE_TYPE += $(CFLAGS)
 endif
 
 ifeq (y,$(CONFIG_JSMPEG))
-   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o 
+   OBJS += mpegDecode.o mpegPS.o videoQueue.o videoFrames.o mpDemux.o jsMPEG.o mpegQueue.o aviHeader.o riffRead.o yuyv.o
 endif
 ifeq (y,$(KERNEL_FB_SM501))
    OBJS += mediaQueue.o sm501Cursor.o 
@@ -184,7 +185,7 @@ endif
 OBJS += jsMouse.o jsCursor.o
 
 ifeq (y,$(KERNEL_FB_SM501))
-OBJS += fbMem.o yuyv.o
+OBJS += fbMem.o 
 SM501LIB = $(INSTALL_ROOT)/lib/libSM501.a
 SM501OBJS = asyncScreenObj.o \
             cylinderShadow.o \
@@ -251,13 +252,12 @@ ifneq (,$(findstring arm, $(CC)))
    STRIP=$(CROSS_COMPILE)strip
    OBJCOPY=$(CROSS_COMPILE)objcopy
    LIBS=-L./ -L$(INSTALL_ROOT)/lib
-   IFLAGS= -I$(CONFIG_KERNELPATH)/include \
-          -I../linux-wlan-ng-0.1.16-pre8/src/include/ \
-          -I$(INSTALL_ROOT)/include \
+   IFLAGS= -I$(INSTALL_ROOT)/include \
           -I$(INSTALL_ROOT)/include/mad \
           -I$(INSTALL_ROOT)/include/nspr \
           -I$(INSTALL_ROOT)/include/freetype2 \
-          -I$(TOOLCHAINROOT)/include 
+          -I$(TOOLCHAINROOT)/include \
+	  -idirafter $(CONFIG_KERNELPATH)/include 
    LIB = $(INSTALL_ROOT)/lib/libCurlCache.a
 else
 #   CC=g++
@@ -346,7 +346,7 @@ dirTest: Makefile dirTest.o
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o dirTest dirTest.o $(LIBS) -lstdc++ -lcurl -lz
 
 curlGet: curlGet.cpp $(LIB) Makefile
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o curlGet -O2 -DSTANDALONE $(IFLAGS) curlGet.cpp $(LIBS) -lCurlCache -lcurl -lstdc++ -lz -lm -lssl -lcrypto -ldl -lrt
 
 daemonize: daemonize.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o daemonize -O2 -DSTANDALONE $(IFLAGS) daemonize.cpp $(LIBS) -lCurlCache -lstdc++
@@ -356,7 +356,7 @@ urlTest.o: urlFile.cpp urlFile.h Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o urlTest.o -O2 -DSTANDALONE urlFile.cpp
 
 urlTest: urlTest.o $(LIB)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl -lcrypto -ldl
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o urlTest urlTest.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lm -lpthread -lssl -lcrypto -ldl -lrt
 
 mp3Play: mp3Play.o $(LIB)
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o mp3Play mp3Play.o $(LIBS) -lCurlCache -lstdc++ -lcurl -lz -lmad
@@ -365,9 +365,13 @@ mp3Play: mp3Play.o $(LIB)
 testJS: testJS.cpp $(LIB) Makefile
 	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -o testJS testJS.cpp -DXP_UNIX=1 $(IFLAGS) $(LIBS) -lCurlCache -lstdc++ -ljs  -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lpthread -lm -lz
 
-jsExec: jsExec.o $(LIB) Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
+jsExec: jsExec.o $(LIB) .git Makefile $(LIBBDGRAPH) $(LIBRARYREFS)
 	echo $(KERNEL_BOARDTYPE)
-	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -g -ggdb -o jsExec jsExec.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl
+	echo -n -e "#include \"version.h\"\nchar const * const sourceVersion=\"jsExec version: " > version.cpp
+	./makeVersion >> version.cpp
+	echo -e " \" BOARDTYPE;" >> version.cpp
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -c $(IFLAGS) -o version.o -O2 -DSTANDALONE version.cpp
+	$(CC) $(HARDWARE_TYPE) -D_REENTRANT=1 -g -ggdb -o jsExec jsExec.o version.o $(LIBS) -lCurlCache -L./bdGraph -lbdGraph -lstdc++ -ljs -lcurl -lpng -ljpeg -lungif -lfreetype -lmad -lid3tag -lCurlCache $(MPEG2LIBS) -lflash -lusb -lpthread -lm -lz -lssl -lcrypto -ldl -lrt
 	$(NM) --demangle jsExec | sort >jsExec.map
 	cp $@ $@.prestrip
 	$(STRIP) $@
@@ -1046,6 +1050,16 @@ parsedURL: parsedURL.cpp Makefile
 
 circularLog: circularLog.cpp Makefile
 	$(CC) $(HARDWARE_TYPE) -DSTANDALONE_CIRCULARLOG $(IFLAGS) -DMODULETEST=1 -fno-rtti -o $@ -Xlinker -Map -Xlinker $@.map $< $(LIBS) -ljpeg -lpng -lungif -lz -lbdGraph -lCurlCache -lpthread -lstdc++ 
+	$(STRIP) $@
+
+cameraToYUV: cameraToYUV.cpp pxaYUV.cpp Makefile
+	echo "Building $@"
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti $< -o $@ pxaYUV.cpp -Xlinker -Map -Xlinker $@.map $(LIBS) -lstdc++ 
+	$(STRIP) $@
+
+cameraRead: cameraRead.cpp Makefile
+	echo "Building $@"
+	$(CC) $(HARDWARE_TYPE) $(IFLAGS) -fno-rtti $< -o $@ -Xlinker -Map -Xlinker $@.map $(LIBS) -lstdc++ 
 	$(STRIP) $@
 
 tcpPipe: tcpPipe.cpp Makefile

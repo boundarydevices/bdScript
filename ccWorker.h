@@ -44,7 +44,7 @@ struct curlTransferRequest_t {
    void              *opaque_ ;     // app-specific data
    bool               https_ ;      // flag for HTTPS setup
    char              url_[256];     // url to request, should be absolute
-   struct HttpPost   *postHead_ ;   // post with parameters or NULL. Deallocated by curl thread.
+   struct curl_httppost   *postHead_ ;   // post with parameters or NULL. Deallocated by curl thread.
    bool volatile     *cancel_ ;     // used to tell curl thread to abort
 };
 

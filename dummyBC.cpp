@@ -49,6 +49,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdlib.h>
 
 static unsigned const maxRxSize = 0x200 ;
 

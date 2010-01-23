@@ -19,7 +19,10 @@
  * Change History : 
  *
  * $Log: fbCmdBlt.h,v $
- * Revision 1.4  2006-12-13 21:31:30  ericn
+ * Revision 1.5  2002-12-15 05:38:51  ericn
+ * -added swapSource() method
+ *
+ * Revision 1.4  2006/12/13 21:31:30  ericn
  * -allow re-targeting RAM
  *
  * Revision 1.2  2006/10/16 22:37:08  ericn
@@ -72,6 +75,8 @@ public:
    void moveDestY( int numRows );
 
    unsigned getWidth( void ) const ;
+
+   void swapSource( fbImage_t const &src, unsigned srcy );
 
 private:
    unsigned long * const data_ ;

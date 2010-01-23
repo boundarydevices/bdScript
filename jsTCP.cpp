@@ -58,6 +58,7 @@
 #include "semClasses.h"
 #include "jsGlobals.h"
 #include <sys/ioctl.h>
+#include <string.h>
 
 class jsTcpHandler_t : public pollHandler_t {
 public:
@@ -376,9 +377,6 @@ JSClass jsTCPClientClass_ = {
 };
 
 static JSPropertySpec tcpClientProperties_[] = {
-  {"isConnected",   TCPCLIENT_ISCONNECTED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onLineIn",      TCPCLIENT_ONLINEIN,      JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"onClose",       TCPCLIENT_ONCLOSE,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
