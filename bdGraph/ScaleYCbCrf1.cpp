@@ -252,16 +252,22 @@ void ScaleYCbCrf1::DoLineJPEGf1(BYTE* dest,DWORD* yPtr,DWORD* cbPtr,DWORD* crPtr
 #endif
 }
 
+#define C_1_72200_DIV2	0xdc6a7ef9
+#define C_0_34414	0x58198f1d
+#define C_0_71414	0xb6d1e108
+#define C_1_40200_DIV2 0xb374bc6a
+
 void ScaleYCbCrf1::CreateBitmap(ScaleUpObj* yObj,ScaleUpObj* cbObj,ScaleUpObj* crObj,DWORD srcWidth,DWORD rowCnt,BYTE* dest,DWORD rowWidth)
 {
 	DWORD yDiv = yObj->GetDiv();
 	DWORD cbDiv = cbObj->GetDiv(); cbDiv += (cbDiv<<1);
 	DWORD crDiv = crObj->GetDiv(); crDiv += (crDiv<<1);
 
-	DWORD cbBlueMult  =  GetMult( ((LONG)(((double)1.72200*0x10000000)*8)),cbDiv);
-	DWORD cbGreenMult =  GetMult( ((LONG)(((double)0.34414*0x10000000)*0x10)),cbDiv);
-	DWORD crGreenMult =  GetMult( ((LONG)(((double)0.71414*0x10000000)*0x10)),crDiv);
-	DWORD crRedMult   =  GetMult( ((LONG)(((double)1.40200*0x10000000)*8)),crDiv);
+	DWORD cbBlueMult  =  GetMult( C_1_72200_DIV2, cbDiv);
+	DWORD cbGreenMult =  GetMult( C_0_34414, cbDiv);
+	DWORD crGreenMult =  GetMult( C_0_71414, crDiv);
+	DWORD crRedMult   =  GetMult( C_1_40200_DIV2, crDiv);
+
 	DWORD yMult = GetReciprocal(yDiv);		//0x100000000/yDiv;
 	srcWidth /= 3;
 	while (rowCnt--)
