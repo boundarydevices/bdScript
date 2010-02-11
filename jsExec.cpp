@@ -426,7 +426,7 @@
 #include <fcntl.h>
 #include "jsUsblp.h"
 #include "jsSHA1.h"
-
+#include "version.h"
 #include "touchPoll.h"
 
 #ifdef KERNEL_SOUND
@@ -699,6 +699,13 @@ jsToInt64( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
    return JS_TRUE;
 }
 
+static JSBool
+jsVersion( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+   *rval = STRING_TO_JSVAL(JS_NewStringCopyZ(cx, sourceVersion));
+   return JS_TRUE;
+}
+
 static JSFunctionSpec shell_functions[] = {
     {"queueCode",       jsQueueCode,      0},
     {"nanosleep",       jsNanosleep,      0},
@@ -708,6 +715,7 @@ static JSFunctionSpec shell_functions[] = {
     {"wdEnable",        jsWdEnable,       0},
     {"getPid",          jsGetPid,         0},
     {"toInt64",         jsToInt64,        0},
+    {"version",         jsVersion,        0},
     {0}
 };
 

@@ -15,5 +15,6 @@ if head=`git rev-parse --verify HEAD 2>/dev/null`; then
 		printf -- '-svn%s' "`git-svn find-rev $head`"
 	fi
 else
-	printf "untracked version" ;
+	now=`date +"%Y-%m-%d %H:%M:%S"` ;
+	printf "$now - untracked version"  ;
 fi

@@ -460,8 +460,6 @@ JSClass jsFontClass_ = {
 };
 
 static JSPropertySpec fontProperties_[] = {
-  {"isLoaded",    FONT_ISLOADED,   JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
-  {"data",        FONT_DATA,       JSPROP_ENUMERATE|JSPROP_READONLY|JSPROP_PERMANENT },
   {0,0,0}
 };
 
