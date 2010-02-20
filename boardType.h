@@ -11,6 +11,8 @@
    #define BOARDTYPE "Neon270 board"
 #elif (CONFIG_XENON==1)
    #define BOARDTYPE "Xenon board"
+#elif (KERNEL_MACH_HYDROGEN==1)
+   #define BOARDTYPE "Hydrogen board"
 #else
    #define BOARDTYPE "unknown board"
 #endif
