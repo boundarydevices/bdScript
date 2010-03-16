@@ -248,3 +248,4 @@ yuvgz
 test_alsa
 version.cpp
 cameraRead
+readEntries watchEntries clearEntries
