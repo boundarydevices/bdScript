@@ -210,3 +210,142 @@ int main( int argc, char const * const argv[] )
 }
 
 #endif
+
+#ifdef IMX_JPEG_TO_YUV
+#include "fb2_overlay.h"
+#include "fbDev.h"
+#include "memFile.h"
+#include <linux/videodev2.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <signal.h>
+
+static fb2_overlay_t *fb2_overlay = 0 ;
+
+static fb2_overlay_t &getOverlay(unsigned x, unsigned y, unsigned w, unsigned h)
+{
+    static unsigned prevx = -1U ;
+    static unsigned prevy = -1U ;
+    static unsigned prevw = -1U ;
+    static unsigned prevh = -1U ;
+    if(fb2_overlay && (x == prevx) && (y == prevy) && (w == prevw) && (h == prevh) ){
+        return *fb2_overlay ;
+    }
+    else if( fb2_overlay ){
+        delete fb2_overlay ;
+        fb2_overlay = 0 ;
+    }
+    fb2_overlay = new fb2_overlay_t(x,y,w,h,255,V4L2_PIX_FMT_YUV420);
+    if( fb2_overlay && fb2_overlay->isOpen() ){
+        printf( "created new overlay: %u:%u %ux%u\n", x, y, w, h );
+        prevx = x ;
+        prevy = y ;
+        prevw = w ; 
+        prevh = h ;
+        return *fb2_overlay ;
+    }
+    else {
+        perror("overlay");
+        exit(1);
+    }
+}
+
+static void closeOverlay( void )
+{
+   printf( "closing overlay\n");
+   if( fb2_overlay ){
+       delete fb2_overlay ;
+       fb2_overlay = 0 ;
+   }
+}
+
+static void ctrlcHandler( int signo )
+{
+   printf( "<ctrl-c>(%d)\r\n", signo );
+   exit(1);
+}
+
+static void showImage(void const *pixData, unsigned short width, unsigned short height)
+{
+     fbDevice_t &fb = getFB();
+     if( (height > fb.getHeight()) || (width > fb.getWidth()) ){
+         printf( "too big\n" );
+         return ;
+     }
+     unsigned x = (fb.getWidth()-width)>>1 ;
+     unsigned y = (fb.getHeight()-height)>>1 ;
+     printf( "%ux%u->%ux%u @%u:%u\n", width, height, fb.getWidth(), fb.getHeight(), x, y );
+     fb2_overlay_t &overlay = getOverlay(x,y,width,height);
+     printf( "outSize: %u\n", overlay.getMemSize());
+     unsigned char *yOut = (unsigned char *)overlay.getMem();
+     unsigned char *uOut = yOut + (width*height*2);
+     unsigned char *vOut = uOut + (width*height)/2 ;
+     printf( "offsets: 0x%x, 0x%x\n", uOut-yOut, vOut-yOut );
+     unsigned char const *inData = (unsigned char *)pixData ;
+     for( unsigned row = 0 ; row < height ; row++){
+       for( unsigned col = 0 ; col < width ; col++ ){
+          *yOut++ = *inData++ ;
+          unsigned char c = 
+             *inData++ ;
+          if( row & 1 ){
+             if(0 == (col&1))
+                *uOut++ = c ;
+             else
+                *vOut++ = c ;
+          }
+       }
+     }
+}
+
+static void trimCtrl(char *buf){
+        char *tail = buf+strlen(buf);
+        // trim trailing <CR> if needed
+        while ( tail > buf ) {
+                --tail ;
+                if ( iscntrl(*tail) ) {
+                        *tail = '\0' ;
+                }
+                else
+                        break;
+        }
+}
+
+static void showFile(char const *fileName)
+{
+      memFile_t fIn( fileName );
+      if( fIn.worked() ){
+         printf( "%s: %lu bytes\n", fileName, fIn.getLength() );
+         void const *pixData ;
+         unsigned short width, height ;
+
+         if(jpegToYUV(fIn.getData(), fIn.getLength(), pixData, width, height) ){
+             showImage(pixData,width,height);
+         }
+      }
+      else
+         perror( fileName );
+}
+
+int main( int argc, char const * const argv[] )
+{
+   printf( "Hello, %s\n", argv[0] );
+   atexit( closeOverlay );
+   signal( SIGINT, ctrlcHandler );
+   signal( SIGTERM, ctrlcHandler );
+   signal( SIGKILL, ctrlcHandler );
+   if( 2 <= argc ){
+        for( int arg = 1 ; arg < argc ; arg++ ){
+            showFile(argv[arg]);
+        }
+   }
+
+    char inBuf[80];
+    while(fgets(inBuf,sizeof(inBuf),stdin)){
+        trimCtrl(inBuf);
+        showFile(inBuf);
+    }
+   
+    return 0 ;
+}
+
+#endif

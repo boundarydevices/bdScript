@@ -249,3 +249,26 @@ test_alsa
 version.cpp
 cameraRead
 readEntries watchEntries clearEntries
+*.jpg
+bayer
+bayerToPBM
+bayerToYUV
+*.ppm
+*.yuv
+camera
+*.pbm
+camera_to_fb2
+clearEntries
+devregs
+diffPBM
+fb2_overlay
+flipper
+fourcc
+get_ipu_ch
+i2c-rw
+imx_fb2_test
+imx_ipu_test
+imx_mjpeg_decoder
+imx_vpu_test
+imx_vpu_test_async
+imx_vpu_test_sync

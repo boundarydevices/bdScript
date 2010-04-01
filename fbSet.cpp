@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include "fourcc.h"
 
 int main( int argc, char const * const argv[] )
 {
@@ -31,7 +32,7 @@ int main( int argc, char const * const argv[] )
          if( 0 == err )
          {
             printf( "id %s\n", fixed_info.id );
-            printf( "smem_start %lu\n", fixed_info.smem_start );
+            printf( "smem_start 0x%lx\n", fixed_info.smem_start );
             printf( "smem_len   %u\n", fixed_info.smem_len );
             printf( "type       %u\n", fixed_info.type );
             printf( "type_aux   %u\n", fixed_info.type_aux );
@@ -45,17 +46,17 @@ int main( int argc, char const * const argv[] )
             printf( "accel      %u\n", fixed_info.accel );
             struct fb_var_screeninfo variable_info;
    
-   	      err = ioctl( fd, FBIOGET_VSCREENINFO, &variable_info );
+          err = ioctl( fd, FBIOGET_VSCREENINFO, &variable_info );
             if( 0 == err )
             {
-               printf( "xres              = %u\n", variable_info.xres );			//  visible resolution
+               printf( "xres              = %u\n", variable_info.xres );            //  visible resolution
                printf( "yres              = %u\n", variable_info.yres );
-               printf( "xres_virtual      = %u\n", variable_info.xres_virtual );		//  virtual resolution
+               printf( "xres_virtual      = %u\n", variable_info.xres_virtual );        //  virtual resolution
                printf( "yres_virtual      = %u\n", variable_info.yres_virtual );
-               printf( "xoffset           = %u\n", variable_info.xoffset );			//  offset from virtual to visible
-               printf( "yoffset           = %u\n", variable_info.yoffset );			//  resolution
-               printf( "bits_per_pixel    = %u\n", variable_info.bits_per_pixel );		//  guess what
-               printf( "grayscale         = %u\n", variable_info.grayscale );		//  != 0 Graylevels instead of colors
+               printf( "xoffset           = %u\n", variable_info.xoffset );         //  offset from virtual to visible
+               printf( "yoffset           = %u\n", variable_info.yoffset );         //  resolution
+               printf( "bits_per_pixel    = %u\n", variable_info.bits_per_pixel );      //  guess what
+               printf( "grayscale         = %u\n", variable_info.grayscale );       //  != 0 Graylevels instead of colors
 
                printf( "red               = offs %u, len %u, msbr %u\n",
                        variable_info.red.offset,
@@ -70,15 +71,15 @@ int main( int argc, char const * const argv[] )
                        variable_info.blue.length,
                        variable_info.blue.msb_right );
 
-               printf( "nonstd            = %u\n", variable_info.nonstd );			//  != 0 Non standard pixel format
-               printf( "activate          = %u\n", variable_info.activate );			//  see FB_ACTIVATE_*
-               printf( "height            = %u\n", variable_info.height );			//  height of picture in mm
-               printf( "width             = %u\n", variable_info.width );			//  width of picture in mm
-               printf( "accel_flags       = %u\n", variable_info.accel_flags );		//  acceleration flags (hints)
-               printf( "pixclock          = %u\n", variable_info.pixclock );			//  pixel clock in ps (pico seconds)
-               printf( "left_margin       = %u\n", variable_info.left_margin );		//  time from sync to picture
-               printf( "right_margin      = %u\n", variable_info.right_margin );		//  time from picture to sync
-               printf( "upper_margin      = %u\n", variable_info.upper_margin );		//  time from sync to picture
+               printf( "nonstd            = 0x%x - %s\n", variable_info.nonstd, fourcc_str(variable_info.nonstd) );          //  != 0 Non standard pixel format
+               printf( "activate          = %u\n", variable_info.activate );            //  see FB_ACTIVATE_*
+               printf( "height            = %u\n", variable_info.height );          //  height of picture in mm
+               printf( "width             = %u\n", variable_info.width );           //  width of picture in mm
+               printf( "accel_flags       = %u\n", variable_info.accel_flags );     //  acceleration flags (hints)
+               printf( "pixclock          = %u\n", variable_info.pixclock );            //  pixel clock in ps (pico seconds)
+               printf( "left_margin       = %u\n", variable_info.left_margin );     //  time from sync to picture
+               printf( "right_margin      = %u\n", variable_info.right_margin );        //  time from picture to sync
+               printf( "upper_margin      = %u\n", variable_info.upper_margin );        //  time from sync to picture
                printf( "lower_margin      = %u\n", variable_info.lower_margin );
                printf( "hsync_len         = %u\n", variable_info.hsync_len );		//  length of horizontal sync
                printf( "vsync_len         = %u\n", variable_info.vsync_len );		//  length of vertical sync

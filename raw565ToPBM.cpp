@@ -66,7 +66,7 @@ int main( int argc, char const * const argv[] )
 			} else
 				perror("read(fdIn)");
 		} else
-			fprintf(stderr, "Invalid size %ld for %ux%u image (is it 8-bit Bayer?)\n", fileSize, width, height );
+			fprintf(stderr, "Invalid size %ld for %ux%u image (is it RGB565?)\n", fileSize, width, height );
 		close(fdIn);
 	} else
 		fprintf(stderr, "Usage: %s infile w h outfile\n", argv[0] );
