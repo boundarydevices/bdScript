@@ -24,17 +24,11 @@
 
 class v4l_overlay_t {
 public:
-	enum output_e {
-		outputOverlay = 3,
-		outputRGB = 4
-	};
-    v4l_overlay_t( 
-    	unsigned inw, unsigned inh,
-        unsigned outx, unsigned outy,
-        unsigned outw, unsigned outh,
-	    unsigned transparency, 
-	    output_e output,
-        unsigned long outfmt );
+    v4l_overlay_t( unsigned inw, unsigned inh,
+                   unsigned outx, unsigned outy,
+                   unsigned outw, unsigned outh,
+                   unsigned transparency,       // 0 == opaque, 255 == fully transparent
+                   unsigned fourcc );           // V4L_PIX_blah
     ~v4l_overlay_t( void );
     
     bool isOpen( void ) const { return 0 <= fd_ ; }
@@ -55,6 +49,9 @@ public:
 
     void putBuf( unsigned idx );
 
+    unsigned lastIndex(void) const { return lastIndex_ ; }
+    unsigned numQueued(void) const { return numQueued_ ; }
+
 private:
     enum {
         NUM_BUFFERS = 4
@@ -64,7 +61,6 @@ private:
     void pollBufs(void);
 
     v4l_overlay_t( v4l_overlay_t const & ); // no copies
-    unsigned long outfmt_ ;
     int         fd_ ;
     unsigned    ysize_ ;
     unsigned    uvsize_ ;
@@ -75,7 +71,7 @@ private:
     bool        streaming_ ;
     bool        buffer_avail[NUM_BUFFERS];
     unsigned    next_buf_ ;
-    output_e 	destination_ ;
+    unsigned    lastIndex_ ;
 };
 
 #endif

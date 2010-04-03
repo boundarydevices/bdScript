@@ -24,20 +24,29 @@
 
 class camera_t {
 public:
+	enum rotation_e {
+		ROTATE_NONE = 0,
+		FLIP_VERTICAL = 1,
+		FLIP_HORIZONTAL = 2,
+		FLIP_BOTH = 3,
+		ROTATE_90_RIGHT = 4,
+		ROTATE_90_LEFT = 7
+	};
 	camera_t( char const *devName,
 		  unsigned    width,
 		  unsigned    height,
 		  unsigned    fps,
-		  unsigned    pixelformat );
+		  unsigned    pixelformat,
+		  rotation_e  rotation = ROTATE_NONE );
 	~camera_t(void);
 
-	bool isOpen(void) const { return 0 <= fd_ ; }
-	int getFd(void) const { return fd_ ; }
+	bool isOpen(void) const { return 0 <= fd_ ;}
+	int getFd(void) const { return fd_ ;}
 
-	unsigned getWidth(void) const { return w_ ; }
-	unsigned getHeight(void) const { return h_ ; }
-	unsigned stride(void) const { return fmt_.fmt.pix.bytesperline ; }
-	unsigned imgSize(void) const { return fmt_.fmt.pix.sizeimage ; }
+	unsigned getWidth(void) const { return w_ ;}
+	unsigned getHeight(void) const { return h_ ;}
+	unsigned stride(void) const { return fmt_.fmt.pix.bytesperline ;}
+	unsigned imgSize(void) const { return fmt_.fmt.pix.sizeimage ;}
 
 	// capture interface
 	bool startCapture(void);
@@ -49,22 +58,26 @@ public:
 	void returnFrame(void const *data, int index);
 
 	bool stopCapture(void);
-	
-	unsigned numDropped(void) const { return frame_drops_ ; }
+
+	unsigned numRead(void) const { return numRead_ ;}
+	unsigned numDropped(void) const { return frame_drops_ ;}
+	unsigned lastRead(void) const { return lastRead_ ;}
 private:
 	struct buffer {
-		void *		  start;
-		size_t		  length;
+		void *            start;
+		size_t            length;
 	};
 
-	int			fd_ ;
-	unsigned const      	w_ ;
-	unsigned const      	h_ ;
-	struct pollfd		pfd_ ;
-	struct v4l2_format	fmt_ ;
-	struct buffer		*buffers_ ;
-	unsigned		n_buffers_ ;
-	unsigned		frame_drops_ ;
+	int                     fd_ ;
+	unsigned const          w_ ;
+	unsigned const          h_ ;
+	struct pollfd           pfd_ ;
+	struct v4l2_format      fmt_ ;
+	struct buffer           *buffers_ ;
+	unsigned                n_buffers_ ;
+	unsigned        numRead_ ;
+	unsigned                frame_drops_ ;
+	unsigned        lastRead_ ;
 };
 
 #endif

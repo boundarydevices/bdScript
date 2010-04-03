@@ -24,9 +24,13 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <linux/types.h>
+#include <stdint.h>
+#include <linux/mxc_v4l2.h>
 
 #ifdef ANDROID
 #define LOG_TAG "BoundaryCameraHal"
+#define ERRMSG LOGE
 #else
 #include <stdarg.h>
 inline int errmsg( char const *fmt, ... )
@@ -62,13 +66,16 @@ camera_t::camera_t
 	  unsigned    width,
 	  unsigned    height,
 	  unsigned    fps,
-	  unsigned    pixelformat )
+	  unsigned    pixelformat,
+      rotation_e  rotation )
 	: fd_( -1 )
 	, w_(width)
 	, h_(height)
 	, buffers_(0)
 	, n_buffers_(0)
+    , numRead_(0)
 	, frame_drops_(0)
+    , lastRead_(0xffffffff)
 {
 	struct stat st;
 
@@ -156,12 +163,22 @@ camera_t::camera_t
 		goto bail ;
 	}
 
+    ERRMSG("%s: sizeimage == %u\n", __func__, fmt_.fmt.pix.sizeimage);
+
 	if( (width != fmt_.fmt.pix.width)
 	    ||
 	    (height != fmt_.fmt.pix.height) ){
 		ERRMSG( "%ux%u not supported: %ux%u\n", width, height,fmt_.fmt.pix.width, fmt_.fmt.pix.height);
 		goto bail ;
 	}
+
+    struct v4l2_control rotate_control ; memset(&rotate_control,0,sizeof(rotate_control));
+    rotate_control.id = V4L2_CID_MXC_ROT ;
+    rotate_control.value = rotation ;
+    if( 0 > xioctl(fd_, VIDIOC_S_CTRL, &rotate_control) ){
+        perror( "VIDIOC_S_CTRL(rotation)");
+        goto bail ;
+    }
 
 	struct v4l2_streamparm stream_parm;
 	if (-1 == xioctl (fd_, VIDIOC_G_PARM, &stream_parm)) {
@@ -228,7 +245,7 @@ camera_t::camera_t
 
 		memset(buffers_[n_buffers_].start, 0, fmt_.fmt.pix.sizeimage);
 		if (fmt_.fmt.pix.sizeimage > buf.length)
-			printf("camera_imgsize=%x but buf.length=%x\n", fmt_.fmt.pix.sizeimage, buf.length);
+			ERRMSG("camera_imgsize=%x but buf.length=%x\n", fmt_.fmt.pix.sizeimage, buf.length);
 	}
 	pfd_.fd = fd_ ;
 	pfd_.events = POLLIN ;
@@ -241,6 +258,7 @@ bail:
 }
 
 camera_t::~camera_t(void) {
+    ERRMSG( "in camera destructor");
 	if( buffers_ ) {
 		while( 0 < n_buffers_ ) {
                         struct buffer &buf = buffers_[n_buffers_-1];
@@ -270,6 +288,7 @@ bool camera_t::startCapture(void)
 		buf.type	= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		buf.memory      = V4L2_MEMORY_MMAP;
 		buf.index       = i;
+		buf.m.offset    = 0;
 
 		if (-1 == xioctl (fd_, VIDIOC_QBUF, &buf)) {
 			perror ("VIDIOC_QBUF");
@@ -304,14 +323,16 @@ bool camera_t::grabFrame(void const *&data,int &index) {
 			buf.memory = V4L2_MEMORY_MMAP;
 			int rv ;
 			if (0 == (rv = xioctl (fd_, VIDIOC_DQBUF, &buf))) {
+				++ numRead_ ;
 				if(0 <= index){
 					debugPrint("camera frame drop\n");
-                                        ++frame_drops_ ;
+					++frame_drops_ ;
 					returnFrame(data,index);
 				}
 				assert (buf.index < n_buffers_);
 				data = buffers_[buf.index].start ;
 				index = buf.index ;
+				lastRead_ = index ;
 				continue;
 			}
 			else if ((errno != EAGAIN)&&(errno != EINTR)) {
@@ -328,6 +349,7 @@ bool camera_t::grabFrame(void const *&data,int &index) {
 
 void camera_t::returnFrame(void const *data, int index) {
 	struct v4l2_buffer buf ;
+	memset(&buf,0,sizeof(buf));
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE ;
         buf.memory = V4L2_MEMORY_MMAP;
 	buf.index  = index ;
@@ -408,7 +430,7 @@ static void parseArgs( int &argc, char const **argv )
             			win = create_window(param+1);
 			}
 			else
-				printf( "unknown option %s\n", param );
+				ERRMSG( "unknown option %s\n", param );
 
 			// pull from argument list
 			for( int j = arg+1 ; j < argc ; j++ ){
