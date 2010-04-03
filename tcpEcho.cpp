@@ -27,6 +27,11 @@ int main( int argc, char const * const argv[] )
          myAddress.sin_addr.s_addr = 0 ; // local
          myAddress.sin_port        = htons(strtoul(argv[1],0,0));
    
+         int doit = 1 ;
+         int result = setsockopt( sFd, SOL_SOCKET, SO_REUSEADDR, &doit, sizeof( doit ) );
+         if( 0 != result )
+            fprintf( stderr, "SO_REUSEADDR:%d:%m\n", result );
+         
          if( 0 == bind( sFd, (struct sockaddr *) &myAddress, sizeof( myAddress ) ) )
          {
             if( 0 == listen( sFd, 20 ) )
