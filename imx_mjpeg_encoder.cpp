@@ -16,6 +16,9 @@
 #include "debugPrint.h"
 #include "fourcc.h"
 
+#include <linux/videodev2.h>
+#include <sys/ioctl.h>
+
 #define STREAM_BUF_SIZE		0x80000
 
 static unsigned char lumaDcBits[16] = {
@@ -149,33 +152,37 @@ static unsigned char chromaRQ2[64] = {
 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C,
 };
 
-mjpeg_encoder_t::mjpeg_encoder_t(vpu_t &vpu, unsigned w, unsigned h, unsigned fourcc)
+mjpeg_encoder_t::mjpeg_encoder_t(
+	vpu_t &vpu, 
+	unsigned w, 
+	unsigned h, 
+	unsigned fourcc,
+	int 	 fdCamera,
+	unsigned numBuffers,
+	unsigned char **cameraBuffers)
 	: initialized_(false)
 	, fourcc_(fourcc)
 	, w_(w)
 	, h_(h)
 	, imgSize_(0)
 	, handle_(0)
-	, numQueued_(0)
-	, nextAlloc_(0)
-	, numStarted_(0)
-	, numCompleted_(0)
+	, buffers(cameraBuffers)
+	, yoffs(0)
+	, uoffs(0)
+	, voffs(0)
 {
 	if( (0 == w) || (0 == h) ) {
 		fprintf(stderr, "Invalid w or h (%ux%u)\n", w, h );
 		return ;
 	}
-	fprintf(stderr, "%s: %ux%u\n", __func__, w_, h_ );
+	fprintf(stderr, "%s: %ux%u - %u buffers\n", __func__, w_, h_, numBuffers );
 	vpu_mem_desc mem_desc = {0};
 
 	unsigned ysize ;
-	unsigned yoffs ;
 	unsigned yadder ;
 	unsigned uvsize ;
 	unsigned uvrowdiv ;
 	unsigned uvcoldiv ;
-	unsigned uoffs ; 
-	unsigned voffs ; 
 	unsigned uvadder ;
 	unsigned totalsize ;
 	if( !fourccOffsets(fourcc,w,h,ysize,yoffs,yadder,uvsize,uvrowdiv,uvcoldiv,uoffs,voffs,uvadder,totalsize) ){
@@ -450,15 +457,8 @@ debugPrint( "encoder initialized\n" );
 	}
 
 	debugPrint( "have initial info\n" );
-	fbcount = src_fbid = initinfo.minFrameBufferCount;
-	debugPrint( "fbcount: %d, src %d\n", fbcount, src_fbid );
 
-	fbcount++ ;
-	if( 1 == fbcount ) {
-		debugPrint( "%s: forcing double-buffering\n", __func__ );
-		fbcount++ ;
-	}
-
+	fbcount = numBuffers ;
 	int stride = (picwidth + 15) & ~15 ;
 
 	fb = (FrameBuffer *)calloc(fbcount, sizeof(FrameBuffer));
@@ -469,63 +469,27 @@ debugPrint( "encoder initialized\n" );
 	}
 debugPrint( "allocated FrameBuffer fb: %p\n", fb );
 
-	struct frame_buf *pool = (struct frame_buf *)calloc(fbcount, sizeof(struct frame_buf));
-	if (pool == NULL) {
-		fprintf(stderr,"Failed to allocate frame buffer pool\n");
-		free(fb);
-		IOFreePhyMem(&mem_desc);
-		return ;
-	}
-debugPrint( "allocated frame_buf pool: %p\n", pool );
-
-	pfbpool = (struct frame_buf **)calloc(fbcount, sizeof(struct frame_buf *));
-	if (pfbpool == NULL) {
-		fprintf(stderr,"Failed to allocate pfbpool\n");
-		free(pool);
-		free(fb);
-		IOFreePhyMem(&mem_desc);
-		return ;
-	}
-debugPrint( "allocated frame_buf pfbpool: %p (count %u)\n", pfbpool, fbcount );
-		
 	for (int i = 0; i < fbcount; i++) {
-		struct frame_buf *f = pfbpool[i] = pool + i ;
-debugPrint( "pfbpool[%u] == %p\n", i, pfbpool[i]);
-		f->desc.size = totalsize ;
-		f->desc.size += totalsize / 4;
-		int err = IOGetPhyMem(&f->desc);
-		if (err) {
-			printf("Frame buffer allocation failure: %d\n", err);
-			free(pool);
-			free(fb);
-			IOFreePhyMem(&mem_desc);
-			return ;
-		}
-debugPrint( "allocated frame buffer %u == 0x%x\n", i, f->desc.phy_addr );
-		f->addrY = f->desc.phy_addr + yoffs;
-		f->addrCb = f->desc.phy_addr + uoffs;
-		f->addrCr = f->desc.phy_addr + voffs;
-		f->mvColBuf = f->addrCr;
-		f->desc.virt_uaddr = IOGetVirtMem(&(f->desc));
-debugPrint( "virt == %p\n", f->desc.virt_uaddr );
-		if (f->desc.virt_uaddr <= 0) {
-			free(pool);
-			free(fb);
-			IOFreePhyMem(&f->desc);
-			fprintf(stderr, "Error mapping frame buffer memory\n" );
-			IOFreePhyMem(&mem_desc);
-			return ;
-		}
+		struct v4l2_buffer buf ; memset(&buf,0,sizeof(buf));
 
-		fb[i].bufY = f->addrY;
-		fb[i].bufCb = f->addrCb;
-		fb[i].bufCr = f->addrCr;
+		buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		buf.memory      = V4L2_MEMORY_MMAP;
+		buf.index       = i ;
+
+		if (0 > ioctl (fdCamera, VIDIOC_QUERYBUF, &buf)) {
+			perror ("VIDIOC_QUERYBUF");
+			free(fb);
+			IOFreePhyMem(&mem_desc);
+			return ;
+		}
+		fb[i].bufY = buf.m.offset+yoffs;
+		fb[i].bufCb = buf.m.offset+uoffs;
+		fb[i].bufCr = buf.m.offset+voffs;
 	}
 debugPrint( "registering frame buffer\n" );
 	ret = vpu_EncRegisterFrameBuffer(handle_, fb, fbcount, stride);
 	if (ret != RETCODE_SUCCESS) {
 		fprintf(stderr,"Register frame buffer failed\n");
-		free(pool);
 		free(fb);
 		IOFreePhyMem(&mem_desc);
 		return ;
@@ -555,25 +519,20 @@ mjpeg_encoder_t::~mjpeg_encoder_t(void) {
 	}
 }
 
-bool mjpeg_encoder_t::get_bufs( unsigned char *&y, unsigned char *&u, unsigned char *&v )
+bool mjpeg_encoder_t::get_bufs( unsigned index, unsigned char *&y, unsigned char *&u, unsigned char *&v )
 {
-	if( 2 > numQueued_ ) {
-		struct frame_buf *pfb= pfbpool[nextAlloc_];
-		y = (unsigned char *)(pfb->addrY + pfb->desc.virt_uaddr - pfb->desc.phy_addr);
-		u = (unsigned char *)(pfb->addrCb + pfb->desc.virt_uaddr - pfb->desc.phy_addr);
-		v = (unsigned char *)(pfb->addrCr + pfb->desc.virt_uaddr - pfb->desc.phy_addr);
-		return true ;
-	} else {
-		return false ;
-	}
+	unsigned char *base = buffers[index];
+	y = base + yoffs ;
+	u = base + uoffs ;
+	v = base + voffs ;
+	return true ;
 }
 
-bool mjpeg_encoder_t::encode( void const *&outData, unsigned &outLength)
+bool mjpeg_encoder_t::encode(unsigned index, void const *&outData, unsigned &outLength)
 {
 	EncParam  enc_param = {0};
 
-	enc_param.sourceFrame = &fb[nextAlloc_];
-	nextAlloc_ ^= 1 ;
+	enc_param.sourceFrame = &fb[index];
 	enc_param.quantParam = 23;
 	enc_param.forceIPicture = 0;
 	enc_param.skipPicture = 0;
@@ -583,8 +542,7 @@ bool mjpeg_encoder_t::encode( void const *&outData, unsigned &outLength)
 								ret);
 		return false ;
 	}
-	++numStarted_ ;
-	
+
 	while (vpu_IsBusy()) {
 		vpu_WaitForInt(30);
 		if(vpu_IsBusy()){
@@ -603,91 +561,5 @@ bool mjpeg_encoder_t::encode( void const *&outData, unsigned &outLength)
 	outData = (void *)(virt_bsbuf_addr + outinfo.bitstreamBuffer - phy_bsbuf_addr);
 	outLength = outinfo.bitstreamSize ;
 	return true ;
-}
-
-bool mjpeg_encoder_t::start_encode( void *y, void *u, void *v, void *opaque )
-{
-	if( 2 <= numQueued_ ) {
-		fprintf(stderr, "Invalid call to %s with %u buffers queued\n", __func__, numQueued_ );
-		return false ;
-	}
-	else {
-		app_context_[nextAlloc_] = opaque ;
-		if(0 == numQueued_) {
-			EncParam  enc_param = {0};
-		
-			enc_param.sourceFrame = &fb[nextAlloc_];
-			enc_param.quantParam = 23;
-			enc_param.forceIPicture = 0;
-			enc_param.skipPicture = 0;
-			RetCode ret = vpu_EncStartOneFrame(handle_, &enc_param);
-			if (ret == RETCODE_SUCCESS) {
-				++numStarted_ ;
-				nextComplete_ = nextAlloc_ ;
-debugPrint("q%d:%d\n",nextComplete_,numQueued_);
-				++numQueued_ ;
-				nextAlloc_ ^= 1 ;
-				return true ;
-			}
-			else {
-				fprintf(stderr,"vpu_EncStartOneFrame failed Err code:%d\n",
-										ret);
-				return false ;
-			}
-		} else {
-debugPrint("db%d\n",numQueued_);
-			++numQueued_ ;
-			nextAlloc_ ^= 1 ;
-			return true ;
-		}
-	}
-}
-
-bool mjpeg_encoder_t::encode_complete(void const *&outData, unsigned &outLength, void *&opaque)
-{
-	if( 0 == numQueued_ )
-		return false ;
-	if( !vpu_IsBusy() ) {
-		EncOutputInfo outinfo = {0};
-		RetCode ret = vpu_EncGetOutputInfo(handle_, &outinfo);
-		if (ret != RETCODE_SUCCESS) {
-			fprintf(stderr,"vpu_EncGetOutputInfo failed Err code: %d\n",
-									ret);
-			return false ;
-		}
-
-		++numCompleted_ ;
-
-		outData = (void *)(virt_bsbuf_addr + outinfo.bitstreamBuffer - phy_bsbuf_addr);
-		outLength = outinfo.bitstreamSize ;
-		opaque = app_context_[nextComplete_];
-		--numQueued_ ;
-		nextComplete_ ^= 1 ;
-debugPrint("r%d\n",nextComplete_);
-		if( 0 < numQueued_ ){
-debugPrint( "double-buffered\n" );
-			EncParam  enc_param = {0};
-
-			enc_param.sourceFrame = &fb[nextAlloc_];
-			enc_param.quantParam = 23;
-			enc_param.forceIPicture = 0;
-			enc_param.skipPicture = 0;
-			RetCode ret = vpu_EncStartOneFrame(handle_, &enc_param);
-			if (ret == RETCODE_SUCCESS) {
-				++numStarted_ ;
-debugPrint("Q%d:%d\n",nextComplete_,numQueued_);
-				return true ;
-			}
-			else {
-				fprintf(stderr,"vpu_EncStartOneFrame failed Err code:%d\n",
-										ret);
-				return false ;
-			}
-		}
-		else
-                        return true ;
-	}
-	else
-		return false ;
 }
 

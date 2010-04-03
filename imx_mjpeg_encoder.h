@@ -49,8 +49,14 @@ extern "C" {
 
 class mjpeg_encoder_t {
 public:
-	mjpeg_encoder_t(vpu_t &vpu, unsigned width, unsigned height, unsigned fourcc);
-	
+	mjpeg_encoder_t(vpu_t &vpu, 
+			unsigned width, 
+			unsigned height, 
+			unsigned fourcc, 
+			int fdCamera,
+			unsigned numBuffers,
+			unsigned char **buffers);
+
 	bool initialized( void ) const { return initialized_ ; }
 
 	inline unsigned fourcc(void) const { return fourcc_ ; }
@@ -58,24 +64,14 @@ public:
 	inline unsigned height(void) const { return h_ ; }
 	inline unsigned yuvSize(void) const { return imgSize_ ; }
 
-	bool get_bufs( unsigned char *&y, unsigned char *&u, unsigned char *&v );
+	bool get_bufs( unsigned index, unsigned char *&y, unsigned char *&u, unsigned char *&v );
 
 	// synchronous encode
-	bool encode( void const *&outData, unsigned &outLength);
-
-	// asynchronous encode
-	bool start_encode( void *y, void *u, void *v, void *opaque );
-	bool encode_complete(void const *&outData, unsigned &outLength, void *&opaque);
-
-
-	inline unsigned numQueued(void) const { return numQueued_ ; }
-
-	inline unsigned numStarted(void) const { return numStarted_ ; }
-	inline unsigned numCompleted(void) const { return numCompleted_ ; }
+	bool encode( unsigned index, void const *&outData, unsigned &outLength);
 
 	~mjpeg_encoder_t(void);
 private:
-
+#if 0
 	struct frame_buf {
 		int addrY;
 		int addrCb;
@@ -83,6 +79,7 @@ private:
 		int mvColBuf;
 		vpu_mem_desc desc;
 	};
+#endif
 
 	bool 	  	initialized_ ;
 	unsigned	fourcc_ ;
@@ -94,17 +91,12 @@ private:
 	unsigned	virt_bsbuf_addr;		/* Virtual bitstream buffer */
 	int 		picwidth;	/* Picture width */
 	int 		picheight;	/* Picture height */
-	int 		fbcount;	/* Total number of framebuffers allocated */
-	int 		src_fbid;	/* Index of frame buffer that contains YUV image */
+	unsigned	fbcount;	/* Total number of framebuffers allocated */
 	FrameBuffer	*fb; /* frame buffer base given to encoder */
-	struct frame_buf **pfbpool; /* allocated fb pointers are stored here */
-
-	unsigned 	numQueued_ ;
-	unsigned	nextAlloc_ ;
-	unsigned	nextComplete_ ;
-	void	       *app_context_[2];
-	unsigned	numStarted_ ;
-	unsigned 	numCompleted_ ;
+	unsigned char  **buffers ; /* mmapped */
+	unsigned	yoffs ;
+	unsigned	uoffs ;
+	unsigned	voffs ;
 };
 
 #endif

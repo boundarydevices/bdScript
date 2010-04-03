@@ -37,71 +37,38 @@ extern "C" {
 #define DEBUGPRINT
 #include "debugPrint.h"
 
-static void camera_to_encoder
-	( void const   *input,
-          mjpeg_encoder_t &encoder )
-{
-	unsigned char *y, *u, *v ;
-	if( encoder.get_bufs(y,u,v) ){
-		unsigned ysize ;
-		unsigned yoffs ;
-		unsigned yadder ;
-		unsigned uvsize ;
-		unsigned uvrowdiv ;
-		unsigned uvcoldiv ;
-		unsigned uoffs ; 
-		unsigned voffs ; 
-		unsigned uvadder ;
-		unsigned totalsize ;
-		if( fourccOffsets(encoder.fourcc(),encoder.width(),encoder.height(),ysize,yoffs,yadder,uvsize,uvrowdiv,uvcoldiv,uoffs,voffs,uvadder,totalsize) ){
-			memcpy(y,input,ysize+uvsize+uvsize);
-			return ;
-		} else {
-			fprintf(stderr,"Invalid format: 0x%x\n", V4L2_PIX_FMT_YUV420);
-		}
-	} else {
-		fprintf(stderr, "Error getting yuv bufs\n" );
-	}
-}
-
 int main(int argc, const char **argv) {
 	vpu_t vpu ;
 	if(vpu.worked()) {
 		cameraParams_t params(argc,argv);
 		params.dump();
 		debugPrint( "%ux%u: %u iterations\n", params.getCameraWidth(), params.getCameraHeight(), params.getIterations());
-		mjpeg_encoder_t encoder(vpu,params.getCameraWidth(), params.getCameraHeight(),params.getCameraFourcc());
-		if( encoder.initialized() ){
-			printf( "encoder: %ux%u (strides %ux%u) y%u, uv%u\n", encoder.width(), encoder.height(), encoder.yuvSize() );
-			v4l_overlay_t overlay(params.getCameraWidth(), params.getCameraHeight(),
-					      params.getPreviewX(),params.getPreviewY(),
-					      params.getPreviewWidth(),params.getPreviewHeight(),
-					      params.getPreviewTransparency(), params.getCameraFourcc());
-			if( overlay.isOpen() ){
-				struct timeval tenc_begin,tenc_end, total_start, total_end;
-				int sec, usec;
-				float tenc_time = 0, total_time=0;
-		
-				camera_t camera(params.getCameraDeviceName(),
-						params.getCameraWidth(), 
-						params.getCameraHeight(),
-						params.getCameraFPS(),
-						params.getCameraFourcc(),
-						params.getCameraRotation());
-				if( !camera.isOpen() ) {
-					fprintf(stderr, "Error opening %s\n", params.getCameraDeviceName() );
-					return -1 ;
-				}
-				if( !camera.startCapture() ) {
-					fprintf(stderr, "Error starting capture on %s\n", params.getCameraDeviceName() );
-					return -1 ;
-				}
+		v4l_overlay_t overlay(params.getCameraWidth(), params.getCameraHeight(),
+				      params.getPreviewX(),params.getPreviewY(),
+				      params.getPreviewWidth(),params.getPreviewHeight(),
+				      params.getPreviewTransparency(), params.getCameraFourcc());
+		if( overlay.isOpen() ){
+			struct timeval tenc_begin,tenc_end, total_start, total_end;
+			int sec, usec;
+			float tenc_time = 0, total_time=0;
 	
-	/*
-				open_device();
-				init_device(0,width,height);
-				start_capturing ();
-	*/
+			camera_t camera(params.getCameraDeviceName(),
+					params.getCameraWidth(), 
+					params.getCameraHeight(),
+					params.getCameraFPS(),
+					params.getCameraFourcc(),
+					params.getCameraRotation());
+			if( !camera.isOpen() ) {
+				fprintf(stderr, "Error opening %s\n", params.getCameraDeviceName() );
+				return -1 ;
+			}
+			if( !camera.startCapture() ) {
+				fprintf(stderr, "Error starting capture on %s\n", params.getCameraDeviceName() );
+				return -1 ;
+			}
+			mjpeg_encoder_t encoder(vpu,params.getCameraWidth(), params.getCameraHeight(),params.getCameraFourcc(),camera.getFd(),camera.numBuffers(),camera.getBuffers());
+			if( encoder.initialized() ){
+				printf( "encoder: %ux%u (strides %ux%u) y%u, uv%u\n", encoder.width(), encoder.height(), encoder.yuvSize() );
 				gettimeofday(&total_start, NULL);
 		
 				unsigned maxSize = 0 ;
@@ -111,11 +78,8 @@ int main(int argc, const char **argv) {
 				for( frame_id = 0 ; frame_id < (unsigned)params.getIterations() ; frame_id++ ){
 					void const *cameraBuf ; 
 					int camera_index ;
-	//                              wait_for_frame(cameraBuf,camera_index);
 					while( !camera.grabFrame(cameraBuf,camera_index) )
 						;
-	
-					camera_to_encoder(cameraBuf,encoder);
 	
 					if( params.getSaveFrameNumber() == frame_id ) {
 						FILE *fOut = fopen("/tmp/imx_vpu_test.bayer", "wb");
@@ -132,13 +96,12 @@ int main(int argc, const char **argv) {
 					    overlay.putBuf(ovIndex);
 					} else
 					    printf( "output frame drop\n" );
-					camera.returnFrame(cameraBuf,camera_index);
 	
 					gettimeofday(&tenc_begin, NULL);
 	
 					void const *outData ;
 					unsigned    outLength ;
-					if( encoder.encode(outData,outLength) ){
+					if( encoder.encode(camera_index, outData,outLength) ){
 						if( maxSize < outLength )
 							maxSize = outLength ;
 						gettimeofday(&tenc_end, NULL);
@@ -166,6 +129,7 @@ int main(int argc, const char **argv) {
 						fprintf(stderr, "encode error\n" );
 						break;
 					}
+					camera.returnFrame(cameraBuf,camera_index);
 				}
 		
 				gettimeofday(&total_end, NULL);
@@ -191,10 +155,9 @@ int main(int argc, const char **argv) {
 				       (frame_id / (total_time / 1000000)));
 				printf("max size: %u bytes\n", maxSize );
 			} else
-				fprintf(stderr, "Error opening preview window\n" );
-		} else {
-			fprintf(stderr, "Error initializing MJPEG decoder\n" );
-		}
+				fprintf(stderr, "Error initializing MJPEG decoder\n" );
+		} else
+			fprintf(stderr, "Error opening preview window\n" );
 	}
 
 	return 0 ;

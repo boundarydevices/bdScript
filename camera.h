@@ -1,5 +1,5 @@
 #ifndef __CAMERA_H__
-#define __CAMERA_H__ "$Id$"
+	#define __CAMERA_H__ "$Id$"
 
 /*
  * camera.h
@@ -47,6 +47,8 @@ public:
 	unsigned getHeight(void) const { return h_ ;}
 	unsigned stride(void) const { return fmt_.fmt.pix.bytesperline ;}
 	unsigned imgSize(void) const { return fmt_.fmt.pix.sizeimage ;}
+	unsigned numBuffers(void) const { return n_buffers_ ; }
+	unsigned char **getBuffers(void) const { return buffers_ ; }
 
 	// capture interface
 	bool startCapture(void);
@@ -63,21 +65,17 @@ public:
 	unsigned numDropped(void) const { return frame_drops_ ;}
 	unsigned lastRead(void) const { return lastRead_ ;}
 private:
-	struct buffer {
-		void *            start;
-		size_t            length;
-	};
-
 	int                     fd_ ;
 	unsigned const          w_ ;
 	unsigned const          h_ ;
 	struct pollfd           pfd_ ;
 	struct v4l2_format      fmt_ ;
-	struct buffer           *buffers_ ;
+	unsigned char	        **buffers_ ;
 	unsigned                n_buffers_ ;
-	unsigned        numRead_ ;
+	unsigned		buffer_length_ ;
+	unsigned        	numRead_ ;
 	unsigned                frame_drops_ ;
-	unsigned        lastRead_ ;
+	unsigned        	lastRead_ ;
 };
 
 #endif
