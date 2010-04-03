@@ -19,6 +19,9 @@ extern "C" {
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <malloc.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <asm/types.h>	  /* for videodev2.h */
 
@@ -42,6 +45,24 @@ int main(int argc, const char **argv) {
 	if(vpu.worked()) {
 		cameraParams_t params(argc,argv);
 		params.dump();
+		int udpSocket = -1 ;
+		sockaddr_in remote ;
+		remote.sin_family = AF_INET ;
+                remote.sin_addr.s_addr = 0 ;
+		remote.sin_port = 0; 
+		if(params.getBroadcastAddr() && params.getBroadcastPort()){
+			udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+			if(0 <= udpSocket){
+				remote.sin_addr.s_addr = params.getBroadcastAddr();
+				remote.sin_port = htons(params.getBroadcastPort());
+				int doit = 1 ;
+                                int result = setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &doit, sizeof( doit ) );
+                                if( 0 != result )
+                                        perror( "SO_BROADCAST" );
+			}
+			else
+				perror("socket");
+		}
 		debugPrint( "%ux%u: %u iterations\n", params.getCameraWidth(), params.getCameraHeight(), params.getIterations());
 		v4l_overlay_t overlay(params.getCameraWidth(), params.getCameraHeight(),
 				      params.getPreviewX(),params.getPreviewY(),
@@ -123,6 +144,12 @@ int main(int argc, const char **argv) {
 								fclose(fOut);
 							} else
 								perror( "outFile");
+						}
+						if(0 <= udpSocket) {
+							int err = sendto(udpSocket, outData, outLength, MSG_DONTROUTE|MSG_DONTWAIT,  (struct sockaddr *)&remote, sizeof( remote ) );
+							if( 0 > err ){
+								perror("sendto");
+							}
 						}
 					}
 					else {
