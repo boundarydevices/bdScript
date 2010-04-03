@@ -272,3 +272,17 @@ imx_mjpeg_decoder
 imx_vpu_test
 imx_vpu_test_async
 imx_vpu_test_sync
+informsHost
+ipu_bufs
+nanosleep
+pmic
+raw565ToPBM
+readEntries
+rgb2yuv
+strrev
+strrev.c
+v4l
+v4l_camera
+v4l_output
+v4l_overlay
+watchEntries
