@@ -104,6 +104,11 @@ int main( int argc, char *argv[] )
                remote.sin_addr   = targetIP ;
                remote.sin_port   = htons(targetPort) ;
 
+int doit = 1 ;
+int result = setsockopt( sFd, SOL_SOCKET, SO_BROADCAST, &doit, sizeof( doit ) );
+if( 0 != result )
+   perror( "SO_BROADCAST" );
+
                if( '^' != argv[3][0] )
                {
 		  unsigned len ;
