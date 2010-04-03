@@ -14,6 +14,30 @@
 #include <string.h>
 #include "fourcc.h"
 #include <linux/videodev2.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+static bool parseIP(char const *ip_and_port, unsigned &targetAddr, unsigned short &targetPort)
+{
+	char const *colon = strchr(ip_and_port,':');
+	char ip_address[256];
+	if(colon &&((colon-ip_and_port)<sizeof(ip_address))){
+		unsigned len = colon-ip_and_port ;
+		memcpy(ip_address,ip_and_port,len);
+		ip_address[len] = '\0' ;
+                struct in_addr addr ;
+                if(inet_aton(ip_address, &addr )){
+			unsigned port = strtoul(colon+1,0,0);
+			if(port && (port < 0x10000) ){
+				targetAddr = addr.s_addr ;
+				targetPort = port ;
+				return true ;
+			}
+		}
+	}
+	return false ;
+}
 
 cameraParams_t::cameraParams_t( int &argc, char const **&argv )
 : inwidth(480)
@@ -30,6 +54,8 @@ cameraParams_t::cameraParams_t( int &argc, char const **&argv )
 , previewDevName("/dev/video16")
 , saveFrame(-1)
 , iterations(-1)
+, broadcastAddr(0)
+, broadcastPort(0)
 {
 	for ( int arg = 1 ; arg < argc ; arg++ ) {
 		if ( '-' == *argv[arg] ) {
@@ -90,6 +116,10 @@ cameraParams_t::cameraParams_t( int &argc, char const **&argv )
 			else if ( 't' == cmdchar ) {
 				transparency = strtoul(param+1,0,0);
 			}
+			else if ( 'b' == cmdchar ) {
+				if(!parseIP(param+1,broadcastAddr,broadcastPort))
+					fprintf(stderr, "Invalid broadcast spec (%s), use form 127.0.0.1:2020\n", param+1);
+			}
 			else if ( 'r' == cmdchar ) {
 				switch (tolower(param[1])) {
 					case 'v': rotation = camera_t::FLIP_VERTICAL ; break ;
@@ -124,6 +154,7 @@ cameraParams_t::cameraParams_t( int &argc, char const **&argv )
 					"\t-ow480        - set preview width to 480\n"
 					"\t-oh272        - set preview height to 272\n"
 					"\t-t128         - set transparency 0(opaque) to 255(transparent)\n"
+					"\t-b10.0.0.1:2020 - set broadcast target\n"
 					"\t-rX           - set rotation to X. Choices are:\n"
 					"                      v   - flip vertical\n"
 					"                      h   - flip horizontal\n"

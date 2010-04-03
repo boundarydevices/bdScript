@@ -40,6 +40,10 @@ public:
 	int getSaveFrameNumber(void) const { return saveFrame ; }
 	int getIterations(void) const { return iterations ; }
 
+	// returns 0 for no broadcast
+	unsigned getBroadcastAddr(void) const { return broadcastAddr ; }
+	unsigned short getBroadcastPort(void) const { return broadcastPort ; }
+
 	void dump(void) const ;
 private:
 	unsigned inwidth ;
@@ -56,6 +60,8 @@ private:
 	char const *previewDevName ;
 	int saveFrame ;
 	int iterations ;
+        unsigned broadcastAddr ;
+	unsigned short broadcastPort ;
 };
 
 #endif
