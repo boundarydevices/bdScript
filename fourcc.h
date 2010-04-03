@@ -4,8 +4,9 @@
 /*
  * fourcc.h
  *
- * This header file declares ...
- *
+ * This header file declares a set of utility routines for handling
+ * various graphics formats via their "fourcc" code (a binary string
+ * representation).
  *
  * Change History : 
  *
@@ -53,6 +54,28 @@ void supported_fourcc_formats(unsigned const *&values, unsigned &numValues);
  * line length.
  */ 
 unsigned bits_per_pixel(unsigned fourcc);
+
+/*
+ * Use this to get the size and offsets of the y, u and v portions
+ * of a YUV image format and the increment between samples of u and v.
+ *
+ * Returns false if not a YUV image format.
+ */
+bool fourccOffsets(
+	unsigned fourcc,
+	unsigned width,
+	unsigned height,
+	unsigned &ysize,
+	unsigned &yoffs,
+	unsigned &yadder,
+	unsigned &uvsize,
+	unsigned &uvrowdiv,
+	unsigned &uvcoldiv,
+	unsigned &uoffs, 
+	unsigned &voffs, 
+	unsigned &uvadder,
+	unsigned &totalsize );
+
 
 #endif
 
