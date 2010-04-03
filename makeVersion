@@ -1,6 +1,6 @@
 #!/bin/sh
+now=`date -u '+%Y-%m-%d %H:%M:%S'`
 if head=`git rev-parse --verify HEAD 2>/dev/null`; then
-	now=`date -u '+%Y-%m-%d %H:%M:%S'`
 	printf "$now $head"
 
 	# Are there uncommitted changes?
@@ -15,6 +15,5 @@ if head=`git rev-parse --verify HEAD 2>/dev/null`; then
 		printf -- '-svn%s' "`git-svn find-rev $head`"
 	fi
 else
-	now=`date +"%Y-%m-%d %H:%M:%S"` ;
 	printf "$now - untracked version"  ;
 fi
