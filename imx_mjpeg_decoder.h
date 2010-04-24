@@ -97,6 +97,7 @@ private:
 	int 		phy_slicebuf_size;
 	unsigned long	virt_bsbuf_addr;
 	unsigned long   bsbuf_end;
+	unsigned	numRead ;
 	int 		fbcount;
 	FrameBuffer	*fb;
 	struct frame_buf *pfbpool;

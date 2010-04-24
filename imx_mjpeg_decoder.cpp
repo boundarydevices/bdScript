@@ -37,6 +37,7 @@ mjpeg_decoder_t::mjpeg_decoder_t(vpu_t &vpu)
 	, phy_slicebuf_size(0)
 	, virt_bsbuf_addr(0)
 	, bsbuf_end(0)
+	, numRead(0)
 	, fbcount(0)
 	, fb(0)
 	, pfbpool(0)
@@ -73,9 +74,9 @@ mjpeg_decoder_t::mjpeg_decoder_t(vpu_t &vpu)
 	oparam.bitstreamBufferSize = STREAM_BUF_SIZE;
 	oparam.reorderEnable = 1 ;
 	oparam.mp4DeblkEnable = 0 ;
-
+	oparam.dynamicAllocEnable = 1 ;
 	oparam.psSaveBuffer = 0 ;
-	oparam.psSaveBufferSize = PS_SAVE_SIZE;
+	oparam.psSaveBufferSize = 0 ;
 
 	ret = vpu_DecOpen(&handle_, &oparam);
 	if (ret != RETCODE_SUCCESS) {
@@ -121,6 +122,8 @@ mjpeg_decoder_t::~mjpeg_decoder_t(void) {
 
 bool mjpeg_decoder_t::space_avail( unsigned &length )
 {
+	return STREAM_BUF_SIZE ;
+
 	RetCode ret;
 	PhysicalAddress pa_read_ptr, pa_write_ptr;
 	unsigned long space;
@@ -140,41 +143,13 @@ bool mjpeg_decoder_t::space_avail( unsigned &length )
 
 bool mjpeg_decoder_t::fill_buf( void const *data, unsigned length, void *opaque )
 {
-	RetCode ret;
-	PhysicalAddress pa_read_ptr, pa_write_ptr;
-	unsigned long space;
-	ret = vpu_DecGetBitstreamBuffer(handle_,&pa_read_ptr, &pa_write_ptr,&space);
-debugPrint("vpu_DecGetBitstreamBuffer: %d, %lx.%lx %u bytes avail\n", ret,pa_read_ptr, pa_write_ptr,space);
-	if( RETCODE_SUCCESS != ret ){
-		fprintf(stderr, "Error %d from vpu_DecGetBitstreamBuffer\n", ret );
-		return false ;
-	}
-	else if( space < length ) {
-		debugPrint( "Not enough room (%lu) for %u bytes of input\n", space, length );
-		ret = vpu_DecUpdateBitstreamBuffer(handle_,0);
-		if( RETCODE_SUCCESS != ret ){
-			fprintf(stderr, "Error %d from flagging end of stream vpu_DecUpdateBitstreamBuffer\n", ret );
-		}
-		return false ;
-	}
-	else {
-		debugPrint( "fill in %u bytes of data here (max %lu)\n", length, space );
-		debugPrint( "readFrom %lx, writePtr %lx\n", pa_read_ptr, pa_write_ptr );
-		unsigned long addr = (virt_bsbuf_addr + pa_write_ptr - phy_bsbuf_addr);
-		if (addr+length<=bsbuf_end) {
-			memcpy((void *)addr,data,length);
-		} else {
-			space = bsbuf_end-addr ;
-			memcpy((void*)addr,data,space);
-			memcpy((void*)virt_bsbuf_addr,data,length-space);
-		}
-		ret = vpu_DecUpdateBitstreamBuffer(handle_,length);
-debugPrint("vpu_DecUpdateBitstreamBuffer: %d, %u\n", ret, length );
-		if( RETCODE_SUCCESS != ret ){
-			fprintf(stderr, "Error %d from vpu_DecUpdateBitstreamBuffer\n", ret );
-			return false ;
-		}
+	if( length < STREAM_BUF_SIZE ){
+		memcpy((void *)virt_bsbuf_addr,data,length);
+		numRead = length ;
+		vpu_DecUpdateBitstreamBuffer(handle_,length);
+debugPrint( "copied %u bytes, state == %d\n", length, state_ );
 		if( INIT == state_ ) {
+			RetCode ret;
 			DecInitialInfo initinfo = {0};
 			ret = vpu_DecGetInitialInfo(handle_, &initinfo);
 debugPrint("vpu_DecGetInitialInfo: %d\n", ret);
@@ -285,6 +260,8 @@ debugPrint("before decode: image size %u, ySize %u, uvSize %u\n", yuvSize(), thi
 		}
 		return true ;
 	}
+	else
+		return false ;
 }
 
 void mjpeg_decoder_t::startDecode(void)
@@ -302,6 +279,10 @@ debugPrint("vpu_DecGiveCommand: %d(SET_ROTATOR_OUTPUT)/%d, fb0 (%p)\n", SET_ROTA
 			}
 #endif
 			DecParam decparam = {0};
+			decparam.chunkSize = numRead ;
+			numRead = 0 ;
+			decparam.picStartByteOffset = 0 ;
+			decparam.picStreamBufferAddr = phy_bsbuf_addr ;
 			ret = vpu_DecStartOneFrame(handle_, &decparam);
 					debugPrint("vpu_DecStartOneFrame: %d: %d,%d,%d,%d,%d,%d,%d,%d,%lx\n",
 						ret,
