@@ -81,7 +81,7 @@ debugPrint( "%s: type %d, code 0x%x, value %d\n", __PRETTY_FUNCTION__, event.typ
          isDown_ = (0 != event.value);
       }
    } else if( EV_SYN == event.type ){
-      if( (isDown_ != wasDown_) && (!isDown_) ){
+      if( !isDown_ ){
          wasDown_ = isDown_ ;
 debugPrint( "%s: released\n", __PRETTY_FUNCTION__ );
          onRelease();
