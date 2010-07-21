@@ -93,17 +93,18 @@ mtdCircular_t::mtdCircular_t( char const *devName, void *opaque, validate_line_t
         unsigned numSectors = meminfo_.size / meminfo_.erasesize ;
         debugPrint( "numSectors  0x%lx\n", numSectors );
         int prevSector = -1 ;
-        int curSequence = -1 ;
+        curSequence_ = -1 ;
         for( unsigned i = 0 ; i < numSectors ; i++ ){
             unsigned offset = i*meminfo_.erasesize ;
             if( offset == (unsigned)lseek( fd_, offset, SEEK_SET ) ){
                 int sequence ;
                 if( sizeof(sequence) == read(fd_,&sequence,sizeof(sequence))){
-//                    debugPrint("sector[%u] == %d\n", i, sequence );
-                    if( sequence > curSequence ){
+                    debugPrint("sector[%u] == %d\n", i, sequence );
+                    if( sequence >= curSequence_ ){
                         if( i != curSector_ ){
                             prevSector = curSector_ ;
                         }
+			debugPrint( "best: %d->%d in sector %u\n",curSequence_,sequence, i);
                         curSector_ = i ;
                         curSequence_ = sequence ;
                     }
