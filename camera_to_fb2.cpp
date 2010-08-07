@@ -18,74 +18,8 @@
 
 #define ARRAY_SIZE(__arr) (sizeof(__arr)/sizeof(__arr[0]))
 
-unsigned transparency = 128 ;
-unsigned x = 0 ; 
-unsigned y = 0 ;
-unsigned outwidth = 480 ;
-unsigned outheight = 272 ;
-char const *devName = "/dev/video16" ;
-unsigned numFrames = 4 ; // isn't double-buffering enough?
-unsigned format = V4L2_PIX_FMT_NV12 ;
 bool doCopy = true ;
 bool doSet = false ;
-
-static void parseArgs( int &argc, char const **argv )
-{
-        for ( int arg = 1 ; arg < argc ; arg++ ) {
-                if ( '-' == *argv[arg] ) {
-                        char const *param = argv[arg]+1 ;
-                        char const cmdchar = isalpha(*param) ? tolower(*param) : *param ;
-                        if ( 'o' == cmdchar ) {
-                                char const second = tolower(param[1]);
-                                if ('w' == second) {
-                                        outwidth = strtoul(param+2,0,0);
-                                }
-                                else if ('h'==second) {
-                                        outheight = strtoul(param+2,0,0);
-                                }
-                                else
-                                        printf( "unknown output option %c\n",second);
-                        }
-                        else if ( 'd' == cmdchar ) {
-                                devName = param+1 ;
-                        }
-                        else if ( 'f' == cmdchar ) {
-                                unsigned fcc ; 
-                                if(supported_fourcc(param+1,fcc)){
-                                    format = fcc ;
-                                } else {
-                                    fprintf(stderr, "Invalid format %s\n", param+1 );
-                                    fprintf(stderr, "supported formats include:\n" );
-                                    unsigned const *formats ; unsigned num_formats ;
-                                    supported_fourcc_formats(formats,num_formats);
-                                    while( num_formats-- ){
-                                        fprintf(stderr, "\t%s\n", fourcc_str(*formats));
-                                        formats++ ;
-                                    }
-                                    exit(1);
-                                }
-                        }
-                        else if ( 'x' == cmdchar ) {
-                                x = strtoul(param+1,0,0);
-                        }
-                        else if ( 'y' == cmdchar ) {
-                                y = strtoul(param+1,0,0);
-                        }
-                        else if (('t' == cmdchar)||('a' == cmdchar)) {
-                                transparency = strtoul(param+1,0,0);
-                        }
-                        else
-                                printf( "unknown option %c-%s\n", cmdchar, param );
-
-                        // pull from argument list
-                        for ( int j = arg+1 ; j < argc ; j++ ) {
-                                argv[j-1] = argv[j];
-                        }
-                        --arg ;
-                        --argc ;
-                }
-        }
-}
 
 class stringSplit_t {
 public:
@@ -248,16 +182,56 @@ static void process_command(char *cmd,int fd,void *fbmem,unsigned fbmemsize)
 
 #include <sys/poll.h>
 #include "tickMs.h"
+#include "cameraParams.h"
+
+static void phys_to_fb2
+	( void const     *cameraMem,
+	  fb2_overlay_t  &overlay,
+	  cameraParams_t &params )
+{
+        unsigned camera_bpl = params.getCameraWidth() * 2 ;
+	unsigned char const *cameraIn = (unsigned char *)cameraMem ;
+	unsigned char *fbOut = (unsigned char *)overlay.getMem();
+	unsigned fb_bpl = 2*params.getPreviewWidth();
+	unsigned maxWidth = params.getPreviewWidth()>params.getCameraWidth() ? params.getCameraWidth() : params.getPreviewWidth();
+	unsigned hskip = ((2*params.getPreviewWidth()) <= params.getCameraWidth()) ? params.getCameraWidth()/params.getPreviewWidth() : 0 ;
+	unsigned vskip = (params.getPreviewHeight() < params.getCameraHeight())
+			? (params.getCameraHeight()+params.getPreviewHeight()-1) / params.getPreviewHeight() 
+			: 1 ;
+	for( unsigned y = 0 ; y < params.getCameraHeight(); y += vskip ){
+		if((y/vskip) >= params.getPreviewHeight())
+			break;
+		if(hskip) {
+			for( unsigned mpix = 0 ; mpix*2 < params.getCameraWidth(); mpix++ ){
+				unsigned inoffs = mpix*4*hskip ;
+				unsigned outoffs = mpix*4 ;
+				memcpy(fbOut+outoffs,cameraIn+inoffs,4); // one macropix
+			}
+		} else
+			memcpy(fbOut,cameraIn,2*maxWidth);
+	
+		cameraIn += vskip*camera_bpl ;
+		fbOut += fb_bpl ;
+	}
+}
 
 int main( int argc, char const **argv ) {
-        parseArgs(argc,argv);
+        
+	cameraParams_t params(argc,argv);
+	params.dump();
 
-        printf( "%ux%u at %u:%u, device %s\n", outwidth, outheight,x, y, devName );
-        printf( "format %s\n", fourcc_str(V4L2_PIX_FMT_NV12));
-        fb2_overlay_t overlay(x,y,outwidth,outheight,transparency,V4L2_PIX_FMT_NV12);
+        printf( "format %s\n", fourcc_str(params.getCameraFourcc()));
+        fb2_overlay_t overlay(params.getPreviewX(),
+			      params.getPreviewY(),
+			      params.getPreviewWidth(),
+			      params.getPreviewHeight(),
+			      params.getPreviewTransparency(),
+			      params.getCameraFourcc());
         if ( overlay.isOpen() ) {
                 printf( "overlay opened successfully: %p/%u\n", overlay.getMem(), overlay.getMemSize() );
-                camera_t camera("/dev/video0",outwidth,outheight,30,V4L2_PIX_FMT_NV12);
+                camera_t camera("/dev/video0",params.getCameraWidth(),
+				params.getCameraHeight(),params.getCameraFPS(),
+				params.getCameraFourcc());
                 if (camera.isOpen()) {
                         printf( "camera opened successfully\n");
                         if ( camera.startCapture() ) {
@@ -271,12 +245,19 @@ int main( int argc, char const **argv ) {
                                         void const *camera_frame ;
                                         int index ;
                                         if ( camera.grabFrame(camera_frame,index) ) {
+						if ( (int)totalFrames == params.getSaveFrameNumber() ) {
+							printf( "saving %u bytes of img %u to /tmp/camera.out\n", camera.imgSize(), index );
+							FILE *fOut = fopen( "/tmp/camera.out", "wb" );
+							if( fOut ) {
+								fwrite(camera_frame,1,camera.imgSize(),fOut);
+								fclose(fOut);
+								printf("done\n");
+							} else
+								perror("/tmp/camera.out" );
+						}
                                                 ++totalFrames ;
                                                 ++frameCount ;
-                                                if(doCopy)
-                                                    memcpy(overlay.getMem(), camera_frame,(outwidth*outheight*3)/2);
-                                                else if(doSet)
-                                                    memset(overlay.getMem(), frameCount, outwidth*outheight);
+						phys_to_fb2(camera_frame,overlay,params);
                                                 camera.returnFrame(camera_frame,index);
                                         }
                                         if ( isatty(0) ) {
@@ -293,7 +274,10 @@ int main( int argc, char const **argv ) {
                                                                 long long elapsed = tickMs()-start;
                                                                 if ( 0LL == elapsed )
                                                                         elapsed = 1 ;
-                                                                printf( "%lu frames, start %llu, elapsed %llu %llu fps. %u dropped\n", frameCount, start, elapsed, (frameCount*1000)/elapsed, camera.numDropped() );
+								unsigned whole_fps = (frameCount*1000)/elapsed ;
+								unsigned frac_fps = ((frameCount*1000000)/elapsed)%1000 ;
+                                                                printf( "%lu frames, start %llu, elapsed %llu %u.%03u fps. %u dropped\n", 
+									frameCount, start, elapsed, whole_fps, frac_fps, camera.numDropped() );
                                                                 frameCount = 0 ; start = tickMs();
                                                         }
                                                         else {
