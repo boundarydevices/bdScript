@@ -189,30 +189,33 @@ static void phys_to_fb2
 	  fb2_overlay_t  &overlay,
 	  cameraParams_t &params )
 {
-        unsigned camera_bpl = params.getCameraWidth() * 2 ;
-	unsigned char const *cameraIn = (unsigned char *)cameraMem ;
-	unsigned char *fbOut = (unsigned char *)overlay.getMem();
-	unsigned fb_bpl = 2*params.getPreviewWidth();
-	unsigned maxWidth = params.getPreviewWidth()>params.getCameraWidth() ? params.getCameraWidth() : params.getPreviewWidth();
-	unsigned hskip = ((2*params.getPreviewWidth()) <= params.getCameraWidth()) ? params.getCameraWidth()/params.getPreviewWidth() : 0 ;
-	unsigned vskip = (params.getPreviewHeight() < params.getCameraHeight())
-			? (params.getCameraHeight()+params.getPreviewHeight()-1) / params.getPreviewHeight() 
-			: 1 ;
-	for( unsigned y = 0 ; y < params.getCameraHeight(); y += vskip ){
-		if((y/vskip) >= params.getPreviewHeight())
-			break;
-		if(hskip) {
-			for( unsigned mpix = 0 ; mpix*2 < params.getCameraWidth(); mpix++ ){
-				unsigned inoffs = mpix*4*hskip ;
-				unsigned outoffs = mpix*4 ;
-				memcpy(fbOut+outoffs,cameraIn+inoffs,4); // one macropix
-			}
-		} else
-			memcpy(fbOut,cameraIn,2*maxWidth);
+	if (V4L2_PIX_FMT_YUYV == params.getCameraFourcc()) {
+		unsigned camera_bpl = params.getCameraWidth() * 2 ;
+		unsigned char const *cameraIn = (unsigned char *)cameraMem ;
+		unsigned char *fbOut = (unsigned char *)overlay.getMem();
+		unsigned fb_bpl = 2*params.getPreviewWidth();
+		unsigned maxWidth = params.getPreviewWidth()>params.getCameraWidth() ? params.getCameraWidth() : params.getPreviewWidth();
+		unsigned hskip = ((2*params.getPreviewWidth()) <= params.getCameraWidth()) ? params.getCameraWidth()/params.getPreviewWidth() : 0 ;
+		unsigned vskip = (params.getPreviewHeight() < params.getCameraHeight())
+				? (params.getCameraHeight()+params.getPreviewHeight()-1) / params.getPreviewHeight() 
+				: 1 ;
+		for( unsigned y = 0 ; y < params.getCameraHeight(); y += vskip ){
+			if((y/vskip) >= params.getPreviewHeight())
+				break;
+			if(hskip) {
+				for( unsigned mpix = 0 ; mpix*2 < params.getCameraWidth(); mpix++ ){
+					unsigned inoffs = mpix*4*hskip ;
+					unsigned outoffs = mpix*4 ;
+					memcpy(fbOut+outoffs,cameraIn+inoffs,4); // one macropix
+				}
+			} else
+				memcpy(fbOut,cameraIn,2*maxWidth);
 	
-		cameraIn += vskip*camera_bpl ;
-		fbOut += fb_bpl ;
-	}
+			cameraIn += vskip*camera_bpl ;
+			fbOut += fb_bpl ;
+		}
+	} else
+		printf ("unsupported video format %s\n", fourcc_str(params.getCameraFourcc()));
 }
 
 int main( int argc, char const **argv ) {
