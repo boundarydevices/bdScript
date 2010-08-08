@@ -191,6 +191,9 @@ mjpeg_encoder_t::mjpeg_encoder_t(
 	}
 	imgSize_ = totalsize ;
 
+printf( "%s: fourcc offsets %u/%u/%u, adders %u/%u\n", __func__, yoffs, uoffs,voffs, yadder,uvadder);
+printf( "%s: sizes %u/%u: %u\n", __func__, ysize, uvsize, totalsize);
+
 	/* get physical contigous bit stream buffer */
 	mem_desc.size = STREAM_BUF_SIZE;
 	if (0 != IOGetPhyMem(&mem_desc)) {
@@ -230,7 +233,6 @@ mjpeg_encoder_t::mjpeg_encoder_t(
 
 	encop.initialDelay = 0;
 	encop.vbvBufferSize = 0;        /* 0 = ignore 8 */
-	encop.enableAutoSkip = 1;
 	encop.intraRefresh = 0;
 	encop.sliceReport = 0;
 	encop.mbReport = 0;
@@ -241,11 +243,18 @@ mjpeg_encoder_t::mjpeg_encoder_t(
 	encop.RcIntervalMode= 1;        /* 0:normal, 1:frame_level, 2:slice_level, 3: user defined Mb_level */
 	encop.MbInterval = 0;
 
+	if (uvsize == ysize/2) {
+	    encop.EncStdParam.mjpgParam.mjpg_sourceFormat = 1 ; // YUV422 horizontal
+	} else if (uvsize == ysize/4) {
+	    encop.EncStdParam.mjpgParam.mjpg_sourceFormat = 0 ; // YUV420
+	} else 
+		printf( "%s: unknown input format: %u/%u\n", __func__,ysize,uvsize );
+printf( "%s: mjpg_source format %d\n", __func__, encop.EncStdParam.mjpgParam.mjpg_sourceFormat);
 	encop.ringBufferEnable = 0;
 	encop.dynamicAllocEnable = 0;
 	encop.chromaInterleave = (uoffs < voffs) ? (uoffs+uvsize > voffs)
 						 : (voffs+uvsize > uoffs);
-
+printf( "%s: chroma interleaved: %d\n", __func__, encop.chromaInterleave);
 	Uint8 *qMatTable = encop.EncStdParam.mjpgParam.mjpg_qMatTable = (Uint8*)calloc(192,1);
 	if (qMatTable == NULL) {
 		fprintf(stderr,"Failed to allocate qMatTable\n");
@@ -372,9 +381,6 @@ debugPrint("allocated qMat and huff tables\n");
 	    encop.vbvBufferSize < 0) {
 		printf( "--> bitrate %d, initial delay %d, vbvBufferSize %d\n", encop.bitRate, encop.initialDelay, encop.vbvBufferSize );
 	}
-	if (encop.enableAutoSkip != 0 && encop.enableAutoSkip != 1) {
-		printf( "--> autoskip %d\n", encop.enableAutoSkip );
-	}
 	if (encop.gopSize > 60) {
 		printf( "--> gopSize %d\n", encop.gopSize );
 	}
@@ -459,7 +465,7 @@ debugPrint( "encoder initialized\n" );
 	debugPrint( "have initial info\n" );
 
 	fbcount = numBuffers ;
-	int stride = (picwidth + 15) & ~15 ;
+	int stride = ((picwidth + 15) & ~15)*((0 != encop.EncStdParam.mjpgParam.mjpg_sourceFormat)+1);
 
 	fb = (FrameBuffer *)calloc(fbcount, sizeof(FrameBuffer));
 	if (fb == NULL) {
