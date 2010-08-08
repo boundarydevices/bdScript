@@ -15,11 +15,13 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "fourcc.h"
+#include "imx_mjpeg_encoder.h"
 
 #define ARRAY_SIZE(__arr) (sizeof(__arr)/sizeof(__arr[0]))
 
 bool doCopy = true ;
-bool doSet = false ;
+static char const *fileName = 0 ;
+static bool saveJPEG = false ;
 
 class stringSplit_t {
 public:
@@ -118,11 +120,6 @@ static void process_command(char *cmd,int fd,void *fbmem,unsigned fbmemsize)
                             printf( "%scopying frames to overlay\n", doCopy ? "" : "not " );
                             break;
                         }
-                        case 's': {
-                            doSet = !doSet ;
-                            printf( "%ssetting frames to overlay\n", doSet ? "" : "not " );
-                            break;
-                        }
                         case 'f': {
                                         struct fb_var_screeninfo variable_info;
                                         int err = ioctl( fd, FBIOGET_VSCREENINFO, &variable_info );
@@ -165,11 +162,27 @@ static void process_command(char *cmd,int fd,void *fbmem,unsigned fbmemsize)
                                                 fprintf(stderr, "Usage: y yval [start [end]]\n" );
                                         break;
                                 }
+                        case 's': {
+				if (1 < split.getCount()) {
+					saveJPEG = false ;
+					fileName = strdup(split.getPtr(1));
+				}
+				break;
+			}
+                        case 'j': {
+				if (1 < split.getCount()) {
+					saveJPEG = true ;
+					fileName = strdup(split.getPtr(1));
+				}
+				break;
+			}
                         case '?': {
                                         printf( "available commands:\n"
                                                 "\tf	- flip buffers\n" 
                                                 "\tc	- toggle copy\n" 
                                                 "\ty yval [start [end]] - set y buffer(s) to specified value\n" 
+                                                "\ts filename - save raw data to filename\n" 
+                                                "\tj filename - save JPEG data to filename\n" 
                                                 "\n"
                                                 "most start and end positions can be specified in fractions.\n" 
                                                 "	/2 or 1/2 is halfway into buffer or memory\n" 
@@ -186,6 +199,7 @@ static void process_command(char *cmd,int fd,void *fbmem,unsigned fbmemsize)
 
 static void phys_to_fb2
 	( void const     *cameraMem,
+	  unsigned	  cameraMemSize,
 	  fb2_overlay_t  &overlay,
 	  cameraParams_t &params )
 {
@@ -214,6 +228,12 @@ static void phys_to_fb2
 			cameraIn += vskip*camera_bpl ;
 			fbOut += fb_bpl ;
 		}
+	} else if ((params.getCameraWidth() == params.getPreviewWidth())
+		   &&
+		   (params.getCameraHeight() == params.getPreviewHeight())
+		   &&
+		   (params.getCameraFourcc() == params.getPreviewFourcc())) {
+		memcpy(overlay.getMem(),cameraMem,cameraMemSize);
 	} else
 		printf ("unsupported video format %s\n", fourcc_str(params.getCameraFourcc()));
 }
@@ -248,19 +268,45 @@ int main( int argc, char const **argv ) {
                                         void const *camera_frame ;
                                         int index ;
                                         if ( camera.grabFrame(camera_frame,index) ) {
-						if ( (int)totalFrames == params.getSaveFrameNumber() ) {
-							printf( "saving %u bytes of img %u to /tmp/camera.out\n", camera.imgSize(), index );
-							FILE *fOut = fopen( "/tmp/camera.out", "wb" );
+						if ((0 != fileName) 
+						    || 
+						    ((int)totalFrames == params.getSaveFrameNumber())) {
+							fileName = (0 == fileName) ? "/tmp/camera.out" : fileName ;
+							printf( "saving %u bytes of img %u to %s\n", camera.imgSize(), index, fileName );
+							FILE *fOut = fopen( fileName, "wb" );
 							if( fOut ) {
-								fwrite(camera_frame,1,camera.imgSize(),fOut);
+								if (0 == saveJPEG) {
+									fwrite(camera_frame,1,camera.imgSize(),fOut);
+								} else {
+                                                                        vpu_t vpu ;
+									mjpeg_encoder_t encoder(vpu,camera.getWidth(),
+												camera.getHeight(),
+												params.getCameraFourcc(),
+												camera.getFd(),
+												camera.numBuffers(),
+												camera.getBuffers() );
+
+									if (encoder.initialized()) {
+										void const *jpegData ; unsigned jpegLen ;
+										if (encoder.encode(index,jpegData,jpegLen)) {
+											printf( "encoded %u bytes of JPEG\n", jpegLen);
+											int numWritten = fwrite(jpegData,1,jpegLen,fOut);
+											printf( "wrote %u bytes\n", numWritten);
+										} else 
+											fprintf (stderr, "Error encoding data\n");
+									} else
+										fprintf (stderr, "Error initializing encoder\n" );
+									printf( "save JPEG data here\n" );
+								}
 								fclose(fOut);
 								printf("done\n");
 							} else
 								perror("/tmp/camera.out" );
+							fileName = 0 ;
 						}
                                                 ++totalFrames ;
                                                 ++frameCount ;
-						phys_to_fb2(camera_frame,overlay,params);
+						phys_to_fb2(camera_frame,camera.imgSize(),overlay,params);
                                                 camera.returnFrame(camera_frame,index);
                                         }
                                         if ( isatty(0) ) {
